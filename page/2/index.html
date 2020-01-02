@@ -176,6 +176,129 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/17/redis-on-the-respberry-pi/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/03/17/redis-on-the-respberry-pi/" class="post-title-link" itemprop="url">[翻译]Redis on the Raspberry Pi: adventures in unaligned lands</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-17 15:05:18" itemprop="dateCreated datePublished" datetime="2018-03-17T15:05:18+08:00">2018-03-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><a href="http://antirez.com/news/111" target="_blank" rel="noopener">原文地址</a></p>
+<p>在售出1000万台设备，实际上是诸如传感器和显示器这样无数不同的应用和辅助设备后，可以说树莓派不仅仅是取得了成功，它还成为了一种程序员最喜爱的嵌入式实验平台。像是Pi zero这样的产品也在成为创造硬件产品的平台，且不会引入设计、构建、为车载设备写软件等方面的风险和开销。</p>
+<p>同样地，我也认同Redis是一个程序员乐于去冒险、实验、构建新事物的平台。而且，能用于嵌入式/物联网应用的设备，通常会有暂时或长期存储数据的需求，像是从传感器接收到的数据，需要在这台设备上运算的数据，或是要发往远程服务器的数据。Redis正在加入一种Stream数据类型，非常适合流式数据和时间序列存储，撰写本文时（2017年初）这个特性快要完成了，后续工作会在接下来几周内开始。Redis现存的数据结构，以及新增的Stream类型，以及它较小的内存使用，以及它即使在小型硬件（低功耗）上也能提供相当不错的性能，都让Redis看起来非常适合应用在树莓派，进而是其它小型ARM设备上。中间缺失的部分也很明显：在树莓派上把Redis跑起来。</p>
+<p>树莓派的一个很酷的特点就是，它的开发环境不像过去的嵌入式系统那样，它上面跑的就是正常的Linux，还包括各种Debian系的工具。简单地说在树莓派上适配Redis不算很困难。Linux程序移植到树莓派上最常见的问题就是性能或内存占用不匹配，但在Redis上这不是问题，因为它本身就被设计为：空实例只占用1MB内存，且查询请求会走内存，因此它足够快，也不会给闪存太高的压力，而且在需要持久化时，它只会用AOF（Append Only File）。但树莓派上用的是ARM处理器，意味着我们要小心处理未对齐的内存访问。</p>
+<p>本文会展示我为了让Redis能愉快地跑在树莓派上都做了什么，我会试着给出一个如何应对那些不能透明地处理非对齐内存访问的平台上（不像x86）的概述。</p>
+<h1 id="关于ARM处理器"><a href="#关于ARM处理器" class="headerlink" title="关于ARM处理器"></a>关于ARM处理器</h1><p>将Redis移植到ARM的过程中，最有趣的事情就是，ARM处理器不太喜欢未对齐的内存访问。如果你一直在用高阶语言，你可能不太了解内存对齐。历史上许多处理器都不能读写地址不是字长整数倍的内存数据。所以如果字长是4字节（32位处理器下），你可以读写0x4、0x8等等地址的数据，但0x7就不行。如果你真这么做了，取决你的CPU和配置，有时程序会抛异常，有时是奇怪的行为。</p>
+<p>之后x86统治了世界，大家几乎忘了这件事（除非要用SSE指令时，不过这些指令也有不需要对齐的版本）。当然，一开始大家没有真的忘记这件事，因为x86处理器可以读写未对齐的内存而不出错，但会带来性能损失：跨字长边界的一次读写可能被拆成两次读写。但近期的x86优化将非对齐访问的性能损失降到了最低，几乎与对齐访问相当，现在非对齐访问对x86来说真的不是事儿了。</p>
+<p>直到ARMv5，ARM平台上非对齐访问还是会引发奇怪的非预期行为，文档是这么说的：“如果地址不是4的整数倍，LDR指令会返回一个旋转后的结果，而不是真的跨字长读取。通常这个结果不符合程序员的预期。”旋转当然不是程序员预期的。初代树莓派用的已经是ARMv6了，它能处理非对齐访问，当然会带来性能损失。但它在处理未对齐的多倍字长的指令时会抛异常，因总线错误而终止程序，或求助于内核（后面会详述）。这意味着Redis在树莓派上运行的时候不会马上挂掉，因为Redis大多数访问都恰好是一个字长。但随着时间推移，编译器产生了多倍字长的读写指令以加速运算，或是Redis自己也会试着读写未对齐的64位数据。理论程序会崩溃，当然Linux还能帮上点忙。</p>
+<h1 id="不要崩溃，求助内核！"><a href="#不要崩溃，求助内核！" class="headerlink" title="不要崩溃，求助内核！"></a>不要崩溃，求助内核！</h1><p>当Linux内核运行在ARM上时，它能帮助进程在访问未对齐内存时也能得到预期的结果，即使CPU本身都不支持。方法是在内核态注册这类异常的handler：内核会检查失败的指令，再通过handler来模拟它运行，从而得到预期的结果，也能让犯错的进程恢复运行。</p>
+<p>如果你想深入底层编程，这个Linux内核代码文件值得一看：<a href="http://lxr.free-electrons.com/source/arch/arm/mm/alignment.c" target="_blank" rel="noopener">http://lxr.free-electrons.com/source/arch/arm/mm/alignment.c</a></p>
+<p>内核在CPU抛非对齐访问错误时的行为受到/proc/cpu/alignment的控制：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ cat &#x2F;proc&#x2F;cpu&#x2F;alignment</span><br><span class="line">User:		0</span><br><span class="line">System:		12590 (ip6_datagram_recv_common_ctl+0xc8&#x2F;0xd4 [ipv6])</span><br><span class="line">Skipped:	0</span><br><span class="line">Half:		0</span><br><span class="line">Word:		0</span><br><span class="line">DWord:		0</span><br><span class="line">Multi:		12590</span><br><span class="line">User faults:	2 (fixup)</span><br></pre></td></tr></table></figure>
+
+<p>如你所见，被内核纠正非对齐访问的错误分成了多个计数器，用户态和内核态都有。上例中内核空间纠正了12590次访问，而用户空间没有纠正过。注意“User faults”是内核如何处理CPU非对齐访问错误的配置：修正、发SIGBUS信号、或记录在内核日志中。我们可以向/proc/cpu/alignment中写一个整数，其中每位控制一种行为，例如我们只需要记录内核日志（不只是修正），就可以执行<code>echo 3 &gt; /proc/cpu/alignment</code>，第1位是允许记录日志，第2位是允许修正。</p>
+<p>我的感觉是，这个功能不只是内核开发者担心用户空间的程序员没办法处理非对齐访问，而是内核自己也不能保证都是对齐访问（看“System”计数器）。所以打开这个功能是解决Linux程序移植ARM的最简单方法，而不是检查每一块代码，确保所有访问都对齐。</p>
+<p>有人可能会受到这个功能的诱惑，说，那就没什么要做的了呗，只要我们把/proc/cpu/alignment设置对，Redis就能按预期那样工作了。但其实不然，看下面2个原因：</p>
+<ol>
+<li>当发生非对齐访问，内核修正时，整个执行速度会<strong>非常</strong>慢，要比底层拆成多次对齐访问还要慢得多。即使它只在非对齐的多倍字长的读写指令中发生，也会导致此时Redis速度远低于预期。</li>
+<li>内核模拟ARM非对齐访问的实现不太完美，在Linux4.4.34版本中，它无法处理某些GCC编译出的指令。</li>
+</ol>
+<p>下面是一个普通的例子：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">$ <span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> **argv)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">int</span> count = <span class="number">1000</span>;</span><br><span class="line">        <span class="keyword">char</span> *buf = <span class="built_in">malloc</span>(count*<span class="keyword">sizeof</span>(<span class="keyword">double</span>));</span><br><span class="line">        <span class="keyword">double</span> sum = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">double</span> *l = (<span class="keyword">double</span>*) (buf+<span class="number">1</span>);</span><br><span class="line">        <span class="keyword">while</span>(count--) &#123;</span><br><span class="line">                l++;</span><br><span class="line">                sum += *l;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ gcc foo.c -g -ggdb</span><br><span class="line">$ .&#x2F;a.out</span><br><span class="line">Bus error</span><br></pre></td></tr></table></figure>
+
+<p>即使我的树莓派配置成修正非对齐访问的错误，我的程序仍然收到了SIGBUS信号！我们通过GDB看下错误是哪里发生的：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ gdb .&#x2F;a.out</span><br><span class="line">(gdb) run</span><br><span class="line"></span><br><span class="line">Program received signal SIGBUS, Bus error.</span><br><span class="line">0x00010484 in main (argc&#x3D;1, argv&#x3D;0xbefff3b4) at foo.c:10</span><br><span class="line">10	                sum +&#x3D; *l;</span><br></pre></td></tr></table></figure>
+
+<p>错误发生在循环内解引用一个未对齐的double指针处，符合预期。我们再检查一下引发异常的ARM指令：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">(gdb) x&#x2F;i $pc</span><br><span class="line">&#x3D;&gt; 0x10484 &lt;main+100&gt;:	vldr	d6, [r11, #-20]	; 0xffffffec</span><br></pre></td></tr></table></figure>
+
+<p>VLDR指令是将内存地址对应的数据加载到一个扩展寄存器中，用于浮点运算。因某些原因，Linux内核关于修正非对齐访问错误的代码不能处理这条指令（我猜就是没实现完全）。“dmesg”命令可以显示这条指令无法被handler识别，进而修正：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[317778.925569] Alignment trap: not handling instruction ed937b00 at [&lt;00010480&gt;]</span><br><span class="line">[317778.925610] Unhandled fault: alignment exception (0x011) at 0x01cb8011</span><br></pre></td></tr></table></figure>
+
+<p>所以，如果树莓派默认的C编译器可能会生成Linux内核默认不能处理的指令，我就真的想让Redis在关掉内核配置时也能正常运行。这就意味着ARM上跑的Redis保证只访问按字长对齐的内存，只有这样CPU才能正确处理。</p>
+<h1 id="修复bug"><a href="#修复bug" class="headerlink" title="修复bug"></a>修复bug</h1><p>既然树莓派上的ARM能处理大多数的非对齐访问，Redis似乎已经可以在大多数情况下工作了。尤其是内核被默认配置为修正很多非对齐访问的错误时。即使这种修正被关掉了，Redis表面上也能工作。但此时测试会跑出很多进程崩溃的情况，尤其是在位运算和哈希函数中。</p>
+<p>Redis要做的第一件事是在编译到不支持非对齐访问的平台时定义<code>USE_ALIGNED_ACCESS</code>宏。之后就是修改一堆代码以避免关键路径上的非对齐访问，或将指针解引用替换为<code>memcpy()</code>。你可能觉得用<code>memcpy()</code>要比直接解引用慢，但事实上前者要更好：对于固定大小的内存拷贝，如<code>memcpy(src, dst, sizeof(uint64_t))</code>，编译器会智能地将函数访问替换为一组能处理非对齐访问的最快的指令。例如，在x86处理器上，这次函数调用会被翻译成单次MOV指令。</p>
+<p>在做完这些修复工作后，Redis和我的两个树莓派（一个是初代模型B，一个是快得多的Pi 3）开始成了好朋友：所有测试都通过了，但其中一个在崩溃报告中生成了调用栈（当然我正要修复这个问题），随着时间推移，集成测试有了一些错误，原因是树莓派在启动master和slave时太慢了。但此时我对正确性的欲望受到了刺激，我想解决更多对齐的问题。</p>
+<h1 id="多走一步：SPARC"><a href="#多走一步：SPARC" class="headerlink" title="多走一步：SPARC"></a>多走一步：SPARC</h1><p>就在我修复ARM上Redis的问题时，Github仓库中还有些issue是关于如何让Rdis正常运行在Solaris/SPARC上。SPARC不像ARM那样友善，它无法处理<strong>任何</strong>非对齐访问。我记得很清楚，在我第一年学习C语言时，我买了一个非常旧的SPARC 4工作站：大端，且无法处理任何非对齐访问。它带给我一些程序移植相关的观点。羞愧的是几个月后我不小心将伏特加洒到了上面，烧坏了主板，但它现在还在我父母的房子中。</p>
+<p>在Solaris/SPARC上处理非对齐访问要比Linux/ARM上复杂得多：根据编译选项，内核总是能处理32位的非对齐访问，而64位的非对齐访问可以通过注册一个用户态陷阱来处理。Sun工作站的C编译器有特定选项来精确控制这类行为，甚至还有能简单发现并修复这类访问的工具。</p>
+<p>如果Redis中很少有不等于字长的非对齐访问，你就可以预期其中到处都是等于字长的非对齐访问。但从我在OpenBSD/SPARC上用Redis3.0开始测试和修复后，随着时间推移，情况不是这样了。最大的问题是哈希函数，原版的Redis字符串库，称为SDS，有着固定大小的头，所以在哈希key的时候总是对齐的。但从Redis3.2开始SDS头不再是固定大小了。此外自我在一年前在SPARC上测试Redis后，又出现了其它非对齐访问的情况。</p>
+<p>为了修复哈希函数的问题，我转而用了SipHash，也为了避免HashDos攻击。但值得一提的是我现在用的是C和D轮数量减少的SipHash变种：SipHash1-2。这是为了避免其它方面不正常的性能回退。但据我所知还没有实质上对SipHash1-2的攻击，总之要比我们之前用的Murmurhash2更安全————考虑到有可能产生种子碰撞时它太弱了。</p>
+<p>我在使用的SipHash实现参见文后链接，我简化了一些代码，且将其改为大小写不敏感。它被设计为能处理非对齐访问，且与字节序无关。我第一次看到一个哈希函数的参考实现能写得这么好。</p>
+<p>因为一位好心的Redis用户为我提供了一个Solaris/SPARC系统的访问权限，SPARC上的剩余修正工作简化了很多。在修正未对齐访问的过程中，我还尝试了修正Solaris/SPARC上Redis的构建和测试，一般来说这也是一项很好的移植性提升练习。这项任务完成后，Redis至少就其独立代码而言终于是“对齐安全”的了。</p>
+<h1 id="树莓派-Redis的性能"><a href="#树莓派-Redis的性能" class="headerlink" title="树莓派+Redis的性能"></a>树莓派+Redis的性能</h1><p>回到树莓派上。在其上Redis能跑多快？既然树莓派的硬件不只一种，这个问题的答案也不只一个。在Pi 3上Redis令人吃惊的快。我的测试是通过loopback做的，因为树莓派上的Redis主要是针对本地程序，或作为IPC（进程间通信）和云与端之间信息交互的消息总线（这里说的云是指应用的中心服务器，端是指应用的本地实例），但当通过以太网访问时，Redis跑的依然很快。</p>
+<p>Pi 3上的性能数字：</p>
+<ul>
+<li>测试1：一百万key（均匀分布）上的五百次写。关闭持久化，关闭流水线。28000次/秒。</li>
+<li>测试2：类似于测试1，但每8个操作一组通过流水线。80000次/秒。</li>
+<li>测试3：类似于测试1，但有只追加持久化（AOF），每秒一次<code>fsync</code>。23000次/秒。</li>
+<li>测试4：类似于测试3，但过程中有覆盖写。21000次/秒。</li>
+</ul>
+<p>基本上Pi 3上的Redis的速度可以满足任何使用场景。考虑到Redis主要是单线程使用，或在启用AOF日志时双线程使用（有个背景线程），你可以预期在达到以上性能的同时，其它进程依然能在树莓派上运行。也就是说：上面的数字并没有榨干树莓派。</p>
+<p>而在初代模型B上情况<strong>很</strong>不一样，Redis的速度要慢得多，例如关闭流水线时只有2000次/秒，打开流水线时15000次/秒。这之间的巨大差别看起来指向了需要上下文切换的系统操作————如读和写————效率太低。但这个数字对大多数应用也足够用了，因为Redis大多数时间不是用来服务外部实例的，也因为当有需要做高负载数据记录时，我们可以简单地打开流水线。</p>
+<p>但此时我还没在我最感兴趣的设备（除了Pi 3）上做测试，那就是Pi zero。看一下它能跑多快还是挺有趣的，应该会比我现在用的模型B要好。</p>
+<h1 id="树莓派的未来（原文是continuity，但我倾向于翻译成未来）"><a href="#树莓派的未来（原文是continuity，但我倾向于翻译成未来）" class="headerlink" title="树莓派的未来（原文是continuity，但我倾向于翻译成未来）"></a>树莓派的未来（原文是continuity，但我倾向于翻译成未来）</h1><p>我乐于让Redis很好地跑在树莓派上的原因之一，是我很兴奋看到像Pi zero这样的树莓派逐渐成为物联网开发平台。我指的是针对最终用户的成品（原文是“I mean even finished products intended for the final user”，不太会翻译）。我抑制不住地去想如果我有时间的话，能在硬件领域做些什么：传感器，显示器，GPIO端口，以及它们能极大简化组建硬件创业公司的低廉价格，以及我爱的“全世界的骇客们现在能创造出不同的智能应用”的想法。我想参与进来，即使稍微做一点，比如为树莓派提供很棒的Redis体验（未来还包括Android和其它基于ARM的系统）。Redis很好地结合了低资源需求、只追加操作、同时适用于写入和分析的数据模型（从而能针对历史数据做决策），我真的相信它能在这个过程中帮到我们。</p>
+<p>所以从现在开始树莓派就是我使用Redis的主要目标平台之一了，像是最初被设定为Redis“标准”的Linux服务器。未来几周内我会继续我的修正工作，这些修正会进入Redis4.0。同时我也会在Redis的官方网站上新写一个章节，包括所有与Redis和树莓派有关的信息：不同设备上的测试数据，最佳实践，等等。</p>
+<p>也许未来我也会发布关于“代理”概念的证明，它的目的是将Redis用于物联网设备和云服务器之间的数据总线，允许设备只将数据写入Redis，而代理会负责在连到外网时将数据搬到云端，同时从设备那获取命令并回复。结合Redis4.2新增的Stream结构后这会更有意思。</p>
+<p>我很想知道那些Redis能帮上忙的嵌入式应用，以及我能为它做些什么。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/15/cpp-object-model-pod/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2013,154 +2136,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/09/30/why-global-static-singleton-var-evil/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2017/09/30/why-global-static-singleton-var-evil/" class="post-title-link" itemprop="url">为什么全局变量、静态变量、单例不好</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2017-09-30 14:38:34" itemprop="dateCreated datePublished" datetime="2017-09-30T14:38:34+08:00">2017-09-30</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="全局变量"><a href="#全局变量" class="headerlink" title="全局变量"></a>全局变量</h2><p>很多人都知道代码中要尽量避免使用全局变量，那么全局变量有什么问题，为什么大家觉得它不好？因为全局变量是一种全局状态，而可变的全局状态破坏了理想的程序。</p>
-<h3 id="理想的程序"><a href="#理想的程序" class="headerlink" title="理想的程序"></a>理想的程序</h3><p>理想情况下：</p>
-<ol>
-<li>整个程序是由一个个相互独立的组件（模块或函数或对象）组成，组件的设计遵循“高内聚低耦合”，不同的组件之间仅在必要时通过公开接口交互，任意两个组件间的通信链路是清晰明确的。组件间的依赖关系因此也是清晰的。</li>
-<li>我们可以替换掉任意组件而不影响其它组件的运行，从而注入我们的逻辑。尤其是在测试中，我们可以mock掉任意组件，从而控制程序的行为，达到我们的测试目的。</li>
-<li>程序不存在未定义行为，任意组件的行为都是可预测的，尤其是组件的初始化顺序是确定的。</li>
-<li>从代码角度，组件的逻辑要有局部性，即逻辑相关的代码是在一起的，尽量减少阅读时的跳跃次数。</li>
-</ol>
-<h3 id="全局状态的问题"><a href="#全局状态的问题" class="headerlink" title="全局状态的问题"></a>全局状态的问题</h3><ol>
-<li>全局状态是暴露在外面的，任何地方都可以访问，你没有办法约束这种行为，破坏了封装性。另一方面，可以认为全局状态也侵入到了访问它的组件中，也破坏了这些组件的封装性。尤其是如果一个const方法访问了全局变量，它可能就算不上const方法了。</li>
-<li>两个组件如果访问了相同的全局状态，它们实际上就耦合在一起了，独立性被破坏了。</li>
-<li>组件交互的链路不再清晰，理想链路上的任意两个组件都可能通过某个全局状态交互。</li>
-<li>全局状态往往会被并发访问，这就要求全局状态一定要具备线程安全性。但这一点不是总能被很好的保证的。尤其是两个分别保证了线程安全性的全局状态，不代表一起使用时还是线程安全的，还需要额外的同步手段。某种程序上，这种同步也会影响程序的性能。</li>
-<li>全局状态最讨厌的是，它导致测试很难写。首先，很难控制所有的全局状态，因此很难把环境弄干净，测试结果可能被任何一个漏掉的全局状态所影响。其次，全局状态是难以替换的，也就意味着mock和逻辑注入非常困难，甚至导致一些测试无法实现。</li>
-</ol>
-<p>C++中全局变量还有一个问题：不同编译单元的全局变量不保证初始化顺序，当你在一个全局变量的构造过程中访问另一个全局变量，很可能会进入未定义状态。</p>
-<p>有一个笑话说：C++中全局变量的名字前缀用什么最好？答案是//。</p>
-<h3 id="哪些全局状态是有价值的"><a href="#哪些全局状态是有价值的" class="headerlink" title="哪些全局状态是有价值的"></a>哪些全局状态是有价值的</h3><p>当然全局变量也有一些场合是有价值的：</p>
-<ol>
-<li>常量。如果一个全局状态在运行期不可变，且我们不需要替换它的逻辑，它就是相对安全的。但不可忽视的是，它仍然可能破坏了组件间的依赖关系。对于非编译期常量来说，初始化顺序的问题依然存在。</li>
-<li>某些模块使用全局状态会极大降低实现复杂度，以至于可以忽略上面说的这些缺点。比如Logger或Trace系统，它们往往不需要替换，同时所有组件都依赖它们，如果不实现为全局状态的话实现上会很复杂。</li>
-<li>写生命期极短的脚本。对此我持怀疑态度，因为有太多预期很快弃用的脚本最终却在线上跑了很久。</li>
-</ol>
-<p>即使是这些场合下，仍然可能有不用全局变量的方法。</p>
-<h3 id="全局状态的替代方法"><a href="#全局状态的替代方法" class="headerlink" title="全局状态的替代方法"></a>全局状态的替代方法</h3><p>一种比较好的方式就是ContextObject，即我们在程序的最上层（比如main函数）构造一个持有变量、资源或配置的对象，它会作为下级模块的环境被传递下去。好处：</p>
-<ol>
-<li>保证了封装性，ContextObject的传递是通过正常的函数调用或对象构造。</li>
-<li>保证了变量的初始化顺序，ContextObject持有的所有成员的初始化都是在它的函数里进行的，因此初始化顺序是确定的。</li>
-<li>容易mock，现在我们只要传递一个不同的ContextObject，就可以改变下级模块依赖的所有组件的行为，很容易构造出不同的测试场景。</li>
-</ol>
-<h2 id="静态变量"><a href="#静态变量" class="headerlink" title="静态变量"></a>静态变量</h2><p>对C++而言，这里说的静态变量指三种静态变量：</p>
-<ol>
-<li>匿名命名空间中的变量。</li>
-<li>类的static成员变量。</li>
-<li>函数中的局部静态变量。</li>
-</ol>
-<h3 id="匿名命名空间中的变量"><a href="#匿名命名空间中的变量" class="headerlink" title="匿名命名空间中的变量"></a>匿名命名空间中的变量</h3><p>本质上，这种变量仍然是全局变量，只不过范围更小，更可控。相比全局变量，它对封装性、独立性、代码局部性的危害比较小。但它对可测性的危害仍然在，甚至比全局变量还大：你没办法从外面访问到它，连修改的机会都没有。</p>
-<h3 id="类的static成员变量"><a href="#类的static成员变量" class="headerlink" title="类的static成员变量"></a>类的static成员变量</h3><p>对于类的private静态成员而言，其它组件没有办法访问到它，因此它与匿名命名空间中的变量/函数类似，对封装性、独立性、代码局部性都有一定保证，而缺点也是不利于测试。如果是static const成员变量，不需要测试，就没有这个缺点了，是可以放心使用的。</p>
-<p>对于类的public静态成员而言，无论是成员变量还是方法，都属于全局状态，全局状态的缺点它一个都不少。</p>
-<h3 id="函数中的局部静态变量"><a href="#函数中的局部静态变量" class="headerlink" title="函数中的局部静态变量"></a>函数中的局部静态变量</h3><p>C++还有一种静态变量是定义在函数中的，某种角度讲它是更危险的全局变量：</p>
-<ol>
-<li><p>一个函数返回了局部静态变量的指针或引用，接收处很容易忽略这一点，错误的析构这个变量，导致未定义行为发生。</p>
-</li>
-<li><p>包含局部静态变量的函数容易被误认为是无状态的、线程安全的、幂等的，实际上不是（C标准库中的一大堆函数）。</p>
-</li>
-<li><p>局部静态变量的构造发生在第一次访问时，因此其构造顺序是不确定的，因此其析构顺序也是不确定的。</p>
-</li>
-<li><p>C++11标准保证了“局部静态变量的构造是串行的”，因此是线程安全的，但C++98没有这种保证。GCC自从4.3才有这种保证，而我们大面积使用的4.1.2并没有这种保证。</p>
- <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Logger&amp; <span class="title">GetLogger</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">static</span> Logger logger;</span><br><span class="line">    <span class="keyword">return</span> logger;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p> 上面这段代码，在C++11之前不保证线程安全。而基于这种方法实现的Singleton也是不对的。</p>
-</li>
-</ol>
-<h3 id="静态变量的替代方法"><a href="#静态变量的替代方法" class="headerlink" title="静态变量的替代方法"></a>静态变量的替代方法</h3><p>对于匿名命名空间的变量，替代方法就是将其从匿名命名空间移出来。在此之后我们就可以使用ContextObject来控制和mock它了。</p>
-<p>对于类的private静态成员，如果不需要修改它的行为，就不需要替代。对于public静态变量，考虑使用ContextObject来替代。对于public静态方法，可以将其逻辑独立成一个类，运行期注入到原来的类中，这样也转化为ContextObject方法能解决的问题。</p>
-<p>对于函数中的局部静态变量，同样可以使用ContextObject方法来替代。</p>
-<h2 id="单例"><a href="#单例" class="headerlink" title="单例"></a>单例</h2><p>很多人喜欢用Singleton，但它也没有避免全局变量的各种问题。一个全局唯一、全局（或模块内）可访问的对象，同样是一种全局状态。</p>
-<p>Singleton的主要目的是为了限制全局只有一个实例，但这违背了“Single Responsibility Principle”，你把两种责任加到了同一个类上。一个类本身不应该关心它自己是不是Singleton。应该负起“限制全局唯一”的应该是最上层模块，如果它只创建了一个该类的实例，那么这个实例就是单例。某人说过，理论上就不存在Singleton。</p>
-<p>Singleton的另一个问题是想正确实现Singleton并不是那么容易的。上面<code>GetLogger</code>实际就是C++中常用的一种Singleton实现，被称为“Meyers Singleton”，但在C++11前不保证线程安全性，也就不保证只初始化一次。而另一种常用的double lock的方法也不容易实现对。</p>
-<p>下面是我见过的一种Singleton实现：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">Object&amp; Object::Instance() &#123;</span><br><span class="line">    <span class="keyword">static</span> Object* obj = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">static</span> Mutex lock;</span><br><span class="line">    <span class="keyword">if</span> (obj != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> *obj;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function">LockGuard <span class="title">guard</span><span class="params">(lock)</span></span>;</span><br><span class="line">    <span class="keyword">if</span> (obj != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> *obj;</span><br><span class="line">    &#125;</span><br><span class="line">    obj = <span class="keyword">new</span> Object;</span><br><span class="line">    <span class="keyword">return</span> *obj;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>它有哪些问题？</p>
-<ol>
-<li>在C++11之前，<code>lock</code>的构造不保证线程安全，即有可能两个线程用到两个<code>Mutex</code>对象。</li>
-<li>内存泄漏，<code>obj</code>是不析构的，如果<code>obj</code>里面还管理着一些需要释放的资源就麻烦了。</li>
-</ol>
-<p>C++中的一些Singleton方法返回的是对象指针，当有人不小心在其上调用<code>delete</code>后什么事情都可能发生。</p>
-<p>与全局变量类似，Singleton也可以被ContextObject替代。</p>
-<p>当然，作为一种全局状态，在一些非常common的模块，用Singleton会令代码非常简洁，例子仍然是Logger或Trace。另一种Singleton的适用场合是当你用它去封装一种硬件资源时。不像软件资源，硬件资源就是只有一份，此时不用Singleton而用其它抽象方式都是背离了它的本质。</p>
-<h2 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h2><ul>
-<li><a href="http://wiki.c2.com/?GlobalVariablesAreBad" target="_blank" rel="noopener">Global Variables Are Bad</a></li>
-<li><a href="https://stackoverflow.com/questions/19158339/why-are-global-variables-evil" target="_blank" rel="noopener">Why are global variables evil?</a></li>
-<li><a href="https://softwareengineering.stackexchange.com/questions/148108/why-is-global-state-so-evil" target="_blank" rel="noopener">Why is Global State so Evil?</a></li>
-<li><a href="https://dzone.com/articles/why-static-bad-and-how-avoid" target="_blank" rel="noopener">Why Static is Bad and How to Avoid It</a></li>
-<li><a href="https://stackoverflow.com/questions/7026507/why-are-static-variables-considered-evil" target="_blank" rel="noopener">Why are static variables considered evil?</a></li>
-<li><a href="https://blogs.msdn.microsoft.com/scottdensmore/2004/05/25/why-singletons-are-evil/" target="_blank" rel="noopener">Why Singletons are Evil</a></li>
-<li><a href="http://wiki.c2.com/?SingletonsAreEvil" target="_blank" rel="noopener">Singletons Are Evil</a></li>
-<li><a href="https://stackoverflow.com/questions/137975/what-is-so-bad-about-singletons" target="_blank" rel="noopener">What is so bad about singletons?</a></li>
-<li><a href="https://whydoesitsuck.com/why-the-singleton-pattern-sucks-and-you-should-avoid-it/" target="_blank" rel="noopener">Why The Singleton Pattern Sucks and You Should Avoid It</a></li>
-<li><a href="https://en.wikipedia.org/wiki/Single_responsibility_principle" target="_blank" rel="noopener">Single responsibility principle</a></li>
-<li><a href="https://stackoverflow.com/questions/1052168/thread-safe-static-variables-without-mutexing" target="_blank" rel="noopener">Thread-safe static variables without mutexing?</a></li>
-<li><a href="https://stackoverflow.com/questions/1661529/is-meyers-implementation-of-the-singleton-pattern-thread-safe" target="_blank" rel="noopener">Is Meyers’ implementation of the Singleton pattern thread safe?</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2234,7 +2209,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">39</span>
+          <span class="site-state-item-count">40</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2266,7 +2241,7 @@
 <div class="copyright">
   
   &copy; 
-  <span itemprop="copyrightYear">2019</span>
+  <span itemprop="copyrightYear">2020</span>
   <span class="with-love">
     <i class="fa fa-user"></i>
   </span>
