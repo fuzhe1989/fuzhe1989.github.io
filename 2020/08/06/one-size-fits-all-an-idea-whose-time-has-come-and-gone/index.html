@@ -44,18 +44,19 @@
   };
 </script>
 
-  <meta name="description" content="Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005. Abstract过去25年的DBMS发展可以总结为“One size fits all”：用一套DBMS架构支持不同需求和特点的数据应用。 但这句话已经过时了，未来会">
+  <meta name="description" content="原文：Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005. 本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。 论证过程：  过去若干年中DBMS厂家追求“One size fits">
 <meta property="og:type" content="article">
-<meta property="og:title" content="[笔记]‘One Size Fits All’: An Idea Whose Time Has Come and Gone">
+<meta property="og:title" content="[笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone">
 <meta property="og:url" content="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/index.html">
 <meta property="og:site_name" content="Fu Zhe&#39;s Blog">
-<meta property="og:description" content="Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005. Abstract过去25年的DBMS发展可以总结为“One size fits all”：用一套DBMS架构支持不同需求和特点的数据应用。 但这句话已经过时了，未来会">
+<meta property="og:description" content="原文：Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005. 本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。 论证过程：  过去若干年中DBMS厂家追求“One size fits">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2020-08-06T08:14:43.000Z">
-<meta property="article:modified_time" content="2020-08-06T08:15:52.257Z">
+<meta property="article:modified_time" content="2020-08-13T04:14:40.288Z">
 <meta property="article:author" content="Fu Zhe">
 <meta property="article:tag" content="笔记">
 <meta property="article:tag" content="BigData">
+<meta property="article:tag" content="Database">
 <meta name="twitter:card" content="summary">
 
 <link rel="canonical" href="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/">
@@ -70,7 +71,7 @@
   };
 </script>
 
-  <title>[笔记]‘One Size Fits All’: An Idea Whose Time Has Come and Gone | Fu Zhe's Blog</title>
+  <title>[笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone | Fu Zhe's Blog</title>
   
 
 
@@ -193,7 +194,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          [笔记]‘One Size Fits All’: An Idea Whose Time Has Come and Gone
+          [笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone
         </h1>
 
         <div class="post-meta">
@@ -202,10 +203,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-08-06 16:14:43 / 修改时间：16:15:52" itemprop="dateCreated datePublished" datetime="2020-08-06T16:14:43+08:00">2020-08-06</time>
+              <time title="创建时间：2020-08-06 16:14:43" itemprop="dateCreated datePublished" datetime="2020-08-06T16:14:43+08:00">2020-08-06</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-13 12:14:40" itemprop="dateModified" datetime="2020-08-13T12:14:40+08:00">2020-08-13</time>
+              </span>
 
           
 
@@ -218,7 +225,23 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p><a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.68.9136&rep=rep1&type=pdf" target="_blank" rel="noopener">Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.</a></p>
+        <blockquote>
+<p>原文：<a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.68.9136&rep=rep1&type=pdf" target="_blank" rel="noopener">Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.</a></p>
+<p>本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。</p>
+<p>论证过程：</p>
+<ol>
+<li>过去若干年中DBMS厂家追求“One size fits all”，原因有若干。</li>
+<li>传统DBMS主要针对OLTP，处理模型为outbound，针对性优化短事务，重点在于ACID，这些特点并不适用于OLAP。</li>
+<li>随着streaming processing兴起，它需要完全不同的优化方向。</li>
+<li>未来使用DBMS的应用类型会越来越多，会有更多针对特定领域的DB engine出现。</li>
+</ol>
+<p>感想：</p>
+<ol>
+<li>任何优化都是有代价的，选择针对一个方向优化，就会在另一个方向平庸。甚至提供不同优化的开关也是有代价的，只要允许选择，代价就会存在。</li>
+<li>不同应用需要不同程度的一致性，但一套系统在架构设计时就要锚定某种一致性，它运行在其它一致性级别时只是稍有优化，而不会达到很理想的水平。</li>
+<li>如何控制DB与应用逻辑的耦合度，过高的耦合度会带来安全性、维护性上的问题，而过低的耦合度又会带来性能开销。存储过程，以及各种各样的UDF就是其中的粘合剂。</li>
+</ol>
+</blockquote>
 <h2 id="Abstract"><a href="#Abstract" class="headerlink" title="Abstract"></a>Abstract</h2><p>过去25年的DBMS发展可以总结为“One size fits all”：用一套DBMS架构支持不同需求和特点的数据应用。</p>
 <p>但这句话已经过时了，未来会有一组独立的db engine和统一的前端解析层。</p>
 <p>后面主要讨论流计算和数据仓库两个方向。</p>
@@ -362,6 +385,7 @@
           <div class="post-tags">
               <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
               <a href="/tags/BigData/" rel="tag"># BigData</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
           </div>
 
         
@@ -373,7 +397,10 @@
     <a href="/2020/07/30/apache-pulsar-versus-apache-kafka/" rel="prev" title="Apache Pulsar Versus Apache Kafka读后">
       <i class="fa fa-chevron-left"></i> Apache Pulsar Versus Apache Kafka读后
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2020/08/13/c-store-a-column-oriented-dbms/" rel="next" title="[笔记] C-store: a column-oriented DBMS">
+      [笔记] C-store: a column-oriented DBMS <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -462,14 +489,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">46</span>
+          <span class="site-state-item-count">47</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">27</span>
+        <span class="site-state-item-count">28</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
