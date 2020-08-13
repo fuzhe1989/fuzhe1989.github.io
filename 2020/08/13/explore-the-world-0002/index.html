@@ -44,21 +44,20 @@
   };
 </script>
 
-  <meta name="description" content="只能对private的分支使用rebase，千万不要对public的分支使用rebase，否则你就会明白为什么说rebase是有害的。  原文地址：Rebase Considered Harmful Merge的两种方式 向上游提交“干净”的patch。不包含历史信息——日常提交、BUG fix、与上游的Merge记录等。就如同一系列针对当前HEAD的diff。 携带完整的历史，并永久保留。">
+  <meta name="description" content="随便看看如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎  从停机问题角度看待这个悖论，很有意思。  李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎  李白的生平。  《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎  而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读今">
 <meta property="og:type" content="article">
-<meta property="og:title" content="翻译：为什么Rebase是有害的">
-<meta property="og:url" content="http://fuzhe1989.github.io/2014/08/11/why-rebase-harmful/index.html">
+<meta property="og:title" content="随便看看 0002">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/index.html">
 <meta property="og:site_name" content="Fu Zhe&#39;s Blog">
-<meta property="og:description" content="只能对private的分支使用rebase，千万不要对public的分支使用rebase，否则你就会明白为什么说rebase是有害的。  原文地址：Rebase Considered Harmful Merge的两种方式 向上游提交“干净”的patch。不包含历史信息——日常提交、BUG fix、与上游的Merge记录等。就如同一系列针对当前HEAD的diff。 携带完整的历史，并永久保留。">
+<meta property="og:description" content="随便看看如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎  从停机问题角度看待这个悖论，很有意思。  李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎  李白的生平。  《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎  而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读今">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2014-08-11T15:06:54.000Z">
-<meta property="article:modified_time" content="2019-12-28T04:45:41.016Z">
+<meta property="article:published_time" content="2020-08-13T07:37:57.000Z">
+<meta property="article:modified_time" content="2020-08-13T07:37:18.216Z">
 <meta property="article:author" content="Fu Zhe">
-<meta property="article:tag" content="翻译">
-<meta property="article:tag" content="git">
+<meta property="article:tag" content="随便看看">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="http://fuzhe1989.github.io/2014/08/11/why-rebase-harmful/">
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/">
 
 
 <script id="page-configurations">
@@ -70,7 +69,7 @@
   };
 </script>
 
-  <title>翻译：为什么Rebase是有害的 | Fu Zhe's Blog</title>
+  <title>随便看看 0002 | Fu Zhe's Blog</title>
   
 
 
@@ -180,7 +179,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2014/08/11/why-rebase-harmful/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -193,7 +192,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          翻译：为什么Rebase是有害的
+          随便看看 0002
         </h1>
 
         <div class="post-meta">
@@ -202,16 +201,10 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
+              
 
-              <time title="创建时间：2014-08-11 23:06:54" itemprop="dateCreated datePublished" datetime="2014-08-11T23:06:54+08:00">2014-08-11</time>
+              <time title="创建时间：2020-08-13 15:37:57 / 修改时间：15:37:18" itemprop="dateCreated datePublished" datetime="2020-08-13T15:37:57+08:00">2020-08-13</time>
             </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
 
           
 
@@ -224,29 +217,69 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <blockquote>
-<p>只能对private的分支使用rebase，千万不要对public的分支使用rebase，否则你就会明白为什么说rebase是有害的。</p>
+        <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a href="https://www.zhihu.com/question/406623513/answer/1338119623" target="_blank" rel="noopener">如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎</a></p>
+<blockquote>
+<p>从停机问题角度看待这个悖论，很有意思。</p>
 </blockquote>
-<p>原文地址：<a href="http://changelog.complete.org/archives/586-rebase-considered-harmful" target="_blank" rel="noopener">Rebase Considered Harmful</a></p>
-<h2 id="Merge的两种方式"><a href="#Merge的两种方式" class="headerlink" title="Merge的两种方式"></a>Merge的两种方式</h2><ol>
-<li>向上游提交“干净”的patch。不包含历史信息——日常提交、BUG fix、与上游的Merge记录等。就如同一系列针对当前HEAD的diff。</li>
-<li>携带完整的历史，并永久保留。</li>
-</ol>
-<p>git鼓励第1种方式——使用rebase。而有些系统则鼓励第2种，例如Darcs。</p>
-<h2 id="git-rebase"><a href="#git-rebase" class="headerlink" title="git rebase"></a>git rebase</h2><p>git rebase的工作方式：</p>
-<ol>
-<li>从目标仓库中移除所有本地patch；</li>
-<li>升级到上游的最新版本；</li>
-<li>重新向HEAD提交你的每个本地change——如果有冲突则中止，直到你fix掉。</li>
-</ol>
-<p>而传统的Merge则与之相反：</p>
-<ol>
-<li>将上游的新patch更新到你的本地分支上；</li>
-<li>解掉冲突后提交为新的版本。</li>
-</ol>
-<h2 id="rebase的问题"><a href="#rebase的问题" class="headerlink" title="rebase的问题"></a>rebase的问题</h2><p>git rebase的manpage上说：<strong>“当你rebase一个分支时，你是在更改它的历史。如果有人已经保存了这个分支的一份拷贝，当他尝试从你那获取更新时，就可能有问题。”</strong></p>
-<p>为什么会出现问题？因为pull和rebase完全不同，pull是从上游获取一系列commit历史，而rebase则移除了旧的历史。</p>
-<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>只能对private的分支使用rebase，千万不要对public的分支使用rebase，否则你就会明白为什么说rebase是有害的。</p>
+<p><a href="https://www.zhihu.com/question/410908068/answer/1379726440" target="_blank" rel="noopener">李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎</a></p>
+<blockquote>
+<p>李白的生平。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/58835500/answer/1374006629" target="_blank" rel="noopener">《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎</a></p>
+<blockquote>
+<p>而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读<a href="https://www.sohu.com/a/305206459_574698" target="_blank" rel="noopener">今天通知明天要，只能是假报告</a>。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/411958013/answer/1388346437" target="_blank" rel="noopener">31 省养老金已全部上调，你父母的退休工资比自己的在职工资高吗？ - 王海的回答 - 知乎</a></p>
+<blockquote>
+<p>现阶段养老基金投资实践中，负债端最大的问题就是资金短期化，委托规模低，资产负债不匹配这三点。</p>
+</blockquote>
+<p><a href="https://zhuanlan.zhihu.com/p/166552504" target="_blank" rel="noopener">揭阳食物中毒案中，为什么一碗河粉就能要人命？ - 厨房人类的文章 - 知乎</a></p>
+<blockquote>
+<p>河粉、米粉不能久放，木耳不能泡太长时间，在外面吃少点这些东西。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/409372180/answer/1384298523" target="_blank" rel="noopener">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 塔列朗的回答 - 知乎</a></p>
+<blockquote>
+<p>凡尔赛条约最大的失误，就是在侮辱德国的同时，没有伤害德国基本盘；讽刺的是，从事后看，凡尔赛合约在保留德国基本盘的同时，彻底摧毁了中欧及东南欧的强权，德国的战略态势相比于1914年反而还好了，中欧和东南欧没有了任何制衡力量。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/409372180/answer/1365283381" target="_blank" rel="noopener">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 路易-拿破仑的回答 - 知乎</a></p>
+<blockquote>
+<p>凡尔赛条约的一个典型特点是它在政治上非常宽松，另一个特点是在经济惩罚上非常严厉。在赔款以外，凡尔赛体系在民族自决这一原则上的“真双标”也是“屈辱”说的一个助推剂。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/357966552/answer/1021968782" target="_blank" rel="noopener">如何评价电影《1917》？ - 电影榨汁的回答 - 知乎</a></p>
+<blockquote>
+<p>《1917》中的行军路线、所属部队和战役历史。</p>
+</blockquote>
+<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a href="https://zhuanlan.zhihu.com/p/163236128" target="_blank" rel="noopener">浅谈OLAP系统核心技术点 - neoReMinD的文章 - 知乎</a></p>
+<blockquote>
+<p>不错的科普，参考文献很棒。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/312019918/answer/608965942" target="_blank" rel="noopener">作为 IT 行业的过来人，你有什么话想对后辈说的？ - 二律背反的回答 - 知乎</a></p>
+<blockquote>
+<p>世界上没有技术驱动型公司；IT领域最重要的是经验而不是你有多聪明；能大规模商用的技术，都不需要智商；要有分享精神；现代管理学的精髓，就是让每个人都变得可替代；程序员工作创造的价值，至少一半是通过文档体现出来才对。</p>
+<p>评论里对什么是技术驱动吵了起来。我的理解：做决定时，技术 or 市场，这条线该划在哪，无论什么公司，总会有一些决定偏向市场，程序员要接受这些决定，但这不妨碍我们尝试把线往技术那边推一推。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/411917655/answer/1385638325" target="_blank" rel="noopener">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 崔晨的回答 - 知乎</a></p>
+<p><a href="https://www.zhihu.com/question/411917655/answer/1388596024" target="_blank" rel="noopener">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 大宽宽的回答 - 知乎</a></p>
+<blockquote>
+<p>shell的历史包袱；奇怪的设计一定是有原因的。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/20405888/answer/15040566" target="_blank" rel="noopener">如何理解「面向对象编程的精髓在于将操作绑定在数据上」？ - 冯东的回答 - 知乎</a></p>
+<blockquote>
+<p>data structure over procedure。</p>
+</blockquote>
+<p><a href="https://zhuanlan.zhihu.com/p/166345772" target="_blank" rel="noopener">关于程序员的59条搞笑但却真实无比的编程语录 - 动力节点的文章 - 知乎</a></p>
+<blockquote>
+<p>很多条很有道理。</p>
+</blockquote>
+<p><a href="https://www.theverge.com/2018/7/16/17577654/amazon-prime-day-website-down-deals-service-disruption" target="_blank" rel="noopener">Amazon’s website crashed as soon as Prime Day began</a></p>
+<blockquote>
+<p>Amazon在2018年的一次崩溃。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/67858225/answer/1091344044" target="_blank" rel="noopener">如何看待sqlite作者放弃sqlite4的开发，说使用LSM Tree是一种失败？ - auxten的回答 - 知乎</a></p>
+<blockquote>
+<p>重点关注其中Dr. D. Richard Hipp关于测试的看法。</p>
+<p>100％MC / DC只是一个阈值，一个很高的阈值，一个易于测量且难以作弊的门槛。100％MC / DC 的主要好处之一并不是每个分支都经过测试，而是你必须编写如此多的测试，然后你就可以发现问题，并修复了许多你从未想过的问题。</p>
+</blockquote>
 
     </div>
 
@@ -256,8 +289,7 @@
 
       <footer class="post-footer">
           <div class="post-tags">
-              <a href="/tags/%E7%BF%BB%E8%AF%91/" rel="tag"># 翻译</a>
-              <a href="/tags/git/" rel="tag"># git</a>
+              <a href="/tags/%E9%9A%8F%E4%BE%BF%E7%9C%8B%E7%9C%8B/" rel="tag"># 随便看看</a>
           </div>
 
         
@@ -265,11 +297,11 @@
 
         
     <div class="post-nav">
-      <div class="post-nav-item"></div>
       <div class="post-nav-item">
-    <a href="/2015/05/06/you-can-do-any-kind-of-atomic-read-modify-write-operation/" rel="next" title="翻译：You Can Do Any Kind of Atomic Read-Modify-Write Operation">
-      翻译：You Can Do Any Kind of Atomic Read-Modify-Write Operation <i class="fa fa-chevron-right"></i>
+    <a href="/2020/08/13/c-store-a-column-oriented-dbms/" rel="prev" title="[笔记] C-store: a column-oriented DBMS">
+      <i class="fa fa-chevron-left"></i> [笔记] C-store: a column-oriented DBMS
     </a></div>
+      <div class="post-nav-item"></div>
     </div>
       </footer>
     
@@ -342,7 +374,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Merge的两种方式"><span class="nav-number">1.</span> <span class="nav-text">Merge的两种方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#git-rebase"><span class="nav-number">2.</span> <span class="nav-text">git rebase</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#rebase的问题"><span class="nav-number">3.</span> <span class="nav-text">rebase的问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#结论"><span class="nav-number">4.</span> <span class="nav-text">结论</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#随便看看"><span class="nav-number">1.</span> <span class="nav-text">随便看看</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#计算机相关"><span class="nav-number">2.</span> <span class="nav-text">计算机相关</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
