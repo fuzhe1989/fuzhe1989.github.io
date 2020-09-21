@@ -176,6 +176,413 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/" class="post-title-link" itemprop="url">[笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-09-21 16:08:09 / 修改时间：16:08:32" itemprop="dateCreated datePublished" datetime="2020-09-21T16:08:09+08:00">2020-09-21</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://people.eecs.berkeley.edu/~kubitron/courses/cs262a-F19/handouts/papers/vldb09-861.pdf" target="_blank" rel="noopener">HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章在尝试结合MapReduce（Hadoop）与DBMS（PostgreSQL），取MapReduce的伸缩性与容错性、DBMS的性能。</p>
+<p>实现：</p>
+<ul>
+<li>PostgreSQL作为Hadoop的DataNode。</li>
+<li>将SQL翻译为MR任务，</li>
+<li>通过兼容于JDBC的InputFormat将具体查询交给PostgreSQL执行。</li>
+</ul>
+<p>结论：结合“A comparison of approaches to large-scale data analysis”的性能测试结果，HadoopDB相比Hadoop的分析性能好了一些，仍然达不到并行DBMS的水平，但验证了这个方向是有意义的。</p>
+<p>HadoopDB将Hive中对数据源的scan换成了单节点PostgreSQL的查询，但仍然是传输数据而不是传输逻辑，且还是要物化中间结果，这些提高了容错性，但显著降低了性能。</p>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>作者观察到的趋势：</p>
+<ul>
+<li>大规模分析的市场越来越大。</li>
+<li>shared-nothing架构因为其伸缩性，特别适合实现大型分析系统。</li>
+<li>典型分析workload的特点（大量scan、多维度聚合、星型join）也非常容易在shared-nothing系统中并行执行。</li>
+</ul>
+<p>但现在的并行DBMS的伸缩性并不好，节点数达到百级别就有点困难了，原因是：</p>
+<ul>
+<li>大规模系统的错误是常态，而并行DBMS的设计假设了错误很罕见。</li>
+<li>并行DBMS通常假设机器是同构的，而实际的大规模系统很难保证这一点。</li>
+<li>大规模系统的需求直到最近才多起来，因此大规模的并行DBMS没有得到过充分的测试，难以预料还有什么工程上的障碍。</li>
+</ul>
+<p>MapReduce可以支持非常高的规模，但它缺乏许多对结构化数据分析非常有用的特性，MR模型也不适合那种一次加载后多次处理的场景。</p>
+<p>HadoopDB就是要结合MapReduce和并行DBMS，用MapReduce作为通信层，将SQL翻译为MapReduce任务，尽可能多地下发查询给DBMS节点执行。</p>
+<p>HadoopDB的目标是尽可能地利用已有的开源资源，用Hadoop+PostgreSQL来实现。</p>
+<h2 id="HadoopDB的实现"><a href="#HadoopDB的实现" class="headerlink" title="HadoopDB的实现"></a>HadoopDB的实现</h2><p>HadoopDB提供了以下四个组件：</p>
+<ol>
+<li>DB Connector，允许TaskTracker访问DBMS。</li>
+<li>Catalog，维护DB的元数据。</li>
+<li>Data Loader，用于全局和本地的数据分区、加载数据到DBMS。它有global hasher和local hasher，前者用于将数据分为HDFS上的若干个文件，后者用于将HDFS的一个文件分区到本地文件系统中。通过两层分区，HadoopDB保证了每个chunk大小均匀，从而得到更好的负载均衡性。</li>
+<li>SQL to MapReduce to SQL Planner（SMS），将SQL转为MR任务，再将各个MR子任务转回SQL。SMS扩展自Hive。相比Hive，SMS可以利用collocation、相同partition key等信息下推尽可能多的信息到DBMS中，即Hive的scan加上filter、group by、join等操作，在SMS中可以结合到一个operator中完成。对于跨DBMS的操作，SMS看起来要走和Hive相同的operator，与底下的DBMS就没有关系了。</li>
+</ol>
+<h2 id="性能指标"><a href="#性能指标" class="headerlink" title="性能指标"></a>性能指标</h2><p>在加载阶段，HadoopDB的性能更接近于DBMS-X，相比Hadoop慢了很多。</p>
+<p>Grep任务中HadoopDB只比Hadoop略快一点点，原因是这个任务以扫描为主，HadoopDB只是省掉了实时的解析开销。</p>
+<p>Selection任务中，HadoopDB默认会将Rankings和UserVisits表一起分区，导致Rankings表被分成了20个只有50MB的chunk，20个map任务的调度开销显著降低了HadoopDB的性能。如果不分区Rankings表，HadoopDB可以利用它在pageRank列上的索引，显著提升了性能（超过了DBMS-X）。</p>
+<p>Aggregation任务中，在聚合度较高时，Hive使用了hash聚合，相比原生Hadoop性能提升了非常多；在聚合高较低时，Hive转而使用了基于sort的聚合策略，这就与原生Hadoop相同了，且Hive在保存中间结果时有额外开销，此时它的整体性能还差于原生Hadoop。PostgreSQL在两种场景下都使用了hash聚合，因此HadoopDB的性能超过了Hadoop。</p>
+<p>Join任务中，HadoopDB得益于使用索引和内建支持join，性能远高于Hadoop，接近于两种DBMS（差距仍然明显）。</p>
+<p>UDF任务中，几个系统的性能差不多。</p>
+<h2 id="容错性"><a href="#容错性" class="headerlink" title="容错性"></a>容错性</h2><p>文章测试了各个系统的正常执行时间，以及单错误节点、单慢节点时的执行时间，HadoopDB的容错性确实比DBMS要好很多。尴尬的是就算在有错误或慢节点时，DBMS的执行时间仍然远低于HadoopDB和Hadoop。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/" class="post-title-link" itemprop="url">[笔记] A comparison of approaches to large-scale data analysis</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-09-17 21:40:22 / 修改时间：21:40:51" itemprop="dateCreated datePublished" datetime="2020-09-17T21:40:22+08:00">2020-09-17</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://people.eecs.berkeley.edu/~kubitron/cs262/handouts/papers/p165-pavlo.pdf" target="_blank" rel="noopener">A comparison of approaches to large-scale data analysis</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文的背景是随着MapReduce的兴起，越来越多的人抛弃了传统的DBMS，直接使用MapReduce来做数据分析。本文对比了MapReduce（Hadoop）、Vertica（列存的并行DBMS）、DBMS-X（某个商用的行存的并行DBMS）的性能，指出并行RDBMS仍然有它的优势，不会被MapReduce取代。</p>
+<p>并行DBMS的优势：</p>
+<ul>
+<li>速度远快于MapReduce（热数据、有组织、强大的优化器）。</li>
+<li>更少的代码（SQL的表达能力优势）。</li>
+</ul>
+<p>劣势：</p>
+<ul>
+<li>冷数据的加载时间长。</li>
+<li>容错能力弱（任意子query失败都会导致 整个query失败）。</li>
+<li>灵活性差，难以处理非关系型数据。</li>
+</ul>
+<p>但本文指出，并行DBMS可以用更少的节点完成同样的任务，因此它不一定需要MapReduce那么强的容错能力。</p>
+<h2 id="并行DBMS"><a href="#并行DBMS" class="headerlink" title="并行DBMS"></a>并行DBMS</h2><p>并行DBMS可以并行处理的两个关键点：</p>
+<ol>
+<li>大多数表分片由多个节点服务。</li>
+<li>SQL优化器可以生成跨节点的查询计划。</li>
+</ol>
+<p>如果filter涉及了partition key，或者两个表join的key恰好是各自的partition key，则查询计划涉及的节点数会大大减少。</p>
+<p>join中的一张非常小的表可以冗余分布在多个节点上。如果join双方都比较大，则可以将其中一张表的数据hash后加载到另一张表涉及的节点上。</p>
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><ul>
+<li>schema：MapReduce看似不需要schema，很多人认为这是它的优点。但当MapReduce的输出会被多个应用共享时，它仍然需要一个schema，这个schema要放到一个大家都能看得到的地方，与数据分离。而且不同于DBMS，每个应用要自己操心如何管理维护schema。</li>
+<li>index：简单的MapReduce任务不需要index，但在需要的时候，每个开发者都要自己写一遍。</li>
+<li>编程模型：SQL模型比MR更高级，不需要开发者手写很低级的逻辑，因此MR社区又在MR模型之上引入了一些更高级的模型。</li>
+<li>数据分发：大规模DB的经验是将计算发送到数据端，而不是反过来。并行DBMS可以利用已有的统计数据，生成最优化的查询计划，最小化需要传输的数据量。而MR需要手写来实现。</li>
+<li>执行策略：MR的一大隐患是Map和Reduce任务间的数据流是M*N的，一旦任务数非常多的时候，会生成非常多的小文件。并行DBMS不会物化split文件，且用push而不是pull模式来传输数据。</li>
+<li>灵活性：MR显然是更灵活的，但DBMS通过UDF、存储过程、自定义聚合函数等特性也弥补了不少的差距。</li>
+<li>容错性：MR可以重试出错的子任务，而通常并行DBMS在某个子query失败时会令整个query失败。</li>
+</ul>
+<h2 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h2><p>文章关注了两个阶段的性能：数据加载、执行。</p>
+<p>无论是哪类任务，数据加载阶段MapReduce有着非常明显的优势，符合预期。</p>
+<p>执行阶段，两种DBMS都明显比MapReduce快。</p>
+<p>Hadoop在启动阶段耗费了10-25秒，严重影响了小数据集场景的性能。随着任务数增多，调度器的延时也在增加。</p>
+<p>Grep任务中，MR一半的时间花在了合并各个reducer的输出上了。当数据量增大时，Vertica相比DBMS-X的优势体现出来了，这主要归功于Vertica激进的压缩策略。</p>
+<p>Selection任务中，两种DBMS仍然明显快于MR，除了上述因素，新的差异在于DBMS有index，而MR没有。Vertica在这个场景中性能超过了DBMS-X一个数量级。但Vertica在节点增多后性能下降得非常厉害，原因是大量节点间的通信打爆了整个系统。这可能是因为Vertica使用了可靠的通信协议，带来了额外的开销。</p>
+<p>Aggregation任务中，两种DBMS仍然明显快于MR。Vertica在group非常多时性能相比DBMS-X没有优势，但在group较少时需要传输的数据量变少，它在扫描上的性能优势就体现出来了。</p>
+<p>Join任务中，两种DBMS的性能比MR好上两个数量级，有两方面原因：</p>
+<ol>
+<li>MR需要扫描所有数据，而DBMS可以利用index只读部分数据。另外MR读出数据还要再解析，而DBMS在加载时已经做完了这部分工作。</li>
+<li>DBMS可以利用join key就是join双方的partition key的特点，直接在各个节点本地join。</li>
+</ol>
+<p>UDF聚合任务中，三种系统的性能终于差不多了。DBMS需要per row调用UDF，UDF还会访问DB以外的文件，这显著增加了开销。</p>
+<h2 id="其它讨论"><a href="#其它讨论" class="headerlink" title="其它讨论"></a>其它讨论</h2><ul>
+<li>DBMS明显比MR更难部署。</li>
+<li>相比于DBMS，Hadoop的任务都是冷启动的，但这不是MR模型本身要求的。假如，如果允许重用JVM的话上述测试结果可以提升10%-15%。</li>
+<li>HDFS支持块级别和记录级别的压缩，但测试结果显示压缩没有提升，甚至可能降低了性能。Vertica的压缩很激进，当I/O为瓶颈时用一部分CPU换取I/O是值得的，也有比较好的效果。</li>
+<li>Hadoop相比DBMS更耗费CPU，原因是它需要解析和反序列化数据。</li>
+<li>DBMS在生成查询计划后，就只在必要时传输数据了，也不需要传输控制消息，这两点都可以明显降低开销。</li>
+<li>MR的上手难度非常低，但对于长期的任务，它的隐式成本就会体现出来（MR模型的表达能力、schema的管理等）。</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/15/the-google-file-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/15/the-google-file-system/" class="post-title-link" itemprop="url">[笔记] The Google File System</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-15 21:20:10" itemprop="dateCreated datePublished" datetime="2020-09-15T21:20:10+08:00">2020-09-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-09-17 21:40:36" itemprop="dateModified" datetime="2020-09-17T21:40:36+08:00">2020-09-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://research.google/pubs/pub51.pdf" target="_blank" rel="noopener">The Google File System</a></p>
+</blockquote>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>GFS在设计上与传统的文件系统的几个区别：</p>
+<ul>
+<li>分布式系统中错误是常态，因此持续监控、错误检测、容错机制、自动恢复都是必要的。</li>
+<li>文件普遍非常大，达到GB级别以上，要重新审视对I/O操作和块大小的预期。</li>
+<li>文件的追加写远多于覆盖写。</li>
+</ul>
+<h2 id="Design-Overview"><a href="#Design-Overview" class="headerlink" title="Design Overview"></a>Design Overview</h2><h3 id="Assumptions"><a href="#Assumptions" class="headerlink" title="Assumptions"></a>Assumptions</h3><ul>
+<li>整个系统由廉价易坏的硬件组成。</li>
+<li>典型文件大小在100MB以上。支持小文件但不做特殊优化。</li>
+<li>主要有两种读模式，大块顺序读和小块随机读。应用也可以自行将多个随机读排序转化为一次顺序读。</li>
+<li>要支持高效的并发追加写同一个文件。</li>
+<li>高吞吐优先于低延时。</li>
+</ul>
+<h3 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h3><p>一个GFS集群由单master和若干个chunkserver组成。文件由固定大小的chunk组成。</p>
+<p>master负责维护：</p>
+<ul>
+<li>所有metadata，包括namespace、ACL、file到chunk的映射、chunk当前所在的chunkserver。</li>
+<li>全局动作，包括chunk的lease管理和chunk的迁移。</li>
+</ul>
+<p>client的数据读写都直接与chunkserver通信，只在需要metadata时才与master通信。</p>
+<p>client和chunkserver都不缓存数据，前者不需要，后者通过Linux的page cache就可以达到目的了。</p>
+<h3 id="Single-Master"><a href="#Single-Master" class="headerlink" title="Single Master"></a>Single Master</h3><p>单master极大简化了设计，但要非常小心地避免它成为读写路径的瓶颈。client只在第一次访问一个chunk时找master要它的位置，之后会缓存这一信息，直接与对应的chunkserver通信完成读写。</p>
+<h3 id="Chunk-Size"><a href="#Chunk-Size" class="headerlink" title="Chunk Size"></a>Chunk Size</h3><p>GFS的chunk size默认为64MB，远大于传统文件系统的block size。大的chunk size的好处：</p>
+<ul>
+<li>减少了client与master的通信次数。</li>
+<li>client一次在大chunk上完成的操作数会更多，减少了每次与chunkserver建立TCP连接的开销。</li>
+<li>减少了master要维护的metadata。</li>
+</ul>
+<p>但大chunk使小文件经常只有非常少量的chunk，容易成为热点。一个场景是应用先写入一个单chunk的文件，之后大量job同时读取这个文件。解法是给这个文件分配更多的replica，同时应用端在job启动时加一个随机的延迟。</p>
+<h3 id="Metadata"><a href="#Metadata" class="headerlink" title="Metadata"></a>Metadata</h3><p>metadata主要为两类：</p>
+<ul>
+<li>namespace和file-chunk映射，修改会记录在operation log中。</li>
+<li>chunk的位置，不持久化，master启动时和有chunkserver加入时，master主动访问chunkserver得到。</li>
+</ul>
+<h4 id="In-Memory-Data-Structures"><a href="#In-Memory-Data-Structures" class="headerlink" title="In-Memory Data Structures"></a>In-Memory Data Structures</h4><p>master管理的所有metadata都常驻内存，好处略。隐患是chunk太多的话master的内存可能成问题（注：pangu1的常见问题），但相比而言给master机器加内存还是比较容易的。</p>
+<h4 id="Chunk-Locations"><a href="#Chunk-Locations" class="headerlink" title="Chunk Locations"></a>Chunk Locations</h4><p>master通过与chunkserver的心跳获得chunk位置，而不持久化这些信息，原因是：</p>
+<ul>
+<li>持久化的话就要保持master与chunkserver关于chunk位置的一致，考虑到chunkserver的扩缩容、failover、改名等情况，比较复杂。</li>
+<li>chunkserver才拥有chunk位置的最终话语权，比如chunk损坏了等。</li>
+</ul>
+<h4 id="Operation-Log"><a href="#Operation-Log" class="headerlink" title="Operation Log"></a>Operation Log</h4><p>operation log不仅记录事件，还充当一个逻辑时钟。</p>
+<p>checkpoint文件本身组织为B-tree，可以直接mmap到内存中访问。</p>
+<h3 id="Consistency-Model"><a href="#Consistency-Model" class="headerlink" title="Consistency Model"></a>Consistency Model</h3><h4 id="Guarantees-by-GFS"><a href="#Guarantees-by-GFS" class="headerlink" title="Guarantees by GFS"></a>Guarantees by GFS</h4><p>一个文件区域在被修改后，如果所有client从无论哪个replica总是看到相同的状态，称其为一致的；如果不光是一致的，client知道修改后的状态，称其为确定的。</p>
+<p>成功的串行修改总是确定的，成功的并行修改是一致但不确定的，失败的修改是不一致的。</p>
+<p>一次成功的追加写至少会写入一份数据，并返回确定区域的offset。</p>
+<p>GFS通过两点保证多次成功的修改后，被修改的文件区域是确定的，包含最后一次写入的内容：</p>
+<ul>
+<li>所有replica应用相同的修改顺序。</li>
+<li>使用chunk version来标识哪些replica已过期。</li>
+</ul>
+<p>过期的repilca不会参与后续的读写，后面会被gc掉。</p>
+<p>在client的chunk位置的cache过期前，有一个小的时间窗口client可能读到过期数据。但因为过期的replica通常都提前结束了，client会与master通信，从而获取到最新的chunk位置。</p>
+<p>master会在chunk有replica损坏或过期后尽快恢复出一个新的replica，除非非常短时间内所有replica都损坏了，此时数据也只是丢失，而不是写坏了，应用可以得到确定的异常，而不是错误的数据。</p>
+<h4 id="Implications-for-Applications"><a href="#Implications-for-Applications" class="headerlink" title="Implications for Applications"></a>Implications for Applications</h4><ul>
+<li>依赖追加写而不是覆盖写，从而可以只用checkpoint就知道哪块文件区域是确定的。</li>
+<li>记录应用自己的checkpoint，读的时候只读到最新的checkpoint，避免读到那些GFS认为成功写入但应用认为没有的区域。</li>
+<li>数据要能自检验、自识别，能知道哪些记录是无效的或重复的。</li>
+</ul>
+<h2 id="System-Interactions"><a href="#System-Interactions" class="headerlink" title="System Interactions"></a>System Interactions</h2><h3 id="Leases-and-Mutation-Order"><a href="#Leases-and-Mutation-Order" class="headerlink" title="Leases and Mutation Order"></a>Leases and Mutation Order</h3><p>master会为每个chunk挑选一个primary，primary负责决定这个chunk的所有修改的顺序。</p>
+<p>master与primary chunk间的lease默认为60s，但master可以提前结束lease（如禁止修改改名中的文件）。假设master与primary chunk断开了，它可以在当前lease过期后再挑选新的primary。</p>
+<p>client执行一次修改操作的过程（类似于2PC）：</p>
+<ol>
+<li>client找master要chunk对应的replica，此时如果这个chunk没有primary，master会临时授予一个。</li>
+<li>client将数据推给所有replica，不需要考虑顺序。chunkserver会将这些数据缓存在LRU队列中（如果过期了后续会导致请求失败）。</li>
+<li>client向primary发送写请求，primary为所有它收到还未处理的数据分配sequence number，并在本地执行修改。</li>
+<li>primary将写请求转发给所有replica，每个replica按相同顺序执行这些写请求。</li>
+<li>secondary回复primary。</li>
+<li>primary回复client。</li>
+</ol>
+<p>任何replica的失败都会使写请求失败，文件的对应区域此时是不一致的。GFS的client默认会重试请求（如何处理留下来的不一致区域？）。</p>
+<p>如果一次写跨chunk，GFS会将其分为多次写，可能导致并发写的数据交织在一起（追加写）或相互覆盖（覆盖写），即一致但未定义。</p>
+<h3 id="Data-Flow"><a href="#Data-Flow" class="headerlink" title="Data Flow"></a>Data Flow</h3><p>为了充分利用整个集群的网络带宽，数据在不同chunkserver间是串行传输的，每个chunkserver会把数据发送给离自己最近的还没收到数据的chunkserver。这里距离是直接用IP地址计算出来的。</p>
+<h3 id="Atomic-Record-Appends"><a href="#Atomic-Record-Appends" class="headerlink" title="Atomic Record Appends"></a>Atomic Record Appends</h3><p>primary接收到一个atomic append请求时，它先判断当前chunk是否有足够空间，如果没有的话，它会先补全当前chunk，再返回client一个可重试的错误。否则primary先在本地追加，再告诉secondary具体的offset，最后回复client。</p>
+<p>如果任一replica写失败，整个请求就失败了，client重试可能导致不同repilca不完全一致：每个replica上可能写了一次或多次或不完整的记录。GFS不保证每个replica完全一致，它只保证数据至少被原子写入一次。成功的请求表明数据一定在所有replica上写到了相同的offset上；每个replica的数据长度都至少等于这条记录的结束位置，因此任何后续的记录都会写到更高的offset或新chunk上（不会覆盖老数据）。追加写保证会得到确定（因此一致）的结果，而交替的覆盖写则是不一致（因此不确定）的。</p>
+<h3 id="Snapshot"><a href="#Snapshot" class="headerlink" title="Snapshot"></a>Snapshot</h3><p>master收到snapshot请求时，先取消所有涉及到的chunk的lease，保证后续写请求都必须先与master通信。之后master将snapshot记入opeartion log，再复制源文件或文件树的metadata。新创建出来的snapshot文件指向与源文件相同的chunk。</p>
+<p>client后续要写snapshot过的chunk C时，它会先找master，master发现C有多个引用，于是要求所有持有C的replica的chunkserver复制出一个C’，再为C’挑选一个primary，此后的流程与正常写相同。</p>
+<h2 id="Master-Operation"><a href="#Master-Operation" class="headerlink" title="Master Operation"></a>Master Operation</h2><h3 id="Namespace-Management-and-Locking"><a href="#Namespace-Management-and-Locking" class="headerlink" title="Namespace Management and Locking"></a>Namespace Management and Locking</h3><p>GFS没有使用树形结构来维护namespace，而是将所有namespace保存在一个表中，每条记录的key就是完整path，如”/d1/d2/…/dn/leaf”对应着”/d1”、”/d1/d2”、”/d1/d2/…/dn/leaf”等一系列key。每条记录对应一个读写锁，在访问一个路径时，要持有它的所有前缀记录的读锁。文件创建不需要持有前缀记录的写锁，只要读锁就足够保证前缀记录不被删除了。</p>
+<p>这一性质的一大优点是它允许在同一目录内并发地修改。</p>
+<h3 id="Replica-Placement"><a href="#Replica-Placement" class="headerlink" title="Replica Placement"></a>Replica Placement</h3><p>chunk的replica位置服务于两个目的：</p>
+<ul>
+<li>最大化数据可靠性和可用性；</li>
+<li>最大化网络带宽利用率。</li>
+</ul>
+<p>因此要将replica分布于不同rack的机器上，从而避免某个rack出问题导致整个chunk数据丢失，也有利于读的时候充分利用整个rack的网络带宽。代价就是写的时候数据要流经多个rack。</p>
+<h3 id="Creation-Re-replication-Rebalancing"><a href="#Creation-Re-replication-Rebalancing" class="headerlink" title="Creation, Re-replication, Rebalancing"></a>Creation, Re-replication, Rebalancing</h3><p>新创建chunk时位置选择的考虑：</p>
+<ul>
+<li>磁盘空闲的chunkserver优先；</li>
+<li>控制每个chunkserver上新创建的chunk不要太多，避免后续流量集中在这个chunkserver上；</li>
+<li>分散在不同rack上。</li>
+</ul>
+<p>一旦master发现某个chunk的replica少了，就会触发re-replication。它的优先级是看replica少了几份，chunk是否活跃，以及是否阻塞了client的请求。</p>
+<p>master定期会做rebalance，但不会直接填满新加入的chunkserver，而是渐进式的。</p>
+<h3 id="Garbage-Collection"><a href="#Garbage-Collection" class="headerlink" title="Garbage Collection"></a>Garbage Collection</h3><p>文件被删除时，master先记录到operation log中，再将文件rename为一个名字包含删除时间戳的隐藏文件。之后master会定期扫描这些文件，删除超过若干天的就被真正删除掉。master给chunkserver的心跳回复中会包含chunkserver持有的哪些chunk需要被删除。</p>
+<p>通过这种异步的、基于状态对比的、批量通知的方式，GFS的回收可以处理多种情况造成的垃圾，简化了流程，也平摊了开销，缺点就是回收延迟比较大。补救措施是，隐藏文件被删除时会立即执行删除、用户可以指定强制删除、用户可以指定某个路径下的文件不参与replication。</p>
+<h3 id="Stale-Replica-Detection"><a href="#Stale-Replica-Detection" class="headerlink" title="Stale Replica Detection"></a>Stale Replica Detection</h3><p>对于每个chunk，master都维护了一个version，每次授予lease时增加，master和replica都会持久化这个version。master如果遇到了比它自己记录的更大的version，可能是master之前failover过了，master会将自己记录的version提升上去；如果遇到了更小的version就会认为这个replica过期了，变成垃圾了。</p>
+<p>master在回复replica位置给client时，也会带上这个version，从而避免client访问过期的replica。</p>
+<h2 id="Fault-Tolerance-and-Diagnosis"><a href="#Fault-Tolerance-and-Diagnosis" class="headerlink" title="Fault Tolerance and Diagnosis"></a>Fault Tolerance and Diagnosis</h2><p>GFS的容量决定了错误是常态。</p>
+<h3 id="High-Availability"><a href="#High-Availability" class="headerlink" title="High Availability"></a>High Availability</h3><h4 id="Fast-Recovery"><a href="#Fast-Recovery" class="headerlink" title="Fast Recovery"></a>Fast Recovery</h4><p>master和chunkserver不区分正常退出和意外退出，都走一样的快速恢复流程。</p>
+<h4 id="Chunk-Replication"><a href="#Chunk-Replication" class="headerlink" title="Chunk Replication"></a>Chunk Replication</h4><ul>
+<li>不同namespace可以有不同的replication level。</li>
+<li>master会尽快复制replica不足的chunk。</li>
+<li>正在探索奇偶校验码、纠删码等其它冗余方案，这是基于GFS追加和读远多于小块随机写的场景的。</li>
+</ul>
+<h4 id="Master-Replication"><a href="#Master-Replication" class="headerlink" title="Master Replication"></a>Master Replication</h4><p>master的修改要等到自身和所有replica的operation log落盘才算提交成功。</p>
+<p>master的replica是shadow而不是mirror，状态可能会落后于primary，但它们也可以提供非最新的读能力。</p>
+<p>shadow replica也会用与primary相同的顺序执行修改，也会从chunkserver获取chunk列表，只有新创建的chunk和被回收的chunk必须从primary处得知。</p>
+<h3 id="Data-Integrity"><a href="#Data-Integrity" class="headerlink" title="Data Integrity"></a>Data Integrity</h3><p>GFS一个集群会有大量磁盘，时常会有磁盘错误，但一一比较每个chunk replica很不现实。而且不同replica也可能不一致。因此chunkserver会通过checksum来校验chunk是否正确。</p>
+<p>chunk的每个block都有checksum，是常驻内存的，读的时候会校验。这对性能的影响非常小，因为对比checksum不会有I/O，而计算checksum的开销会被I/O平摊掉。client会按block大小对齐读的范围。</p>
+<p>追加写的时候直接基于旧的checksum计算新的checksum。如果之前这个block状态已经不一致了，checksum不对，后续读的时候会发现。</p>
+<p>覆盖写需要读出整个范围的block重新计算checksum。</p>
+<p>chunkserver会在空闲时挑选一些不活跃的chunk校验数据。</p>
+<h1 id="Experiences"><a href="#Experiences" class="headerlink" title="Experiences"></a>Experiences</h1><p>GFS发展过程中遇到的问题：</p>
+<ul>
+<li>后续才增加了权限和配额的支持。</li>
+<li>磁盘驱动版本。</li>
+<li>Linux 2.2的<code>fsync()</code>有性能bug。</li>
+<li>Linux一个进程读写页面时有一个大的读写锁，加载page和通过<code>mmap</code>更新page互斥。后续通过将<code>mmap</code>改为<code>pread</code>解决。</li>
+</ul>
+<blockquote>
+<p>pangu1也是单master，与GFS的区别主要在于：</p>
+<ul>
+<li>似乎没有primary chunk的概念。</li>
+<li>master会记录chunk的长度。</li>
+</ul>
+<p>pangu1中文件分成了LogFile、NormalFile、以及一个可以随机写的File（不记得名字了）。</p>
+<p>NormalFile类似于GFS的File，链式replication，只支持追加写。它的主要的写接口是<code>append()</code>、<code>commit()</code>和<code>truncate()</code>，<code>append</code>写入的数据不会改变master端记录的size，这个是在<code>commit</code>时确定的。当出现写失败时，不同replica可能不一致，此时可以通过<code>truncate</code>到上次<code>commit</code>时的offset来解决这种不一致。对于<code>commit</code>超时的情况，client需要重新打开文件，触发master主动获取各个replica的size。</p>
+<p>LogFile是专门针对小的record设计的类型，星型写，只支持追加写，不需要额外的<code>commit</code>，也不支持<code>truncate</code>。它的size更新逻辑似乎是如果三份都成功，则不立即更新；当写失败时，client需要重新打开文件，触发master主动封存当前chunk，此时master会确认chunk的size。</p>
+<p>master也会在与chunkserver的日常通信过程中确认chunk的size。</p>
+<p>pangu2将单master按功能拆成若干种master node，从而解决了单master内存爆炸的问题。另外不同的文件类型也统一掉了，具体的细节不清楚。</p>
+</blockquote>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1383,321 +1790,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/07/30/explore-the-world-0001/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/07/30/explore-the-world-0001/" class="post-title-link" itemprop="url">随便看看 0001</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-07-30 15:44:57" itemprop="dateCreated datePublished" datetime="2020-07-30T15:44:57+08:00">2020-07-30</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-13 15:05:43" itemprop="dateModified" datetime="2020-08-13T15:05:43+08:00">2020-08-13</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a href="https://www.zhihu.com/question/25648987/answer/31410048" target="_blank" rel="noopener">哥德尔定理是否支持不可知论？ - 罗心澄的回答 - 知乎</a></p>
-<blockquote>
-<p>数学意义上的「真」和「可证」是两个不重叠的概念。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/23289984/answer/24131288" target="_blank" rel="noopener">是否存在「可证明」的对于世界的解释？ - oldgoat的回答 - 知乎</a></p>
-<blockquote>
-<p>一般来说，仅根据经验事实就可以确认某个判断为真，这就叫做“证实”（verify），具有这种特征的判断就叫做可证实（verifiability）的。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/27528796/answer/1346097249" target="_blank" rel="noopener">如何简单清晰地解释哥德尔不完备定理？ - 叶青杰的回答 - 知乎</a></p>
-<blockquote>
-<p>哥德尔数与不动点。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/27528796/answer/246963736" target="_blank" rel="noopener">如何简单清晰地解释哥德尔不完备定理？ - LLLBK的回答 - 知乎</a></p>
-<blockquote>
-<p>他认为自己的不完全性定理表明，存在一些确实为真的东西是人为构造的逻辑系统无法达到的，这些确实为真的东西就是数学的理念世界，它们跟人无关，它们有自己确定的真值，不论人有没有去研究它。</p>
-</blockquote>
-<p><a href="https://www.nature.com/news/paradox-at-the-heart-of-mathematics-makes-physics-problem-unanswerable-1.18983" target="_blank" rel="noopener">Paradox at the heart of mathematics makes physics problem unanswerable</a></p>
-<blockquote>
-<p>凝聚态计算spectral gap，当模型为无限大小的2D平面时，无法预测计算是否能结束，即spectral gap是否存在。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/410353226/answer/1370123832" target="_blank" rel="noopener">如何看待南京一中高考成绩令部分家长不满，家长要求「校长下课」？ - 不想上吊王承恩的回答 - 知乎</a></p>
-<blockquote>
-<p>任何东西都是拥有了才有资格不在乎。像我这种工贼太多了，所以全世界的鸡蛋联合不起来，石头也不允许鸡蛋联合起来。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/408092992/answer/1353007308" target="_blank" rel="noopener">如何看待杭州某物业私自将业主别墅出租给《我和我的儿女们》剧组拍摄，业主看剧才发现是自己家这件事？ - stan的回答 - 知乎</a></p>
-<blockquote>
-<p>法律常识学习：侵权还是违约？无权代理还是无权处分？合同效力？剧组是否应当承担责任？</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/409332169/answer/1370797027" target="_blank" rel="noopener">为什么金属乐迷大多热衷于将金属从摇滚中独立出来？ - 远古邪恶小人物的回答 - 知乎</a></p>
-<blockquote>
-<p>摇滚乐是一场人类文化运动；类型文化总是具有原教旨倾向。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/410072393/answer/1365721848" target="_blank" rel="noopener">如何看待美国防长 7 月 21 日谈中美关系时，称「我们不是要寻找冲突」？ - 王子君的回答 - 知乎</a></p>
-<blockquote>
-<p>华盛顿的态度是：我们又不是到摊牌的地步，你们为什么反应这么激烈嘛；北京的态度是：你们不能老是把你们国情的代价转移给我们。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/60779831/answer/1367943371" target="_blank" rel="noopener">就目前（2017年）的国际局势来看，美国的联俄制中政策会取得成功吗? - 王子君的回答 - 知乎</a></p>
-<blockquote>
-<p>之所以折腾到今天，美俄还是冷眼互看，主要是内外都有阻力：外部反对；内部阻力。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/408451534/answer/1368146776" target="_blank" rel="noopener">如何评价睡前消息第147期？ - 离离图总裂夫的回答 - 知乎</a></p>
-<blockquote>
-<p>一个没有核心价值的威权主义组织，有两个问题：第一，领袖稍微不行就一堆破事，组织开始涣散。从商周到罗马以色列，再到俄罗斯台湾全都是这样；第二，没有产生合格领袖的机制。</p>
-<p>纲不举的结果，就是目不张。</p>
-<p>新加坡其实适合走西方议会制路线的。因为英、美的制度设计，本质就是一种精英寡头政治。西方议会政治建立在社会中产以上有着强共识，而且统治集团人数很少，和中产没有根本利益冲突的前提下。这种制度下，一旦社会出现分裂，立马就混不下去。</p>
-<p>要说西方真对我们有什么贡献的话，就是让中国人明白，有时候还是得放下过去。（避免路线依赖）</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/406597161/answer/1344659749" target="_blank" rel="noopener">如何看待「香港或被踢出 SWIFT 银行结算系统」的消息？如果属实，将会造成什么样的影响？ - Mason Wu的回答 - 知乎</a></p>
-<blockquote>
-<p>什么是SWIFT？为什么会有这个谣言？</p>
-</blockquote>
-<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a href="https://www.memsql.com/resources/ebook-oreilly-pulsar-vs-kafka" target="_blank" rel="noopener">O’Reilly eBook: Apache Pulsar Versus Apache Kafka - MemSQL</a></p>
-<blockquote>
-<p>只有33页的新书，各方面对比了一下Pulsar和Kafka，不是特别有新意。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/392213415/answer/1362966848" target="_blank" rel="noopener">为什么有线网络可以全双工，而无线网络只能半双工呢? - 甜草莓的回答 - 知乎</a></p>
-<blockquote>
-<p>同时同频（In-band）的无线全双工存在自干扰问题；解决方案收益不大且成本高（增加天线或增加隔离度）。</p>
-</blockquote>
-<p><a href="https://zhuanlan.zhihu.com/p/165144850" target="_blank" rel="noopener">deno fmt 从 prettier 切换到 dprint，性能提升 10+ 倍 - justjavac的文章 - 知乎</a></p>
-<blockquote>
-<p>Rust降维打击；wasm性能损耗不低。</p>
-</blockquote>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/06/28/2020-h1-summary/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/06/28/2020-h1-summary/" class="post-title-link" itemprop="url">2020年上半年总结</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-06-28 18:14:16" itemprop="dateCreated datePublished" datetime="2020-06-28T18:14:16+08:00">2020-06-28</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-07-28 21:19:32" itemprop="dateModified" datetime="2020-07-28T21:19:32+08:00">2020-07-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="读书"><a href="#读书" class="headerlink" title="读书"></a>读书</h2><ul>
-<li><a href="https://book.douban.com/subject/1770782/" target="_blank" rel="noopener">追风筝的人</a></li>
-<li><a href="https://book.douban.com/subject/2308234/" target="_blank" rel="noopener">CSS权威指南（第三版）</a></li>
-<li><a href="https://book.douban.com/subject/4166546/" target="_blank" rel="noopener">数据库系统实现</a></li>
-<li><a href="https://book.douban.com/subject/5348018/" target="_blank" rel="noopener">国富论</a></li>
-<li><a href="https://book.douban.com/subject/10455982/" target="_blank" rel="noopener">什么是数学</a></li>
-<li><a href="https://book.douban.com/subject/10549733/" target="_blank" rel="noopener">JavaScript权威指南(第6版)</a></li>
-<li><a href="https://book.douban.com/subject/10794070/" target="_blank" rel="noopener">心外传奇</a></li>
-<li><a href="https://book.douban.com/subject/20499301/" target="_blank" rel="noopener">政治的历史与边界</a></li>
-<li><a href="https://book.douban.com/subject/24155919/" target="_blank" rel="noopener">简明逻辑学</a></li>
-<li><a href="https://book.douban.com/subject/24708288/" target="_blank" rel="noopener">算法设计与分析基础 : 第3版</a></li>
-<li><a href="https://book.douban.com/subject/25752357/" target="_blank" rel="noopener">Head First HTML与CSS（第2版）</a></li>
-<li><a href="https://book.douban.com/subject/25829287/" target="_blank" rel="noopener">数学</a></li>
-<li><a href="https://book.douban.com/subject/25832801/" target="_blank" rel="noopener">旧制度与大革命</a></li>
-<li><a href="https://book.douban.com/subject/26769754/" target="_blank" rel="noopener">Elixir程序设计</a></li>
-<li><a href="https://book.douban.com/subject/26772632/" target="_blank" rel="noopener">Java 8实战</a></li>
-<li><a href="https://book.douban.com/subject/26801314/" target="_blank" rel="noopener">人性的弱点</a></li>
-<li><a href="https://book.douban.com/subject/26874287/" target="_blank" rel="noopener">历史意识的维度</a></li>
-<li><a href="https://book.douban.com/subject/26954760/" target="_blank" rel="noopener">月亮与六便士</a></li>
-<li><a href="https://book.douban.com/subject/27042910/" target="_blank" rel="noopener">Mesos 实战</a></li>
-<li><a href="https://book.douban.com/subject/30389639/" target="_blank" rel="noopener">三十年战争史 : 1618-1648</a></li>
-<li><a href="https://book.douban.com/subject/30468519/" target="_blank" rel="noopener">局外人</a></li>
-<li><a href="https://book.douban.com/subject/34767458/" target="_blank" rel="noopener">Google工作法</a></li>
-<li><a href="https://book.douban.com/subject/34782541/" target="_blank" rel="noopener">从一到无穷大</a></li>
-<li><a href="https://book.douban.com/subject/35041576/" target="_blank" rel="noopener">Spring Cloud Alibaba 微服务原理与实战 : Cloud</a></li>
-</ul>
-<h2 id="技能"><a href="#技能" class="headerlink" title="技能"></a>技能</h2><ul>
-<li>Dart</li>
-<li>Java<ul>
-<li>Guice</li>
-</ul>
-</li>
-<li>SQL</li>
-</ul>
-<h2 id="见识"><a href="#见识" class="headerlink" title="见识"></a>见识</h2><ul>
-<li>入关学</li>
-<li>新公司的协作方式</li>
-</ul>
-<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><ul>
-<li>如何预测与测量项目的收益</li>
-<li>团队内的沟通</li>
-<li>两个公司的管理模式的差异</li>
-<li>我的职业发展的目标是什么</li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/01/22/optimizations-in-cpp-compilers/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/01/22/optimizations-in-cpp-compilers/" class="post-title-link" itemprop="url">[翻译]C++编译器中的优化</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-01-22 22:58:28" itemprop="dateCreated datePublished" datetime="2020-01-22T22:58:28+08:00">2020-01-22</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-07-28 21:19:32" itemprop="dateModified" datetime="2020-07-28T21:19:32+08:00">2020-07-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<ul>
-<li>原文：<a href="https://queue.acm.org/detail.cfm?id=3372264" target="_blank" rel="noopener">Optimizations in C++ Compilers</a></li>
-<li>作者：<a href="https://www.linkedin.com/in/godbolt/" target="_blank" rel="noopener">Matt Godbolt</a></li>
-</ul>
-</blockquote>
-<p>在将上层容易写的代码转换为高效的由计算机去执行的机器码的过程中，编译器必不可少。但它们在其中完成的复杂工作却常常被人忽视。你也许会花许多时间来慎重考虑算法和解决错误，但可能没有足够的时间关注编译器能做什么。</p>
-<p>本文介绍了一些编译器和代码生产方面的概念，之后着重介绍一些你的编译器为你所做的令人印象深刻的转换工作，以及我最喜欢的优化方式的一些实际例子。希望你能了解编译器可以做哪些优化，以及如何进一步探索该主题。最重要的是，你可能也会爱上看汇编输出，并开始对编译器的工程质量肃然起敬。</p>
-<p>本文举的都是C/C++的例子，这是我最有经验的语言。但其中的许多优化方法也适用于其它编译语言。事实上，像LLVM这样的前端不可见的编译器工具包的出现意味着多数优化方法都会以相同方式作用在Rust/Swift/D语言等语言上。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/01/22/optimizations-in-cpp-compilers/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1771,14 +1863,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">51</span>
+          <span class="site-state-item-count">54</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">30</span>
+        <span class="site-state-item-count">33</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
