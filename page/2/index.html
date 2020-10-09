@@ -176,6 +176,354 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/" class="post-title-link" itemprop="url">[笔记] Column-Stores vs. Row-Stores: How Different Are They Really?</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-08-31 12:29:30 / 修改时间：12:30:15" itemprop="dateCreated datePublished" datetime="2020-08-31T12:29:30+08:00">2020-08-31</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="http://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2017/2010/Papers/sigmod08-columstore-abadi.pdf" target="_blank" rel="noopener">Column-Stores vs. Row-Stores: How Different Are They Really?</a> </p>
+</blockquote>
+<p>本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。</p>
+<p>本文针对的场景：星型的data warehouse，OLAP。</p>
+<h2 id="针对RowStore的优化技术"><a href="#针对RowStore的优化技术" class="headerlink" title="针对RowStore的优化技术"></a>针对RowStore的优化技术</h2><h3 id="垂直分片"><a href="#垂直分片" class="headerlink" title="垂直分片"></a>垂直分片</h3><p>每列对应一个分片，每个分片存储一列数据加主键。重新组合relation的时候要join涉及的列。</p>
+<h3 id="全部索引化"><a href="#全部索引化" class="headerlink" title="全部索引化"></a>全部索引化</h3><p>每列建一个索引。查询的时候分别在每个索引上应用谓词，再在内存中join结果。对于那些没有谓词的列，可以将其与同query的有谓词的列组成一个索引以避免扫描整个索引。</p>
+<h3 id="物化视图"><a href="#物化视图" class="headerlink" title="物化视图"></a>物化视图</h3><p>创建好一些物化视图，只包含query需要的列，避免加载不需要的列。</p>
+<h2 id="针对ColumnStore的优化技术"><a href="#针对ColumnStore的优化技术" class="headerlink" title="针对ColumnStore的优化技术"></a>针对ColumnStore的优化技术</h2><h3 id="压缩"><a href="#压缩" class="headerlink" title="压缩"></a>压缩</h3><p>列存的压缩效果往往远好于行存，原因是同一列数据的局部性更好，墒更低。而且列存可以用像RLE这样的不需要解压缩就能扫描的压缩算法。</p>
+<p>一列排序好的数据的压缩效果会非常好，列存比较容易实现排序，而行存因为同一列不是连续排列的，这种排序性很难被利用上。</p>
+<h3 id="延迟物化"><a href="#延迟物化" class="headerlink" title="延迟物化"></a>延迟物化</h3><p>同一个relation的不同列在被加载上来之后，最原始的做法是直接组合成relation，再运算。这样列存与行存就只是存储格式的区别了。我们还可以尽量延迟组合物化的时间，在此之前完成尽量多的操作。一列数据可以表示为数组、位图等数据结构，可以做非常高效的操作。延迟物化的好处：物化前先进行过滤和组合可以避免掉一些不必要的物化；避免不必要的解压缩；cache更友好；更容易应用按块迭代；固定长度的列操作更高效，延迟物化可以避免少量变长列影响其它列的操作。</p>
+<h3 id="按块迭代"><a href="#按块迭代" class="headerlink" title="按块迭代"></a>按块迭代</h3><p>算子一次处理一个block，函数调用次数更少，不需要额外的提取操作，如果是固定长度的列，可以以数组形式处理。</p>
+<h3 id="隐式join"><a href="#隐式join" class="headerlink" title="隐式join"></a>隐式join</h3><p>对于星型data warehouse，处理query时比较常见的做法是先join fact table和最具选择性的维表，再在fact table上做aggregation，之后再针对每个谓词join不同的维表。</p>
+<p>另一种延迟join的做法是先在维表上应用谓词，再将结果与fact table join，这样能得到两组选中的位置，一组来自维表，一组来自fact table，从维表的位置中我们能得到其它需要的列（但通常是乱序的）。这样依次处理完所有维表，再最终与fact table join得到想要的relation。</p>
+<p>本文引入了另一种方法，隐式join。它也是延迟join，但会最小化需要乱序提取的值。它将join改写为应用在fact table上的谓词，这些谓词会通过hash查找（值来自各个维表应用谓词的结果）或区间谓词等方式求值。不同列的隐式join可以同时进行，直到最终选出想要的relation后再与各个维表进行join。</p>
+<h3 id="区间谓词"><a href="#区间谓词" class="headerlink" title="区间谓词"></a>区间谓词</h3><p>如果应用过谓词后得到了某一列上连续的区间，我们可以将hash查找改写为一个区间上的IN谓词。这种优化没办法应用在非排序列上。对于原本排序好的列，一些重排序操作也会打乱它们的顺序，此时可以应用字典编码来重新给这些列赋值，以保持其有序性，从而可以继续应用这种优化。</p>
+<h2 id="性能对比"><a href="#性能对比" class="headerlink" title="性能对比"></a>性能对比</h2><p>RowStore的三种模拟ColumnStore的优化都没办法得到特别好的效果。垂直分片只在选择的列少于1/4时有一定优势，超过之后它的空间上的额外开销（重复存储的主键）影响了影响。完全index要求fact table在应用谓词前一定要与维表join。物化视图有效果，但效果仍赶不上ColumnStore。</p>
+<p>ColumnStore的优化方法中，按块迭代提升了5%到50%的性能。隐式join提升了50%到75%的性能，主要是区间谓词的贡献。压缩提升了2倍性能，且仍有上升空间（多维度排序维表）。对于一些不需要解压缩就能过滤的场景，压缩的性能提升可以达到10倍。延迟物化提升了3倍性能。</p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>只是将RowStore改造为按列存储是达不到完全针对列存优化的ColumnStore的性能的。这种性能差异的主要因素是压缩和延迟物化，次要因素是按块迭代和隐式join。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/" class="post-title-link" itemprop="url">[笔记] The Chubby lock service for loosely-coupled distributed systems</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-08-28 11:59:16 / 修改时间：11:59:54" itemprop="dateCreated datePublished" datetime="2020-08-28T11:59:16+08:00">2020-08-28</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://www.usenix.org/event/osdi06/tech/full_papers/burrows/burrows_html/" target="_blank" rel="noopener">The Chubby lock service for loosely-coupled distributed systems</a></p>
+<p>本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。</p>
+<p>论证过程：</p>
+<ol>
+<li>如何实现强一致：Paxos。</li>
+<li>实现为库还是外部服务：库是侵入式的，应用接入困难；外部服务能把应用与Chubby解耦开。</li>
+<li>提供什么样的接口：类UNIX文件系统，建议式锁，尽可能降低应用接入和开发者的使用难度。</li>
+<li>针对读远多于写的使用场景，如何降低server负载：尽可能地cache，为了降低开发者的理解难度，使用一致性cache而不是基于TTL的cache。</li>
+<li>如何提高可用性：粗粒度锁，client在session过期后有一个grace period。</li>
+<li>未来可以做哪些改进：使用proxy和partitioning进一步提升服务规模。</li>
+</ol>
+</blockquote>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Chubby是一个<strong>锁服务</strong>。通过Chubby，不同client可以实现临界区，或达成共识。Chubby的主要设计目的是可靠性、可用性（服务大量普通商用机器）、语义容易理解，次要目的是吞吐和存储容量。Chubby提供了类似于文件系统的API（每个操作都会读写整个文件），建议式锁和事件通知。</p>
+<p>Chubby预期提供<strong>粗粒度</strong>的同步，尤其是选举leader。</p>
+<p>Chubby内核是Paxos算法。</p>
+<h2 id="Design"><a href="#Design" class="headerlink" title="Design"></a>Design</h2><h3 id="Rationale"><a href="#Rationale" class="headerlink" title="Rationale"></a>Rationale</h3><p>为什么不实现一个Paxos库（client会成为一个Paxos系统的一个node），而是实现一个外部的锁服务：</p>
+<ul>
+<li>应用一开始可能对可用性没那么高要求，等到后面再想接入Paxos库就困难了（比如要重新实现一个Paxos需要的状态机）；而接入一个外部的锁不需要做很多修改。</li>
+<li>许多应用需要有办法能知道当前的共识是什么（谁是leader、某块数据是什么），外部服务可以提供一致的cache，而库只能实现基于时间过期的cache。</li>
+<li>开发者更熟悉基于锁的API。</li>
+<li>使用Paxos库会导致replica数量与client数量成正比，而外部服务将其解耦开，只需要少量机器运行Chubby就可以满足大量机器的一致性需求。</li>
+</ul>
+<p>基于以上理由产生的两个关键决策：</p>
+<ul>
+<li>锁服务而不是Paxos库或服务。</li>
+<li>提供小文件的读写服务以广播和获取共识结果，而不是实现第二种服务（name service）。</li>
+</ul>
+<p>一些根据使用场景而做出的决策：</p>
+<ul>
+<li>需要支持一个Chubby file被数千个client读取，最好不需要大量机器。</li>
+<li>需要提供事件通知，这样client不需要轮询结果。</li>
+<li>需要有cache来支持大量client轮询。</li>
+<li>需要一致性cache以降低开发者理解难度。</li>
+<li>需要支持ACL。</li>
+</ul>
+<p>Chubby不打算支持细粒度锁（通常只持有若干秒或更短时间），原因：</p>
+<ul>
+<li>粗粒度锁的获取频率更低，降低server压力。</li>
+<li>受server failover影响的client更少（粗粒度锁在failover期间client很可能不需要与server交互）。</li>
+</ul>
+<p>应用可以基于Chubby的粗粒度锁自己实现细粒度锁：通过Chubby lock来维持若干个app lock server，每个app lock server管理若干个app lock，与app client之间通过lease维持。</p>
+<h3 id="System-structure"><a href="#System-structure" class="headerlink" title="System structure"></a>System structure</h3><p>Chubby通常有5个replica，之间使用共识协议算法选举master。master与其它replica之间的lease为若干秒。每个replica都维护一个小DB，但只有master提供读写服务。</p>
+<p>client通过DNS获取replica列表，与非master的replica通信时会被告知master地址。</p>
+<p>如果有replica挂掉数小时没有恢复，它会被自动替换掉，更新DNS，master从而知道replica列表变动。</p>
+<h3 id="Files-directories-and-handles"><a href="#Files-directories-and-handles" class="headerlink" title="Files, directories, and handles"></a>Files, directories, and handles</h3><p>Chubby提供的文件路径类似于：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;ls&#x2F;foo&#x2F;wombat&#x2F;pouch</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>ls</code>表示lock service，<code>foo</code>是cell name（如果是<code>local</code>表示访问应用所在的cell）。</p>
+<p>Chubby因此可以被其它文件系统使用，可以使用现成的工具，极大降低了教育成本。</p>
+<p>Chubby与UNIX文件系统间的设计差异是为了降低分布难度：不同的目录可能被不同的Chubby集群服务，因此：</p>
+<ul>
+<li>不支持跨目录的文件移动；</li>
+<li>不支持目录修改时间；</li>
+<li>避免依赖于路径的权限机制（文件权限只取决于文件自身而不是目录权限）；</li>
+<li>为了方便缓存meta数据，不显示最近访问时间。</li>
+</ul>
+<p>文件或目录都被称为node，不同的node有不同的路径，不存在软硬链接。永久的node需要显式删除，临时的node在没有client使用时自动删除。临时node通常用于临时文件或标识client存活。</p>
+<p>node的meta数据包含三类ACL（读、写、修改ACL），这些ACL在node创建时从它的父node处继承来（可覆盖）。ACL本身也是文件，存放在每个cell的固定路径下。Chubby的ACL机制类似于Plan9的groups。</p>
+<p>node的meta数据中来包含4个单调增的64位整数：</p>
+<ul>
+<li>instance number，重复创建node时增加；</li>
+<li>content generation number，文件被写入时增加；</li>
+<li>lock generation number，node的锁被持有时增加；</li>
+<li>ACL generation number，node的ACL名字发生变化时增加。</li>
+</ul>
+<p>Chubby也提供了每个文件的checksum，可以用来检测文件内容变化。</p>
+<p>client持有的handle包含：</p>
+<ul>
+<li>标识handle是否创建完成的位，这样只在创建handle时做完整的权限检查。</li>
+<li>sequence number，允许master检查这是不是之前master创建的handle。</li>
+<li>打开文件时使用的模式，允许新master重建handle对应的状态。</li>
+</ul>
+<h3 id="Locks-and-sequencers"><a href="#Locks-and-sequencers" class="headerlink" title="Locks and sequencers"></a>Locks and sequencers</h3><p>Chubby提供的lock都是建议式的读写锁。不提供强制锁的原因：</p>
+<ul>
+<li>应用可能使用Chubby保护lock对应的文件之外的资源。</li>
+<li>通过查看被锁住的文件来debug或做维护工作。</li>
+<li>相信开发者，强制锁也没办法保护错误或恶意的使用。</li>
+</ul>
+<p>分布式锁常见的一个问题是一个client先获得锁，进一步操作时已经丢掉锁了但自己不知道，最终导致数据错误。常见解法是使用sequence number。</p>
+<p>Chubby默认不使用sequence number（开销大），但允许client获取锁时同时也获得一个sequencer（包含lock name、mode、generation number的字符串），client后续操作可以带上这个sequencer从而允许server检测lock是否还有效。</p>
+<p>对于早期的不支持sequencer的Chubby服务，有另一种机制，在一个lock holder挂掉后不立即允许其它client获取，而是等一段时间（如1分钟），这样避免出错的client破坏整个系统。</p>
+<h3 id="Events"><a href="#Events" class="headerlink" title="Events"></a>Events</h3><p>client在创建handle时可以订阅若干事件，包括：</p>
+<ul>
+<li>文件内容修改；</li>
+<li>子node的增删改（从而可以监控临时文件）；</li>
+<li>Chubby master自己的failover，表明可能有其它event丢失，client要自己处理这种情况，比如重新扫描文件；</li>
+<li>handle和lock不可用；</li>
+<li>锁被人获取成功；</li>
+<li>与另一个client的锁请求冲突。</li>
+</ul>
+<p>事件投递晚于事件发生。</p>
+<p>最后两个事件很少被用到：</p>
+<ul>
+<li>client通常不仅要知道选举结果产生了，还要知道leader是谁，因此它直接订阅文件内容修改就好了；</li>
+<li>订阅另一个client的锁请求冲突可以实现一种场景，即当前持有锁的client提前释放锁，但实践中没有应用这么用。</li>
+</ul>
+<h3 id="API"><a href="#API" class="headerlink" title="API"></a>API</h3><ul>
+<li><code>open</code>：返回handle。</li>
+<li><code>close</code>：不会失败，调用后不再允许使用该handle（进程可能会挂掉）。</li>
+<li><code>poison</code>：使该handle的后续操作失败，可以跨线程使用。</li>
+<li><code>GetContentsAndStat</code>：返回文件数据和meta。</li>
+<li><code>GetStat</code>：只返回meta。</li>
+<li><code>ReadDir</code>：返回目录的子结点的名字和meta。</li>
+<li><code>SetContents</code>：覆盖整个文件，可以传入content generation number以实现CAS。</li>
+<li><code>SetACL</code>：设置文件的ACL。</li>
+<li><code>Delete</code>：删除没有子结点的结点。</li>
+<li><code>Acquire</code>、<code>TryAcquire</code>、<code>Release</code>：与锁相关。</li>
+<li><code>GetSequencer</code>：返回sequencer。</li>
+<li><code>CheckSequencer</code>：检测sequencer是否有效。</li>
+</ul>
+<h3 id="Caching"><a href="#Caching" class="headerlink" title="Caching"></a>Caching</h3><p>client有一个文件内容和node meta的一致的写穿透的cache。master与client间通过lease维护cache，因此master知道client可能cache了什么。当文件内容或meta变动时，master会向可能缓存了这个文件的client发送invalidation。invalidation包含在了KeepAlive请求中，client收到后会在下次KeepAlive请求中回复master。文件内容或meta的修改要等到master获得了所有client的回复或cache lease过期后才生效。</p>
+<p>如果client不回复invalidation，master就认为这个node不能缓存，这样invalidation只需要一轮RPC。Chubby的场景下读远多于写，因此可以这么做。另一个方案是阻塞住对这个node的后续操作，从而避免太多对这个node的操作击垮master，但会增加延迟。</p>
+<p>Chubby的cache协议只失效，不更新，从而简化设计，也避免了访问过一个文件的client就要接收这个文件的后续的无穷无尽的更新消息。</p>
+<p>Chubby没有选择更弱化的一致性cache是因为那样的cache很难使用。那些需要client在每个消息中都交换sequence number的方案不适用于已经存在多套通信协议的环境。</p>
+<p>client还会cache handle，因此一个client重复<code>open</code>一个文件时，会返回相同的handle，避免每次都发RPC给master。</p>
+<p>Chubby协议允许client缓存lock，即在lock失效后继续持有lock，直到另一个client冲突再主动释放。</p>
+<h3 id="Sessions-and-KeepAlives"><a href="#Sessions-and-KeepAlives" class="headerlink" title="Sessions and KeepAlives"></a>Sessions and KeepAlives</h3><p>只要client与master之间的session有效，client的handl、lock、cache都有效。如果client不持有任何handle且1分钟以上无调用，session自动失效。</p>
+<p>master延长client的lease timeout的情况：</p>
+<ul>
+<li>创建session时</li>
+<li>master发生failover时</li>
+<li>回复KeepAlive时</li>
+</ul>
+<p>master收到KeepAlive时会hold，直到当前lease快过期时再回复。client收到回复后会立即发送下个KeepAlive。</p>
+<p>master会把event和invalidation也加到KeepAlive的回复中，保证了client如果不告知invalidation是否成功，就没办法保有session。</p>
+<p>client自己也维护一个local lease timeout，比master的lease timeout略大一点点（包含KeepAlive网络传输时间）。一旦local lease过期，client就会清空cache，等待grace period（45秒）后如果仍不能收到master回复，client就假设session已失效。</p>
+<h3 id="Fail-overs"><a href="#Fail-overs" class="headerlink" title="Fail-overs"></a>Fail-overs</h3><p>master一旦丢掉了master资格，就会清空掉session、handle、lock的内存状态。但session timer会直到新master产生才结束（不立即让client的session失效）。这样如果client能在grace period与新master建立通信，它的所有现存session都不会受影响。</p>
+<p>在grace period中，client会阻塞住应用调用，以避免应用看到不一致的数据。</p>
+<p>新master产生后通过读取持久化数据以及从client获取数据来重建内存状态。</p>
+<p>新master要执行的操作：</p>
+<ul>
+<li>选择新的epoch给client后续API使用。</li>
+<li>可以回复master-location请求。</li>
+<li>从DB中读取session和lock，将session lease延长至前一个master可能达到的最大值。</li>
+<li>可以回复client的KeepAlive请求，但不做其它session相关的操作。</li>
+<li>向每个session发送failover事件，收到的client会清空cache。</li>
+<li>等待直到每个client要么告知了failover事件已收到，要么session过期。</li>
+<li>可以执行任何操作。</li>
+<li>将上一个master创建的handle延长至当前epoch。在当前epoch内该handle不可重建，从而避免网络上飘的请求创建出已经close的handle。</li>
+<li>等待一段时间后删除没人打开的临时文件。client在收到failover事件后应该重新刷新临时文件的handle。但如果某个持有该临时文件的client的session过期了，临时文件可能不会立即删除。</li>
+</ul>
+<h3 id="Database-implementation"><a href="#Database-implementation" class="headerlink" title="Database implementation"></a>Database implementation</h3><p>Chubby一开始使用BDB，但不需要那么完整的功能，同时BDB的replication带来了过高的风险，最终Chubby选择了实现一个简化版的使用WAL和snapshot的DB。</p>
+<h3 id="Backup"><a href="#Backup" class="headerlink" title="Backup"></a>Backup</h3><p>Chubby会定期把DB的snapshot写入另一个cell的GFS上。</p>
+<h3 id="Mirroring"><a href="#Mirroring" class="headerlink" title="Mirroring"></a>Mirroring</h3><p>Chubby可以在一个cell上镜像另一个cell的若干文件。<code>/ls/global/master</code>在各个cell都有镜像，路径为<code>/ls/cellname/slave</code>。</p>
+<h2 id="Mechanisms-for-scaling"><a href="#Mechanisms-for-scaling" class="headerlink" title="Mechanisms for scaling"></a>Mechanisms for scaling</h2><p>Chubby为了提高伸缩性而采取的部分措施：</p>
+<ul>
+<li>多创建cell，保证不同client可以就近访问Chubby。</li>
+<li>master在高负载时可能会把lease timeout从12秒上调到60秒。</li>
+<li>Chubby client会缓存文件数据、meta、文件不存在、handle等，以降低rpc call。</li>
+<li>有server将Chubby协议转换为更简单的协议如DNS。</li>
+</ul>
+<p>Proxy和Partitioning是已设计但未实现的功能，原因是目前压力还没那么大：</p>
+<ul>
+<li>一个数据中心的机器数量有限。</li>
+<li>硬件性能的提升也会带来Chubby容量的提升。</li>
+</ul>
+<h3 id="Proxies"><a href="#Proxies" class="headerlink" title="Proxies"></a>Proxies</h3><p>Proxy可以处理KeepAlive和读请求，但不能处理写请求。使用Proxy会降低可用性，Proxy和Chubby master不可用都会导致client受影响。</p>
+<h3 id="Partitioning"><a href="#Partitioning" class="headerlink" title="Partitioning"></a>Partitioning</h3><p>一个Chubby cell可以分为N个partition，每个目录根据其路径的hash只由一个partition服务，这样目录与父目录可能在不同partition上。</p>
+<p>需要跨partition的操作：</p>
+<ul>
+<li>访问ACL。但ACL非常适合缓存（数据量小、修改极少）。</li>
+<li>删除目录时可能需要跨partition以确认它为空。</li>
+</ul>
+<p>partitioning可以降低读写的压力，但每个client仍然要与多数partition保持KeepAlive，因此KeepAlive的压力没办法降低。</p>
+<h2 id="Use-surprises-and-design-errors"><a href="#Use-surprises-and-design-errors" class="headerlink" title="Use, surprises and design errors"></a>Use, surprises and design errors</h2><h3 id="Use-and-behaviour"><a href="#Use-and-behaviour" class="headerlink" title="Use and behaviour"></a>Use and behaviour</h3><p>一些结论：</p>
+<ul>
+<li>多数（60%）文件需要按名字访问。</li>
+<li>配置、ACL、元数据文件很常见。</li>
+<li>缓存文件不存在的信息是很重要的。</li>
+<li>平均每个被缓存的文件有10个client使用。</li>
+<li>很少的client会持有锁，共享锁很罕见。锁主要用在选举leader和数据分片上。</li>
+<li>RPC主要由KeepAlive贡献。</li>
+</ul>
+<p>9次服务中断：</p>
+<ul>
+<li>网络维护：4次。</li>
+<li>未知网络链路问题：2次。</li>
+<li>软件错误：2次。</li>
+<li>过载：1次。</li>
+</ul>
+<p>6次丢失数据：</p>
+<ul>
+<li>DB软件错误：4次。</li>
+<li>误操作：2次。</li>
+</ul>
+<p>上调lease timeout可以降低KeepAlive的压力。group commit可以降低写压力，但通常不需要。</p>
+<p>Chubby伸缩性的关键不是server性能，而是降低通信次数。</p>
+<h3 id="Java-clients"><a href="#Java-clients" class="headerlink" title="Java clients"></a>Java clients</h3><p>略</p>
+<h3 id="Use-as-a-name-service"><a href="#Use-as-a-name-service" class="headerlink" title="Use as a name service"></a>Use as a name service</h3><p>用作name service时，对比DNS，Chubby的优势是一致性cache，不需要设置TTL。但Chubby也会遇到性能问题，尤其是大量job启动时，此时可以用batch name lookup来缓解。</p>
+<p>Chubby cache的一致性已经超出了name service需要的程度，因此可以使用专门为name service设计的协议转换server来进一步降低Chubby的负载。</p>
+<h3 id="Problems-with-fail-over"><a href="#Problems-with-fail-over" class="headerlink" title="Problems with fail-over"></a>Problems with fail-over</h3><p>Chubby的旧的failover方案需要master在创建session时写DB，使用BDB时写入压力太大，Chubby选择只在session第一次执行写（包括open和lock）操作时写DB。但这带来一个问题，readonly的session不在DB中，在master发生failover后很可能已经失效了，存在一个窗口期client可能读到过期的数据。</p>
+<p>新方案中master不会在DB中记录session，而是在启动后等待最长可能的lease timeout，保证在此期间没有与master建立连接的client的session过期。这也允许proxy来管理与client的session。</p>
+<h3 id="Abusive-clients"><a href="#Abusive-clients" class="headerlink" title="Abusive clients"></a>Abusive clients</h3><ul>
+<li>应用接入前review很重要。用户经常没办法预计业务增长速度，因此review时要找出使开销线性化的因素，想办法弥补。</li>
+<li>多数文档中缺乏性能方面的建议，导致一个调用了Chubby的接口未来被其它应用误用。</li>
+<li>一开始Chubby没有缓存handle和文件不存在，导致<code>open</code>开销很大，经常有业务反复<code>open</code>。</li>
+<li>一开始Chubby没有限制文件大小，导致有应用拿它作为存储用。最终Chubby上线了256KB的文件大小限制。</li>
+<li>有应用拿Chubby作为PubSub用，但Chubby的重一致性导致了它不适合这个场景。</li>
+</ul>
+<h3 id="Lessons-learned"><a href="#Lessons-learned" class="headerlink" title="Lessons learned"></a>Lessons learned</h3><ul>
+<li>开发者经常忽视可用性：<ul>
+<li>Chubby稍有波动就可能导致应用出现严重问题。</li>
+<li>服务在线与服务可用之间有差别。如Chubby的global cell的总在线时间是超过local cell的，但从某个client来看，global cell的可用性却低于local cell，因为local cell与client之间网络通常不会分区，它们的维护时间通常也是重合的。</li>
+<li>Chubby提供了master failover的事件，但发现应用经常收到这个event后直接crash。</li>
+<li>Chubby提供了三种机制：接入前review；client中提供接口以自动处理Chubby中断；为Chubby中断提供事后报告。</li>
+</ul>
+</li>
+<li>可以不实现细粒度锁。</li>
+<li>将KeepAlive与invalidation合并可以强制client一定要回复invalidation，否则session就会过期，但这样就给KeepAlive的协议选择带来了压力。TCP的退避重试可能会影响到lease timeout，因此Chubby选择了用UDP发送KeepAlive。</li>
+</ul>
+<h2 id="Comparison-with-related-work"><a href="#Comparison-with-related-work" class="headerlink" title="Comparison with related work"></a>Comparison with related work</h2><p>略</p>
+<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>略</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1297,209 +1645,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2019/04/07/three-optimization-tips-for-cpp/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2019/04/07/three-optimization-tips-for-cpp/" class="post-title-link" itemprop="url">[笔记] Three Optimization Tips for C++</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2019-04-07 19:29:29" itemprop="dateCreated datePublished" datetime="2019-04-07T19:29:29+08:00">2019-04-07</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-23 17:14:06" itemprop="dateModified" datetime="2020-08-23T17:14:06+08:00">2020-08-23</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://www.facebook.com/notes/facebook-engineering/three-optimization-tips-for-c/10151361643253920/" target="_blank" rel="noopener">Three Optimization Tips for C++</a></p>
-</blockquote>
-<p>建议：</p>
-<ul>
-<li>Prefer static linking and position-dependent code (as opposed to PIC, position-independent code).</li>
-<li>Prefer 64-bit code and 32-bit data.</li>
-<li>Prefer array indexing to pointers (this one seems to reverse every ten years).</li>
-<li>Prefer regular memory access patterns.</li>
-<li>Minimize control flow.</li>
-<li>Avoid data dependencies.</li>
-</ul>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2019/04/07/three-optimization-tips-for-cpp/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/07/22/cpp-use-mixin-to-get-better-performance/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/07/22/cpp-use-mixin-to-get-better-performance/" class="post-title-link" itemprop="url">C++：使用mixin获得比继承+组合更好的性能</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-07-22 17:00:52" itemprop="dateCreated datePublished" datetime="2018-07-22T17:00:52+08:00">2018-07-22</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>注：本文所使用编译器均为gcc4.1.2，即只能使用C++98标准。</p>
-<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Node</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> mRow;</span><br><span class="line">    <span class="keyword">int</span> mCol;</span><br><span class="line">    <span class="keyword">int</span> mValue;</span><br><span class="line"></span><br><span class="line">    Node(<span class="keyword">int</span> row, <span class="keyword">int</span> col, <span class="keyword">int</span> value)</span><br><span class="line">        : mRow(row), mCol(col), mValue(value)</span><br><span class="line">    &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Iterator</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~Iterator() &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Node <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>我们有一个接口类<code>Iterator</code>，它有三个方法，可以返回<code>Node</code>类型的值。现在我们要用这个接口来遍历一个矩阵。</p>
-<p>矩阵的类型是<code>vector&lt;vector&lt;int&gt;&gt;</code>，我们有几种不同的遍历需求：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>这个方法返回一个最原始的<code>Iterator</code>，只是单纯遍历数据。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>在<code>RawIterator</code>基础上，只返回奇数。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>在<code>OddIterator</code>基础上，遍历过程中，在每行末尾加上<code>appendix</code>中的元素。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>在<code>AppendPerRowIterator</code>基础上，返回的每个<code>Node</code>的value都乘2。</p>
-<h2 id="测试程序"><a href="#测试程序" class="headerlink" title="测试程序"></a>测试程序</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    srand(time(<span class="literal">NULL</span>));</span><br><span class="line">    <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt; matrix;</span><br><span class="line">    <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; appendix;</span><br><span class="line">    PrepareMatrix(matrix, <span class="number">1000</span>, <span class="number">10000</span>);</span><br><span class="line">    PrepareAppendix(appendix, <span class="number">3</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int64_t</span> t0 = Measure(NewRawIterator(matrix));</span><br><span class="line">    <span class="keyword">int64_t</span> t1 = Measure(NewOddIterator(matrix));</span><br><span class="line">    <span class="keyword">int64_t</span> t2 = Measure(NewAppendPerRowIterator(matrix, appendix));</span><br><span class="line">    <span class="keyword">int64_t</span> t3 = Measure(NewDoubleIterator(matrix, appendix));</span><br><span class="line"></span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; <span class="string">"Raw:"</span> &lt;&lt; t0 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Odd:"</span> &lt;&lt; t1 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Append:"</span> &lt;&lt; t2 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Double:"</span> &lt;&lt; t3 &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>我们会在一个1000*10000的矩阵上测试各个<code>Iterator</code>。</p>
-<h2 id="基于继承-组合的实现"><a href="#基于继承-组合的实现" class="headerlink" title="基于继承+组合的实现"></a>基于继承+组合的实现</h2><p>上面的需求看起来很适合用继承+组合来实现：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RawIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">OddIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AppendPerRowIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    AppendPerRowIterator(Iterator* iter, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix);</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">DoubleIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">DoubleIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>我们用了4个派生自<code>Iterator</code>的新类型来实现不同的需求，除了<code>RawIterator</code>外，其它3种类型都是在组合了已有的<code>Iterator</code>基础上实现新功能，因此可以任意顺序组合。</p>
-<p>几个New函数的实现：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> RawIterator(matrix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    Iterator* rawIter = NewRawIterator(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> OddIterator(rawIter);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* oddIter = NewOddIterator(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> AppendPerRowIterator(oddIter, appendix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* appendIter = NewAppendPerRowIterator(matrix, appendix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> DoubleIterator(appendIter);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>测试结果为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:164311</span><br><span class="line">Odd:316020</span><br><span class="line">Append:436596</span><br><span class="line">Double:458733</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，每增加一层功能，调用延时就明显上涨了一截。有没有其它性能更好的方案了呢？</p>
-<h2 id="mixin"><a href="#mixin" class="headerlink" title="mixin"></a>mixin</h2><p>mixin是给一组基础类，每个都建模了一个抽象概念，且能直接组合成一个新的类，像乐高一样，满足需求。如果你新增了基础类，只要它是和其它基础类正交的，就可以扩展到这个组合类里。</p>
-<p>C++中的一种mixin方法是结合模板和继承，通过模板参数来组合基础类（见<a href="https://fuzhe1989.github.io/2018/04/21/mixin/">通过mixin组合功能</a>）。</p>
-<p>在上面这个例子中，<code>RawIterator</code>是一个基础类，可以单独使用，而<code>OddIterator</code>、<code>AppendIterator</code>和<code>DoubleIterator</code>则是用来提供新的功能的，是mixin类，我们可以将这三个类型实现为模板类，以<code>OddIterator</code>为例：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    OddIterator(?)</span><br><span class="line">        : T(?) &#123;</span><br><span class="line">        MoveUntilOdd();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">Node <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::GetValue();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::IsValid();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        T::MoveNext();</span><br><span class="line">        MoveUntilOdd();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">MoveUntilOdd</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">while</span> (T::IsValid() &amp;&amp; T::GetValue().mValue % <span class="number">2</span> == <span class="number">0</span>) &#123;</span><br><span class="line">            T::MoveNext();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，新的<code>OddIterator</code>是通过继承自<code>T</code>来给<code>T</code>增加功能的，这有什么好处？摘取上文中的一段：</p>
-<blockquote>
-<p>不需要堆分配。<br>没有运行期检查null。<br>不需要显式管理生命期。<br>没有多余的虚函数定义及其调用。<br>编译器有机会做更多优化。</p>
-</blockquote>
-<p>似乎一切都很美好，除了代码有些怪异外。但我们还有一个问题没有解决：怎么构造<code>T</code>？</p>
-<h2 id="一种mixin的通用构造方法"><a href="#一种mixin的通用构造方法" class="headerlink" title="一种mixin的通用构造方法"></a>一种mixin的通用构造方法</h2><p>这是一个很大很复杂的课题，这里我只提出一种似乎可行的方式（至少本文的例子是没问题的）。</p>
-<p>我们要求每个mixin类型，及需要与这个mixin类型组合的基础类型内部，都定义一个Context类型，且有一个只有一个Context类型参数的构造函数。例子：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RawIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; mMatrix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span></span><br><span class="line">            : mMatrix(matrix) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="keyword">const</span> Context&amp; context)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; base)</span></span></span><br><span class="line">            : mBase(base) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    OddIterator(<span class="keyword">const</span> Context&amp; c)</span><br><span class="line">        : T(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AppendPerRowIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line">        <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; mAppendix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; base, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span></span><br><span class="line">            : mBase(base), mAppendix(appendix) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line">    AppendPerRowIterator(<span class="keyword">const</span> Context&amp; c)</span><br><span class="line">       : T(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br></pre></td></tr></table></figure>
-
-<p>通过这种方式，我们可以在不知道<code>T</code>的具体类型（也就不知道它到底有什么样的构造函数）的情况下，构造出组合类型。从而也获得了任意组合这些mixin顺序的能力。</p>
-<p>在C++11后，我们可以通过变长参数和继承构造函数的方式提供更优雅的mixin的通用构造方案，这是另外的话题，这里不展开了。</p>
-<p>在使用了上面的方法来构造mixin后，几个New函数的实现为：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> RawIterator(c);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> OddIter(c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    AppendIter::<span class="function">Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> AppendIter(c2);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line">    <span class="keyword">typedef</span> DoubleIterator&lt;AppendIter&gt; DoubleIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    AppendIter::<span class="function">Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    DoubleIter::<span class="function">Context <span class="title">c3</span><span class="params">(c2)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> DoubleIter(c3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>看起来还是很笨拙，但至少我们成功地把它们构造出来了。</p>
-<h2 id="mixin的性能"><a href="#mixin的性能" class="headerlink" title="mixin的性能"></a>mixin的性能</h2><p>重新编译，运行，基于mixin的结果为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:165505</span><br><span class="line">Odd:164377</span><br><span class="line">Append:187320</span><br><span class="line">Double:191260</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，在Raw结果不变的情况下（这是当然的），其它三种场景mixin方案的延时分别比继承+组合减少了48%、57%和58%，调用链越长，mixin方案的优势越大。</p>
-<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>本文提出了用mixin来解决功能组合的方案，且使用了Context类型来解决构造问题，相比常见的继承+组合的方案，mixin方案有着非常明显的性能优势。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1573,14 +1718,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">58</span>
+          <span class="site-state-item-count">60</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-count">39</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

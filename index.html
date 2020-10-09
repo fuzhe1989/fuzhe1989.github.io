@@ -176,6 +176,383 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/" class="post-title-link" itemprop="url">[笔记] Improving MapReduce Performance in Heterogeneous Environments</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-10-09 23:13:07 / 修改时间：23:14:10" itemprop="dateCreated datePublished" datetime="2020-10-09T23:13:07+08:00">2020-10-09</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://static.usenix.org/event/osdi08/tech/full_papers/zaharia/zaharia.pdf" target="_blank" rel="noopener">Improving MapReduce Performance in Heterogeneous Environments</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章讲的是如何优化Hadoop在异构环境下的任务调度性能。</p>
+<p>任务调度的关键在于如何让长尾任务尽快完成。MapReduce会在最后阶段冗余运行长尾任务，Google的数据显示这么做能提升44%的任务响应速度。</p>
+<p>Hadoop的调度策略是冗余运行最慢的任务，而这篇文章提出的LATE（Longest Approximate Time to End)策略则是找最可能最慢结束的任务。在异构环境下LATE可以让任务响应速度达到Hadoop原有策略的2倍。</p>
+<h2 id="Hadoop的探测运行机制"><a href="#Hadoop的探测运行机制" class="headerlink" title="Hadoop的探测运行机制"></a>Hadoop的探测运行机制</h2><p>Hadoop会给每个任务打一个0-1的分。map任务的分数就是它读取的input file的比例。reduce任务的分数分为三部分：copy、sort、reduce，每部分占1/3，乘上各自完成比例，最后累加起来。</p>
+<p>之后Hadoop会统计所有任务的平均分，小于这个平均分减一个阈值（默认0.2）的任务会被认为是慢任务，调度器同时最多探测运行一个慢任务。同构环境中任务通常是一波一波开始结束的，因此这种调度策略运行结果很好。</p>
+<p>但它做了几个假设：</p>
+<ol>
+<li>各节点执行速度差不多。</li>
+<li>任务的分数随运行时间线性增长。</li>
+<li>在空闲的节点上启动一个探测任务是没有开销的。</li>
+<li>任务的分数就代表着它的完成度，尤其对于reduce任务，它的copy、sort、reduce三阶段工作量是相同的。</li>
+<li>任务倾向于一波一波结束，因此分数低的任务很可能是慢任务。</li>
+<li>同类型（map或reduce）的任务间工作量差不多。</li>
+</ol>
+<p>异构环境下1和2不一定成立，即使是同构环境下3、4、5也不一定成立，还会拖慢Hadoop，Yahoo因此就在某些任务上关掉了探测执行。Facebook不对reduce任务启用探测执行。</p>
+<p>3在资源共享情况下不成立，不同任务间可能竞争网络和磁盘，且如果同时有多个作业执行，作业之间也会有资源竞争。</p>
+<p>4的问题是reduce任务的不同阶段工作量往往差别很大，典型的MapReduce任务的copy阶段工作量最大，因为它需要所有map任务的输出。可能出现的场景，30%的reduce任务完成了copy后迅速完成了后2阶段，分数从1/3直接变成了1，此时平均分是0.53，所有其它reduce任务都落后于平均分0.2，都变成了慢任务。实际场景中可以有80%的reduce任务被探测运行了。</p>
+<p>5的问题是分数低的任务可能刚刚启动。</p>
+<p>6取决于任务切分策略，理想情况下是的，但即使工作量分配不均匀，只要能找准慢任务，多探测运行几个慢任务也不坏。</p>
+<p>最后，0.2的阈值意味着只要分数过了0.8的任务都不会被认为是慢任务。</p>
+<h2 id="异构环境"><a href="#异构环境" class="headerlink" title="异构环境"></a>异构环境</h2><ol>
+<li>大型数据中心的机器难以保证配置相同（逐次更新换代）。</li>
+<li>软硬件问题导致不同机器执行速度不同。</li>
+<li>虚拟化。</li>
+</ol>
+<h2 id="LATE"><a href="#LATE" class="headerlink" title="LATE"></a>LATE</h2><p>LATE仍然统计各任务的分数，之后计算得到速度<code>progress rate = progress score / T</code>（T是任务已运行时间）和完成所需时间<code>(1 - progress score) / progress rate</code>。</p>
+<p>LATE还会统计各节点的分数（节点上所有运行过的任务的分数之和），从而找出慢节点，避免调度探测任务到这些慢节点上。</p>
+<p>LATE有两个关键参数：</p>
+<ul>
+<li>SpeculativeCap，同时最多有多少个探测任务运行。</li>
+<li>SlowTaskThreshold，速度慢于此值的任务才是慢任务。</li>
+</ul>
+<p>LATE会拒绝分配探测任务给慢节点，并在适当时候找出可能最晚结束的任务分配给快节点探测运行。</p>
+<p>LATE分配探测的map任务时不考虑局部性，作者假设map阶段正常的任务都是读本地盘的，这些探测任务的网络竞争应该很小。</p>
+<p>这种策略可能导致的一个问题：任务A的分数更高，但进入了运行较慢的阶段，任务B还没进入这个阶段，分数更低但速度更快，按前面的公式任务B会先执行完。但我们知道B到了下一阶段也会慢下来。这篇文章没有考虑解决这个问题。</p>
+<p>想要解决这一问题可能需要历史统计数据。</p>
+<p>反过来，如果后面阶段快于前面阶段则没有问题。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/09/understanding-compression/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/10/09/understanding-compression/" class="post-title-link" itemprop="url">[笔记] 数据压缩入门（Understanding Compression）</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-10-09 11:21:22 / 修改时间：19:30:58" itemprop="dateCreated datePublished" datetime="2020-10-09T11:21:22+08:00">2020-10-09</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p><a href="https://book.douban.com/subject/35034359/" target="_blank" rel="noopener">数据压缩入门</a></p>
+</blockquote>
+<h2 id="并非无趣的一章"><a href="#并非无趣的一章" class="headerlink" title="并非无趣的一章"></a>并非无趣的一章</h2><p>适合游戏数据的压缩：</p>
+<ol>
+<li>无损：去掉重复数据（lz）；熵压缩（Huffman，算术编码）</li>
+<li>有损：降精度，图像视频压缩，音频压缩</li>
+</ol>
+<p><a href="https://www.youtube.com/watch?v=Eb7rzMxHyOk&list=PLOU2XLYxmsIJGErt5rrCqaSGTMyyqNt2H" target="_blank" rel="noopener">Compressor Head - Youtube</a></p>
+<p>5类压缩算法：变长编码，统计压缩，字典编码，上下文模型，多上下文模型</p>
+<p>压缩数据的两个思路：</p>
+<ol>
+<li>减少符号数量（字母表尽可能小）</li>
+<li>用更少的位数对更常见的符号进行编码</li>
+</ol>
+<p><a href="https://www.pingdom.com/blog/the-web-in-1996-1997" target="_blank" rel="noopener">The web back in 1996-1997</a></p>
+<p>BWT是压缩dna信息最有效的格式</p>
+<h2 id="突破熵"><a href="#突破熵" class="headerlink" title="突破熵"></a>突破熵</h2><p><a href="http://www.rosettacode.org/" target="_blank" rel="noopener">Rosetta Code</a></p>
+<p>一组符号的香农熵是表示一个符号最小的位数</p>
+<p>通过利用真实数据的两个性质，很可能把数据压缩得比熵小</p>
+<p>突破熵：改变数据的表示形式</p>
+<p>增量编码</p>
+<p>字典编码器</p>
+<p>排列（无重复）通常很难压缩</p>
+<p>通过消除编码法压缩排列</p>
+<p>数据压缩的艺术，就在于将数据转换为熵值更小的新的表现形式</p>
+<p>对压缩进行评价时熵不是一个好指标（除了统计压缩）</p>
+<p>柯尔莫戈洛夫复杂度（Kolmogorov complexity），为了准确地生成数据，需要的生成程序的大小。如果生成程序很小，可以用它代替数据本身。逻辑综合（logic synthesis），程序综合（program synthesis）</p>
+<h2 id="VLC"><a href="#VLC" class="headerlink" title="VLC"></a>VLC</h2><p>给定一组符号，将最短的编码分配给最常见的符号</p>
+<p>编码需满足前缀性质</p>
+<p>整数转为VLC的方法称为通用编码（universal codes）。越小的数字编码越短。还有唯一可译码（uniquely decodable codes）与非奇异码（nonsingular codes）</p>
+<p>一元码：编码N为N个1加1个0。</p>
+<p>Elias Gamma编码：</p>
+<ol>
+<li>x= 2^N + L</li>
+<li>用一元码编码N</li>
+<li>用固定长度二进制码编码L</li>
+</ol>
+<p>Elias delta</p>
+<p>Elias omega</p>
+<p>VLC的问题：</p>
+<ol>
+<li>不按字节对齐</li>
+<li>大整数的长度超过固定编码</li>
+<li>按位解码慢</li>
+</ol>
+<p>variant算法：Google用在LevelDB中的按字节vlc</p>
+<p>避免压缩整数（escaping for compressed integers）</p>
+<h2 id="统计编码"><a href="#统计编码" class="headerlink" title="统计编码"></a>统计编码</h2><p>通过数据集中符号出现的概率确定唯一的新的变长编码，有时被称为熵编码</p>
+<p>哈夫曼编码，总是将码表放在数据流前面一起传输，避免解码时创建码表</p>
+<p><a href="https://www.ted.com/talks/robert_lang_the_math_and_magic_of_origami" target="_blank" rel="noopener">TED: The math and magic of origami</a></p>
+<p>哈夫曼编码的问题：单个符号的编码长度总是整数，当符号出现概率不是2的负整数幂时达不到最优</p>
+<p>算术编码：将整个输入流转换为长度很长的数值</p>
+<p>区间编码：绕开算术编码的专利限制</p>
+<p>算术编码过程：</p>
+<ol>
+<li>初始区间为[0, 1)</li>
+<li>将当前区间按各符号概率进行分割</li>
+<li>读入一个符号，选择对应的字区间，更新当前区间</li>
+<li>重复</li>
+</ol>
+<p>最终输出最后一个区间中任意一个数（二进制位数最少的）</p>
+<p>ANS（asymmetric numeral systems）是新编码算法，压缩率和算术编码接近，性能和哈夫曼编码接近</p>
+<p><a href="https://ieeexplore.ieee.org/document/7170048" target="_blank" rel="noopener">The Use of Asymmetric Numeral Systems as an Accurate Replacement for Huffman Coding</a></p>
+<ol>
+<li>创建转换表，每个符号一列，按概率自左向右排列</li>
+<li>填入数值，满足：<ol>
+<li>唯一</li>
+<li>每列升序</li>
+<li>大于该行行号（从1开始）</li>
+<li>每列值的个数满足乘以maxVal后等于该符号的出现概率</li>
+<li>每个cell的值除以行号近似等于该符号的出现概率</li>
+</ol>
+</li>
+<li>实际使用时从maxVal开始</li>
+</ol>
+<p>变种：有限状态熵（finite state entropy）</p>
+<h2 id="自适应统计编码"><a href="#自适应统计编码" class="headerlink" title="自适应统计编码"></a>自适应统计编码</h2><p>前一章的统计编码需要先遍历数据计算符号的概率，有两个问题：</p>
+<ol>
+<li>不同部分的符号概率不同（局部偏态），数据量大的话偏差增大。</li>
+<li>流数据没办法先遍历。</li>
+</ol>
+<p>局部性很重要（locality matters）。</p>
+<p>最优方式分割数据流是NP完全问题，因此我们要做的是自动重置统计编码：如果期望的熵与实际编码位数出现显著差异，则重置概率表。</p>
+<p>通常统计压缩的步骤：</p>
+<ol>
+<li>遍历数据流并计算概率。</li>
+<li>根据概率生成VLC。</li>
+<li>再次遍历数据流真正压缩。</li>
+</ol>
+<p>动态VLC编码：</p>
+<ol>
+<li>读取符号。</li>
+<li>输出对应码字。</li>
+<li>更新符号的概率和码字。</li>
+</ol>
+<p>解码：</p>
+<ol>
+<li>读取码字。</li>
+<li>输出符号。</li>
+<li>更新符号的概率和码字。</li>
+</ol>
+<p>编解码过程中遇到第一次出现的符号时，使用一个特殊的LITERAL符号对应的码字，后面再跟着这个符号的原始编码。</p>
+<p>初始概率表只有LITERAL，概率为100%。</p>
+<p>监视平均位数，如果与熵值的差别超过阈值，表明数据模式发生了变化，需要重置。</p>
+<p>自适应算术编码可以使用类似方法。</p>
+<p>自适应Huffman编码（参见<a href="https://dl.acm.org/doi/10.1145/31846.42227" target="_blank" rel="noopener">Design and Analysis of Dynamic Huffman Codes</a>）。</p>
+<h2 id="字典转换"><a href="#字典转换" class="headerlink" title="字典转换"></a>字典转换</h2><p>统计压缩接受任何符号；字典转换接收的是符号集，并重新定义要使用的符号以减少生成的数据流的熵。</p>
+<p>字典转换实际是一个数据流的预处理，之后数据流会更小，压缩率更高。之后还可以做统计编码。</p>
+<p>字典转换的中心问题是分词。</p>
+<p>LZ算法向前查找当前单词是否出现过，因此：</p>
+<ol>
+<li>数据流前半部分新单词很多，后半部分匹配的概率大。</li>
+<li>向前匹配可以找出最长的匹配词。</li>
+</ol>
+<p>当前位置左边叫搜索缓冲区（search buffer），是已经处理过的符号；右边叫先行缓冲区（look ahead buffer）。</p>
+<p>匹配过程类似于字符串查找的bm算法。</p>
+<p>考虑到性能和局部性，需要有滑动窗口，search buffer通常有几万B，look ahead buffer通常只有几十B。</p>
+<p>匹配完成后算法输出&lt;offset, len&gt;。或者&lt;offset, len, C&gt;，其中C是原始符号，表示匹配失败。</p>
+<p>LZ将数据流转换为了记号流，之后可以继续使用统计编码，如把offset/len/C分成三组再分别编码。</p>
+<h2 id="上下文数据转换"><a href="#上下文数据转换" class="headerlink" title="上下文数据转换"></a>上下文数据转换</h2><p>上下文转换：给定一组相邻的符号集，对其进行变换以易于压缩。</p>
+<p>最重要的3种转换方法：</p>
+<ol>
+<li>行程编码（run-length coding，RLE）</li>
+<li>增量编码（delta coding）</li>
+<li>Burrows-Wheeler transform，BWT</li>
+</ol>
+<p>RLE主要针对连续出现的相同符号聚类的现象。它会用包含符号值和重复次数的tuple替换单个符号连续的“行程”。编码就是找到一个符号，向前看看行程有多长。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AAAABCCCC -&gt; [A,4][B,1][C,4]</span><br></pre></td></tr></table></figure>
+
+<p>B是短行程，因此直接输出字面值B。为了区分字面值后有没有次数，在整个输出流前面加上一个bitmap，长度为符号数，1表示有次数，0表示无次数。</p>
+<p>一般来说数据流中交错出现字面值是会出问题的。</p>
+<p>压缩时字面值和次数分开压缩，解码时根据bitmap选择。</p>
+<p>通常认为RLE是单字符上下文模型。一种新的RLE：TurboRLE。</p>
+<p>增量编码是将数据转换为delta的过程。</p>
+<p>减法增量编码可能出现负数，影响效率。可以用XOR代替，保证没有负数，但不一定会缩小delta的范围。</p>
+<p>参照系（frame of reference，FOR）增量编码，即找一个参照值，将所有值减去参照值，从而缩小范围。</p>
+<p>为了处理离群值，使用修正的参照系增量编码（Patched Frame of Reference Delta Coding，PFOR）：</p>
+<ol>
+<li>选择位宽b</li>
+<li>用b位对每个值编码</li>
+<li>当遇到的值位数超过b时，将这个值单独存起来</li>
+</ol>
+<p>为了还原，需要存离群值的位置。可以将离群值的低b位留在原数据流中，只存储其余位，这样可以进一步压缩离群值。</p>
+<p>编码后可以进一步用统计编码压缩。</p>
+<p>前移编码（move-to-front coding，MTF）更多考虑在较短的窗口内某个特定符号的出现次数。</p>
+<p>预期：每出现一个符号，短时间内它可能还会出现很多次。</p>
+<p>MTF是局部自适应的。它维护一个SortedArray，保存所有出现过的符号。每遇到一个符号，输出它在Array中的索引，并将它移到Array最前面（索引0）。</p>
+<p>为了避免离群符号打乱Array，可以：</p>
+<ol>
+<li>向前K个位置。最常见的K为1。</li>
+<li>出现C次再前移。</li>
+</ol>
+<p>MTF是最简单的动态统计转换形式之一。它会输出很多0和1，因此很适合配合统计编码或RLE。</p>
+<p>BWT通过打乱数据流次序来让重复的子串聚集，从而利于后续压缩方法。</p>
+<p>BWT需要维护一张表，保存输入流的所有移位排列，之后：</p>
+<ol>
+<li>表中加入原始流。</li>
+<li>依次将原始流向右rotate1位，加入表，直到操作完一轮。</li>
+<li>按字典序排序表。</li>
+<li>依次输出每行最后一个字符，即组成原始流的一种新排列，且通常有更好的聚集性。</li>
+</ol>
+<p>如BANANA转换为NNBAAA。另一个重要数据是原始流在排序后的索引值，如3。</p>
+<p>BWT的优点是可逆，且开销极小。</p>
+<p>恢复过程：</p>
+<ol>
+<li>将NNBAAA排序为AAABNN。</li>
+<li>与NNBAAA配对组合为NA/NA/BA/AB/AN/AN，再次排序</li>
+<li>重复以上过程，直到每个子串长度达到6，此时原始流就在它的索引位置。</li>
+</ol>
+<p>应用BWT时需要先对数据分块，如1MB。BWT压缩文本的性能不如gzip，但非常适合压缩DNA数据。</p>
+<p>最常见的组合是BWT输出给MTF，再用统计编码。</p>
+<p>不用RLE的原因是RLE对干扰敏感，而MTF不敏感。</p>
+<h2 id="数据建模"><a href="#数据建模" class="headerlink" title="数据建模"></a>数据建模</h2><p>多上下文编码算法的基本概念：考虑最后观察到的几个符号以确定当前符号的理想编码位数。</p>
+<p>可以认为统计编码算法就是一阶马尔可夫链。</p>
+<p>通过为每个前面出现过的符号增加一张符号码字对应表，可以创建二阶马尔可夫链。</p>
+<p>应用马尔可夫链编码和解码时，随着读取输入流，动态调整一阶和二阶表。可以组合之前的自适应编码方法。</p>
+<p>实际不会用原始的马尔可夫链来压缩，一个问题是高阶马尔可夫表需要的内存和计算太多。</p>
+<p>值得注意的衍生算法：部分匹配预测算法（prediction by partial matching，PPM）和上下文混合算法（context mixing）。</p>
+<p>PPM的一种构造方法：使用trie记录原始串的所有子串和出现次数。之后依次为每个节点生成概率表。匹配时先按N阶上下文匹配，如果发现概率为0则用N-1阶重试。如果N减为0，则遇到了不认识的新子串，输出转义码。对转义码的不同处理产生了不同的PPM算法。</p>
+<p>大多数PPM算法的N为5或6。</p>
+<p>上下文混合算法，即为了找出给定符号的最佳编码，使用两个或更多的统计模型。</p>
+<p>对数据压缩来说，相邻性很重要，LZ、RLE、Delta Encoding、BWT都是基于假设：数据的相邻性与最佳编码方式有关。</p>
+<p>但相邻性和局部性都只是上下文的最简单方式，不是唯一的方式。</p>
+<p>模型是用来识别和描述符号之间的关系。需要处理的数据类型不同，模型也会不同。</p>
+<p>PAQ（一种上下文混合算法）包含模型：</p>
+<ol>
+<li>n元语法（n-grams），指之前的n个字符。</li>
+<li>整词n元语法（whole-word n-grams），忽略大小写和非字母字符。</li>
+<li>稀疏上下文，由前面的8位或16位字节的高字节位组成（对多媒体文件很有用）。</li>
+<li>二维上下文（对图像、表、电子表格很有用），行的长度由找出的重复字节模式的步长决定。</li>
+<li>只针对特定文件类型的特殊模型。</li>
+</ol>
+<p>将不同模型的输出结合的方法：</p>
+<ol>
+<li>线性混合（linear mixing），将各个模型的预测值加权平均。权重是静态的。</li>
+<li>逻辑混合，使用神经网络来更新权重，缺点是内存占用大，运算复杂。</li>
+</ol>
+<p>移动设备很难应用上下文混合算法。只有当数据量很大时它才能发挥作用。</p>
+<h2 id="换个话题"><a href="#换个话题" class="headerlink" title="换个话题"></a>换个话题</h2><p>大多数多媒体数据压缩都是有损压缩算法。</p>
+<p>通用压缩是用来处理除多媒体数据之外的数据的。</p>
+<h2 id="评价数据压缩"><a href="#评价数据压缩" class="headerlink" title="评价数据压缩"></a>评价数据压缩</h2><p>ZPAQ：文本压缩率高，但内存占用和运算量大。</p>
+<p>LZMA：内存占用高。</p>
+<p>JPG、Ｈ.264在大多数客户端都有硬件支持。GZIP有专用芯片。</p>
+<p>WebP的压缩率和图片质量都好于JPEG，但最初版本解码时间长，现在改善了。</p>
+<p>GZIP流行的一个主要原因是大小合适，解码快。</p>
+<h2 id="压缩图像数据"><a href="#压缩图像数据" class="headerlink" title="压缩图像数据"></a>压缩图像数据</h2><p>大多数人分辨不出图片质量75和90的区别，前者文件大小只有后者的一半，适合作为默认上传值。75以下会影响体验。</p>
+<p>量化（quantization）和区块化（blocking）是导致图像压缩出现视觉问题的最常见形式。</p>
+<p>评价图像质量的指标：峰值信噪比（peak signal-to-noise ratio，PSNR）和结构相似性（structural similarity index，SSIM）。</p>
+<p>PSNR计算的是去噪之后经过均方处理的原始值与压缩后的值的误差</p>
+<p>SSIM考虑了人眼的感知情况，比较了源图像与压缩后图像的边缘相似性，计算更复杂。</p>
+<p>PNG：无损（使用GZIP等算法），支持透明度、元数据块（对用户无用）。</p>
+<p>JPEG：有损，不支持透明度，支持元数据块。有广泛的硬件支持。</p>
+<p>GIF：有损，支持透明度、动画。第一步将图像颜色数降到256，第二步使用LZW无损压缩。</p>
+<p>WebP：介于PNG和JPEG之间，支持有损或无损、透明度。</p>
+<p>GPU可以直接渲染以下格式而无需解压：DXT、ETC、PVR。它们适合用于游戏中。</p>
+<p>矢量格式：描述如何生成图像，能精准缩放，不适合高质量图像。SVG。</p>
+<h2 id="序列化数据"><a href="#序列化数据" class="headerlink" title="序列化数据"></a>序列化数据</h2><p>二进制序列化格式相比JSON/XML等可读格式的真正优点是可以产生更好的压缩效果，有时后续还可以用GZIP等通用压缩算法进一步处理。</p>
+<p>对于大的序列化文件，将结构的数组转换为数组的结构极为重要。</p>
+<p>组织数据以便高效获取。服务端返回的数据不需要客户端重新组合。</p>
+<p>将数据切分为适当的压缩形式。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1135,354 +1512,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/" class="post-title-link" itemprop="url">[笔记] Column-Stores vs. Row-Stores: How Different Are They Really?</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2020-08-31 12:29:30 / 修改时间：12:30:15" itemprop="dateCreated datePublished" datetime="2020-08-31T12:29:30+08:00">2020-08-31</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="http://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2017/2010/Papers/sigmod08-columstore-abadi.pdf" target="_blank" rel="noopener">Column-Stores vs. Row-Stores: How Different Are They Really?</a> </p>
-</blockquote>
-<p>本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。</p>
-<p>本文针对的场景：星型的data warehouse，OLAP。</p>
-<h2 id="针对RowStore的优化技术"><a href="#针对RowStore的优化技术" class="headerlink" title="针对RowStore的优化技术"></a>针对RowStore的优化技术</h2><h3 id="垂直分片"><a href="#垂直分片" class="headerlink" title="垂直分片"></a>垂直分片</h3><p>每列对应一个分片，每个分片存储一列数据加主键。重新组合relation的时候要join涉及的列。</p>
-<h3 id="全部索引化"><a href="#全部索引化" class="headerlink" title="全部索引化"></a>全部索引化</h3><p>每列建一个索引。查询的时候分别在每个索引上应用谓词，再在内存中join结果。对于那些没有谓词的列，可以将其与同query的有谓词的列组成一个索引以避免扫描整个索引。</p>
-<h3 id="物化视图"><a href="#物化视图" class="headerlink" title="物化视图"></a>物化视图</h3><p>创建好一些物化视图，只包含query需要的列，避免加载不需要的列。</p>
-<h2 id="针对ColumnStore的优化技术"><a href="#针对ColumnStore的优化技术" class="headerlink" title="针对ColumnStore的优化技术"></a>针对ColumnStore的优化技术</h2><h3 id="压缩"><a href="#压缩" class="headerlink" title="压缩"></a>压缩</h3><p>列存的压缩效果往往远好于行存，原因是同一列数据的局部性更好，墒更低。而且列存可以用像RLE这样的不需要解压缩就能扫描的压缩算法。</p>
-<p>一列排序好的数据的压缩效果会非常好，列存比较容易实现排序，而行存因为同一列不是连续排列的，这种排序性很难被利用上。</p>
-<h3 id="延迟物化"><a href="#延迟物化" class="headerlink" title="延迟物化"></a>延迟物化</h3><p>同一个relation的不同列在被加载上来之后，最原始的做法是直接组合成relation，再运算。这样列存与行存就只是存储格式的区别了。我们还可以尽量延迟组合物化的时间，在此之前完成尽量多的操作。一列数据可以表示为数组、位图等数据结构，可以做非常高效的操作。延迟物化的好处：物化前先进行过滤和组合可以避免掉一些不必要的物化；避免不必要的解压缩；cache更友好；更容易应用按块迭代；固定长度的列操作更高效，延迟物化可以避免少量变长列影响其它列的操作。</p>
-<h3 id="按块迭代"><a href="#按块迭代" class="headerlink" title="按块迭代"></a>按块迭代</h3><p>算子一次处理一个block，函数调用次数更少，不需要额外的提取操作，如果是固定长度的列，可以以数组形式处理。</p>
-<h3 id="隐式join"><a href="#隐式join" class="headerlink" title="隐式join"></a>隐式join</h3><p>对于星型data warehouse，处理query时比较常见的做法是先join fact table和最具选择性的维表，再在fact table上做aggregation，之后再针对每个谓词join不同的维表。</p>
-<p>另一种延迟join的做法是先在维表上应用谓词，再将结果与fact table join，这样能得到两组选中的位置，一组来自维表，一组来自fact table，从维表的位置中我们能得到其它需要的列（但通常是乱序的）。这样依次处理完所有维表，再最终与fact table join得到想要的relation。</p>
-<p>本文引入了另一种方法，隐式join。它也是延迟join，但会最小化需要乱序提取的值。它将join改写为应用在fact table上的谓词，这些谓词会通过hash查找（值来自各个维表应用谓词的结果）或区间谓词等方式求值。不同列的隐式join可以同时进行，直到最终选出想要的relation后再与各个维表进行join。</p>
-<h3 id="区间谓词"><a href="#区间谓词" class="headerlink" title="区间谓词"></a>区间谓词</h3><p>如果应用过谓词后得到了某一列上连续的区间，我们可以将hash查找改写为一个区间上的IN谓词。这种优化没办法应用在非排序列上。对于原本排序好的列，一些重排序操作也会打乱它们的顺序，此时可以应用字典编码来重新给这些列赋值，以保持其有序性，从而可以继续应用这种优化。</p>
-<h2 id="性能对比"><a href="#性能对比" class="headerlink" title="性能对比"></a>性能对比</h2><p>RowStore的三种模拟ColumnStore的优化都没办法得到特别好的效果。垂直分片只在选择的列少于1/4时有一定优势，超过之后它的空间上的额外开销（重复存储的主键）影响了影响。完全index要求fact table在应用谓词前一定要与维表join。物化视图有效果，但效果仍赶不上ColumnStore。</p>
-<p>ColumnStore的优化方法中，按块迭代提升了5%到50%的性能。隐式join提升了50%到75%的性能，主要是区间谓词的贡献。压缩提升了2倍性能，且仍有上升空间（多维度排序维表）。对于一些不需要解压缩就能过滤的场景，压缩的性能提升可以达到10倍。延迟物化提升了3倍性能。</p>
-<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>只是将RowStore改造为按列存储是达不到完全针对列存优化的ColumnStore的性能的。这种性能差异的主要因素是压缩和延迟物化，次要因素是按块迭代和隐式join。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/" class="post-title-link" itemprop="url">[笔记] The Chubby lock service for loosely-coupled distributed systems</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2020-08-28 11:59:16 / 修改时间：11:59:54" itemprop="dateCreated datePublished" datetime="2020-08-28T11:59:16+08:00">2020-08-28</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://www.usenix.org/event/osdi06/tech/full_papers/burrows/burrows_html/" target="_blank" rel="noopener">The Chubby lock service for loosely-coupled distributed systems</a></p>
-<p>本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。</p>
-<p>论证过程：</p>
-<ol>
-<li>如何实现强一致：Paxos。</li>
-<li>实现为库还是外部服务：库是侵入式的，应用接入困难；外部服务能把应用与Chubby解耦开。</li>
-<li>提供什么样的接口：类UNIX文件系统，建议式锁，尽可能降低应用接入和开发者的使用难度。</li>
-<li>针对读远多于写的使用场景，如何降低server负载：尽可能地cache，为了降低开发者的理解难度，使用一致性cache而不是基于TTL的cache。</li>
-<li>如何提高可用性：粗粒度锁，client在session过期后有一个grace period。</li>
-<li>未来可以做哪些改进：使用proxy和partitioning进一步提升服务规模。</li>
-</ol>
-</blockquote>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Chubby是一个<strong>锁服务</strong>。通过Chubby，不同client可以实现临界区，或达成共识。Chubby的主要设计目的是可靠性、可用性（服务大量普通商用机器）、语义容易理解，次要目的是吞吐和存储容量。Chubby提供了类似于文件系统的API（每个操作都会读写整个文件），建议式锁和事件通知。</p>
-<p>Chubby预期提供<strong>粗粒度</strong>的同步，尤其是选举leader。</p>
-<p>Chubby内核是Paxos算法。</p>
-<h2 id="Design"><a href="#Design" class="headerlink" title="Design"></a>Design</h2><h3 id="Rationale"><a href="#Rationale" class="headerlink" title="Rationale"></a>Rationale</h3><p>为什么不实现一个Paxos库（client会成为一个Paxos系统的一个node），而是实现一个外部的锁服务：</p>
-<ul>
-<li>应用一开始可能对可用性没那么高要求，等到后面再想接入Paxos库就困难了（比如要重新实现一个Paxos需要的状态机）；而接入一个外部的锁不需要做很多修改。</li>
-<li>许多应用需要有办法能知道当前的共识是什么（谁是leader、某块数据是什么），外部服务可以提供一致的cache，而库只能实现基于时间过期的cache。</li>
-<li>开发者更熟悉基于锁的API。</li>
-<li>使用Paxos库会导致replica数量与client数量成正比，而外部服务将其解耦开，只需要少量机器运行Chubby就可以满足大量机器的一致性需求。</li>
-</ul>
-<p>基于以上理由产生的两个关键决策：</p>
-<ul>
-<li>锁服务而不是Paxos库或服务。</li>
-<li>提供小文件的读写服务以广播和获取共识结果，而不是实现第二种服务（name service）。</li>
-</ul>
-<p>一些根据使用场景而做出的决策：</p>
-<ul>
-<li>需要支持一个Chubby file被数千个client读取，最好不需要大量机器。</li>
-<li>需要提供事件通知，这样client不需要轮询结果。</li>
-<li>需要有cache来支持大量client轮询。</li>
-<li>需要一致性cache以降低开发者理解难度。</li>
-<li>需要支持ACL。</li>
-</ul>
-<p>Chubby不打算支持细粒度锁（通常只持有若干秒或更短时间），原因：</p>
-<ul>
-<li>粗粒度锁的获取频率更低，降低server压力。</li>
-<li>受server failover影响的client更少（粗粒度锁在failover期间client很可能不需要与server交互）。</li>
-</ul>
-<p>应用可以基于Chubby的粗粒度锁自己实现细粒度锁：通过Chubby lock来维持若干个app lock server，每个app lock server管理若干个app lock，与app client之间通过lease维持。</p>
-<h3 id="System-structure"><a href="#System-structure" class="headerlink" title="System structure"></a>System structure</h3><p>Chubby通常有5个replica，之间使用共识协议算法选举master。master与其它replica之间的lease为若干秒。每个replica都维护一个小DB，但只有master提供读写服务。</p>
-<p>client通过DNS获取replica列表，与非master的replica通信时会被告知master地址。</p>
-<p>如果有replica挂掉数小时没有恢复，它会被自动替换掉，更新DNS，master从而知道replica列表变动。</p>
-<h3 id="Files-directories-and-handles"><a href="#Files-directories-and-handles" class="headerlink" title="Files, directories, and handles"></a>Files, directories, and handles</h3><p>Chubby提供的文件路径类似于：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;ls&#x2F;foo&#x2F;wombat&#x2F;pouch</span><br></pre></td></tr></table></figure>
-
-<p>其中<code>ls</code>表示lock service，<code>foo</code>是cell name（如果是<code>local</code>表示访问应用所在的cell）。</p>
-<p>Chubby因此可以被其它文件系统使用，可以使用现成的工具，极大降低了教育成本。</p>
-<p>Chubby与UNIX文件系统间的设计差异是为了降低分布难度：不同的目录可能被不同的Chubby集群服务，因此：</p>
-<ul>
-<li>不支持跨目录的文件移动；</li>
-<li>不支持目录修改时间；</li>
-<li>避免依赖于路径的权限机制（文件权限只取决于文件自身而不是目录权限）；</li>
-<li>为了方便缓存meta数据，不显示最近访问时间。</li>
-</ul>
-<p>文件或目录都被称为node，不同的node有不同的路径，不存在软硬链接。永久的node需要显式删除，临时的node在没有client使用时自动删除。临时node通常用于临时文件或标识client存活。</p>
-<p>node的meta数据包含三类ACL（读、写、修改ACL），这些ACL在node创建时从它的父node处继承来（可覆盖）。ACL本身也是文件，存放在每个cell的固定路径下。Chubby的ACL机制类似于Plan9的groups。</p>
-<p>node的meta数据中来包含4个单调增的64位整数：</p>
-<ul>
-<li>instance number，重复创建node时增加；</li>
-<li>content generation number，文件被写入时增加；</li>
-<li>lock generation number，node的锁被持有时增加；</li>
-<li>ACL generation number，node的ACL名字发生变化时增加。</li>
-</ul>
-<p>Chubby也提供了每个文件的checksum，可以用来检测文件内容变化。</p>
-<p>client持有的handle包含：</p>
-<ul>
-<li>标识handle是否创建完成的位，这样只在创建handle时做完整的权限检查。</li>
-<li>sequence number，允许master检查这是不是之前master创建的handle。</li>
-<li>打开文件时使用的模式，允许新master重建handle对应的状态。</li>
-</ul>
-<h3 id="Locks-and-sequencers"><a href="#Locks-and-sequencers" class="headerlink" title="Locks and sequencers"></a>Locks and sequencers</h3><p>Chubby提供的lock都是建议式的读写锁。不提供强制锁的原因：</p>
-<ul>
-<li>应用可能使用Chubby保护lock对应的文件之外的资源。</li>
-<li>通过查看被锁住的文件来debug或做维护工作。</li>
-<li>相信开发者，强制锁也没办法保护错误或恶意的使用。</li>
-</ul>
-<p>分布式锁常见的一个问题是一个client先获得锁，进一步操作时已经丢掉锁了但自己不知道，最终导致数据错误。常见解法是使用sequence number。</p>
-<p>Chubby默认不使用sequence number（开销大），但允许client获取锁时同时也获得一个sequencer（包含lock name、mode、generation number的字符串），client后续操作可以带上这个sequencer从而允许server检测lock是否还有效。</p>
-<p>对于早期的不支持sequencer的Chubby服务，有另一种机制，在一个lock holder挂掉后不立即允许其它client获取，而是等一段时间（如1分钟），这样避免出错的client破坏整个系统。</p>
-<h3 id="Events"><a href="#Events" class="headerlink" title="Events"></a>Events</h3><p>client在创建handle时可以订阅若干事件，包括：</p>
-<ul>
-<li>文件内容修改；</li>
-<li>子node的增删改（从而可以监控临时文件）；</li>
-<li>Chubby master自己的failover，表明可能有其它event丢失，client要自己处理这种情况，比如重新扫描文件；</li>
-<li>handle和lock不可用；</li>
-<li>锁被人获取成功；</li>
-<li>与另一个client的锁请求冲突。</li>
-</ul>
-<p>事件投递晚于事件发生。</p>
-<p>最后两个事件很少被用到：</p>
-<ul>
-<li>client通常不仅要知道选举结果产生了，还要知道leader是谁，因此它直接订阅文件内容修改就好了；</li>
-<li>订阅另一个client的锁请求冲突可以实现一种场景，即当前持有锁的client提前释放锁，但实践中没有应用这么用。</li>
-</ul>
-<h3 id="API"><a href="#API" class="headerlink" title="API"></a>API</h3><ul>
-<li><code>open</code>：返回handle。</li>
-<li><code>close</code>：不会失败，调用后不再允许使用该handle（进程可能会挂掉）。</li>
-<li><code>poison</code>：使该handle的后续操作失败，可以跨线程使用。</li>
-<li><code>GetContentsAndStat</code>：返回文件数据和meta。</li>
-<li><code>GetStat</code>：只返回meta。</li>
-<li><code>ReadDir</code>：返回目录的子结点的名字和meta。</li>
-<li><code>SetContents</code>：覆盖整个文件，可以传入content generation number以实现CAS。</li>
-<li><code>SetACL</code>：设置文件的ACL。</li>
-<li><code>Delete</code>：删除没有子结点的结点。</li>
-<li><code>Acquire</code>、<code>TryAcquire</code>、<code>Release</code>：与锁相关。</li>
-<li><code>GetSequencer</code>：返回sequencer。</li>
-<li><code>CheckSequencer</code>：检测sequencer是否有效。</li>
-</ul>
-<h3 id="Caching"><a href="#Caching" class="headerlink" title="Caching"></a>Caching</h3><p>client有一个文件内容和node meta的一致的写穿透的cache。master与client间通过lease维护cache，因此master知道client可能cache了什么。当文件内容或meta变动时，master会向可能缓存了这个文件的client发送invalidation。invalidation包含在了KeepAlive请求中，client收到后会在下次KeepAlive请求中回复master。文件内容或meta的修改要等到master获得了所有client的回复或cache lease过期后才生效。</p>
-<p>如果client不回复invalidation，master就认为这个node不能缓存，这样invalidation只需要一轮RPC。Chubby的场景下读远多于写，因此可以这么做。另一个方案是阻塞住对这个node的后续操作，从而避免太多对这个node的操作击垮master，但会增加延迟。</p>
-<p>Chubby的cache协议只失效，不更新，从而简化设计，也避免了访问过一个文件的client就要接收这个文件的后续的无穷无尽的更新消息。</p>
-<p>Chubby没有选择更弱化的一致性cache是因为那样的cache很难使用。那些需要client在每个消息中都交换sequence number的方案不适用于已经存在多套通信协议的环境。</p>
-<p>client还会cache handle，因此一个client重复<code>open</code>一个文件时，会返回相同的handle，避免每次都发RPC给master。</p>
-<p>Chubby协议允许client缓存lock，即在lock失效后继续持有lock，直到另一个client冲突再主动释放。</p>
-<h3 id="Sessions-and-KeepAlives"><a href="#Sessions-and-KeepAlives" class="headerlink" title="Sessions and KeepAlives"></a>Sessions and KeepAlives</h3><p>只要client与master之间的session有效，client的handl、lock、cache都有效。如果client不持有任何handle且1分钟以上无调用，session自动失效。</p>
-<p>master延长client的lease timeout的情况：</p>
-<ul>
-<li>创建session时</li>
-<li>master发生failover时</li>
-<li>回复KeepAlive时</li>
-</ul>
-<p>master收到KeepAlive时会hold，直到当前lease快过期时再回复。client收到回复后会立即发送下个KeepAlive。</p>
-<p>master会把event和invalidation也加到KeepAlive的回复中，保证了client如果不告知invalidation是否成功，就没办法保有session。</p>
-<p>client自己也维护一个local lease timeout，比master的lease timeout略大一点点（包含KeepAlive网络传输时间）。一旦local lease过期，client就会清空cache，等待grace period（45秒）后如果仍不能收到master回复，client就假设session已失效。</p>
-<h3 id="Fail-overs"><a href="#Fail-overs" class="headerlink" title="Fail-overs"></a>Fail-overs</h3><p>master一旦丢掉了master资格，就会清空掉session、handle、lock的内存状态。但session timer会直到新master产生才结束（不立即让client的session失效）。这样如果client能在grace period与新master建立通信，它的所有现存session都不会受影响。</p>
-<p>在grace period中，client会阻塞住应用调用，以避免应用看到不一致的数据。</p>
-<p>新master产生后通过读取持久化数据以及从client获取数据来重建内存状态。</p>
-<p>新master要执行的操作：</p>
-<ul>
-<li>选择新的epoch给client后续API使用。</li>
-<li>可以回复master-location请求。</li>
-<li>从DB中读取session和lock，将session lease延长至前一个master可能达到的最大值。</li>
-<li>可以回复client的KeepAlive请求，但不做其它session相关的操作。</li>
-<li>向每个session发送failover事件，收到的client会清空cache。</li>
-<li>等待直到每个client要么告知了failover事件已收到，要么session过期。</li>
-<li>可以执行任何操作。</li>
-<li>将上一个master创建的handle延长至当前epoch。在当前epoch内该handle不可重建，从而避免网络上飘的请求创建出已经close的handle。</li>
-<li>等待一段时间后删除没人打开的临时文件。client在收到failover事件后应该重新刷新临时文件的handle。但如果某个持有该临时文件的client的session过期了，临时文件可能不会立即删除。</li>
-</ul>
-<h3 id="Database-implementation"><a href="#Database-implementation" class="headerlink" title="Database implementation"></a>Database implementation</h3><p>Chubby一开始使用BDB，但不需要那么完整的功能，同时BDB的replication带来了过高的风险，最终Chubby选择了实现一个简化版的使用WAL和snapshot的DB。</p>
-<h3 id="Backup"><a href="#Backup" class="headerlink" title="Backup"></a>Backup</h3><p>Chubby会定期把DB的snapshot写入另一个cell的GFS上。</p>
-<h3 id="Mirroring"><a href="#Mirroring" class="headerlink" title="Mirroring"></a>Mirroring</h3><p>Chubby可以在一个cell上镜像另一个cell的若干文件。<code>/ls/global/master</code>在各个cell都有镜像，路径为<code>/ls/cellname/slave</code>。</p>
-<h2 id="Mechanisms-for-scaling"><a href="#Mechanisms-for-scaling" class="headerlink" title="Mechanisms for scaling"></a>Mechanisms for scaling</h2><p>Chubby为了提高伸缩性而采取的部分措施：</p>
-<ul>
-<li>多创建cell，保证不同client可以就近访问Chubby。</li>
-<li>master在高负载时可能会把lease timeout从12秒上调到60秒。</li>
-<li>Chubby client会缓存文件数据、meta、文件不存在、handle等，以降低rpc call。</li>
-<li>有server将Chubby协议转换为更简单的协议如DNS。</li>
-</ul>
-<p>Proxy和Partitioning是已设计但未实现的功能，原因是目前压力还没那么大：</p>
-<ul>
-<li>一个数据中心的机器数量有限。</li>
-<li>硬件性能的提升也会带来Chubby容量的提升。</li>
-</ul>
-<h3 id="Proxies"><a href="#Proxies" class="headerlink" title="Proxies"></a>Proxies</h3><p>Proxy可以处理KeepAlive和读请求，但不能处理写请求。使用Proxy会降低可用性，Proxy和Chubby master不可用都会导致client受影响。</p>
-<h3 id="Partitioning"><a href="#Partitioning" class="headerlink" title="Partitioning"></a>Partitioning</h3><p>一个Chubby cell可以分为N个partition，每个目录根据其路径的hash只由一个partition服务，这样目录与父目录可能在不同partition上。</p>
-<p>需要跨partition的操作：</p>
-<ul>
-<li>访问ACL。但ACL非常适合缓存（数据量小、修改极少）。</li>
-<li>删除目录时可能需要跨partition以确认它为空。</li>
-</ul>
-<p>partitioning可以降低读写的压力，但每个client仍然要与多数partition保持KeepAlive，因此KeepAlive的压力没办法降低。</p>
-<h2 id="Use-surprises-and-design-errors"><a href="#Use-surprises-and-design-errors" class="headerlink" title="Use, surprises and design errors"></a>Use, surprises and design errors</h2><h3 id="Use-and-behaviour"><a href="#Use-and-behaviour" class="headerlink" title="Use and behaviour"></a>Use and behaviour</h3><p>一些结论：</p>
-<ul>
-<li>多数（60%）文件需要按名字访问。</li>
-<li>配置、ACL、元数据文件很常见。</li>
-<li>缓存文件不存在的信息是很重要的。</li>
-<li>平均每个被缓存的文件有10个client使用。</li>
-<li>很少的client会持有锁，共享锁很罕见。锁主要用在选举leader和数据分片上。</li>
-<li>RPC主要由KeepAlive贡献。</li>
-</ul>
-<p>9次服务中断：</p>
-<ul>
-<li>网络维护：4次。</li>
-<li>未知网络链路问题：2次。</li>
-<li>软件错误：2次。</li>
-<li>过载：1次。</li>
-</ul>
-<p>6次丢失数据：</p>
-<ul>
-<li>DB软件错误：4次。</li>
-<li>误操作：2次。</li>
-</ul>
-<p>上调lease timeout可以降低KeepAlive的压力。group commit可以降低写压力，但通常不需要。</p>
-<p>Chubby伸缩性的关键不是server性能，而是降低通信次数。</p>
-<h3 id="Java-clients"><a href="#Java-clients" class="headerlink" title="Java clients"></a>Java clients</h3><p>略</p>
-<h3 id="Use-as-a-name-service"><a href="#Use-as-a-name-service" class="headerlink" title="Use as a name service"></a>Use as a name service</h3><p>用作name service时，对比DNS，Chubby的优势是一致性cache，不需要设置TTL。但Chubby也会遇到性能问题，尤其是大量job启动时，此时可以用batch name lookup来缓解。</p>
-<p>Chubby cache的一致性已经超出了name service需要的程度，因此可以使用专门为name service设计的协议转换server来进一步降低Chubby的负载。</p>
-<h3 id="Problems-with-fail-over"><a href="#Problems-with-fail-over" class="headerlink" title="Problems with fail-over"></a>Problems with fail-over</h3><p>Chubby的旧的failover方案需要master在创建session时写DB，使用BDB时写入压力太大，Chubby选择只在session第一次执行写（包括open和lock）操作时写DB。但这带来一个问题，readonly的session不在DB中，在master发生failover后很可能已经失效了，存在一个窗口期client可能读到过期的数据。</p>
-<p>新方案中master不会在DB中记录session，而是在启动后等待最长可能的lease timeout，保证在此期间没有与master建立连接的client的session过期。这也允许proxy来管理与client的session。</p>
-<h3 id="Abusive-clients"><a href="#Abusive-clients" class="headerlink" title="Abusive clients"></a>Abusive clients</h3><ul>
-<li>应用接入前review很重要。用户经常没办法预计业务增长速度，因此review时要找出使开销线性化的因素，想办法弥补。</li>
-<li>多数文档中缺乏性能方面的建议，导致一个调用了Chubby的接口未来被其它应用误用。</li>
-<li>一开始Chubby没有缓存handle和文件不存在，导致<code>open</code>开销很大，经常有业务反复<code>open</code>。</li>
-<li>一开始Chubby没有限制文件大小，导致有应用拿它作为存储用。最终Chubby上线了256KB的文件大小限制。</li>
-<li>有应用拿Chubby作为PubSub用，但Chubby的重一致性导致了它不适合这个场景。</li>
-</ul>
-<h3 id="Lessons-learned"><a href="#Lessons-learned" class="headerlink" title="Lessons learned"></a>Lessons learned</h3><ul>
-<li>开发者经常忽视可用性：<ul>
-<li>Chubby稍有波动就可能导致应用出现严重问题。</li>
-<li>服务在线与服务可用之间有差别。如Chubby的global cell的总在线时间是超过local cell的，但从某个client来看，global cell的可用性却低于local cell，因为local cell与client之间网络通常不会分区，它们的维护时间通常也是重合的。</li>
-<li>Chubby提供了master failover的事件，但发现应用经常收到这个event后直接crash。</li>
-<li>Chubby提供了三种机制：接入前review；client中提供接口以自动处理Chubby中断；为Chubby中断提供事后报告。</li>
-</ul>
-</li>
-<li>可以不实现细粒度锁。</li>
-<li>将KeepAlive与invalidation合并可以强制client一定要回复invalidation，否则session就会过期，但这样就给KeepAlive的协议选择带来了压力。TCP的退避重试可能会影响到lease timeout，因此Chubby选择了用UDP发送KeepAlive。</li>
-</ul>
-<h2 id="Comparison-with-related-work"><a href="#Comparison-with-related-work" class="headerlink" title="Comparison with related work"></a>Comparison with related work</h2><p>略</p>
-<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>略</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1556,14 +1585,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">58</span>
+          <span class="site-state-item-count">60</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-count">39</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

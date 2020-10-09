@@ -176,6 +176,209 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2019/04/07/three-optimization-tips-for-cpp/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2019/04/07/three-optimization-tips-for-cpp/" class="post-title-link" itemprop="url">[笔记] Three Optimization Tips for C++</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2019-04-07 19:29:29" itemprop="dateCreated datePublished" datetime="2019-04-07T19:29:29+08:00">2019-04-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-23 17:14:06" itemprop="dateModified" datetime="2020-08-23T17:14:06+08:00">2020-08-23</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://www.facebook.com/notes/facebook-engineering/three-optimization-tips-for-c/10151361643253920/" target="_blank" rel="noopener">Three Optimization Tips for C++</a></p>
+</blockquote>
+<p>建议：</p>
+<ul>
+<li>Prefer static linking and position-dependent code (as opposed to PIC, position-independent code).</li>
+<li>Prefer 64-bit code and 32-bit data.</li>
+<li>Prefer array indexing to pointers (this one seems to reverse every ten years).</li>
+<li>Prefer regular memory access patterns.</li>
+<li>Minimize control flow.</li>
+<li>Avoid data dependencies.</li>
+</ul>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/04/07/three-optimization-tips-for-cpp/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/07/22/cpp-use-mixin-to-get-better-performance/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/07/22/cpp-use-mixin-to-get-better-performance/" class="post-title-link" itemprop="url">C++：使用mixin获得比继承+组合更好的性能</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-07-22 17:00:52" itemprop="dateCreated datePublished" datetime="2018-07-22T17:00:52+08:00">2018-07-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>注：本文所使用编译器均为gcc4.1.2，即只能使用C++98标准。</p>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Node</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> mRow;</span><br><span class="line">    <span class="keyword">int</span> mCol;</span><br><span class="line">    <span class="keyword">int</span> mValue;</span><br><span class="line"></span><br><span class="line">    Node(<span class="keyword">int</span> row, <span class="keyword">int</span> col, <span class="keyword">int</span> value)</span><br><span class="line">        : mRow(row), mCol(col), mValue(value)</span><br><span class="line">    &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Iterator</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~Iterator() &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Node <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们有一个接口类<code>Iterator</code>，它有三个方法，可以返回<code>Node</code>类型的值。现在我们要用这个接口来遍历一个矩阵。</p>
+<p>矩阵的类型是<code>vector&lt;vector&lt;int&gt;&gt;</code>，我们有几种不同的遍历需求：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>这个方法返回一个最原始的<code>Iterator</code>，只是单纯遍历数据。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>RawIterator</code>基础上，只返回奇数。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>OddIterator</code>基础上，遍历过程中，在每行末尾加上<code>appendix</code>中的元素。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>AppendPerRowIterator</code>基础上，返回的每个<code>Node</code>的value都乘2。</p>
+<h2 id="测试程序"><a href="#测试程序" class="headerlink" title="测试程序"></a>测试程序</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    srand(time(<span class="literal">NULL</span>));</span><br><span class="line">    <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt; matrix;</span><br><span class="line">    <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; appendix;</span><br><span class="line">    PrepareMatrix(matrix, <span class="number">1000</span>, <span class="number">10000</span>);</span><br><span class="line">    PrepareAppendix(appendix, <span class="number">3</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int64_t</span> t0 = Measure(NewRawIterator(matrix));</span><br><span class="line">    <span class="keyword">int64_t</span> t1 = Measure(NewOddIterator(matrix));</span><br><span class="line">    <span class="keyword">int64_t</span> t2 = Measure(NewAppendPerRowIterator(matrix, appendix));</span><br><span class="line">    <span class="keyword">int64_t</span> t3 = Measure(NewDoubleIterator(matrix, appendix));</span><br><span class="line"></span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; <span class="string">"Raw:"</span> &lt;&lt; t0 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Odd:"</span> &lt;&lt; t1 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Append:"</span> &lt;&lt; t2 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Double:"</span> &lt;&lt; t3 &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们会在一个1000*10000的矩阵上测试各个<code>Iterator</code>。</p>
+<h2 id="基于继承-组合的实现"><a href="#基于继承-组合的实现" class="headerlink" title="基于继承+组合的实现"></a>基于继承+组合的实现</h2><p>上面的需求看起来很适合用继承+组合来实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RawIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">OddIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AppendPerRowIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    AppendPerRowIterator(Iterator* iter, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix);</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">DoubleIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">DoubleIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们用了4个派生自<code>Iterator</code>的新类型来实现不同的需求，除了<code>RawIterator</code>外，其它3种类型都是在组合了已有的<code>Iterator</code>基础上实现新功能，因此可以任意顺序组合。</p>
+<p>几个New函数的实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> RawIterator(matrix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    Iterator* rawIter = NewRawIterator(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> OddIterator(rawIter);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* oddIter = NewOddIterator(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> AppendPerRowIterator(oddIter, appendix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* appendIter = NewAppendPerRowIterator(matrix, appendix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> DoubleIterator(appendIter);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>测试结果为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:164311</span><br><span class="line">Odd:316020</span><br><span class="line">Append:436596</span><br><span class="line">Double:458733</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，每增加一层功能，调用延时就明显上涨了一截。有没有其它性能更好的方案了呢？</p>
+<h2 id="mixin"><a href="#mixin" class="headerlink" title="mixin"></a>mixin</h2><p>mixin是给一组基础类，每个都建模了一个抽象概念，且能直接组合成一个新的类，像乐高一样，满足需求。如果你新增了基础类，只要它是和其它基础类正交的，就可以扩展到这个组合类里。</p>
+<p>C++中的一种mixin方法是结合模板和继承，通过模板参数来组合基础类（见<a href="https://fuzhe1989.github.io/2018/04/21/mixin/">通过mixin组合功能</a>）。</p>
+<p>在上面这个例子中，<code>RawIterator</code>是一个基础类，可以单独使用，而<code>OddIterator</code>、<code>AppendIterator</code>和<code>DoubleIterator</code>则是用来提供新的功能的，是mixin类，我们可以将这三个类型实现为模板类，以<code>OddIterator</code>为例：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    OddIterator(?)</span><br><span class="line">        : T(?) &#123;</span><br><span class="line">        MoveUntilOdd();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">Node <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::GetValue();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::IsValid();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        T::MoveNext();</span><br><span class="line">        MoveUntilOdd();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">MoveUntilOdd</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">while</span> (T::IsValid() &amp;&amp; T::GetValue().mValue % <span class="number">2</span> == <span class="number">0</span>) &#123;</span><br><span class="line">            T::MoveNext();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，新的<code>OddIterator</code>是通过继承自<code>T</code>来给<code>T</code>增加功能的，这有什么好处？摘取上文中的一段：</p>
+<blockquote>
+<p>不需要堆分配。<br>没有运行期检查null。<br>不需要显式管理生命期。<br>没有多余的虚函数定义及其调用。<br>编译器有机会做更多优化。</p>
+</blockquote>
+<p>似乎一切都很美好，除了代码有些怪异外。但我们还有一个问题没有解决：怎么构造<code>T</code>？</p>
+<h2 id="一种mixin的通用构造方法"><a href="#一种mixin的通用构造方法" class="headerlink" title="一种mixin的通用构造方法"></a>一种mixin的通用构造方法</h2><p>这是一个很大很复杂的课题，这里我只提出一种似乎可行的方式（至少本文的例子是没问题的）。</p>
+<p>我们要求每个mixin类型，及需要与这个mixin类型组合的基础类型内部，都定义一个Context类型，且有一个只有一个Context类型参数的构造函数。例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RawIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; mMatrix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span></span><br><span class="line">            : mMatrix(matrix) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="keyword">const</span> Context&amp; context)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; base)</span></span></span><br><span class="line">            : mBase(base) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    OddIterator(<span class="keyword">const</span> Context&amp; c)</span><br><span class="line">        : T(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AppendPerRowIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line">        <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; mAppendix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; base, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span></span><br><span class="line">            : mBase(base), mAppendix(appendix) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line">    AppendPerRowIterator(<span class="keyword">const</span> Context&amp; c)</span><br><span class="line">       : T(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br></pre></td></tr></table></figure>
+
+<p>通过这种方式，我们可以在不知道<code>T</code>的具体类型（也就不知道它到底有什么样的构造函数）的情况下，构造出组合类型。从而也获得了任意组合这些mixin顺序的能力。</p>
+<p>在C++11后，我们可以通过变长参数和继承构造函数的方式提供更优雅的mixin的通用构造方案，这是另外的话题，这里不展开了。</p>
+<p>在使用了上面的方法来构造mixin后，几个New函数的实现为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> RawIterator(c);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> OddIter(c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    AppendIter::<span class="function">Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> AppendIter(c2);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line">    <span class="keyword">typedef</span> DoubleIterator&lt;AppendIter&gt; DoubleIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    AppendIter::<span class="function">Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    DoubleIter::<span class="function">Context <span class="title">c3</span><span class="params">(c2)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> DoubleIter(c3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看起来还是很笨拙，但至少我们成功地把它们构造出来了。</p>
+<h2 id="mixin的性能"><a href="#mixin的性能" class="headerlink" title="mixin的性能"></a>mixin的性能</h2><p>重新编译，运行，基于mixin的结果为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:165505</span><br><span class="line">Odd:164377</span><br><span class="line">Append:187320</span><br><span class="line">Double:191260</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，在Raw结果不变的情况下（这是当然的），其它三种场景mixin方案的延时分别比继承+组合减少了48%、57%和58%，调用链越长，mixin方案的优势越大。</p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>本文提出了用mixin来解决功能组合的方案，且使用了Context类型来解决构造问题，相比常见的继承+组合的方案，mixin方案有着非常明显的性能优势。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/07/22/cpp-inline-member-function-in-cpp-file/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1785,379 +1988,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/17/redis-on-the-respberry-pi/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/17/redis-on-the-respberry-pi/" class="post-title-link" itemprop="url">[翻译] Redis on the Raspberry Pi: adventures in unaligned lands</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-03-17 15:05:18" itemprop="dateCreated datePublished" datetime="2018-03-17T15:05:18+08:00">2018-03-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-23 17:14:20" itemprop="dateModified" datetime="2020-08-23T17:14:20+08:00">2020-08-23</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><a href="http://antirez.com/news/111" target="_blank" rel="noopener">原文地址</a></p>
-<p>在售出1000万台设备，实际上是诸如传感器和显示器这样无数不同的应用和辅助设备后，可以说树莓派不仅仅是取得了成功，它还成为了一种程序员最喜爱的嵌入式实验平台。像是Pi zero这样的产品也在成为创造硬件产品的平台，且不会引入设计、构建、为车载设备写软件等方面的风险和开销。</p>
-<p>同样地，我也认同Redis是一个程序员乐于去冒险、实验、构建新事物的平台。而且，能用于嵌入式/物联网应用的设备，通常会有暂时或长期存储数据的需求，像是从传感器接收到的数据，需要在这台设备上运算的数据，或是要发往远程服务器的数据。Redis正在加入一种Stream数据类型，非常适合流式数据和时间序列存储，撰写本文时（2017年初）这个特性快要完成了，后续工作会在接下来几周内开始。Redis现存的数据结构，以及新增的Stream类型，以及它较小的内存使用，以及它即使在小型硬件（低功耗）上也能提供相当不错的性能，都让Redis看起来非常适合应用在树莓派，进而是其它小型ARM设备上。中间缺失的部分也很明显：在树莓派上把Redis跑起来。</p>
-<p>树莓派的一个很酷的特点就是，它的开发环境不像过去的嵌入式系统那样，它上面跑的就是正常的Linux，还包括各种Debian系的工具。简单地说在树莓派上适配Redis不算很困难。Linux程序移植到树莓派上最常见的问题就是性能或内存占用不匹配，但在Redis上这不是问题，因为它本身就被设计为：空实例只占用1MB内存，且查询请求会走内存，因此它足够快，也不会给闪存太高的压力，而且在需要持久化时，它只会用AOF（Append Only File）。但树莓派上用的是ARM处理器，意味着我们要小心处理未对齐的内存访问。</p>
-<p>本文会展示我为了让Redis能愉快地跑在树莓派上都做了什么，我会试着给出一个如何应对那些不能透明地处理非对齐内存访问的平台上（不像x86）的概述。</p>
-<h1 id="关于ARM处理器"><a href="#关于ARM处理器" class="headerlink" title="关于ARM处理器"></a>关于ARM处理器</h1><p>将Redis移植到ARM的过程中，最有趣的事情就是，ARM处理器不太喜欢未对齐的内存访问。如果你一直在用高阶语言，你可能不太了解内存对齐。历史上许多处理器都不能读写地址不是字长整数倍的内存数据。所以如果字长是4字节（32位处理器下），你可以读写0x4、0x8等等地址的数据，但0x7就不行。如果你真这么做了，取决你的CPU和配置，有时程序会抛异常，有时是奇怪的行为。</p>
-<p>之后x86统治了世界，大家几乎忘了这件事（除非要用SSE指令时，不过这些指令也有不需要对齐的版本）。当然，一开始大家没有真的忘记这件事，因为x86处理器可以读写未对齐的内存而不出错，但会带来性能损失：跨字长边界的一次读写可能被拆成两次读写。但近期的x86优化将非对齐访问的性能损失降到了最低，几乎与对齐访问相当，现在非对齐访问对x86来说真的不是事儿了。</p>
-<p>直到ARMv5，ARM平台上非对齐访问还是会引发奇怪的非预期行为，文档是这么说的：“如果地址不是4的整数倍，LDR指令会返回一个旋转后的结果，而不是真的跨字长读取。通常这个结果不符合程序员的预期。”旋转当然不是程序员预期的。初代树莓派用的已经是ARMv6了，它能处理非对齐访问，当然会带来性能损失。但它在处理未对齐的多倍字长的指令时会抛异常，因总线错误而终止程序，或求助于内核（后面会详述）。这意味着Redis在树莓派上运行的时候不会马上挂掉，因为Redis大多数访问都恰好是一个字长。但随着时间推移，编译器产生了多倍字长的读写指令以加速运算，或是Redis自己也会试着读写未对齐的64位数据。理论程序会崩溃，当然Linux还能帮上点忙。</p>
-<h1 id="不要崩溃，求助内核！"><a href="#不要崩溃，求助内核！" class="headerlink" title="不要崩溃，求助内核！"></a>不要崩溃，求助内核！</h1><p>当Linux内核运行在ARM上时，它能帮助进程在访问未对齐内存时也能得到预期的结果，即使CPU本身都不支持。方法是在内核态注册这类异常的handler：内核会检查失败的指令，再通过handler来模拟它运行，从而得到预期的结果，也能让犯错的进程恢复运行。</p>
-<p>如果你想深入底层编程，这个Linux内核代码文件值得一看：<a href="http://lxr.free-electrons.com/source/arch/arm/mm/alignment.c" target="_blank" rel="noopener">http://lxr.free-electrons.com/source/arch/arm/mm/alignment.c</a></p>
-<p>内核在CPU抛非对齐访问错误时的行为受到/proc/cpu/alignment的控制：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ cat &#x2F;proc&#x2F;cpu&#x2F;alignment</span><br><span class="line">User:		0</span><br><span class="line">System:		12590 (ip6_datagram_recv_common_ctl+0xc8&#x2F;0xd4 [ipv6])</span><br><span class="line">Skipped:	0</span><br><span class="line">Half:		0</span><br><span class="line">Word:		0</span><br><span class="line">DWord:		0</span><br><span class="line">Multi:		12590</span><br><span class="line">User faults:	2 (fixup)</span><br></pre></td></tr></table></figure>
-
-<p>如你所见，被内核纠正非对齐访问的错误分成了多个计数器，用户态和内核态都有。上例中内核空间纠正了12590次访问，而用户空间没有纠正过。注意“User faults”是内核如何处理CPU非对齐访问错误的配置：修正、发SIGBUS信号、或记录在内核日志中。我们可以向/proc/cpu/alignment中写一个整数，其中每位控制一种行为，例如我们只需要记录内核日志（不只是修正），就可以执行<code>echo 3 &gt; /proc/cpu/alignment</code>，第1位是允许记录日志，第2位是允许修正。</p>
-<p>我的感觉是，这个功能不只是内核开发者担心用户空间的程序员没办法处理非对齐访问，而是内核自己也不能保证都是对齐访问（看“System”计数器）。所以打开这个功能是解决Linux程序移植ARM的最简单方法，而不是检查每一块代码，确保所有访问都对齐。</p>
-<p>有人可能会受到这个功能的诱惑，说，那就没什么要做的了呗，只要我们把/proc/cpu/alignment设置对，Redis就能按预期那样工作了。但其实不然，看下面2个原因：</p>
-<ol>
-<li>当发生非对齐访问，内核修正时，整个执行速度会<strong>非常</strong>慢，要比底层拆成多次对齐访问还要慢得多。即使它只在非对齐的多倍字长的读写指令中发生，也会导致此时Redis速度远低于预期。</li>
-<li>内核模拟ARM非对齐访问的实现不太完美，在Linux4.4.34版本中，它无法处理某些GCC编译出的指令。</li>
-</ol>
-<p>下面是一个普通的例子：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">$ <span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> **argv)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">int</span> count = <span class="number">1000</span>;</span><br><span class="line">        <span class="keyword">char</span> *buf = <span class="built_in">malloc</span>(count*<span class="keyword">sizeof</span>(<span class="keyword">double</span>));</span><br><span class="line">        <span class="keyword">double</span> sum = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">double</span> *l = (<span class="keyword">double</span>*) (buf+<span class="number">1</span>);</span><br><span class="line">        <span class="keyword">while</span>(count--) &#123;</span><br><span class="line">                l++;</span><br><span class="line">                sum += *l;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ gcc foo.c -g -ggdb</span><br><span class="line">$ .&#x2F;a.out</span><br><span class="line">Bus error</span><br></pre></td></tr></table></figure>
-
-<p>即使我的树莓派配置成修正非对齐访问的错误，我的程序仍然收到了SIGBUS信号！我们通过GDB看下错误是哪里发生的：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ gdb .&#x2F;a.out</span><br><span class="line">(gdb) run</span><br><span class="line"></span><br><span class="line">Program received signal SIGBUS, Bus error.</span><br><span class="line">0x00010484 in main (argc&#x3D;1, argv&#x3D;0xbefff3b4) at foo.c:10</span><br><span class="line">10	                sum +&#x3D; *l;</span><br></pre></td></tr></table></figure>
-
-<p>错误发生在循环内解引用一个未对齐的double指针处，符合预期。我们再检查一下引发异常的ARM指令：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">(gdb) x&#x2F;i $pc</span><br><span class="line">&#x3D;&gt; 0x10484 &lt;main+100&gt;:	vldr	d6, [r11, #-20]	; 0xffffffec</span><br></pre></td></tr></table></figure>
-
-<p>VLDR指令是将内存地址对应的数据加载到一个扩展寄存器中，用于浮点运算。因某些原因，Linux内核关于修正非对齐访问错误的代码不能处理这条指令（我猜就是没实现完全）。“dmesg”命令可以显示这条指令无法被handler识别，进而修正：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[317778.925569] Alignment trap: not handling instruction ed937b00 at [&lt;00010480&gt;]</span><br><span class="line">[317778.925610] Unhandled fault: alignment exception (0x011) at 0x01cb8011</span><br></pre></td></tr></table></figure>
-
-<p>所以，如果树莓派默认的C编译器可能会生成Linux内核默认不能处理的指令，我就真的想让Redis在关掉内核配置时也能正常运行。这就意味着ARM上跑的Redis保证只访问按字长对齐的内存，只有这样CPU才能正确处理。</p>
-<h1 id="修复bug"><a href="#修复bug" class="headerlink" title="修复bug"></a>修复bug</h1><p>既然树莓派上的ARM能处理大多数的非对齐访问，Redis似乎已经可以在大多数情况下工作了。尤其是内核被默认配置为修正很多非对齐访问的错误时。即使这种修正被关掉了，Redis表面上也能工作。但此时测试会跑出很多进程崩溃的情况，尤其是在位运算和哈希函数中。</p>
-<p>Redis要做的第一件事是在编译到不支持非对齐访问的平台时定义<code>USE_ALIGNED_ACCESS</code>宏。之后就是修改一堆代码以避免关键路径上的非对齐访问，或将指针解引用替换为<code>memcpy()</code>。你可能觉得用<code>memcpy()</code>要比直接解引用慢，但事实上前者要更好：对于固定大小的内存拷贝，如<code>memcpy(src, dst, sizeof(uint64_t))</code>，编译器会智能地将函数访问替换为一组能处理非对齐访问的最快的指令。例如，在x86处理器上，这次函数调用会被翻译成单次MOV指令。</p>
-<p>在做完这些修复工作后，Redis和我的两个树莓派（一个是初代模型B，一个是快得多的Pi 3）开始成了好朋友：所有测试都通过了，但其中一个在崩溃报告中生成了调用栈（当然我正要修复这个问题），随着时间推移，集成测试有了一些错误，原因是树莓派在启动master和slave时太慢了。但此时我对正确性的欲望受到了刺激，我想解决更多对齐的问题。</p>
-<h1 id="多走一步：SPARC"><a href="#多走一步：SPARC" class="headerlink" title="多走一步：SPARC"></a>多走一步：SPARC</h1><p>就在我修复ARM上Redis的问题时，Github仓库中还有些issue是关于如何让Rdis正常运行在Solaris/SPARC上。SPARC不像ARM那样友善，它无法处理<strong>任何</strong>非对齐访问。我记得很清楚，在我第一年学习C语言时，我买了一个非常旧的SPARC 4工作站：大端，且无法处理任何非对齐访问。它带给我一些程序移植相关的观点。羞愧的是几个月后我不小心将伏特加洒到了上面，烧坏了主板，但它现在还在我父母的房子中。</p>
-<p>在Solaris/SPARC上处理非对齐访问要比Linux/ARM上复杂得多：根据编译选项，内核总是能处理32位的非对齐访问，而64位的非对齐访问可以通过注册一个用户态陷阱来处理。Sun工作站的C编译器有特定选项来精确控制这类行为，甚至还有能简单发现并修复这类访问的工具。</p>
-<p>如果Redis中很少有不等于字长的非对齐访问，你就可以预期其中到处都是等于字长的非对齐访问。但从我在OpenBSD/SPARC上用Redis3.0开始测试和修复后，随着时间推移，情况不是这样了。最大的问题是哈希函数，原版的Redis字符串库，称为SDS，有着固定大小的头，所以在哈希key的时候总是对齐的。但从Redis3.2开始SDS头不再是固定大小了。此外自我在一年前在SPARC上测试Redis后，又出现了其它非对齐访问的情况。</p>
-<p>为了修复哈希函数的问题，我转而用了SipHash，也为了避免HashDos攻击。但值得一提的是我现在用的是C和D轮数量减少的SipHash变种：SipHash1-2。这是为了避免其它方面不正常的性能回退。但据我所知还没有实质上对SipHash1-2的攻击，总之要比我们之前用的Murmurhash2更安全————考虑到有可能产生种子碰撞时它太弱了。</p>
-<p>我在使用的SipHash实现参见文后链接，我简化了一些代码，且将其改为大小写不敏感。它被设计为能处理非对齐访问，且与字节序无关。我第一次看到一个哈希函数的参考实现能写得这么好。</p>
-<p>因为一位好心的Redis用户为我提供了一个Solaris/SPARC系统的访问权限，SPARC上的剩余修正工作简化了很多。在修正未对齐访问的过程中，我还尝试了修正Solaris/SPARC上Redis的构建和测试，一般来说这也是一项很好的移植性提升练习。这项任务完成后，Redis至少就其独立代码而言终于是“对齐安全”的了。</p>
-<h1 id="树莓派-Redis的性能"><a href="#树莓派-Redis的性能" class="headerlink" title="树莓派+Redis的性能"></a>树莓派+Redis的性能</h1><p>回到树莓派上。在其上Redis能跑多快？既然树莓派的硬件不只一种，这个问题的答案也不只一个。在Pi 3上Redis令人吃惊的快。我的测试是通过loopback做的，因为树莓派上的Redis主要是针对本地程序，或作为IPC（进程间通信）和云与端之间信息交互的消息总线（这里说的云是指应用的中心服务器，端是指应用的本地实例），但当通过以太网访问时，Redis跑的依然很快。</p>
-<p>Pi 3上的性能数字：</p>
-<ul>
-<li>测试1：一百万key（均匀分布）上的五百次写。关闭持久化，关闭流水线。28000次/秒。</li>
-<li>测试2：类似于测试1，但每8个操作一组通过流水线。80000次/秒。</li>
-<li>测试3：类似于测试1，但有只追加持久化（AOF），每秒一次<code>fsync</code>。23000次/秒。</li>
-<li>测试4：类似于测试3，但过程中有覆盖写。21000次/秒。</li>
-</ul>
-<p>基本上Pi 3上的Redis的速度可以满足任何使用场景。考虑到Redis主要是单线程使用，或在启用AOF日志时双线程使用（有个背景线程），你可以预期在达到以上性能的同时，其它进程依然能在树莓派上运行。也就是说：上面的数字并没有榨干树莓派。</p>
-<p>而在初代模型B上情况<strong>很</strong>不一样，Redis的速度要慢得多，例如关闭流水线时只有2000次/秒，打开流水线时15000次/秒。这之间的巨大差别看起来指向了需要上下文切换的系统操作————如读和写————效率太低。但这个数字对大多数应用也足够用了，因为Redis大多数时间不是用来服务外部实例的，也因为当有需要做高负载数据记录时，我们可以简单地打开流水线。</p>
-<p>但此时我还没在我最感兴趣的设备（除了Pi 3）上做测试，那就是Pi zero。看一下它能跑多快还是挺有趣的，应该会比我现在用的模型B要好。</p>
-<h1 id="树莓派的未来（原文是continuity，但我倾向于翻译成未来）"><a href="#树莓派的未来（原文是continuity，但我倾向于翻译成未来）" class="headerlink" title="树莓派的未来（原文是continuity，但我倾向于翻译成未来）"></a>树莓派的未来（原文是continuity，但我倾向于翻译成未来）</h1><p>我乐于让Redis很好地跑在树莓派上的原因之一，是我很兴奋看到像Pi zero这样的树莓派逐渐成为物联网开发平台。我指的是针对最终用户的成品（原文是“I mean even finished products intended for the final user”，不太会翻译）。我抑制不住地去想如果我有时间的话，能在硬件领域做些什么：传感器，显示器，GPIO端口，以及它们能极大简化组建硬件创业公司的低廉价格，以及我爱的“全世界的骇客们现在能创造出不同的智能应用”的想法。我想参与进来，即使稍微做一点，比如为树莓派提供很棒的Redis体验（未来还包括Android和其它基于ARM的系统）。Redis很好地结合了低资源需求、只追加操作、同时适用于写入和分析的数据模型（从而能针对历史数据做决策），我真的相信它能在这个过程中帮到我们。</p>
-<p>所以从现在开始树莓派就是我使用Redis的主要目标平台之一了，像是最初被设定为Redis“标准”的Linux服务器。未来几周内我会继续我的修正工作，这些修正会进入Redis4.0。同时我也会在Redis的官方网站上新写一个章节，包括所有与Redis和树莓派有关的信息：不同设备上的测试数据，最佳实践，等等。</p>
-<p>也许未来我也会发布关于“代理”概念的证明，它的目的是将Redis用于物联网设备和云服务器之间的数据总线，允许设备只将数据写入Redis，而代理会负责在连到外网时将数据搬到云端，同时从设备那获取命令并回复。结合Redis4.2新增的Stream结构后这会更有意思。</p>
-<p>我很想知道那些Redis能帮上忙的嵌入式应用，以及我能为它做些什么。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/15/cpp-object-model-pod/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/15/cpp-object-model-pod/" class="post-title-link" itemprop="url">C++对象模型（三）POD</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-03-15 18:37:59" itemprop="dateCreated datePublished" datetime="2018-03-15T18:37:59+08:00">2018-03-15</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>注：本节不讨论<code>union</code>。</p>
-<h1 id="Scalar-Type"><a href="#Scalar-Type" class="headerlink" title="Scalar Type"></a>Scalar Type</h1><p>第一个概念，Scalar Type，即标量类型。</p>
-<p>所谓标量，就是一个数字，而标量类型，就是可以表示为一个数字的类型。</p>
-<p>C++的标量类型为：</p>
-<ul>
-<li>各种整数/浮点类型，如<code>int8_t</code>、<code>uint32_t</code>、<code>char</code>、<code>float</code>等，可满足<code>std::is_arithmetic&lt;T&gt;</code>为true。</li>
-<li>枚举类型，可满足<code>std::is_enum&lt;T&gt;</code>为true。</li>
-<li>各种指针类型，包括<code>std::nullptr_t</code>，可满足<code>std::is_pointer&lt;T&gt;</code>或<code>std::is_member_pointer&lt;T&gt;</code>为true。</li>
-</ul>
-<p>以上类型都属于标量类型，都可满足<code>std::is_scalar&lt;T&gt;::value</code>为true。</p>
-<h1 id="Aggregate-Type"><a href="#Aggregate-Type" class="headerlink" title="Aggregate Type"></a>Aggregate Type</h1><p>第二个概念，Aggregate Type，即聚合类型。</p>
-<p>所谓聚合类型，就是可以使用<code>= {v1, v2, v3}</code>这样语法（注意不是C++11的<code>std::initializer_list</code>特性）进行初始化或赋值的类型，对应C的数组和struct。</p>
-<p>C++的聚合类型为：</p>
-<ul>
-<li>所有数组类型。</li>
-<li>满足以下条件的类（包括<code>class</code>、<code>struct</code>）：<ul>
-<li>所有非静态成员变量的访问权限都是<code>public</code>。</li>
-<li>没有用户自定义的构造函数（但允许使用<code>= default</code>来显式使用编译器合成的构造函数，或使用<code>= delete</code>来显式禁止某种构造函数）。</li>
-<li>没有基类（C++17后允许有<code>public</code>的非虚基类）。</li>
-<li>没有虚函数。</li>
-<li>成员变量没有默认初始化式（不在构造函数里那种）（C++11新增，但似乎C++14又去掉了此限制）。</li>
-</ul>
-</li>
-</ul>
-<p>根据上面的定义，聚合类型还有下面的几个特点：</p>
-<ul>
-<li>不要求其所有非静态成员变量均为聚合类型。</li>
-<li>对静态成员没有任何限制。</li>
-<li>只对构造函数有限制，对析构函数、赋值函数等无限制。</li>
-<li>非聚合类型的数组也是聚合类型。</li>
-</ul>
-<p>当我们写</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Type a[m] &#x3D; &#123;b0, b1, ..., bn-1&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>时：</p>
-<ul>
-<li>若m == n，则会发生b0到a[0]、b1到a[1]等等n次复制初始化。</li>
-<li>若m &lt; n，则报错。</li>
-<li>若m &gt; n，则a[0]-a[n-1]发生复制初始化，而a[n]-a[m-1]则发生默认初始化。</li>
-<li>若m为空，则a的长度会被设定为n，同样发生n次复制初始化。 </li>
-</ul>
-<p>对于下面的聚合类型</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    TypeA a;</span><br><span class="line">    TypeB b;</span><br><span class="line">    TypeC c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>当我们写</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">S s = &#123;a<span class="number">'</span>, b<span class="number">'</span>, c<span class="number">'</span>&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>时：</p>
-<ul>
-<li>若<code>{}</code>内元素数量与<code>S</code>中非静态成员变量数量相等，会按a’-&gt;a、b’-&gt;b、c’-&gt;c的方式进行复制初始化。</li>
-<li>若<code>{}</code>内元素数量更多，则报错。</li>
-<li>若<code>S</code>中非静态成员变量数量更多，则后面的成员发生默认初始化。</li>
-</ul>
-<p>在初始化时：</p>
-<ul>
-<li>若发生复制初始化，则会调用相应类型的复制构造函数或赋值函数。</li>
-<li>若列表中某项为表达式，则复制/赋值时允许发生隐式转换（C++11开始要求不能是narrow转换）。</li>
-<li>若列表中某项本身也是个<code>{}</code>列表，则要求对应的数组元素/非静态成员变量也是聚合类型，尝试递归聚合赋值。</li>
-<li>标量类型的默认初始化会将其初始化为0、0.0、false等。</li>
-<li>引用类型的默认初始化会报错。</li>
-</ul>
-<p>在对聚合类型（非数组）做列表赋值时，我们还可以指定成员的名字，如：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">A</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> x;</span><br><span class="line">    <span class="keyword">int</span> y;</span><br><span class="line">    <span class="keyword">int</span> z;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">A a = &#123;.x = <span class="number">1</span>, .z = <span class="number">2</span>&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>它有以下特点：</p>
-<ul>
-<li>列表中名字顺序必须符合成员顺序，即<code>{.z = 2, .x = 1}</code>是不行的。（注意，<a href="http://en.cppreference.com/w/c/language/struct_initialization" target="_blank" rel="noopener">C允许乱序，还允许其它多种初始化方式</a>，但C++不允许）</li>
-<li>列表中元素数量可以少于成员数量，未在列表中出现的成员发生默认初始化，即上例中<code>a.y</code>为0。</li>
-</ul>
-<h1 id="Trivial-Type"><a href="#Trivial-Type" class="headerlink" title="Trivial Type"></a>Trivial Type</h1><p>第三个概念，Trivial Type，即平凡类型。</p>
-<p>所谓平凡类型，可以认为是有bitwise语义的类型，即可以直接按字节复制的类型。C中的所有类型都是Trivial Type。</p>
-<p>Trivial Type有两个标准：</p>
-<ul>
-<li>能trivial静态构造，即要有一个trivial的默认构造函数。</li>
-<li>能trivial拷贝，即满足Trivial Copyable标准。</li>
-</ul>
-<p>Trivial Copyable类型即是满足<code>std::is_trivially_copyable&lt;T&gt;::value</code>为true的类型，它要求：</p>
-<ul>
-<li>所有复制构造、赋值函数要么是trivial的，要么是deleted。</li>
-<li>所有移动构造、赋值函数要么是trivial的，要么是deleted。</li>
-<li>至少有一个非deleted复制或移动的构造或赋值函数。</li>
-<li>析构函数为trivial，且非deleted。</li>
-</ul>
-<p>构造函数、析构函数、复制构造/赋值函数、移动构造/赋值函数的trivial是指：</p>
-<ul>
-<li>满足bitwise语义。</li>
-<li>要么是编译器隐式合成的版本。</li>
-<li>要么通过<code>= default</code>显式使用编译器的合成版本。</li>
-</ul>
-<p>以上条件也就意味着一个Trivial Type：</p>
-<ul>
-<li>不能有虚函数（会导致构造函数等失去bitwise语义）。</li>
-<li>不能有虚基类（同上）。</li>
-<li>如果有基类，基类也要是Trivial Type。</li>
-<li>不能有自定义的构造、析构、复制、移动函数。</li>
-<li>不能有非Trivial Type类型的非静态成员变量。</li>
-</ul>
-<p>标量类型、Trivial Type的数组也是Trivial Type。</p>
-<p>Trivial Type是用来区分那些可以像C一样通过<code>memset</code>、<code>memcpy</code>等函数直接构造和复制的类型，C++11中增加了<code>std::is_trivial</code>模板来判断一个类型是否是trivial的。</p>
-<p>注意，Trivial Type还有以下特点：</p>
-<ul>
-<li>不限制成员变量的访问限制，即<code>public</code>、<code>protected</code>、<code>private</code>都可以。</li>
-<li>只要求默认构造函数是trivial的，对其它构造函数没有要求。</li>
-</ul>
-<h1 id="Standard-Layout-Type"><a href="#Standard-Layout-Type" class="headerlink" title="Standard Layout Type"></a>Standard Layout Type</h1><p>第四个概念，Standard Layout Type，即标准布局类型。</p>
-<p>标准布局的目的是定义一种与C兼容的内存布局，满足标准布局的类型即为标准布局类型，Standard Layout Type。</p>
-<p>关于不同C++类型的内存布局，可以见上一篇文章<a href="https://fuzhe1989.github.io/2018/03/11/cpp-object-model-struct/">C++对象模型（二）struct/class的内存布局</a>。</p>
-<p>C++的Standard Layout Type要求：</p>
-<ul>
-<li><p>所有非静态成员变量有着相同的访问权限。</p>
-</li>
-<li><p>没有虚函数或虚基类。</p>
-</li>
-<li><p>没有引用类型的非静态成员变量。</p>
-</li>
-<li><p>所有基类和非静态成员变量本身也是Standard Layout Type。</p>
-</li>
-<li><p>该类型与其所有基类中，最多只能有一个类型有非静态成员变量（其它类型都需要是空类型），即所有非静态成员变量都在一个类型中。</p>
-</li>
-<li><p>第一个非静态成员变量（包括继承自基类的成员）其类型不能与任一空基类相同（影响空基类优化）。</p>
-</li>
-<li><p>该类型的继承树中同一类型不能出现多次。</p>
-<p>  例子：</p>
-  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Q</span> &#123;</span>&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> Q &#123;&#125;；</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">T</span>:</span> Q &#123;&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">U</span>:</span> S, T &#123;&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>  <code>U</code>的继承树中<code>Q</code>出现了两次，则<code>Q</code>、<code>S</code>、<code>T</code>都是Standard Layout Type，但<code>U</code>不是。</p>
-</li>
-</ul>
-<p>相同访问权限的原因：标准只规定了同一个section内成员的顺序，未规定不同section之间的顺序，因此若非静态成员变量分布在不同section下，无法给出一个确定的布局。</p>
-<p>所有非静态成员变量都在一个类型中的原因：标准未规定基类子对象的位置，因此不同基类、或基类与子类的非静态成员变量间的顺序是未定义的。</p>
-<p>没有虚函数或虚基类的原因：虚函数和虚基类会影响类的内存布局，但标准未规定其实现方式，因此有虚函数或虚基类的类型无法给出一个确定的布局。</p>
-<p>第一个非静态成员变量不能与空基类类型相同的原因：标准规定同时存在的两个变量不能有相同地址，若应用空基类优化，则第一个非静态成员变量的地址与对象地址相同，也与所有空基类地址相同，若其中有相同类型，则导致该地址同时对应了多个变量。</p>
-<p>C++11新增了<code>std::is_standard_layout</code>来判断一个类型是不是Standard Layout Type。</p>
-<h2 id="标准布局"><a href="#标准布局" class="headerlink" title="标准布局"></a>标准布局</h2><p>C++的标准布局实际就是C中struct的布局，对于一个标准布局类的对象：</p>
-<ul>
-<li>其本身的地址与其所有基类子对象的地址相同，即基类子对象的地址无偏移。</li>
-<li>其各个非静态成员变量的位置按声明顺序从对象地址开始由低到高排列。</li>
-<li>其第一个非静态成员变量的地址与对象地址相同。</li>
-<li>其各个非静态成员变量的地址均满足对齐要求。</li>
-</ul>
-<h1 id="POD-Type"><a href="#POD-Type" class="headerlink" title="POD Type"></a>POD Type</h1><p>最后一个概念，POD Type，即Plain Old Data Type，即可导出，可跨语言使用的类型（通常也意味着与C二进制兼容）。</p>
-<p>一个POD类型为：</p>
-<ul>
-<li>标量类型。</li>
-<li>满足以下条件的自定义类型：<ul>
-<li>C++11之前：<ul>
-<li>聚合类型。</li>
-<li>没有非POD类型的非静态成员变量。</li>
-<li>没有引用类型的非静态成员变量。</li>
-<li>没有自定义的构造函数或析构函数。</li>
-</ul>
-</li>
-<li>C++11之后：<ul>
-<li>是平凡类。</li>
-<li>是标准布局类。</li>
-<li>没有非POD类型的非静态成员变量。</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>POD类型的数组。</li>
-</ul>
-<p>可以看到POD的标准在C++11前后发生了很大的变化。C++11里放宽了对POD的限制，且根据这些限制的目的，提出了平凡类和标准布局类这两个更清晰的概念。在C++20后POD这个概念本身都会被去掉，而是在不同场合直接使用平凡类、标准布局类等概念。</p>
-<p>一个类型可以只是平凡类或只是标准布局类：</p>
-<ul>
-<li>如果是平凡类，则意味着它可以直接通过<code>memcpy</code>、<code>memset</code>等函数来操作。</li>
-<li>如果是标准布局类，则意味着它的布局是确定的，可以与其它语言交互。</li>
-</ul>
-<p>可以用<code>is_pod</code>来判断一个类型是不是POD类型。</p>
-<h1 id="POD的用途"><a href="#POD的用途" class="headerlink" title="POD的用途"></a>POD的用途</h1><p>平凡类的用途：</p>
-<ul>
-<li>平凡类的对象可以与字节流之间安全转换，即：<ul>
-<li>若要将对象转为字节流，直接取其地址即可。</li>
-<li>若要将字节流转为对象，直接将该地址cast为对象指针即可。</li>
-<li>直接通过复制字节的方式复制对象。</li>
-</ul>
-</li>
-<li>安全的静态初始化。<ul>
-<li>C++11的<code>thread_local</code>变量可以是非平凡类型，但在某些编译器下会有比较大的性能开销。gcc扩展的<code>__thread</code>只能使用POD类型。</li>
-</ul>
-</li>
-</ul>
-<p>标准布局类的用途：</p>
-<ul>
-<li>跨进程、跨语言使用。</li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2231,14 +2061,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">58</span>
+          <span class="site-state-item-count">60</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-count">39</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
