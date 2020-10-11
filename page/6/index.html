@@ -1223,7 +1223,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+                <time title="修改时间：2020-10-11 18:22:50" itemprop="dateModified" datetime="2020-10-11T18:22:50+08:00">2020-10-11</time>
               </span>
 
           
@@ -1275,7 +1275,7 @@
 <h3 id="如何取舍auto与代码的可读性"><a href="#如何取舍auto与代码的可读性" class="headerlink" title="如何取舍auto与代码的可读性"></a>如何取舍<code>auto</code>与代码的可读性</h3><p><code>auto</code>只是一种选项，不是强制要求，如果显式声明类型能让代码更干净，更好维护，就继续用显式类型声明。</p>
 <p>但根据其它语言中的经验，自动类型推断并没有阻碍我们对大型的工业级代码库的开发和维护。</p>
 <p>有人担心<code>auto</code>略去了类型，会影响我们对代码的理解，但很多时间一个好的名字能解决这个问题，比如知道这个变量是容器、计数器，还是一个智能指针。</p>
-<p>显式写出类型，往往只能引入微妙的问题，而没有提供很多信息。使用<code>auto</code>还能帮助我们做重构。比如一个变量的初始类型是<code>int</code>，有一天你想换成<code>lond</code>，那么用了<code>auto</code>的地方自动就变掉了，但用了<code>int</code>去声明的地方则要你一个一个的找出来。</p>
+<p>显式写出类型，往往只能引入微妙的问题，而没有提供很多信息。使用<code>auto</code>还能帮助我们做重构。比如一个变量的初始类型是<code>int</code>，有一天你想换成<code>long</code>，那么用了<code>auto</code>的地方自动就变掉了，但用了<code>int</code>去声明的地方则要你一个一个的找出来。</p>
 <h2 id="Item6-在auto推断非预期时显式声明类型"><a href="#Item6-在auto推断非预期时显式声明类型" class="headerlink" title="Item6: 在auto推断非预期时显式声明类型"></a>Item6: 在<code>auto</code>推断非预期时显式声明类型</h2><p>一些场景下表达式的类型与我们想要的类型并不一致，我们依赖于隐式类型转换才能得到想要的类型。这个时候我们需要显式声明类型，如果用<code>auto</code>就会得到非预期的类型。</p>
 <p>一种常见场景是表达式返回一个代理类型，比如<code>std::vector&lt;bool&gt;::operator[]</code>返回<code>std::vector&lt;bool&gt;::reference</code>，而不是我们预期的<code>bool</code>。类的设计者预期我们会把返回值的类型声明为<code>bool</code>，再通过<code>reference::operator bool()</code>来做隐式转换。</p>
 <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">bool</span>&gt; features();</span><br><span class="line">...</span><br><span class="line"><span class="keyword">bool</span> highPriority = features()[<span class="number">5</span>];  <span class="comment">// reference -&gt; bool, not bool&amp;</span></span><br><span class="line">...</span><br><span class="line">processWidget(w, highPriority);</span><br></pre></td></tr></table></figure>
