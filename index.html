@@ -176,6 +176,98 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/" class="post-title-link" itemprop="url">[笔记] SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-10-11 18:18:37 / 修改时间：18:18:38" itemprop="dateCreated datePublished" datetime="2020-10-11T18:18:37+08:00">2020-10-11</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="http://www.vldb.org/pvldb/vol1/1454166.pdf" target="_blank" rel="noopener">SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>SCOPE是一种分布式批处理语言，将类SQL的脚本编译为可以运行在Cosmos平台上的分布式作业。</p>
+<p>它的特点：</p>
+<ul>
+<li>同时支持类SQL语法和分步的声明式语法。</li>
+<li>支持使用C#编写扩展类和脚本内直接调用C#表达式。</li>
+<li>支持导入已有的脚本，且可传递参数。</li>
+<li>编译期支持基于开销进行优化，重写执行计划；运行期也支持优化，比如按rack做预聚合。</li>
+</ul>
+<h2 id="语法"><a href="#语法" class="headerlink" title="语法"></a>语法</h2><p>SCOPE支持两种语法，既可以直接写成类似SQL的形式：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">SELECT query, COUNT(*) AS count</span><br><span class="line">FROM &quot;search.log&quot; USING LogExtractor</span><br><span class="line">GROUP BY query</span><br><span class="line">HAVING count &gt; 1000</span><br><span class="line">ORDER BY count DESC;</span><br><span class="line">OUTPUT TO &quot;qcount.result&quot;;</span><br></pre></td></tr></table></figure>
+
+<p>也可以使用声明式语法：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">e &#x3D; EXTRACT query</span><br><span class="line"> FROM “search.log&quot;</span><br><span class="line"> USING LogExtractor;</span><br><span class="line">s1 &#x3D; SELECT query, COUNT(*) as count</span><br><span class="line"> FROM e</span><br><span class="line"> GROUP BY query;</span><br><span class="line">s2 &#x3D; SELECT query, count</span><br><span class="line"> FROM s1</span><br><span class="line"> WHERE count &gt; 1000;</span><br><span class="line">s3 &#x3D; SELECT query, count</span><br><span class="line"> FROM s2</span><br><span class="line"> ORDER BY count DESC;</span><br><span class="line">OUTPUT s3 TO “qcount.result&quot;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/scope-01.jpg" alt=""></p>
+<p>SCOPE是建立在Cosmos分布式执行平台之上的（参考<a href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/">Dryad</a>）。</p>
+<h2 id="SCOPE语言"><a href="#SCOPE语言" class="headerlink" title="SCOPE语言"></a>SCOPE语言</h2><p>SCOPE提供了EXTRACT和OUTPUT两条指令来定义输入和输出：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">EXTRACT column[:&lt;type&gt;] [, …]</span><br><span class="line">FROM &lt; input_stream(s) &gt;</span><br><span class="line">USING &lt;Extractor&gt; [(args)]</span><br><span class="line">[HAVING &lt;predicate&gt;]</span><br><span class="line"></span><br><span class="line">OUTPUT [&lt;input&gt;</span><br><span class="line"> [PRESORT column [ASC | DESC] [, …]]]</span><br><span class="line">TO &lt;output_stream&gt;</span><br><span class="line">[USING &lt;Outputter&gt; [(args)]]</span><br></pre></td></tr></table></figure>
+
+<p>用户可以用C#实现自己的Extractor和Producer来扩展这两条指令。</p>
+<p>SCOPE还支持SELECT和JOIN，其中FROM子句支持嵌套，但不支持子查询。但用户可以用OUTER JOIN来绕开这一限制，如下面的SQL：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">SELECT Ra, Rb</span><br><span class="line">FROM R</span><br><span class="line">WHERE Rb &lt; 100</span><br><span class="line"> AND (Ra &gt; 5 OR EXISTS(SELECT * FROM S</span><br><span class="line"> WHERE Sa &lt; 20</span><br><span class="line"> AND Sc &#x3D; Rc))</span><br></pre></td></tr></table></figure>
+
+<p>可以改写为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">SQ &#x3D; SELECT DISTINCT Sc FROM S WHERE Sa &lt; 20;</span><br><span class="line">M1 &#x3D; SELECT Ra, Rb, Rc FROM R WHERE Rb &lt; 100;</span><br><span class="line">M2 &#x3D; SELECT Ra, Rb, Rc, Sc</span><br><span class="line"> FROM M1 LEFT OUTER JOIN SQ ON Rc &#x3D;&#x3D; Sc;</span><br><span class="line">Q &#x3D; SELECT Ra, Rb FROM M2</span><br><span class="line"> WHERE Ra &gt; 5 OR Rc !&#x3D; Sc;</span><br></pre></td></tr></table></figure>
+
+<p>SCOPE脚本中还可以直接调用C#表达式，如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">R1 &#x3D; SELECT A+C AS ac, B.Trim() AS B1</span><br><span class="line"> FROM R</span><br><span class="line"> WHERE StringOccurs(C, “xyz”) &gt; 2</span><br><span class="line"></span><br><span class="line">#CS</span><br><span class="line">public static</span><br><span class="line">int StringOccurs(string str, string ptrn)</span><br><span class="line">&#123;</span><br><span class="line"> int cnt&#x3D;0; int pos&#x3D;-1;</span><br><span class="line"> while (pos+1 &lt; str.Length) &#123;</span><br><span class="line"> pos &#x3D; str.IndexOf(ptrn, pos+1) ;</span><br><span class="line"> if (pos &lt; 0) break;</span><br><span class="line"> cnt++;</span><br><span class="line"> &#125;</span><br><span class="line"> return cnt;</span><br><span class="line">&#125;</span><br><span class="line">#ENDCS</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>#CS</code>和<code>#ENDCS</code>中间可以直接嵌入C#代码。</p>
+<p>用户还可以自己定制PROCESS、REDUCE、COMBINE三类算子，从而实现类似于<a href="2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/">MapReduceMerge</a>的操作。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1279,203 +1371,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/15/the-google-file-system/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/15/the-google-file-system/" class="post-title-link" itemprop="url">[笔记] The Google File System</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-09-15 21:20:10" itemprop="dateCreated datePublished" datetime="2020-09-15T21:20:10+08:00">2020-09-15</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-09-17 21:40:36" itemprop="dateModified" datetime="2020-09-17T21:40:36+08:00">2020-09-17</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://research.google/pubs/pub51.pdf" target="_blank" rel="noopener">The Google File System</a></p>
-</blockquote>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>GFS在设计上与传统的文件系统的几个区别：</p>
-<ul>
-<li>分布式系统中错误是常态，因此持续监控、错误检测、容错机制、自动恢复都是必要的。</li>
-<li>文件普遍非常大，达到GB级别以上，要重新审视对I/O操作和块大小的预期。</li>
-<li>文件的追加写远多于覆盖写。</li>
-</ul>
-<h2 id="Design-Overview"><a href="#Design-Overview" class="headerlink" title="Design Overview"></a>Design Overview</h2><h3 id="Assumptions"><a href="#Assumptions" class="headerlink" title="Assumptions"></a>Assumptions</h3><ul>
-<li>整个系统由廉价易坏的硬件组成。</li>
-<li>典型文件大小在100MB以上。支持小文件但不做特殊优化。</li>
-<li>主要有两种读模式，大块顺序读和小块随机读。应用也可以自行将多个随机读排序转化为一次顺序读。</li>
-<li>要支持高效的并发追加写同一个文件。</li>
-<li>高吞吐优先于低延时。</li>
-</ul>
-<h3 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h3><p>一个GFS集群由单master和若干个chunkserver组成。文件由固定大小的chunk组成。</p>
-<p>master负责维护：</p>
-<ul>
-<li>所有metadata，包括namespace、ACL、file到chunk的映射、chunk当前所在的chunkserver。</li>
-<li>全局动作，包括chunk的lease管理和chunk的迁移。</li>
-</ul>
-<p>client的数据读写都直接与chunkserver通信，只在需要metadata时才与master通信。</p>
-<p>client和chunkserver都不缓存数据，前者不需要，后者通过Linux的page cache就可以达到目的了。</p>
-<h3 id="Single-Master"><a href="#Single-Master" class="headerlink" title="Single Master"></a>Single Master</h3><p>单master极大简化了设计，但要非常小心地避免它成为读写路径的瓶颈。client只在第一次访问一个chunk时找master要它的位置，之后会缓存这一信息，直接与对应的chunkserver通信完成读写。</p>
-<h3 id="Chunk-Size"><a href="#Chunk-Size" class="headerlink" title="Chunk Size"></a>Chunk Size</h3><p>GFS的chunk size默认为64MB，远大于传统文件系统的block size。大的chunk size的好处：</p>
-<ul>
-<li>减少了client与master的通信次数。</li>
-<li>client一次在大chunk上完成的操作数会更多，减少了每次与chunkserver建立TCP连接的开销。</li>
-<li>减少了master要维护的metadata。</li>
-</ul>
-<p>但大chunk使小文件经常只有非常少量的chunk，容易成为热点。一个场景是应用先写入一个单chunk的文件，之后大量job同时读取这个文件。解法是给这个文件分配更多的replica，同时应用端在job启动时加一个随机的延迟。</p>
-<h3 id="Metadata"><a href="#Metadata" class="headerlink" title="Metadata"></a>Metadata</h3><p>metadata主要为两类：</p>
-<ul>
-<li>namespace和file-chunk映射，修改会记录在operation log中。</li>
-<li>chunk的位置，不持久化，master启动时和有chunkserver加入时，master主动访问chunkserver得到。</li>
-</ul>
-<h4 id="In-Memory-Data-Structures"><a href="#In-Memory-Data-Structures" class="headerlink" title="In-Memory Data Structures"></a>In-Memory Data Structures</h4><p>master管理的所有metadata都常驻内存，好处略。隐患是chunk太多的话master的内存可能成问题（注：pangu1的常见问题），但相比而言给master机器加内存还是比较容易的。</p>
-<h4 id="Chunk-Locations"><a href="#Chunk-Locations" class="headerlink" title="Chunk Locations"></a>Chunk Locations</h4><p>master通过与chunkserver的心跳获得chunk位置，而不持久化这些信息，原因是：</p>
-<ul>
-<li>持久化的话就要保持master与chunkserver关于chunk位置的一致，考虑到chunkserver的扩缩容、failover、改名等情况，比较复杂。</li>
-<li>chunkserver才拥有chunk位置的最终话语权，比如chunk损坏了等。</li>
-</ul>
-<h4 id="Operation-Log"><a href="#Operation-Log" class="headerlink" title="Operation Log"></a>Operation Log</h4><p>operation log不仅记录事件，还充当一个逻辑时钟。</p>
-<p>checkpoint文件本身组织为B-tree，可以直接mmap到内存中访问。</p>
-<h3 id="Consistency-Model"><a href="#Consistency-Model" class="headerlink" title="Consistency Model"></a>Consistency Model</h3><h4 id="Guarantees-by-GFS"><a href="#Guarantees-by-GFS" class="headerlink" title="Guarantees by GFS"></a>Guarantees by GFS</h4><p>一个文件区域在被修改后，如果所有client从无论哪个replica总是看到相同的状态，称其为一致的；如果不光是一致的，client知道修改后的状态，称其为确定的。</p>
-<p>成功的串行修改总是确定的，成功的并行修改是一致但不确定的，失败的修改是不一致的。</p>
-<p>一次成功的追加写至少会写入一份数据，并返回确定区域的offset。</p>
-<p>GFS通过两点保证多次成功的修改后，被修改的文件区域是确定的，包含最后一次写入的内容：</p>
-<ul>
-<li>所有replica应用相同的修改顺序。</li>
-<li>使用chunk version来标识哪些replica已过期。</li>
-</ul>
-<p>过期的repilca不会参与后续的读写，后面会被gc掉。</p>
-<p>在client的chunk位置的cache过期前，有一个小的时间窗口client可能读到过期数据。但因为过期的replica通常都提前结束了，client会与master通信，从而获取到最新的chunk位置。</p>
-<p>master会在chunk有replica损坏或过期后尽快恢复出一个新的replica，除非非常短时间内所有replica都损坏了，此时数据也只是丢失，而不是写坏了，应用可以得到确定的异常，而不是错误的数据。</p>
-<h4 id="Implications-for-Applications"><a href="#Implications-for-Applications" class="headerlink" title="Implications for Applications"></a>Implications for Applications</h4><ul>
-<li>依赖追加写而不是覆盖写，从而可以只用checkpoint就知道哪块文件区域是确定的。</li>
-<li>记录应用自己的checkpoint，读的时候只读到最新的checkpoint，避免读到那些GFS认为成功写入但应用认为没有的区域。</li>
-<li>数据要能自检验、自识别，能知道哪些记录是无效的或重复的。</li>
-</ul>
-<h2 id="System-Interactions"><a href="#System-Interactions" class="headerlink" title="System Interactions"></a>System Interactions</h2><h3 id="Leases-and-Mutation-Order"><a href="#Leases-and-Mutation-Order" class="headerlink" title="Leases and Mutation Order"></a>Leases and Mutation Order</h3><p>master会为每个chunk挑选一个primary，primary负责决定这个chunk的所有修改的顺序。</p>
-<p>master与primary chunk间的lease默认为60s，但master可以提前结束lease（如禁止修改改名中的文件）。假设master与primary chunk断开了，它可以在当前lease过期后再挑选新的primary。</p>
-<p>client执行一次修改操作的过程（类似于2PC）：</p>
-<ol>
-<li>client找master要chunk对应的replica，此时如果这个chunk没有primary，master会临时授予一个。</li>
-<li>client将数据推给所有replica，不需要考虑顺序。chunkserver会将这些数据缓存在LRU队列中（如果过期了后续会导致请求失败）。</li>
-<li>client向primary发送写请求，primary为所有它收到还未处理的数据分配sequence number，并在本地执行修改。</li>
-<li>primary将写请求转发给所有replica，每个replica按相同顺序执行这些写请求。</li>
-<li>secondary回复primary。</li>
-<li>primary回复client。</li>
-</ol>
-<p>任何replica的失败都会使写请求失败，文件的对应区域此时是不一致的。GFS的client默认会重试请求（如何处理留下来的不一致区域？）。</p>
-<p>如果一次写跨chunk，GFS会将其分为多次写，可能导致并发写的数据交织在一起（追加写）或相互覆盖（覆盖写），即一致但未定义。</p>
-<h3 id="Data-Flow"><a href="#Data-Flow" class="headerlink" title="Data Flow"></a>Data Flow</h3><p>为了充分利用整个集群的网络带宽，数据在不同chunkserver间是串行传输的，每个chunkserver会把数据发送给离自己最近的还没收到数据的chunkserver。这里距离是直接用IP地址计算出来的。</p>
-<h3 id="Atomic-Record-Appends"><a href="#Atomic-Record-Appends" class="headerlink" title="Atomic Record Appends"></a>Atomic Record Appends</h3><p>primary接收到一个atomic append请求时，它先判断当前chunk是否有足够空间，如果没有的话，它会先补全当前chunk，再返回client一个可重试的错误。否则primary先在本地追加，再告诉secondary具体的offset，最后回复client。</p>
-<p>如果任一replica写失败，整个请求就失败了，client重试可能导致不同repilca不完全一致：每个replica上可能写了一次或多次或不完整的记录。GFS不保证每个replica完全一致，它只保证数据至少被原子写入一次。成功的请求表明数据一定在所有replica上写到了相同的offset上；每个replica的数据长度都至少等于这条记录的结束位置，因此任何后续的记录都会写到更高的offset或新chunk上（不会覆盖老数据）。追加写保证会得到确定（因此一致）的结果，而交替的覆盖写则是不一致（因此不确定）的。</p>
-<h3 id="Snapshot"><a href="#Snapshot" class="headerlink" title="Snapshot"></a>Snapshot</h3><p>master收到snapshot请求时，先取消所有涉及到的chunk的lease，保证后续写请求都必须先与master通信。之后master将snapshot记入opeartion log，再复制源文件或文件树的metadata。新创建出来的snapshot文件指向与源文件相同的chunk。</p>
-<p>client后续要写snapshot过的chunk C时，它会先找master，master发现C有多个引用，于是要求所有持有C的replica的chunkserver复制出一个C’，再为C’挑选一个primary，此后的流程与正常写相同。</p>
-<h2 id="Master-Operation"><a href="#Master-Operation" class="headerlink" title="Master Operation"></a>Master Operation</h2><h3 id="Namespace-Management-and-Locking"><a href="#Namespace-Management-and-Locking" class="headerlink" title="Namespace Management and Locking"></a>Namespace Management and Locking</h3><p>GFS没有使用树形结构来维护namespace，而是将所有namespace保存在一个表中，每条记录的key就是完整path，如”/d1/d2/…/dn/leaf”对应着”/d1”、”/d1/d2”、”/d1/d2/…/dn/leaf”等一系列key。每条记录对应一个读写锁，在访问一个路径时，要持有它的所有前缀记录的读锁。文件创建不需要持有前缀记录的写锁，只要读锁就足够保证前缀记录不被删除了。</p>
-<p>这一性质的一大优点是它允许在同一目录内并发地修改。</p>
-<h3 id="Replica-Placement"><a href="#Replica-Placement" class="headerlink" title="Replica Placement"></a>Replica Placement</h3><p>chunk的replica位置服务于两个目的：</p>
-<ul>
-<li>最大化数据可靠性和可用性；</li>
-<li>最大化网络带宽利用率。</li>
-</ul>
-<p>因此要将replica分布于不同rack的机器上，从而避免某个rack出问题导致整个chunk数据丢失，也有利于读的时候充分利用整个rack的网络带宽。代价就是写的时候数据要流经多个rack。</p>
-<h3 id="Creation-Re-replication-Rebalancing"><a href="#Creation-Re-replication-Rebalancing" class="headerlink" title="Creation, Re-replication, Rebalancing"></a>Creation, Re-replication, Rebalancing</h3><p>新创建chunk时位置选择的考虑：</p>
-<ul>
-<li>磁盘空闲的chunkserver优先；</li>
-<li>控制每个chunkserver上新创建的chunk不要太多，避免后续流量集中在这个chunkserver上；</li>
-<li>分散在不同rack上。</li>
-</ul>
-<p>一旦master发现某个chunk的replica少了，就会触发re-replication。它的优先级是看replica少了几份，chunk是否活跃，以及是否阻塞了client的请求。</p>
-<p>master定期会做rebalance，但不会直接填满新加入的chunkserver，而是渐进式的。</p>
-<h3 id="Garbage-Collection"><a href="#Garbage-Collection" class="headerlink" title="Garbage Collection"></a>Garbage Collection</h3><p>文件被删除时，master先记录到operation log中，再将文件rename为一个名字包含删除时间戳的隐藏文件。之后master会定期扫描这些文件，删除超过若干天的就被真正删除掉。master给chunkserver的心跳回复中会包含chunkserver持有的哪些chunk需要被删除。</p>
-<p>通过这种异步的、基于状态对比的、批量通知的方式，GFS的回收可以处理多种情况造成的垃圾，简化了流程，也平摊了开销，缺点就是回收延迟比较大。补救措施是，隐藏文件被删除时会立即执行删除、用户可以指定强制删除、用户可以指定某个路径下的文件不参与replication。</p>
-<h3 id="Stale-Replica-Detection"><a href="#Stale-Replica-Detection" class="headerlink" title="Stale Replica Detection"></a>Stale Replica Detection</h3><p>对于每个chunk，master都维护了一个version，每次授予lease时增加，master和replica都会持久化这个version。master如果遇到了比它自己记录的更大的version，可能是master之前failover过了，master会将自己记录的version提升上去；如果遇到了更小的version就会认为这个replica过期了，变成垃圾了。</p>
-<p>master在回复replica位置给client时，也会带上这个version，从而避免client访问过期的replica。</p>
-<h2 id="Fault-Tolerance-and-Diagnosis"><a href="#Fault-Tolerance-and-Diagnosis" class="headerlink" title="Fault Tolerance and Diagnosis"></a>Fault Tolerance and Diagnosis</h2><p>GFS的容量决定了错误是常态。</p>
-<h3 id="High-Availability"><a href="#High-Availability" class="headerlink" title="High Availability"></a>High Availability</h3><h4 id="Fast-Recovery"><a href="#Fast-Recovery" class="headerlink" title="Fast Recovery"></a>Fast Recovery</h4><p>master和chunkserver不区分正常退出和意外退出，都走一样的快速恢复流程。</p>
-<h4 id="Chunk-Replication"><a href="#Chunk-Replication" class="headerlink" title="Chunk Replication"></a>Chunk Replication</h4><ul>
-<li>不同namespace可以有不同的replication level。</li>
-<li>master会尽快复制replica不足的chunk。</li>
-<li>正在探索奇偶校验码、纠删码等其它冗余方案，这是基于GFS追加和读远多于小块随机写的场景的。</li>
-</ul>
-<h4 id="Master-Replication"><a href="#Master-Replication" class="headerlink" title="Master Replication"></a>Master Replication</h4><p>master的修改要等到自身和所有replica的operation log落盘才算提交成功。</p>
-<p>master的replica是shadow而不是mirror，状态可能会落后于primary，但它们也可以提供非最新的读能力。</p>
-<p>shadow replica也会用与primary相同的顺序执行修改，也会从chunkserver获取chunk列表，只有新创建的chunk和被回收的chunk必须从primary处得知。</p>
-<h3 id="Data-Integrity"><a href="#Data-Integrity" class="headerlink" title="Data Integrity"></a>Data Integrity</h3><p>GFS一个集群会有大量磁盘，时常会有磁盘错误，但一一比较每个chunk replica很不现实。而且不同replica也可能不一致。因此chunkserver会通过checksum来校验chunk是否正确。</p>
-<p>chunk的每个block都有checksum，是常驻内存的，读的时候会校验。这对性能的影响非常小，因为对比checksum不会有I/O，而计算checksum的开销会被I/O平摊掉。client会按block大小对齐读的范围。</p>
-<p>追加写的时候直接基于旧的checksum计算新的checksum。如果之前这个block状态已经不一致了，checksum不对，后续读的时候会发现。</p>
-<p>覆盖写需要读出整个范围的block重新计算checksum。</p>
-<p>chunkserver会在空闲时挑选一些不活跃的chunk校验数据。</p>
-<h1 id="Experiences"><a href="#Experiences" class="headerlink" title="Experiences"></a>Experiences</h1><p>GFS发展过程中遇到的问题：</p>
-<ul>
-<li>后续才增加了权限和配额的支持。</li>
-<li>磁盘驱动版本。</li>
-<li>Linux 2.2的<code>fsync()</code>有性能bug。</li>
-<li>Linux一个进程读写页面时有一个大的读写锁，加载page和通过<code>mmap</code>更新page互斥。后续通过将<code>mmap</code>改为<code>pread</code>解决。</li>
-</ul>
-<blockquote>
-<p>pangu1也是单master，与GFS的区别主要在于：</p>
-<ul>
-<li>似乎没有primary chunk的概念。</li>
-<li>master会记录chunk的长度。</li>
-</ul>
-<p>pangu1中文件分成了LogFile、NormalFile、以及一个可以随机写的File（不记得名字了）。</p>
-<p>NormalFile类似于GFS的File，链式replication，只支持追加写。它的主要的写接口是<code>append()</code>、<code>commit()</code>和<code>truncate()</code>，<code>append</code>写入的数据不会改变master端记录的size，这个是在<code>commit</code>时确定的。当出现写失败时，不同replica可能不一致，此时可以通过<code>truncate</code>到上次<code>commit</code>时的offset来解决这种不一致。对于<code>commit</code>超时的情况，client需要重新打开文件，触发master主动获取各个replica的size。</p>
-<p>LogFile是专门针对小的record设计的类型，星型写，只支持追加写，不需要额外的<code>commit</code>，也不支持<code>truncate</code>。它的size更新逻辑似乎是如果三份都成功，则不立即更新；当写失败时，client需要重新打开文件，触发master主动封存当前chunk，此时master会确认chunk的size。</p>
-<p>master也会在与chunkserver的日常通信过程中确认chunk的size。</p>
-<p>pangu2将单master按功能拆成若干种master node，从而解决了单master内存爆炸的问题。另外不同的文件类型也统一掉了，具体的细节不清楚。</p>
-</blockquote>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1549,7 +1444,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">61</span>
+          <span class="site-state-item-count">62</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
