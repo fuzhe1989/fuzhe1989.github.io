@@ -176,6 +176,136 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/" class="post-title-link" itemprop="url">[笔记] OLTP Through the Looking Glass, and What We Found There</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-09-01 12:23:11 / 修改时间：12:23:56" itemprop="dateCreated datePublished" datetime="2020-09-01T12:23:11+08:00">2020-09-01</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="http://pages.cs.wisc.edu/~yxy/cs839-s20/papers/hstore_lookingglass_2008.pdf" target="_blank" rel="noopener">OLTP Through the Looking Glass, and What We Found There</a> </p>
+</blockquote>
+<p>本文观点：随着硬件的发展和需求的变化，OLTP需要有新的设计；测量传统OLTP架构中各部分对性能的影响。</p>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>自从70年代以来OLTP系统的架构就没有太大的变化，但两个趋势使重新设计OLTP系统变得必要：</p>
+<ol>
+<li>硬件的发展。CPU算力的发展使一个事务只需要几ms或更短时间；内存的廉价化使很多DB可以整个放到内存中。</li>
+<li>需求的变化。很多应用不需要那么完整的事务支持。</li>
+</ol>
+<p>本文测试了以下模块：</p>
+<ul>
+<li>logging，包括undo和redo log。</li>
+<li>locking，指2PL。</li>
+<li>latching，指具体的各种mutex。将事务处理改成单线程就可以去掉很多mutex。</li>
+<li>buffer management，指page和cache管理。</li>
+</ul>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f1.jpg" alt="TPC-C New Order场景指令数分布"></p>
+<h2 id="Single-Threading-in-OLTP-Systems"><a href="#Single-Threading-in-OLTP-Systems" class="headerlink" title="Single Threading in OLTP Systems"></a>Single Threading in OLTP Systems</h2><p>如果内存足够大，OLTP系统不再需要多线程：</p>
+<ul>
+<li>不再有disk wait。</li>
+<li>不再有user wait：事务几乎都使用存储过程。</li>
+<li>OLTP事务足够简单，几百ms就可以完成；长时间的事务主要由OLAP服务。</li>
+</ul>
+<p>为了充分利用多核资源，可以使多进程+单线程，每个进程是一个site。</p>
+<p>网络可能是个瓶颈，但很多应用可以将事务范围限制在一个site内，从而避免网络影响。</p>
+<h2 id="High-Availability-vs-Logging"><a href="#High-Availability-vs-Logging" class="headerlink" title="High Availability vs. Logging"></a>High Availability vs. Logging</h2><p><a href="http://www.vldb.org/conf/2006/p703-lau.pdf" target="_blank" rel="noopener">LM06</a>表明至少在data warehouse中，使用standby足以恢复数据。<a href="http://acm.mementodepot.org/pubs/books/3226595/3226595.3226637/3226595.3226637.pdf" target="_blank" rel="noopener">SMA+07</a>表明OLTP系统也可以这样，通过其它节点而不是redo log恢复数据。</p>
+<h2 id="Transaction-Variants"><a href="#Transaction-Variants" class="headerlink" title="Transaction Variants"></a>Transaction Variants</h2><p>一些应用认为可用性比事务语义更重要，因此更倾向于最终一致性。snapshot isolation的流行也表明用户愿意放宽事务语义来换取性能。</p>
+<p>一些研究表明有些限制了用法的事务可以显著简化事务：假如所有事务都先执行完所有读再执行所有写，且保证在读阶段结束后不abort，就不需要undo log了。</p>
+<h2 id="Removing-Components"><a href="#Removing-Components" class="headerlink" title="Removing Components"></a>Removing Components</h2><p>移除logging：</p>
+<ol>
+<li>避免执行过程中产生I/O请求：group commit，增大buffer size以保证过程中不flush。</li>
+<li>注释掉所有准备和写log record的代码。</li>
+<li>避免产生LSN。</li>
+</ol>
+<p>移除locking：</p>
+<ol>
+<li>修改LockManager，所有调用直接返回。</li>
+<li>修改钉住record的函数，在一个目录下查找record，并通过B-tree索引访问。</li>
+</ol>
+<p>移除latcing：</p>
+<ol>
+<li>修改所有mutex，所有调用直接返回。</li>
+<li>避免请求mutex。</li>
+</ol>
+<p>移除buffer manager调用：</p>
+<ol>
+<li>创建record时直接malloc，而不是通过page allocation。</li>
+<li>没有直接移除buffer manager的代码，而是尽量简化了逻辑。</li>
+</ol>
+<p>其它优化：</p>
+<ol>
+<li>单独优化了B-tree的key为未压缩的整数的场景（对应下图中的“Btree keys”）。</li>
+<li>为目录查找增加了一个cache（对应下图中的“dir lookup”）。</li>
+<li>增大page size到32KB（对应下图中的“small page”）从而降低B-tree高度。</li>
+<li>通过将所有事务放到一个session中，移除了每个事务启动和结束session的开销（对应下图中的“Xactions”）。</li>
+</ol>
+<h2 id="Performance-Study"><a href="#Performance-Study" class="headerlink" title="Performance Study"></a>Performance Study</h2><p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f5.jpg" alt="Payment场景指令数分布"></p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f6.jpg" alt="New Order场景指令数分布"></p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f7.jpg" alt="New Order场景指令数详细分布"></p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f8.jpg" alt="New Order场景指令数与周期数对比"></p>
+<p>两个观察：</p>
+<ol>
+<li>单个部分的优化效果并不明显，最明显的也不过30%。</li>
+<li>多个优化一起的效果就很明显了。一个单线程处理事务、所有事务都是读写两阶段的、通过其它节点恢复数据的OLTP系统与当前的系统会非常不一样。</li>
+</ol>
+<h2 id="Implications-for-Future-OLTP-Engines"><a href="#Implications-for-Future-OLTP-Engines" class="headerlink" title="Implications for Future OLTP Engines"></a>Implications for Future OLTP Engines</h2><ol>
+<li>并发控制。测试结果表明动态locking对性能影响非常大，但不是所有系统都可以串行执行事务，因此最佳的并发控制方法仍然很有研究价值。</li>
+<li>多核支持。多线程导致需要使用latch，实现高效的多线程并发系统需要新的设计。也可以通过虚拟化来实现每个site一个核，单线程。另外还可以考虑单个query内并行执行。</li>
+<li>传统的replication是基于log的active-passive架构，它的缺点是：除非使用2PC，否则secondary与primary很难保持事务一致，因此secondary没办法服务需要事务一致的读请求；failover不是立即生效的；logging对性能有影响，占用了20%左右的周期数。基于log的传统设计的考虑是在secondary上恢复log的成本要远低于执行事务。但基于内存的系统的执行事务成本也是很低的，允许我们使用多个active secondary，每个secondary同步执行事务。</li>
+<li>弱一致性。最终一致性加上事务一致性。</li>
+<li>cache友好的B-tree。</li>
+</ol>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1568,88 +1698,11 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/01/02/the-tail-at-scale/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/01/02/the-tail-at-scale/" class="post-title-link" itemprop="url">[笔记] The Tail at Scale</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-01-02 12:45:00" itemprop="dateCreated datePublished" datetime="2020-01-02T12:45:00+08:00">2020-01-02</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-07-30 22:59:44" itemprop="dateModified" datetime="2020-07-30T22:59:44+08:00">2020-07-30</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><a href="https://research.google/pubs/pub40801/" target="_blank" rel="noopener">原文地址</a></p>
-<p>在评估离线应用的性能时，我们通常关心吞吐和平均延时。但在交互/在线应用中，延时长尾对用户体验同样有着非常大的影响。这些应用涉及的机器数越多，数据规模越大，延时长尾越严重，tail-tolerant越重要，就像fault-tolerant一样。</p>
-<p>本文介绍了大型系统中常见的几种产生延时长尾的因素，以及如何消除它们。这些方法通常可以借助已有技术，不会增加多少开销。</p>
-<blockquote>
-<p>我在Tablestore做性能优化时，非常明显地感觉到了延时长尾对整体性能/用户体验的影响。这篇文章主要讲的是如何解决准交互（亚秒级）分析的延时长尾，但并没有太多涉及我最关心的Batch写入长尾问题。无论如何，这篇文章都很有意义。<br>本文为笔记性质。请对照原文阅读。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/01/02/the-tail-at-scale/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/6/">6</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1718,7 +1771,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">60</span>
+          <span class="site-state-item-count">61</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
