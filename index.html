@@ -201,7 +201,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2020-10-14 16:56:10 / 修改时间：16:56:13" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
+              <time title="创建时间：2020-10-14 16:56:10 / 修改时间：18:51:21" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
             </span>
 
           
@@ -227,7 +227,8 @@
 <li>基于log的恢复机制。</li>
 </ul>
 <p>本文观点是在这套架构上小修小补已经不够了，我们需要全新的设计。</p>
-<p>H-Store针对OLTP场景，打破了上面这种架构，主要是充分利用大内存和多节点，省掉log和lock相关的很多机制，从而大幅度提升了性能。</p>
+<p>尤其是传统RDBMS想用一套系统满足全部需求的想法已经过时了。</p>
+<p>H-Store针对OLTP场景，打破了上面这种架构，主要是充分利用大内存和多节点，结合对OLTP场景的若干假设，省掉log和lock相关的很多机制，从而大幅度提升了性能。</p>
 <h2 id="OLTP-Design-Considerations"><a href="#OLTP-Design-Considerations" class="headerlink" title="OLTP Design Considerations"></a>OLTP Design Considerations</h2><ol>
 <li>内存：随着内存容量上升，很大的OLTP数据库也可以整个放到内存中，而旧的设计是面向磁盘的，没办法充分利用内存的特点，新的设计需要将内存放到比磁盘更高优先级的位置。</li>
 <li>多线程和并发控制：假如所有数据都在内存中，则OLTP的事务通常都比较短，此时多线程在延时方面的优势就不明显了，使用单线程可以去掉并发控制、并发数据结构，整体架构更可靠，性能也更好。</li>
