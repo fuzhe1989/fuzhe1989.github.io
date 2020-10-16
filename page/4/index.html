@@ -176,6 +176,176 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/04/21/crtp/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/04/21/crtp/" class="post-title-link" itemprop="url">Curiously Recurring Template Pattern(CRTP)</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-04-21 00:53:59" itemprop="dateCreated datePublished" datetime="2018-04-21T00:53:59+08:00">2018-04-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-10-11 18:12:25" itemprop="dateModified" datetime="2020-10-11T18:12:25+08:00">2020-10-11</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="CRTP"><a href="#CRTP" class="headerlink" title="CRTP"></a>CRTP</h2><p>C++中有一种很特别的模式，称为Curiously Recurring Template Pattern，缩写是CRTP。从它的名字看，前三个词都是关键字。Curiously，意思是奇特的。Recurring，说明它是递归的。Template，说明它与模板有关。</p>
+<p>最常见的CRTP形式就很符合这三个关键字：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Derived</span> :</span> <span class="keyword">public</span> Base&lt;Derived&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>猛一看这段代码，确实挺奇特的：派生类继承自一个用派生类特化的基类，相当于自己特化了自己。</p>
+<p>这里面应用到了C++模板的一个特性：与模板参数有关的代码的编译会推迟到模板实例化时进行。</p>
+<h2 id="静态多态"><a href="#静态多态" class="headerlink" title="静态多态"></a>静态多态</h2><p>CRTP的第一个用途就是实现静态多态。</p>
+<p>传统的C++中我们想要实现多态首先要有继承和虚函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">int</span> <span class="title">Foo</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Derived</span> :</span> <span class="keyword">public</span> Base &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">Foo</span><span class="params">()</span> <span class="keyword">override</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>并通过基类的指针或引用来触发多态：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">(Base&amp; b)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; b.Foo() &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但这套方案有两个问题：</p>
+<ol>
+<li>虚函数会影响类型的内存布局，空间上增加一个虚表指针。</li>
+<li>虚函数调用需要增加一次跳转，增加了运行时开销。</li>
+</ol>
+<p>而用CRTP，我们可以实现编译时的静态多态。在这个方案中，基类负责定义接口，而派生类则负责实现接口：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">Foo</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;T*&gt;(<span class="keyword">this</span>)-&gt;Foo();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Derived</span> :</span> <span class="keyword">public</span> Base&lt;Derived&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">Foo</span><span class="params">()</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这个方案中，基类的<code>Foo()</code>会去调用派生类的<code>Foo()</code>，相当于前者是接口，而后者是实现。</p>
+<p>注意在<code>Base::Foo</code>中，我们为了调用<code>Derived::Foo</code>，需要通过<code>static_cast</code>来显式转换<code>this</code>的类型。为什么这里用<code>static_cast</code>而不是<code>dynamic_cast</code>呢？因为<code>Base</code>自己是不知道<code>T</code>是它的派生类的，因此这里也不应该用<code>dynamic_cast</code>，而因为这里我们没有虚函数，用<code>static_cast</code>也是安全的。</p>
+<p>CRTP方案的优点：</p>
+<ol>
+<li>没有虚函数，不会改变派生类的内存布局，空间上开销更小。</li>
+<li><code>b.Foo()</code>不是虚函数调用，不会增加一次跳转，运行时开销更小。</li>
+<li><code>Base::Foo()</code>甚至可以内联掉，进一步降低了运行时开销。</li>
+<li>模板对接口的要求是“Duck Typing”，比虚函数的要求更低。这个例子中，只要派生类满足有一个public的，名字为<code>Foo</code>，接受0个参数，返回类型可隐式转换为<code>int</code>的函数，就满足了<code>Base</code>的接口要求。</li>
+</ol>
+<p>当然静态多态就导致了<code>Base</code>的不同的派生类实际继承自不同的基类，因此没有办法把它们的指针或引用放到某个容器中。另外，这样每个派生类都会实例化一个基类类型，会导致目标代码多于普通的继承。</p>
+<h2 id="mixin"><a href="#mixin" class="headerlink" title="mixin"></a>mixin</h2><p>CRTP的第二个用途就是为其它类型增加功能，此时CRTP的基类就是一种mixin类型。</p>
+<p>当CRTP用于mixin时，它的写法与静态多态很类似，只不过此时我们要的不是多态，而是新的功能，因此基类与派生类的方法名要不同：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Repeatable</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Repeat</span><span class="params">(<span class="keyword">int</span> n)</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; n; ++i) &#123;</span><br><span class="line">            <span class="keyword">static_cast</span>&lt;<span class="keyword">const</span> T*&gt;(<span class="keyword">this</span>)-&gt;Foo();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ZeroPrinter</span> :</span> <span class="keyword">public</span> Repeatable&lt;ZeroPrinter&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Foo</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="built_in">cout</span> &lt;&lt; <span class="string">"0"</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们用CRTP为<code>ZeroPrinter</code>增加了一个<code>Repeat</code>功能，此时<code>Repeatable</code>就是一种mixin。而在这个方案中，我们不需要让<code>ZeroPrinter</code>去实现某个接口，去把自己已有的函数改成虚函数。</p>
+<p>而且我们还可以为已经存在的类型增加功能。假如<code>ZeroPrinter</code>是第三方库提供的类型，我们没办法让它继承自<code>Repeatable</code>，那么我们可以增加一种新类型，同时继承<code>ZeroPrinter</code>和<code>Repeatable</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RepeatableZeroPrinter</span>:</span> <span class="keyword">public</span> ZeroPrinter, <span class="keyword">public</span> Repeatable&lt;RepeatableZeroPrinter&gt; &#123;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>注意，当我们用CRTP来实现mixin时，要注意派生类与基类的函数名不能相同，因为派生类会屏蔽掉基类的名字，而导致我们想增加的功能无法被使用。</p>
+<p>另一个mixin的例子是<code>Counter</code>，我们可以利用<code>Base&lt;T&gt;</code>和<code>Base&lt;R&gt;</code>不是一个类型的特性，为不同的类型增加实例个数的Counter统计的功能。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Counter</span> &#123;</span></span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">int</span> mObjectsCreated;</span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">int</span> mObjectsAlive;</span><br><span class="line"></span><br><span class="line">    Counter() &#123;</span><br><span class="line">        ++mObjectsCreated;</span><br><span class="line">        ++mObjectsAlive;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    Counter(<span class="keyword">const</span> Counter&amp;) &#123;</span><br><span class="line">        ++mObjectsCreated;</span><br><span class="line">        ++mObjectsAlive;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">protected</span>:</span><br><span class="line">    <span class="comment">// objects should never be removed through pointers of this type</span></span><br><span class="line">    ~Counter() &#123;</span><br><span class="line">        --mObjectsAlive;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt; <span class="keyword">int</span> Counter&lt;T&gt;::mObjectsCreated(<span class="number">0</span>);</span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt; <span class="keyword">int</span> Counter&lt;T&gt;::mObjectsAlive(<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">X</span> :</span> Counter&lt;X&gt; &#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Y</span> :</span> Counter&lt;Y&gt; &#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，<code>X</code>和<code>Y</code>各自通过<code>Counter&lt;X&gt;</code>和<code>Counter&lt;Y&gt;</code>来实现统计功能。</p>
+<h2 id="链式多态"><a href="#链式多态" class="headerlink" title="链式多态"></a>链式多态</h2><p>假设有基类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Printer</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    explicit Printer(ostream&amp; pstream) : mStream(pstream) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function">Printer&amp; <span class="title">Print</span><span class="params">(T&amp;&amp; t)</span> </span>&#123;</span><br><span class="line">        mStream &lt;&lt; t;</span><br><span class="line">        <span class="keyword">return</span> *<span class="keyword">this</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function">Printer&amp; <span class="title">Println</span><span class="params">(T&amp;&amp; t)</span> </span>&#123;</span><br><span class="line">        mStream &lt;&lt; t &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">        <span class="keyword">return</span> *<span class="keyword">this</span>;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    ostream&amp; mStream;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以链式调用：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Printer&#123;myStream&#125;.Println(<span class="string">"hello"</span>).Println(<span class="number">500</span>);</span><br></pre></td></tr></table></figure>
+
+<p>但派生类就不行：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">CoutPrinter</span> :</span> <span class="keyword">public</span> Printer &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    CoutPrinter() : Printer(<span class="built_in">cout</span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">CoutPrinter&amp; <span class="title">SetConsoleColor</span><span class="params">(Color c)</span> </span>&#123; ... <span class="keyword">return</span> *<span class="keyword">this</span>; &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">                             v-- we have a &#39;Printer&#39; here, not a &#39;CoutPrinter&#39;</span><br><span class="line">CoutPrinter().Print(&quot;Hello &quot;).SetConsoleColor(Color.red).Println(&quot;Printer!&quot;); &#x2F;&#x2F; compile error</span><br></pre></td></tr></table></figure>
+
+<p>因为<code>print</code>只会返回<code>Printer&amp;</code>。</p>
+<p>用CRTP就可以解决这个问题：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Base class</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> ConcretePrinter&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Printer</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    explicit Printer(ostream&amp; pstream) : mStream(pstream) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function">ConcretePrinter&amp; <span class="title">Print</span><span class="params">(T&amp;&amp; t)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        mStream &lt;&lt; t;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;ConcretePrinter&amp;&gt;(*<span class="keyword">this</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function">ConcretePrinter&amp; <span class="title">Println</span><span class="params">(T&amp;&amp; t)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        mStream &lt;&lt; t &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;ConcretePrinter&amp;&gt;(*<span class="keyword">this</span>);</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    ostream&amp; mStream;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="comment">// Derived class</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">CoutPrinter</span> :</span> <span class="keyword">public</span> Printer&lt;CoutPrinter&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    CoutPrinter() : Printer(<span class="built_in">cout</span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">CoutPrinter&amp; <span class="title">SetConsoleColor</span><span class="params">(Color c)</span> </span>&#123; ... <span class="keyword">return</span> *<span class="keyword">this</span>; &#125;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="comment">// usage</span></span><br><span class="line">CoutPrinter().Print(<span class="string">"Hello "</span>).SetConsoleColor(Color.red).Println(<span class="string">"Printer!"</span>);</span><br></pre></td></tr></table></figure>
+
+<h2 id="利用CRTP提供默认Clone"><a href="#利用CRTP提供默认Clone" class="headerlink" title="利用CRTP提供默认Clone"></a>利用CRTP提供默认Clone</h2><p>当要通过基类指针获得对象的拷贝时，通常做法是加个虚的<code>Clone</code>函数，而用CRTP可以避免在每个派生类中重复这个函数，只要派生类允许复制构造即可：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Base class has a pure virtual function for cloning</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Shape</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~Shape() &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Shape* <span class="title">Clone</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// This CRTP class implements clone() for Derived</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Derived&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Shape_CRTP</span> :</span> <span class="keyword">public</span> Shape &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Shape* <span class="title">Clone</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Derived(<span class="keyword">static_cast</span>&lt;Derived <span class="keyword">const</span>&amp;&gt;(*<span class="keyword">this</span>));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Square</span> :</span> <span class="keyword">public</span> Shape_CRTP&lt;Square&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Circle</span> :</span> <span class="keyword">public</span> Shape_CRTP&lt;Circle&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="摆脱static-cast"><a href="#摆脱static-cast" class="headerlink" title="摆脱static_cast"></a>摆脱<code>static_cast</code></h2><p>上面每个CRTP例子中都有<code>static_cast</code>，我们可以通过一个辅助类来避免每次都直接调用<code>static_cast</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">CRTP</span> &#123;</span></span><br><span class="line">    <span class="function">T&amp; <span class="title">Underlying</span><span class="params">()</span> </span>&#123; <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;T&amp;&gt;(*<span class="keyword">this</span>); &#125;</span><br><span class="line">    <span class="function">T <span class="keyword">const</span>&amp; <span class="title">Underlying</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123; <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;T <span class="keyword">const</span>&amp;&gt;(*<span class="keyword">this</span>); &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这样前面的例子就可以写成：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">emplate &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base</span> :</span> <span class="keyword">private</span> CRTP&lt;T&gt;&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">Foo</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>-&gt;Underlying().Foo();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>注意1：这里要private继承，是因为我们不想把<code>Underlying</code>函数暴露出去。</p>
+<p>注意2：这里为什么要用<code>this-&gt;Underlying()</code>而不是直接使用<code>Underlying()</code>？参见<a href="/2017/09/05/how-to-call-method-of-base-class-in-template/">模板类中如何调用其模板基类中的函数</a>。</p>
+<h2 id="避免继承错误的基类"><a href="#避免继承错误的基类" class="headerlink" title="避免继承错误的基类"></a>避免继承错误的基类</h2><p>当我们写多个CRTP类型时，可能会因为copy/paste而不小心继承错基类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Derived1</span> :</span> <span class="keyword">public</span> Base&lt;Derived1&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Derived2</span> :</span> <span class="keyword">public</span> Base&lt;Derived1&gt; &#123; <span class="comment">// bug in this line of code</span></span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>解法很简单，将<code>Base</code>的构造函数声明为private，并将<code>T</code>设置为友元，这样<code>Derived2</code>根本就没办法调用<code>Base&lt;Derived1&gt;</code>的构造函数，从而制造编译错误：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    Base()&#123;&#125;;</span><br><span class="line">    <span class="keyword">friend</span> T;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="避免菱形继承"><a href="#避免菱形继承" class="headerlink" title="避免菱形继承"></a>避免菱形继承</h2><p>想象我们有两个mixin类型，都使用了CRTP来实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Scalable</span> :</span> <span class="keyword">private</span> CRTP&lt;T&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Scale</span><span class="params">(<span class="keyword">double</span> multiplicator)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">this</span>-&gt;Underlying().SetValue(<span class="keyword">this</span>-&gt;Underlying().GetValue() * multiplicator);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Squarable</span> :</span> <span class="keyword">private</span> CRTP&lt;T&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Square</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> v = <span class="keyword">this</span>-&gt;Underlying().GetValue();</span><br><span class="line">        <span class="keyword">this</span>-&gt;Underlying().SetValue(v * v);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>现在我们把这两个功能加到一个类型上：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Sensitivity</span> :</span> <span class="keyword">public</span> Scalable&lt;Sensitivity&gt;, <span class="keyword">public</span> Squarable&lt;Sensitivity&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">double</span> <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123; <span class="keyword">return</span> mValue; &#125;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">SetValue</span><span class="params">(<span class="keyword">double</span> value)</span> </span>&#123; mValue = value; &#125;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">double</span> mValue;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>BOOM！编译错误：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">error: &#39;CRTP&lt;Sensitivity&gt;&#39; is an ambiguous base of &#39;Sensitivity&#39;</span><br></pre></td></tr></table></figure>
+
+<p>问题出在我们不小心搞出来菱形继承了！</p>
+<ul>
+<li><code>Sensitivity</code> -&gt; <code>Scalable&lt;Sensitivity&gt;</code> -&gt; <code>CRTP&lt;Sensitivity&gt;</code></li>
+<li><code>Sensitivity</code> -&gt; <code>Squarable&lt;Sensitivity&gt;</code> -&gt; <code>CRTP&lt;Sensitivity&gt;</code></li>
+</ul>
+<p>一种解法是将mixin的类型也加到<code>CRTP</code>的模板参数中：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T, <span class="keyword">template</span> &lt;<span class="keyword">typename</span>&gt; <span class="class"><span class="keyword">class</span> <span class="title">CrtpType</span>&gt;</span></span><br><span class="line"><span class="class"><span class="title">struct</span> <span class="title">CRTP</span> &#123;</span></span><br><span class="line">    <span class="function">T&amp; <span class="title">Underlying</span><span class="params">()</span> </span>&#123; <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;T&amp;&gt;(*<span class="keyword">this</span>); &#125;</span><br><span class="line">    <span class="function">T <span class="keyword">const</span>&amp; <span class="title">Underlying</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123; <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;T <span class="keyword">const</span>&amp;&gt;(*<span class="keyword">this</span>); &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    CRTP() &#123;&#125;</span><br><span class="line">    <span class="keyword">friend</span> CrtpType&lt;T&gt;;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>注意这里的<code>CrtpType</code>不是普通的模板参数类型，它前面的<code>template</code>说明它本身也是一个模板类型。我们没有直接用到<code>CrtpType</code>，只是用它保证同样的<code>T</code>加上不同的mixin会产生不同的<code>CRTP</code>类型。</p>
+<p>新的<code>Sensitivity</code>的继承关系：</p>
+<ul>
+<li><code>Sensitivity</code> -&gt; <code>Scalable&lt;Sensitivity&gt;</code> -&gt; <code>CRTP&lt;Sensitivity, Scalable&gt;</code></li>
+<li><code>Sensitivity</code> -&gt; <code>Squarable&lt;Sensitivity&gt;</code> -&gt; <code>CRTP&lt;Sensitivity, Squarable&gt;</code></li>
+</ul>
+<p>这样我们只要保证一个类型不要多次集成了同一个mixin，就没问题了。</p>
+<h1 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h1><ul>
+<li><a href="https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern" target="_blank" rel="noopener">Curiously recurring template pattern</a></li>
+<li><a href="https://www.fluentcpp.com/2017/05/12/curiously-recurring-template-pattern/" target="_blank" rel="noopener">The Curiously Recurring Template Pattern (CRTP)</a></li>
+<li><a href="https://www.fluentcpp.com/2017/05/16/what-the-crtp-brings-to-code/" target="_blank" rel="noopener">What the Curiously Recurring Template Pattern can bring to your code</a></li>
+<li><a href="https://www.fluentcpp.com/2017/05/19/crtp-helper/" target="_blank" rel="noopener">An Implementation Helper For The Curiously Recurring Template Pattern</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/25/cpp-object-model-copy-move/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2028,214 +2198,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/11/07/persistent-data-structure/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2017/11/07/persistent-data-structure/" class="post-title-link" itemprop="url">Persistent Data Structure</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2017-11-07 23:29:27" itemprop="dateCreated datePublished" datetime="2017-11-07T23:29:27+08:00">2017-11-07</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="Persistent-Data-Structure"><a href="#Persistent-Data-Structure" class="headerlink" title="Persistent Data Structure"></a>Persistent Data Structure</h1><p>Persistent Data Structure，直译就是“持久性数据结构”。根据<a href="https://en.wikipedia.org/wiki/Persistent_data_structure" target="_blank" rel="noopener">Wiki定义</a>，如果一种数据结构，能保留它每一次被修改前的版本，就可以被称为“持久性数据结构”。而与之相对的就是Ephemeral Data Structure，即“暂存性数据结构”。</p>
-<p>C++中，我们熟悉的数据结构大多数都属于暂存性数据结构，比如<code>std::vector</code>，当我们修改了一个<code>std::vector</code>，与之相关的所有已存在的Iterator就失效了，不能再访问了。而如果我们修改了一个持久性数据结构，我们仍然能够访问到它修改之前的版本，比如Iterator（假如有的话）不会失效，不会读到修改后的数据等。从这个角度讲，持久性数据结构也是不可变（Immutable）的。</p>
-<p>什么地方需要用到持久性数据结构？</p>
-<ol>
-<li>函数式编程语言。它的定义就要求了不能有可变数据和可变数据结构。</li>
-<li>并发编程。</li>
-</ol>
-<p>（另外，使用Persistent Map/HashMap有助于简化Prototype的实现，也算是一个用途。）</p>
-<p>持久性数据结构对Lazy Evaluation也很有帮助：如果一个数据结构是可变的，我们肯定不会放心对它使用Lazy Evaluation。</p>
-<h2 id="Persistent-Data-Structure与并发"><a href="#Persistent-Data-Structure与并发" class="headerlink" title="Persistent Data Structure与并发"></a>Persistent Data Structure与并发</h2><p>并发编程的核心问题是竞争，即不同线程同时访问相同数据。对此我们往往需要用到一些同步手段来保证临界区的原子性，即同时只有一个线程能读出或写入相同的共享数据。</p>
-<p>最常见的同步手段就是锁，但锁也会引起一大堆的问题：</p>
-<ul>
-<li>死锁。</li>
-<li>活锁。</li>
-<li>临界区太大导致性能低下。</li>
-<li>错误地在临界区外访问数据导致数据竞争。</li>
-<li>控制反转。</li>
-<li>…</li>
-</ul>
-<p>另一种同步手段基于原子操作，从而实现出一套lock-free的数据结构。它的问题在于：</p>
-<ul>
-<li>原子操作本质上也是锁（总线锁），因此高并发度时开销还是会很大。</li>
-<li>需要非常精细的实现一个lock-free的数据结构，维护难度大，且很难证明其正确性。一些久经考验的数据结构仍然可能存在bug。</li>
-</ul>
-<p>而当我们在不同线程间访问相同的持久性数据结构时，我们很清楚其中不会有任何的数据竞争，因为无论其他线程如何修改这个结构，当前线程看到的结构永远是不变的。这不需要异常复杂的实现和同样复杂的测试来保证。</p>
-<p>可以认为通过锁和原子操作实现的并发数据结构追求的是“没有明显的错误”，而持久性数据结构则是“明显没有错误”。</p>
-<p>而从性能角度，持久性数据结构也并非一定处于劣势。实现良好的持久性数据结构，通常都可以提供一种或多种操作，其时间和空间复杂度与对应的暂存性数据结构相同。且编译器针对持久性数据结构的不变性，往往能给出更优化的目标代码。</p>
-<h1 id="如何实现Persistent-Data-Structure"><a href="#如何实现Persistent-Data-Structure" class="headerlink" title="如何实现Persistent Data Structure"></a>如何实现Persistent Data Structure</h1><p>想要实现一种持久性数据结构，最简单的方法就是“Copy Anything”，即每当我们修改原结构时，实际上我们都创建了一个副本，再在副本上修改。</p>
-<p>当然这种方法的缺点也是很明显的：开销太大。</p>
-<p>第二种方法是修改时不创建数据的副本，而是保存每次对结构的修改操作，当需要读取的时候再创建数据的副本，再在其上应用每个操作。显然这种方法在读取时的开销非常大。一种改进方案是每K个修改操作创建一次数据副本。</p>
-<p>第三种方法是路径复制（Path Copy），即对于基于Node的数据结构，当我们进行修改时，我们会复制路径上经过的Node，直到最终修改发生的Node。这里我们用“构造”代替了“修改”。</p>
-<p>目前最常用的实现方法就是路径复制。</p>
-<h2 id="垃圾回收与引用计数"><a href="#垃圾回收与引用计数" class="headerlink" title="垃圾回收与引用计数"></a>垃圾回收与引用计数</h2><p>持久性数据结构的一个核心思想是为当前每个持有的人保留一个版本，即对于相同的数据可能同时存在多个版本。这样我们就需要有垃圾回收机制，对于每个版本的数据，在没有人持有之后回收掉。</p>
-<p>对于C++而言，通常引用计数就足够了。因为持久化数据结构有一个特点：它的引用链一定是无回路的，只有新对象引用老对象，不可能有老对象引用新对象，因此单纯的引用计数就可以完全回收掉所有垃圾数据。</p>
-<p>同时，这个特点对Java类的分代GC也是很有好处的。</p>
-<p>有位老同志指出：对于非特定的基于引用计数的数据结构，不能使用<code>std::shared_ptr</code>，原因是它的析构是链式递归进行的，C++的编译器不一定能去掉所有的尾递归，可能会打爆栈。一种解法是从Root节点开始，收集后面所有的节点，然后循环析构。</p>
-<p>为什么<code>std::map</code>可以递归析构？因为平衡树的析构链长度为lgn，假设系统的栈深度上限为100，需要<code>std::map</code>中有2^100个元素以上才会栈溢出，此时内存早就爆掉了。</p>
-<h1 id="Persistent-List"><a href="#Persistent-List" class="headerlink" title="Persistent List"></a>Persistent List</h1><p>Persistent List可能是最简单的持久性数据结构。它支持两种基本操作：构造、插入头节点，即：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">List</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    List();</span><br><span class="line">    List(T val, List tail);</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>这里我们使用的实现方法就是路径复制：当我们插入或删除或修改List的第N个节点时，我们需要复制前N-1个节点。</p>
-<p>因此，插入或删除头节点都是O(1)的开销，而任意位置插入或删除节点则是O(n)的开销。</p>
-<h2 id="基本操作"><a href="#基本操作" class="headerlink" title="基本操作"></a>基本操作</h2><p>以下是List的一个最简单实现，包括了支持的几个O(1)操作：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">List</span> &#123;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Item</span> &#123;</span></span><br><span class="line">        Item(<span class="keyword">const</span> T&amp; v, <span class="keyword">const</span> Item* tail) : mValue(v), mNext(tail) &#123;&#125;</span><br><span class="line">        T mValue;</span><br><span class="line">        <span class="keyword">const</span> Item* mNext;</span><br><span class="line">    &#125;;</span><br><span class="line">    explicit List(const Item* item): mHead(item) &#123;&#125;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    List(): mHead(<span class="literal">nullptr</span>) &#123;&#125;</span><br><span class="line">    List(<span class="keyword">const</span> T&amp; val, List tail): mHead(<span class="keyword">new</span> Item(val, tail.mHead)) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">Empty</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> mHead == <span class="literal">nullptr</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">const</span> T&amp; <span class="title">Front</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        assert(mHead);</span><br><span class="line">        <span class="keyword">return</span> *mHead;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">List <span class="title">PushFront</span><span class="params">(<span class="keyword">const</span> T&amp; val)</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> List(val, mHead);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">List <span class="title">PopFront</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> List(mHead-&gt;mNext);</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">const</span> Item* mHead;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>可以看到这个实现中还没有任何引用计数有关的代码。我们有两种方式来实现引用计数：</p>
-<ol>
-<li>使用<code>std::shared_ptr</code>，这样只需要把每个使用<code>const Item*</code>的地方都换成<code>std::shared_ptr&lt;const Item&gt;</code>即可。</li>
-<li>自己实现一种侵入式的引用计数基类<code>Reference</code>，并令<code>Item</code>继承自它。</li>
-</ol>
-<h2 id="其它列表操作"><a href="#其它列表操作" class="headerlink" title="其它列表操作"></a>其它列表操作</h2><p>当我们拥有了一个持久性的List后，我们就可以在其上实现一套函数式的操作：</p>
-<ul>
-<li>fmap</li>
-<li>filter</li>
-<li>foldl/foldr</li>
-<li>forEach</li>
-</ul>
-<p>实现<a href="https://github.com/BartoszMilewski/Okasaki/blob/master/SimpleList/ListGC.h" target="_blank" rel="noopener">戳这里</a>。</p>
-<h1 id="Persistent-Map"><a href="#Persistent-Map" class="headerlink" title="Persistent Map"></a>Persistent Map</h1><p>Persistent Map的实现也是基于路径复制的。算法导论上有这么一道习题，清晰的体现了它的实现思路：</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/persistent_set.png" alt="Persistent Map"></p>
-<p>当我们插入或删除一个节点时，路径上的每个节点都需要被复制一次，因此这样的操作的开销是O(lgn)的。</p>
-<p>插入操作是很简单的：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Node* <span class="title">Insert</span><span class="params">(Node* root, <span class="keyword">const</span> T&amp; val)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!root) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Node(val, <span class="literal">nullptr</span>, <span class="literal">nullptr</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &lt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Node(root-&gt;mValue, Insert(root-&gt;mLeft, val), root-&gt;mRight);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &gt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Node(root-&gt;mValue, root-&gt;mLeft, Insert(root-&gt;mRight, val));</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> root;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>删除操作有些麻烦，需要处理删除的节点有子节点的情况。原则就是：用构造代替所有的修改。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Node* <span class="title">Delete</span><span class="params">(Node* root, <span class="keyword">const</span> T&amp; val)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!root) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nullptr</span>;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &lt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Node(root-&gt;mValue, Delete(root-&gt;mLeft, val), root-&gt;mRight);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &gt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Node(root-&gt;mValue, root-&gt;mLeft, Delete(root-&gt;mRight, val));</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (!root-&gt;mLeft) &#123;</span><br><span class="line">            <span class="keyword">return</span> root-&gt;mRight;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!root-&gt;mRight) &#123;</span><br><span class="line">            <span class="keyword">return</span> root-&gt;mLeft;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            Node* leftMost;</span><br><span class="line">            tie(leftMost, root-&gt;mRight) = RemoveLeftMost(root-&gt;mRight);</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">new</span> Node(leftMost-&gt;mValue, root-&gt;mLeft, root-&gt;mRight);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>注：以上代码均未考虑垃圾回收。</p>
-<p>对于红黑树而言，每次它平衡时，同样要复制涉及到的节点。每次平衡最多涉及3个节点，因此平衡的开销是O(1)。</p>
-<p>实现<a href="https://github.com/BartoszMilewski/Okasaki/blob/master/RBTree/RBTree.h" target="_blank" rel="noopener">戳这里</a>。不过这个实现没有删除功能。</p>
-<h1 id="Persistent-Vector"><a href="#Persistent-Vector" class="headerlink" title="Persistent Vector"></a>Persistent Vector</h1><p>Persistent Vector的基本思想与Persistent Map非常接近：你把Persistent Vector想象成以下标为Key的Map即可：</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/7to10.png" alt="Basic Persistent Vector"></p>
-<p>图中就是一个这样的Map，它有如下特点：</p>
-<ol>
-<li>分为内部节点和叶节点两类，其中数据都在叶节点上。</li>
-<li>所有叶节点的高度相同。</li>
-<li>每个内部节点有两个子节点。</li>
-<li>每层节点中，只有最后一个节点有可能是半满的，其它节点都是满的。</li>
-</ol>
-<p>当然这样的实现效率是很低的，每次Update、PushBack的时间复杂度是O(lgn)。因此实践上我们会使用类似于Trie树的结构，即每个节点能容纳多于两个子节点，通常为32个，这样一个6层的Map就可以容纳最多1073741824个元素，每次Update、PushBack最多需要复制6个节点，可以认为变成了一次O(1)操作。</p>
-<p>查找：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">const</span> T&amp; <span class="title">Get</span><span class="params">(Node* root, <span class="keyword">int32_t</span> index)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">while</span> (!root-&gt;IsLeaf()) &#123;</span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">int32_t</span> mask = root-&gt;Mask();</span><br><span class="line">        root = root-&gt;Get(index / mask);</span><br><span class="line">        index %= mask;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> *(<span class="keyword">const</span> T*)root-&gt;Get(index);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h2 id="保留Tail节点来提高PushBack性能"><a href="#保留Tail节点来提高PushBack性能" class="headerlink" title="保留Tail节点来提高PushBack性能"></a>保留Tail节点来提高PushBack性能</h2><p>想想一个Persistent Vector执行PushBack的时候都发生了什么？从Root开始，一直复制到Tail叶节点。原因是当我们复制了一个子节点，我们就需要修改它的父节点，根据“修改即构造”原则，就需要重新构造一个父节点，从而一直到Root都要构造一遍。</p>
-<p>那么，假如Persistent Vector直接持有Tail节点呢？这样当它未满时，PushBack只要复制两个节点：Tail节点和Vector本身。当Tail节点已满时，我们才需要真正做一次PushBack。对于32个子节点的Persistent Vector来说，有31/32的PushBack是真正的O(1)操作，其它1/32的PushBack才需要O(lgn)。</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/7to10-tail.png" alt="Tail"></p>
-<p>新的查找也很简单。为了配合查找，我们要记录下Tail节点的offset：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> lookup_index &lt; tail_offset:</span><br><span class="line">  <span class="comment"># tree_lookup = old lookup technique</span></span><br><span class="line">  <span class="keyword">return</span> tree_lookup(lookup_index)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">  <span class="keyword">return</span> tail[lookup_index - tail_offset]</span><br></pre></td></tr></table></figure>
-
-<h2 id="Transient"><a href="#Transient" class="headerlink" title="Transient"></a>Transient</h2><p>当我们要对Persistent Vector进行一系列修改时，每次Update/PushBack/PopBack都要复制lgn节点，即使有了Tail节点优化，也只能对PushBack和PopBack有一定的效果。问题在于，我们即使每个操作都复制了一个新节点，下次操作这个节点时还是要再复制，因为我们要保证不破坏其它人的使用。那么什么时候可以直接重用这个节点，不用复制呢？</p>
-<ol>
-<li>只能被当前Vector访问到的节点。</li>
-<li>当前Vector在这次操作后不会被其它人使用。</li>
-</ol>
-<p>对于条件1，很好解决：我们每次修改Vector时都申请一个UUID，并放到这次修改创建的节点中，这样通过UUID就能判断节点是不是当前Vector创建出来的。</p>
-<p>对于条件2，我们没有办法阻止用户在所有修改完成之前使用这个Vector。因此我们使用一个新类型Transient来进行批量修改。好处：显式的让用户知道，我们要做一些不一样的事情啦，在它结束之前不要访问这个Vector。</p>
-<p>在批量修改结束之后，还需要一个操作来把Transient变为Persistent，这步操作会把每个节点中的ID置为NULL，保证合法的Vector的节点没有ID，从而避免一个Transient被误用。</p>
-<h1 id="Persistent-HashMap"><a href="#Persistent-HashMap" class="headerlink" title="Persistent HashMap"></a>Persistent HashMap</h1><p>当我们有了一个Persistent Vector的实现之后，实现一个Persistent HashMap也就不困难了。</p>
-<p>一个HashMap是什么？如果我们使用分桶链表来实现HashMap，它就是一个Vector，其中每个元素是一个List。那么我们可以用Persistent Vector + Persistent List来实现Persistent HashMap。如果我们使用开放散列法来实现HashMap，它就是单纯的一个Vector，只要用Persistent Vector来实现就可以了。</p>
-<h1 id="Persistent-Data-Structure的一个使用场景"><a href="#Persistent-Data-Structure的一个使用场景" class="headerlink" title="Persistent Data Structure的一个使用场景"></a>Persistent Data Structure的一个使用场景</h1><p>想象我们有一个UserMap，保存每个UserID和对应的NickName。有两种操作：</p>
-<ul>
-<li>NewUser：增加一对新的UserID和NickName。</li>
-<li>Update：修改已有UserID对应的NickName。</li>
-</ul>
-<p>现在我们用一个Persistent HashMap作为UserMap。有若干个前台线程可以访问和修改UserMap。</p>
-<p>最简单的做法：</p>
-<ol>
-<li>前台线程获得当前UserMap，称为M0。</li>
-<li>前台线程修改UserMap，得到M1。</li>
-<li>前台线程将M0替换为M1，原有的M0析构。</li>
-</ol>
-<p>只有一个前台线程时，这种用法是没什么问题的。但当我们有多个前台线程时，就会有问题：</p>
-<ol>
-<li>线程T1获得M0。</li>
-<li>线程T2获得M0。</li>
-<li>线程T1修改M0，得到M1。</li>
-<li>线程T2修改M0，得到M2。</li>
-<li>线程T1将M0替换为M1。</li>
-<li>线程T2将M1替换为M2。</li>
-</ol>
-<p>结果就是丢了一次数据！实际上这就是一个很经典的RMW操作，先Read，再本地Modify，再Write写回。对于RMW操作，必不可少的操作就是CompareAndExchange，也就是在Write时比较一下原对象有没有在你的Read之后被修改过。如果有的话，需要重试整个RMW操作。</p>
-<p>在我们这个场景中，我们需要做的就是每个线程在替换UserMap时确认一下UserMap的最后修改时间是否与自己手上持有的M0的修改时间相同，如果相同才能完成替换，否则就整个操作重来。这种先确认数据是否冲突再写入的操作，就是一种很典型的Transaction。因此我们可以使用STM（Software Transactional Memory）来更规范的使用UserMap：</p>
-<ol>
-<li>线程创建Transaction t。</li>
-<li>线程通过t获得M0。</li>
-<li>线程通过t修改M0，得到M1。</li>
-<li>线程通过t替换UserMap为M1。</li>
-</ol>
-<p>这个过程中，如果有数据冲突，根据STM的实现不同，可能在不同的地方失败，只有当没有数据冲突时，整个操作才能顺利走下去。</p>
-<p>可以看到，当我们使用Persistent Data Structure时，数据冲突的概率决定了它的使用是否高效。上面的例子中，对于全局唯一的UserMap，如果有大量的修改操作同时进行，那么其中只会有非常少量的操作能成功，其它操作都会因为数据冲突而失败。那么我们在使用时，就要考虑能否减少UserMap的粒度，从而降低冲突概率，提高性能。比如，我们将UserMap分成4096个桶，每个桶是一个Persistent HashMap，那么冲突概率就会小很多，整体性能就上去了。</p>
-<p>当然，在分桶后，如果有涉及多个UserID的操作，我们就需要一次性原子的替换多个UserMap。这不是一件容易的事情，幸好，STM就是干这个的。这也说明Persistent Data Structure和STM确实是好朋友。</p>
-<h1 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h1><ul>
-<li><a href="http://hypirion.com/musings/understanding-persistent-vector-pt-1" target="_blank" rel="noopener">Understanding Clojure’s Persistent Vectors, pt. 1</a></li>
-<li><a href="http://hypirion.com/musings/understanding-persistent-vector-pt-2" target="_blank" rel="noopener">Understanding Clojure’s Persistent Vectors, pt. 2</a></li>
-<li><a href="http://hypirion.com/musings/understanding-persistent-vector-pt-3" target="_blank" rel="noopener">Understanding Clojure’s Persistent Vectors, pt. 3</a></li>
-<li><a href="http://hypirion.com/musings/understanding-clojure-transients" target="_blank" rel="noopener">Understanding Clojure’s Transients</a></li>
-<li><a href="http://hypirion.com/musings/persistent-vector-performance-summarised" target="_blank" rel="noopener">Persistent Vector Performance Summarised</a></li>
-<li><a href="https://bartoszmilewski.com/2013/11/13/functional-data-structures-in-c-lists/" target="_blank" rel="noopener">Functional Data Structures in C++: Lists</a></li>
-<li><a href="http://blog.higher-order.net/2009/09/08/understanding-clojures-persistenthashmap-deftwice" target="_blank" rel="noopener">Understanding Clojure’s PersistentHashMap</a></li>
-<li><a href="https://gotocon.com/dl/goto-amsterdam-2012/slides/KarlKrukow_IntroductionToConcurrencyandDataStructuresInClojure.pdf" target="_blank" rel="noopener">Intro to Clojure data structures</a></li>
-<li><a href="https://kunigami.blog/2017/03/18/amortization-and-persistence-via-lazy-evaluation/" target="_blank" rel="noopener">Amortization and Persistence via Lazy Evaluation</a></li>
-<li><a href="https://github.com/rsms/immutable-cpp" target="_blank" rel="noopener">GitHub: Immutable Array via C++</a></li>
-<li><a href="https://stackoverflow.com/questions/1536953/recommend-a-fast-scalable-persistent-map-java" target="_blank" rel="noopener">Recommend a fast &amp; scalable persistent Map - Java</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2309,7 +2271,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">63</span>
+          <span class="site-state-item-count">64</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

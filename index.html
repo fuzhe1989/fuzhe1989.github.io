@@ -176,6 +176,155 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/" class="post-title-link" itemprop="url">[笔记] FlumeJava: Easy, Efficient Data-Parallel Pipelines</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-10-16 20:00:43 / 修改时间：20:00:45" itemprop="dateCreated datePublished" datetime="2020-10-16T20:00:43+08:00">2020-10-16</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://research.google/pubs/pub35650.pdf" target="_blank" rel="noopener">FlumeJava: Easy, Efficient Data-Parallel Pipelines</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>FlumeJava是基于MapReduce的计算框架。它的特点：</p>
+<ul>
+<li>提供了表达能力很强的Java库。</li>
+<li>惰性求值。</li>
+<li>结合了本地运算与远端MapReduce作业。</li>
+<li>可以生成优化的MapReduce程序。</li>
+</ul>
+<p>（FlumeJava这套框架目前仍在被大量使用，但底下应该已经不是MapReduce了。）</p>
+<h2 id="The-FlumeJava-Library"><a href="#The-FlumeJava-Library" class="headerlink" title="The FlumeJava Library"></a>The FlumeJava Library</h2><p>FlumeJava提供了几个核心类：</p>
+<ul>
+<li><code>PCollection&lt;T&gt;</code>：一个不可变序列。</li>
+<li><code>PTable&lt;K, V&gt;</code>：一个不可变的multi-map。</li>
+<li><code>PObject&lt;T&gt;</code>：单个Object。</li>
+</ul>
+<p>这几个类都是惰性求值的。</p>
+<p>基础转换关系：</p>
+<ul>
+<li><code>PCollection.&lt;T&gt;parallelDo(fn&lt;T, U&gt;, collectionOf(...))</code> -&gt; <code>PCollection&lt;U&gt;</code>。</li>
+<li><code>PCollection.&lt;T&gt;parallelDo(fn&lt;T, Pair&lt;K, V&gt;&gt;, tableOf(...))</code> -&gt; <code>PTable&lt;K, V&gt;</code>。</li>
+<li><code>PTable.&lt;K, V&gt;groupByKey()</code> -&gt; <code>PTable&lt;K, Collection&lt;V&gt;&gt;</code>。</li>
+<li><code>PTable.&lt;K, Collection&lt;V&gt;&gt;combineValues(fn&lt;V, U&gt;)</code> -&gt; <code>PTable.&lt;K, U&gt;</code>。</li>
+<li><code>flatten(Collection&lt;PCollection&lt;T&gt;&gt;)</code> -&gt; <code>PCollection&lt;T&gt;</code>，新序列的元素直接来自各个输入，不会发生拷贝。</li>
+<li><code>PCollection.&lt;T&gt;asSequentialCollection()</code> -&gt; <code>PObject&lt;Collection&lt;T&gt;&gt;</code>。</li>
+<li><code>PTable.&lt;K, V&gt;asSequentialCollection()</code> -&gt; <code>PObject&lt;Collection&lt;Pair&lt;K, V&gt;&gt;&gt;</code>。</li>
+<li><code>PCollection.&lt;T&gt;combine(fn&lt;T, U&gt;)</code> -&gt; <code>PObject&lt;U&gt;</code>。</li>
+<li><code>operate(PObject&lt;T&gt;, fn&lt;T, U&gt;)</code> -&gt; <code>PObject&lt;U&gt;</code>。</li>
+</ul>
+<p>衍生出<code>join()</code>：</p>
+<ul>
+<li><code>parallelDo</code>：<code>PTable&lt;K, Vi&gt;</code> -&gt; <code>PTable&lt;K, TaggeeUnion2&lt;V1, V2&gt;&gt;</code>。</li>
+<li><code>flatten</code>。</li>
+<li><code>groupByKey</code>：<code>PTable&lt;K, TaggeeUnion2&lt;V1, V2&gt;&gt;</code> -&gt; <code>PTable&lt;K, Collection&lt;TaggeeUnion2&lt;V1, V2&gt;&gt;&gt;</code>。</li>
+<li><code>parallelDo</code>：<code>PTable&lt;K, Collection&lt;TaggeeUnion2&lt;V1, V2&gt;&gt;&gt;</code> -&gt; <code>PTable&lt;K, Tuple2&lt;Collection&lt;V1&gt;, Collection&lt;V2&gt;&gt;&gt;</code>。</li>
+</ul>
+<p>top()：</p>
+<ul>
+<li><code>parallelDo</code>。</li>
+<li><code>groupByKey</code>。</li>
+<li><code>combineValues</code>。</li>
+</ul>
+<h2 id="Optimizer"><a href="#Optimizer" class="headerlink" title="Optimizer"></a>Optimizer</h2><h3 id="合并parallelDo"><a href="#合并parallelDo" class="headerlink" title="合并parallelDo"></a>合并<code>parallelDo</code></h3><p>合并后的<code>parallelDo</code>可以有多个输出。</p>
+<p>可以合并连续的<code>parallelDo</code>，以及同一个输入的不同下游<code>parallelDo</code>。</p>
+<p><code>combineValues</code>是另一种形式的<code>parallelDo</code>，因此也可以一起合并掉。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-01.jpg" alt=""></p>
+<h3 id="MapShuffleCombineReduce（MSCR）"><a href="#MapShuffleCombineReduce（MSCR）" class="headerlink" title="MapShuffleCombineReduce（MSCR）"></a>MapShuffleCombineReduce（MSCR）</h3><p>可以将<code>parallelDo</code>、<code>groupByKey</code>、<code>combineValues</code>、<code>flatten</code>合并为一个MapReduce作业，称为MapShuffleCombineReduce（MSCR）。</p>
+<p>一个MSCR有M个输入（每个对应一种map操作）和R个输出（每个可以包含shuffle、combine、reduce阶段）。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-02.jpg" alt=""></p>
+<p>注意shuffle发生在<code>groupByKey</code>之前。</p>
+<h3 id="合并MSCR。"><a href="#合并MSCR。" class="headerlink" title="合并MSCR。"></a>合并MSCR。</h3><p>如果多个<code>groupByKey</code>操作有相同的上游（可以是合并后的一个<code>parallelDo</code>的不同输出），称它们相关。</p>
+<p>多个相关的<code>groupByKey</code>可以合并为一个MSCR，这些<code>groupByKey</code>上游的<code>parallelDo</code>合并进MSCR，对应一个输入，每个<code>groupByKey</code>对应一个输出。如果MSCR的某个输出只被<code>comineValues</code>或<code>parallelDo</code>消费，这个操作也可以合并进来（<code>parallelDo</code>也可以合并进下个MSCR的输入）。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-03.jpg" alt=""></p>
+<p>最后孤立的<code>parallelDo</code>会被转换为平凡的MSCR，这样最终执行计划只剩下MSCR、<code>fatten</code>、<code>operate</code>。</p>
+<h3 id="整体优化"><a href="#整体优化" class="headerlink" title="整体优化"></a>整体优化</h3><p>整体优化的顺序：</p>
+<ol>
+<li>下移<code>flatten</code>，将它下面的<code>parallelDo</code>复制到每个输入上，即将<code>parallelDo(flatten(A, B))</code>转为<code>flatten(parallelDo(A), parallelDo(B))</code>，这样能创造更多的合并<code>parallelDo</code>的机会。</li>
+<li>如果<code>groupByKey</code>后面跟着<code>combineValues</code>，可以将<code>combineValues</code>视为普通的<code>parallelDo</code>，从而参与<code>parallelDo</code>的合并。</li>
+<li>如果两个<code>groupByKey</code>中间是一个或多个<code>parallelDo</code>，我们需要找一个边界，将它们切成两个MSCR。优化器会沿着这条路径估计每步产生的<code>PCollection</code>的大小，从最小的那个位置切开。</li>
+<li>合并<code>parallelDo</code>。</li>
+<li>合并与转换MSCR。</li>
+</ol>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-04.jpg" alt=""></p>
+<h3 id="限制"><a href="#限制" class="headerlink" title="限制"></a>限制</h3><p>目前FlumeJava没有做：</p>
+<ul>
+<li>静态分析用户代码。</li>
+<li>修改用户代码。</li>
+<li>公共表达式消除。</li>
+<li>移除不必要的<code>groupByKey</code>。</li>
+</ul>
+<h2 id="Executor"><a href="#Executor" class="headerlink" title="Executor"></a>Executor</h2><p>FlumeJava可以根据数据大小决定是本地运行，还是启动远端的MapReduce作业。</p>
+<h2 id="Lumberjack的教训"><a href="#Lumberjack的教训" class="headerlink" title="Lumberjack的教训"></a>Lumberjack的教训</h2><p>FlumeJava之前，Google还开发过一个类似的语言Lumberjack：</p>
+<ul>
+<li>适合表达并行pipeline。</li>
+<li>隐式并行。</li>
+<li>函数式。</li>
+<li>精巧的多态类型系统。</li>
+<li>局部类型推导。</li>
+<li>轻量tuple和record类型。</li>
+<li>匿名函数作为一等公民。</li>
+<li>拥有强大的静态优化器，包含了内联、数据流分析等常规优化，以及合并并行循环等非常规优化。</li>
+<li>编译为中间代码，最终可以生成Java字节码或机器码。</li>
+</ul>
+<p>它的问题在于：</p>
+<ul>
+<li>隐式并行违反了用户的习惯。相比之下，FlumeJava代码写起来更多，但更好理解，它有一个<code>PCollection</code>到<code>Collection</code>和<code>parallelDo</code>到<code>iterator</code>的明显的边界。FlumeJava的“命令式为主”的接口加上不可变结构也更符合用户的习惯。</li>
+<li>Lumberjack的静态优化器没办法根据运行期数据进行优化。FlumeJava的动态优化器带来的开销是非常有限的，但运行期优化却有着非常大的优势。</li>
+<li>基于Lumberjack开发高效完整的系统比基于FlumeJava更难，更花时间。</li>
+<li>新颖阻碍着被接受。FlumeJava是Java的一个库，极大降低了用户接入的成本。</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1288,105 +1437,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/" class="post-title-link" itemprop="url">[笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2020-09-21 16:08:09 / 修改时间：16:08:32" itemprop="dateCreated datePublished" datetime="2020-09-21T16:08:09+08:00">2020-09-21</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://people.eecs.berkeley.edu/~kubitron/courses/cs262a-F19/handouts/papers/vldb09-861.pdf" target="_blank" rel="noopener">HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章在尝试结合MapReduce（Hadoop）与DBMS（PostgreSQL），取MapReduce的伸缩性与容错性、DBMS的性能。</p>
-<p>实现：</p>
-<ul>
-<li>PostgreSQL作为Hadoop的DataNode。</li>
-<li>将SQL翻译为MR任务，</li>
-<li>通过兼容于JDBC的InputFormat将具体查询交给PostgreSQL执行。</li>
-</ul>
-<p>结论：结合“A comparison of approaches to large-scale data analysis”的性能测试结果，HadoopDB相比Hadoop的分析性能好了一些，仍然达不到并行DBMS的水平，但验证了这个方向是有意义的。</p>
-<p>HadoopDB将Hive中对数据源的scan换成了单节点PostgreSQL的查询，但仍然是传输数据而不是传输逻辑，且还是要物化中间结果，这些提高了容错性，但显著降低了性能。</p>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>作者观察到的趋势：</p>
-<ul>
-<li>大规模分析的市场越来越大。</li>
-<li>shared-nothing架构因为其伸缩性，特别适合实现大型分析系统。</li>
-<li>典型分析workload的特点（大量scan、多维度聚合、星型join）也非常容易在shared-nothing系统中并行执行。</li>
-</ul>
-<p>但现在的并行DBMS的伸缩性并不好，节点数达到百级别就有点困难了，原因是：</p>
-<ul>
-<li>大规模系统的错误是常态，而并行DBMS的设计假设了错误很罕见。</li>
-<li>并行DBMS通常假设机器是同构的，而实际的大规模系统很难保证这一点。</li>
-<li>大规模系统的需求直到最近才多起来，因此大规模的并行DBMS没有得到过充分的测试，难以预料还有什么工程上的障碍。</li>
-</ul>
-<p>MapReduce可以支持非常高的规模，但它缺乏许多对结构化数据分析非常有用的特性，MR模型也不适合那种一次加载后多次处理的场景。</p>
-<p>HadoopDB就是要结合MapReduce和并行DBMS，用MapReduce作为通信层，将SQL翻译为MapReduce任务，尽可能多地下发查询给DBMS节点执行。</p>
-<p>HadoopDB的目标是尽可能地利用已有的开源资源，用Hadoop+PostgreSQL来实现。</p>
-<h2 id="HadoopDB的实现"><a href="#HadoopDB的实现" class="headerlink" title="HadoopDB的实现"></a>HadoopDB的实现</h2><p>HadoopDB提供了以下四个组件：</p>
-<ol>
-<li>DB Connector，允许TaskTracker访问DBMS。</li>
-<li>Catalog，维护DB的元数据。</li>
-<li>Data Loader，用于全局和本地的数据分区、加载数据到DBMS。它有global hasher和local hasher，前者用于将数据分为HDFS上的若干个文件，后者用于将HDFS的一个文件分区到本地文件系统中。通过两层分区，HadoopDB保证了每个chunk大小均匀，从而得到更好的负载均衡性。</li>
-<li>SQL to MapReduce to SQL Planner（SMS），将SQL转为MR任务，再将各个MR子任务转回SQL。SMS扩展自Hive。相比Hive，SMS可以利用collocation、相同partition key等信息下推尽可能多的信息到DBMS中，即Hive的scan加上filter、group by、join等操作，在SMS中可以结合到一个operator中完成。对于跨DBMS的操作，SMS看起来要走和Hive相同的operator，与底下的DBMS就没有关系了。</li>
-</ol>
-<h2 id="性能指标"><a href="#性能指标" class="headerlink" title="性能指标"></a>性能指标</h2><p>在加载阶段，HadoopDB的性能更接近于DBMS-X，相比Hadoop慢了很多。</p>
-<p>Grep任务中HadoopDB只比Hadoop略快一点点，原因是这个任务以扫描为主，HadoopDB只是省掉了实时的解析开销。</p>
-<p>Selection任务中，HadoopDB默认会将Rankings和UserVisits表一起分区，导致Rankings表被分成了20个只有50MB的chunk，20个map任务的调度开销显著降低了HadoopDB的性能。如果不分区Rankings表，HadoopDB可以利用它在pageRank列上的索引，显著提升了性能（超过了DBMS-X）。</p>
-<p>Aggregation任务中，在聚合度较高时，Hive使用了hash聚合，相比原生Hadoop性能提升了非常多；在聚合高较低时，Hive转而使用了基于sort的聚合策略，这就与原生Hadoop相同了，且Hive在保存中间结果时有额外开销，此时它的整体性能还差于原生Hadoop。PostgreSQL在两种场景下都使用了hash聚合，因此HadoopDB的性能超过了Hadoop。</p>
-<p>Join任务中，HadoopDB得益于使用索引和内建支持join，性能远高于Hadoop，接近于两种DBMS（差距仍然明显）。</p>
-<p>UDF任务中，几个系统的性能差不多。</p>
-<h2 id="容错性"><a href="#容错性" class="headerlink" title="容错性"></a>容错性</h2><p>文章测试了各个系统的正常执行时间，以及单错误节点、单慢节点时的执行时间，HadoopDB的容错性确实比DBMS要好很多。尴尬的是就算在有错误或慢节点时，DBMS的执行时间仍然远低于HadoopDB和Hadoop。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1460,7 +1510,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">63</span>
+          <span class="site-state-item-count">64</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

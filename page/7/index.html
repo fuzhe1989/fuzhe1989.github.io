@@ -176,6 +176,111 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/05/16/cpp-delete-incomplete-pointer/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2017/05/16/cpp-delete-incomplete-pointer/" class="post-title-link" itemprop="url">C++：delete不完整类型的指针</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-05-16 22:50:29" itemprop="dateCreated datePublished" datetime="2017-05-16T22:50:29+08:00">2017-05-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="简单版"><a href="#简单版" class="headerlink" title="简单版"></a>简单版</h2><p>以下代码编译时会有warning：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">X</span>;</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">foo</span><span class="params">(X* x)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">delete</span> x;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在GCC4.1.2下，编译出错信息是：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">warning: possible problem detected in invocation of delete operator:</span><br><span class="line">warning: ‘x’ has incomplete type</span><br><span class="line">warning: forward declaration of ‘struct X’</span><br><span class="line">note: neither the destructor nor the class-specific operator delete will be called, even if they are declared when the class is defined.</span><br></pre></td></tr></table></figure>
+
+<p>这是因为在<code>foo</code>里，编译器看不到<code>X</code>的完整类型，没办法确定两件事情：</p>
+<ol>
+<li><code>X</code>有没有自定义的析构函数（准确的说，有没有non-trivial的析构函数）。</li>
+<li><code>X</code>有没有自定义的<code>operator delete</code>函数。</li>
+</ol>
+<p>在不确定这两件事情的情况下，编译器只能按最普通的方式去处理<code>delete x</code>：</p>
+<ol>
+<li>不调用任何析构函数。</li>
+<li>调用全局的<code>operator delete</code>，通常来说就是直接释放内存。</li>
+</ol>
+<h2 id="日常版"><a href="#日常版" class="headerlink" title="日常版"></a>日常版</h2><p>有一个我们平常会遇到的场景，就会触发上面这个问题。</p>
+<p>以下是由三个文件组成的一个工程，其中用到了’pImpl’方法来隐藏实现，因此在接口类中放了一个<code>std::auto_ptr</code>，很简单：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// test.h</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;memory&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">A</span> &#123;</span></span><br><span class="line">    <span class="class"><span class="keyword">class</span> <span class="title">Impl</span>;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    A();</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span></span>;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="built_in">std</span>::<span class="built_in">auto_ptr</span>&lt;Impl&gt; mImpl;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// test.cpp</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"test.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">A</span>:</span>:Impl &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="built_in">std</span>::<span class="built_in">cout</span> &lt;&lt; <span class="string">"Func"</span> &lt;&lt; <span class="built_in">std</span>::<span class="built_in">endl</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">A::A(): mImpl(<span class="keyword">new</span> Impl) &#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">void</span> A::Func() &#123;</span><br><span class="line">    mImpl-&gt;Func();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// main.cpp</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"test.h"</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    A a;</span><br><span class="line">    a.Func();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看起来很正常，但编译时有warning：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$g++ test.cpp main.cpp</span><br><span class="line">In destructor ‘std::auto_ptr&lt;_Tp&gt;::~auto_ptr() [with _Tp &#x3D; A::Impl]’:</span><br><span class="line">test.h:4:   instantiated from here</span><br><span class="line">warning: possible problem detected in invocation of delete operator:</span><br><span class="line">warning: invalid use of undefined type ‘struct A::Impl’</span><br><span class="line">test.h:5: warning: forward declaration of ‘struct A::Impl’</span><br><span class="line">note: neither the destructor nor the class-specific operator delete will be called, even if they are declared when the class is defined.</span><br></pre></td></tr></table></figure>
+
+<p>和前面说的warning信息完全一致，看起来也是在调用<code>delete</code>时出的问题。但哪里调用了<code>delete</code>呢？</p>
+<p>答案是<code>std::auto_ptr</code>。</p>
+<p>上面的代码中，我们没有给<code>class A</code>手动写一个析构函数，因为编译器自动生成的析构函数就是我们要的：析构时把<code>mImpl</code>析构掉。</p>
+<p>那么自动生成的析构函数长什么样子呢？大概是：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">A::~A() &#123;</span><br><span class="line">    mImpl.~<span class="built_in">auto_ptr</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>展开了基本就是一句<code>delete</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">A::~A() &#123;</span><br><span class="line">    <span class="keyword">delete</span> mImpl._M_ptr;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个析构函数的位置在哪呢？C++标准里说会把自动生成的类成员函数放在类的定义中，那么就是在test.h中。</p>
+<p>问题清楚了：我们在编译main.cpp时，看不到<code>A::Impl</code>的完整定义，但却有一个自动生成的<code>A::~A</code>，其中delete了一个不完整的类对象！</p>
+<h2 id="解法"><a href="#解法" class="headerlink" title="解法"></a>解法</h2><p>手动写一个<code>A</code>的析构函数，位置要在能看到<code>A::Impl</code>完整定义的地方，也就是test.cpp：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">```cpp</span><br><span class="line"><span class="comment">// test.h</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;memory&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">A</span> &#123;</span></span><br><span class="line">    <span class="class"><span class="keyword">class</span> <span class="title">Impl</span>;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    A();</span><br><span class="line">    ~A();</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span></span>;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="built_in">std</span>::<span class="built_in">auto_ptr</span>&lt;Impl&gt; mImpl;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// test.cpp</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"test.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">A</span>:</span>:Impl &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="built_in">std</span>::<span class="built_in">cout</span> &lt;&lt; <span class="string">"Func"</span> &lt;&lt; <span class="built_in">std</span>::<span class="built_in">endl</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">A::A(): mImpl(<span class="keyword">new</span> Impl) &#123;&#125;</span><br><span class="line">A::~A() &#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">void</span> A::Func() &#123;</span><br><span class="line">    mImpl-&gt;Func();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="相关文献"><a href="#相关文献" class="headerlink" title="相关文献"></a>相关文献</h2><ul>
+<li><a href="http://stackoverflow.com/questions/4325154/delete-objects-of-incomplete-type" target="_blank" rel="noopener">http://stackoverflow.com/questions/4325154/delete-objects-of-incomplete-type</a></li>
+<li><a href="http://stackoverflow.com/questions/4023794/forward-declaration-just-wont-do" target="_blank" rel="noopener">http://stackoverflow.com/questions/4023794/forward-declaration-just-wont-do</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -712,7 +817,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">63</span>
+          <span class="site-state-item-count">64</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
