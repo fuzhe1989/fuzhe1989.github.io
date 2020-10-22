@@ -176,6 +176,164 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/22/mega-store-providing-scalable-highly-available-storage-for-interactive-services/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/10/22/mega-store-providing-scalable-highly-available-storage-for-interactive-services/" class="post-title-link" itemprop="url">[笔记] Megastore: Providing scalable, highly available storage for interactive services</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-10-22 17:38:03 / 修改时间：17:38:52" itemprop="dateCreated datePublished" datetime="2020-10-22T17:38:03+08:00">2020-10-22</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://research.google/pubs/pub36971.pdf" target="_blank" rel="noopener">Megastore: Providing scalable, highly available storage for interactive services</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Megastore结合了NoSQL的扩展性和RDBMS的便利性，支持局部的ACID、多datacenter间的无缝failover。</p>
+<p>Megastore在每个datacenter有一个instance，数据存储在对应的Bigtable中，instance之间使用Paxos协调。</p>
+<p>从性能指标来看读写延时有点高，平均在100ms以上。</p>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Megastore的设计目标：</p>
+<ul>
+<li>高扩展性。</li>
+<li>能支持快速开发。</li>
+<li>低延时。</li>
+<li>提供前后一致（consistent）的数据视图。</li>
+<li>高可用。</li>
+</ul>
+<p>传统RDBMS难以满足扩展性的要求，而NoSQL则缺少一致性，开发成本高。</p>
+<p>Megastore结合了这两者，将数据分片后各自单独replicate，分片内提供ACID，分片间提供有限的一致性。</p>
+<p>Megastore还使用了Paxos来同步各个datacenter的数据，而不只是用Paxos来选master或同步metadata。</p>
+<h2 id="Toward-Availability-and-Scale"><a href="#Toward-Availability-and-Scale" class="headerlink" title="Toward Availability and Scale"></a>Toward Availability and Scale</h2><ul>
+<li>针对可用性，Megastore实现了同步的、容错的、针对远距离链路优化的log replicator。</li>
+<li>针对扩展性，Megastore将数据切分为很多小分片，每个分片独立有log，存储在各个instance对应的Bigtable中。</li>
+</ul>
+<h3 id="Replication"><a href="#Replication" class="headerlink" title="Replication"></a>Replication</h3><p>Megastore放弃了那些可能丢数据、或不保证ACID、或需要有很重的master（避免单点不可用）的replication策略。</p>
+<p>Megastore使用了Paxos，但做了一些扩展，允许：读任意足够新的本地replica；写只需要一轮往返。</p>
+<p>另外Megastore每个分片使用单独的log也是为了提高Paxos的扩展性。</p>
+<h3 id="Partitioning-and-Locality"><a href="#Partitioning-and-Locality" class="headerlink" title="Partitioning and Locality"></a>Partitioning and Locality</h3><p>Megastore中每个数据分片称为一个entity group，entity group内支持1PC的ACID，之间只支持2PC或异步通信（最终一致）。注意这里的异步通信是在逻辑的不同分片间的，而不是物理上不同datacenter之间，后者是同步且强一致的。</p>
+<p>局部索引支持ACID，全局索引支持最终一致。</p>
+<p>不同应用分片策略不同：</p>
+<ul>
+<li>Email根据account。</li>
+<li>Blog需要根据不同维度，比如profile、blog、blog的唯一标识。有些操作会跨不同entity group，需要选择用2PC还是异步通信。</li>
+<li>Maps可以根据经纬度分片，如果分得过细，跨分片的操作会太多；如果分得过粗则总吞吐有限。</li>
+</ul>
+<p>Megastore的数据存储在Bigtable上，同一分片的数据对应在Bigtable的连续的行上。用户可以参与指定数据的存储方式。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-01.jpg" alt=""></p>
+<h2 id="A-Tour-of-Megastore"><a href="#A-Tour-of-Megastore" class="headerlink" title="A Tour of Megastore"></a>A Tour of Megastore</h2><h3 id="API-Design-Philosophy"><a href="#API-Design-Philosophy" class="headerlink" title="API Design Philosophy"></a>API Design Philosophy</h3><p>规范化的关系schema依赖于查询时join，因此不适合Megastore：</p>
+<ul>
+<li>join的延时难以预测。</li>
+<li>Megastore中读远多于写，因此将工作从读移到写是合算的。</li>
+<li>Bigtable适合存储和查询分级的数据。</li>
+</ul>
+<p>使用分级布局和声明式的反规范化有助于消除大多数的join。用户需要的时候可以自己在应用代码中实现join，比如有用户自己基于并行查询实现了outer join。</p>
+<p>（作者给了一些Megastore不支持join的理由，但不是很有说服力）</p>
+<h3 id="Data-Model"><a href="#Data-Model" class="headerlink" title="Data Model"></a>Data Model</h3><p>Megastore中数据按表 - entity - property来组织。每个property可以是基础类型，也可以是protobuf对象，可以是required、optional、repeated。</p>
+<p>表可以是entity root表，或是child表。每个child表都有可以唯一标识root表中entity的外键。</p>
+<p>每个entity对应Bigtable上的一行。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">CREATE SCHEMA PhotoApp;</span><br><span class="line"></span><br><span class="line">CREATE TABLE User &#123;</span><br><span class="line">  required int64 user_id;</span><br><span class="line">  required string name;</span><br><span class="line">&#125; PRIMARY KEY(user_id), ENTITY GROUP ROOT;</span><br><span class="line"></span><br><span class="line">CREATE TABLE Photo &#123;</span><br><span class="line">  required int64 user_id;</span><br><span class="line">  required int32 photo_id;</span><br><span class="line">  required int64 time;</span><br><span class="line">  required string full_url;</span><br><span class="line">  optional string thumbnail_url;</span><br><span class="line">  repeated string tag;</span><br><span class="line">&#125; PRIMARY KEY(user_id, photo_id),</span><br><span class="line">  IN TABLE User,</span><br><span class="line">  ENTITY GROUP KEY(user_id) REFERENCES User;</span><br><span class="line"></span><br><span class="line">CREATE LOCAL INDEX PhotosByTime</span><br><span class="line">  ON Photo(user_id, time);</span><br><span class="line"></span><br><span class="line">CREATE GLOBAL INDEX PhotosByTag</span><br><span class="line">  ON Photo(tag) STORING (thumbnail_url);</span><br></pre></td></tr></table></figure>
+
+<p><code>IN TABLE User</code>表示所有Photo entity都会直接存储在User对应的Bigtable表中，且物理上与User entity相连。这样可以拍平分级的join。</p>
+<p>索引既可以定义在任意property上，也可以定义在protobuf对象的内部字段上。局部索引适用于entity group内部，会与主表entity同步原子更新。全局索引跨entity group，但更新是异步的。</p>
+<p>使用<code>STORING</code>可以减少索引反查主表的次数。</p>
+<p>定义在repeated property上的索引，每个不同的property value对应一个索引行，与主表entity是N:1的关系。</p>
+<p>索引可以内联到更上层主表中，此时索引项相当于上层主表entity的一个repeated property。如将PhotosByTime定义为内联到User的索引，这样每个User对应若干项PhotosByTime。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-02.jpg" alt=""></p>
+<p>每个entity group的metadata和log也会保存到entity root对应的Bigtable表的一行中，这样可以原子更新。</p>
+<h3 id="Transactions-and-Concurrency-Control"><a href="#Transactions-and-Concurrency-Control" class="headerlink" title="Transactions and Concurrency Control"></a>Transactions and Concurrency Control</h3><p>Megastore中的事务是先将修改写进entity group对应的WAL中，再更新Bigtable表。</p>
+<p>Megastore使用了MVCC来保证修改的原子性：所有修改都完成后再提升readable version。</p>
+<p>Megastore提供了三种读级别：</p>
+<ul>
+<li>Current：确保readable version提升到当前的committed version。</li>
+<li>Snapshot：使用当前readable version。</li>
+<li>Inconsistent：无视readable version，直接读，可能读到不一致或不完整的数据（但能避免读entity group metadata？）。</li>
+</ul>
+<p>写事务总是先做一次current read来确定下个log位置，然后将所有修改打包为一个entry，使用更大的timestamp，再通过Paxos提交。使用一个server来批量提交所有写事务能避免冲突。</p>
+<p>完整的事务周期：</p>
+<ul>
+<li>读metadata。</li>
+<li>读应用数据。</li>
+<li>使用Paxos提交。</li>
+<li>更新Bigtable表。</li>
+<li>清理垃圾数据。</li>
+</ul>
+<p>跨entity group的操作可以走异步消息队列，但也可以使用2PC，虽然Megastore不推荐应用依赖于2PC。</p>
+<h2 id="Replication-1"><a href="#Replication-1" class="headerlink" title="Replication"></a>Replication</h2><p>Megastore的Paxos不依赖于某个master，任意replica都可以服务读写请求。</p>
+<p>为了保证读请求大多数情况下可以只读本地，Megastore在每个instance中增加了一个coordinator，它记录了哪些entity group的本地replica足够新。写请求负责在有写失败时通知coordinator将对应的entity group去掉。</p>
+<p>原生的Paxos的写需要两轮往返，通常的优化是基于master，master可以把上个请求的ACCEPT和下个请求的PREPARE合并为一个请求，这样变成一轮。Megastore不想要master带来的单点可用性问题。相反，它使用了leader。每个entity group的每个replica有一套单独的Paxos来选出一个特殊的leader，leader可以直接发起proposal为0的ACCEPT，其它writer仍然要走正常的两轮Paxos协议。</p>
+<p>应用写本地Bigtable不需要走replication server。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-03.jpg" alt=""></p>
+<p>replication log中每个log entry对应Bigtable中的一个cell，Megastore允许某个replica的log中间有空洞，这样刚failover的replica可以尽快参与到投票中。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-04.jpg" alt=""></p>
+<p>在做current read时，至少有一个replica的readable version要追上committed version，称为catch up。完整过程：</p>
+<ul>
+<li>读本地的coordinator判断当前entity group是否足够新。</li>
+<li>获取committed version并选择replica：<ul>
+<li>如果本地replica足够新就读本地。</li>
+<li>否则走正常的Paxos读。</li>
+</ul>
+</li>
+<li>触发对应replica的catch up。</li>
+<li>如果选择的是本地replica，且完成了catch up，则向coordinator发送一个请求来判断entity group是否健康。应用不需要等待这个请求返回，如果失败了后续的读请求还会自动重试。</li>
+<li>读数据。</li>
+</ul>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-05.jpg" alt=""></p>
+<p>写流程：</p>
+<ol>
+<li>询问leader是否接受当前log entry作为0号proposal，如果是，直接跳到步骤3。</li>
+<li>向每个replica发送PREPARE。</li>
+<li>询问其它replica是否接受当前proposal。</li>
+<li>与拒绝或失败的replica对应的coordinator通信，移除这个entity group。</li>
+<li>更新接受的replica对应的Bigtable。</li>
+</ol>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1315,128 +1473,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/" class="post-title-link" itemprop="url">[笔记] Dremel: interactive analysis of web-scale datasets</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2020-09-22 18:46:25 / 修改时间：18:46:22" itemprop="dateCreated datePublished" datetime="2020-09-22T18:46:25+08:00">2020-09-22</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://research.google/pubs/pub36632.pdf" target="_blank" rel="noopener">Dremel: interactive analysis of web-scale datasets</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章讲了两方面：</p>
-<ul>
-<li>支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的<a href="https://parquet.apache.org/" target="_blank" rel="noopener">Parquet</a>）。</li>
-<li>并行执行架构。</li>
-</ul>
-<p>能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。</p>
-<h2 id="列式存储"><a href="#列式存储" class="headerlink" title="列式存储"></a>列式存储</h2><h3 id="Repetion-Level和Definition-Level"><a href="#Repetion-Level和Definition-Level" class="headerlink" title="Repetion Level和Definition Level"></a>Repetion Level和Definition Level</h3><p>以下面这个proto为例。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">message Document &#123;</span><br><span class="line">    required int64 DocId;</span><br><span class="line">    optional group Links &#123;</span><br><span class="line">        repeated int64 Backward;</span><br><span class="line">        repeated int64 Forward;</span><br><span class="line">    &#125;</span><br><span class="line">    repeated group Name &#123;</span><br><span class="line">        repeated group Language &#123;</span><br><span class="line">            required string Code;</span><br><span class="line">            optional string Country;</span><br><span class="line">        &#125;</span><br><span class="line">        optional string Url;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>Dremel会存储以下列：</p>
-<ul>
-<li><code>DocId</code></li>
-<li><code>Links.Backward</code></li>
-<li><code>Links.Forward</code></li>
-<li><code>Name.Language.Code</code></li>
-<li><code>Name.Language.Country</code></li>
-<li><code>Name.Url</code></li>
-</ul>
-<p>不同记录的相同列会存储在一起。</p>
-<p>问题是如何用这些列来还原这些记录呢？考虑到<code>optional</code>和<code>repeated</code>字段，我们需要能分辨：</p>
-<ul>
-<li>前后两个<code>Links.Forward</code>属于一条记录还是两条记录。</li>
-<li>前后两个<code>Name.Language.Country</code>属于一条记录的一个<code>Name</code>还是两个<code>Name</code>还是两条记录。</li>
-</ul>
-<p>光靠列值自身是没办法做到的。</p>
-<p>Dremel引入了两个概念：Definition Level（DL）和Repetition Level（RL）。</p>
-<p>DL指，一个路径上有多少个<code>optional</code>或<code>repeated</code>字段被定义了，如<code>DocId</code>的DL为0，<code>Links.Backward</code>的DL为1，<code>Name.Language.Country</code>的DL为3。</p>
-<p>RL指，一个值是在它的路径的第几个<code>repeated</code>字段上在重复。这里的重复的范围是一条记录内，每条记录的这列的第一个值的RL总是0。以<code>Name.Language.Country</code>为例：</p>
-<ul>
-<li>如果RL为0，表示它与上一个值是跨记录的。如果上一个值属于当前记录，则要新开始一个记录。</li>
-<li>如果RL为1，表示它与上一个值是跨<code>Name</code>的。</li>
-<li>如果RL为2，表示它与上一个值是跨<code>Name.Language</code>的。</li>
-</ul>
-<p>如果某一层级下，一个<code>optional</code>或<code>repeated</code>字段未定义，但有和它平级的其它字段定义了，为了避免混淆，我们要插入一个<code>NULL</code>。这个<code>NULL</code>也是有DL和RL的。</p>
-<p>实际存储中：</p>
-<ul>
-<li>不需要显式存储<code>NULL</code>，只要DL小于字段的深度，就是<code>NULL</code>。</li>
-<li>DL总为0的字段不存储DL。</li>
-<li>RL也只在需要时存储，如DL为0隐含RL为0，则RL也不需要保存。</li>
-<li>DL和RL按实际使用的位数保存。</li>
-</ul>
-<p>同一列非<code>NULL</code>的值的DL都是相同的，但<code>NULL</code>的DL值可能不同，由此我们可以知道这个<code>NULL</code>来自哪一层。</p>
-<h3 id="反序列化"><a href="#反序列化" class="headerlink" title="反序列化"></a>反序列化</h3><p>Dremel会根据查询条件构建一个有限状态机（FSM），每个查询需要的列是一个状态，根据RL转换状态。</p>
-<h2 id="查询"><a href="#查询" class="headerlink" title="查询"></a>查询</h2><p>Dremel有一个RootServer来接收client请求，读取对应表的元数据，再将查询下发给中间节点，直到叶子节点执行。叶子节点会去扫描保存为tablet的列存数据。Dremel允许client指定只扫描完一定比例的tablet就返回，如98%，经常可以显著降低延时。</p>
-<p>Dremel的一些算子（如Top-K或Count-Distinct）使用了近似算法。</p>
-<p>Dremel有QueryDispatcher来分配节点，它还可以检测慢节点并重新分配交给慢节点执行的查询。</p>
-<h2 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h2><p>本地磁盘：</p>
-<ul>
-<li>只需要读很少的列的时候，列存的读取性能高于行存一个数量级。</li>
-<li>组装记录和解析非常耗费性能，分别导致处理时间加倍。（和C-Store的延迟物化结论一样）</li>
-<li>通常在读取数十列以上时列存的处理时间和行存差不多了，但不同数据集差异非常大，且列存不一定需要组装记录。</li>
-</ul>
-<p>MR和Dremel：</p>
-<ul>
-<li>MR将行存换成列存，性能提升了接近一个数量级。</li>
-<li>将MR换成Dremel，性能提升了两个数量级。</li>
-</ul>
-<p>树状执行结构：</p>
-<ul>
-<li>大量聚合场景多层节点的优势非常明显（每一层做部分聚合，避免串行处理太多下游节点的响应）。</li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1510,14 +1546,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">64</span>
+          <span class="site-state-item-count">65</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">40</span>
+        <span class="site-state-item-count">41</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

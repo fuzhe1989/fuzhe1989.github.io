@@ -176,6 +176,128 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/" class="post-title-link" itemprop="url">[笔记] Dremel: interactive analysis of web-scale datasets</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-09-22 18:46:25 / 修改时间：18:46:22" itemprop="dateCreated datePublished" datetime="2020-09-22T18:46:25+08:00">2020-09-22</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://research.google/pubs/pub36632.pdf" target="_blank" rel="noopener">Dremel: interactive analysis of web-scale datasets</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章讲了两方面：</p>
+<ul>
+<li>支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的<a href="https://parquet.apache.org/" target="_blank" rel="noopener">Parquet</a>）。</li>
+<li>并行执行架构。</li>
+</ul>
+<p>能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。</p>
+<h2 id="列式存储"><a href="#列式存储" class="headerlink" title="列式存储"></a>列式存储</h2><h3 id="Repetion-Level和Definition-Level"><a href="#Repetion-Level和Definition-Level" class="headerlink" title="Repetion Level和Definition Level"></a>Repetion Level和Definition Level</h3><p>以下面这个proto为例。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">message Document &#123;</span><br><span class="line">    required int64 DocId;</span><br><span class="line">    optional group Links &#123;</span><br><span class="line">        repeated int64 Backward;</span><br><span class="line">        repeated int64 Forward;</span><br><span class="line">    &#125;</span><br><span class="line">    repeated group Name &#123;</span><br><span class="line">        repeated group Language &#123;</span><br><span class="line">            required string Code;</span><br><span class="line">            optional string Country;</span><br><span class="line">        &#125;</span><br><span class="line">        optional string Url;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Dremel会存储以下列：</p>
+<ul>
+<li><code>DocId</code></li>
+<li><code>Links.Backward</code></li>
+<li><code>Links.Forward</code></li>
+<li><code>Name.Language.Code</code></li>
+<li><code>Name.Language.Country</code></li>
+<li><code>Name.Url</code></li>
+</ul>
+<p>不同记录的相同列会存储在一起。</p>
+<p>问题是如何用这些列来还原这些记录呢？考虑到<code>optional</code>和<code>repeated</code>字段，我们需要能分辨：</p>
+<ul>
+<li>前后两个<code>Links.Forward</code>属于一条记录还是两条记录。</li>
+<li>前后两个<code>Name.Language.Country</code>属于一条记录的一个<code>Name</code>还是两个<code>Name</code>还是两条记录。</li>
+</ul>
+<p>光靠列值自身是没办法做到的。</p>
+<p>Dremel引入了两个概念：Definition Level（DL）和Repetition Level（RL）。</p>
+<p>DL指，一个路径上有多少个<code>optional</code>或<code>repeated</code>字段被定义了，如<code>DocId</code>的DL为0，<code>Links.Backward</code>的DL为1，<code>Name.Language.Country</code>的DL为3。</p>
+<p>RL指，一个值是在它的路径的第几个<code>repeated</code>字段上在重复。这里的重复的范围是一条记录内，每条记录的这列的第一个值的RL总是0。以<code>Name.Language.Country</code>为例：</p>
+<ul>
+<li>如果RL为0，表示它与上一个值是跨记录的。如果上一个值属于当前记录，则要新开始一个记录。</li>
+<li>如果RL为1，表示它与上一个值是跨<code>Name</code>的。</li>
+<li>如果RL为2，表示它与上一个值是跨<code>Name.Language</code>的。</li>
+</ul>
+<p>如果某一层级下，一个<code>optional</code>或<code>repeated</code>字段未定义，但有和它平级的其它字段定义了，为了避免混淆，我们要插入一个<code>NULL</code>。这个<code>NULL</code>也是有DL和RL的。</p>
+<p>实际存储中：</p>
+<ul>
+<li>不需要显式存储<code>NULL</code>，只要DL小于字段的深度，就是<code>NULL</code>。</li>
+<li>DL总为0的字段不存储DL。</li>
+<li>RL也只在需要时存储，如DL为0隐含RL为0，则RL也不需要保存。</li>
+<li>DL和RL按实际使用的位数保存。</li>
+</ul>
+<p>同一列非<code>NULL</code>的值的DL都是相同的，但<code>NULL</code>的DL值可能不同，由此我们可以知道这个<code>NULL</code>来自哪一层。</p>
+<h3 id="反序列化"><a href="#反序列化" class="headerlink" title="反序列化"></a>反序列化</h3><p>Dremel会根据查询条件构建一个有限状态机（FSM），每个查询需要的列是一个状态，根据RL转换状态。</p>
+<h2 id="查询"><a href="#查询" class="headerlink" title="查询"></a>查询</h2><p>Dremel有一个RootServer来接收client请求，读取对应表的元数据，再将查询下发给中间节点，直到叶子节点执行。叶子节点会去扫描保存为tablet的列存数据。Dremel允许client指定只扫描完一定比例的tablet就返回，如98%，经常可以显著降低延时。</p>
+<p>Dremel的一些算子（如Top-K或Count-Distinct）使用了近似算法。</p>
+<p>Dremel有QueryDispatcher来分配节点，它还可以检测慢节点并重新分配交给慢节点执行的查询。</p>
+<h2 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h2><p>本地磁盘：</p>
+<ul>
+<li>只需要读很少的列的时候，列存的读取性能高于行存一个数量级。</li>
+<li>组装记录和解析非常耗费性能，分别导致处理时间加倍。（和C-Store的延迟物化结论一样）</li>
+<li>通常在读取数十列以上时列存的处理时间和行存差不多了，但不同数据集差异非常大，且列存不一定需要组装记录。</li>
+</ul>
+<p>MR和Dremel：</p>
+<ul>
+<li>MR将行存换成列存，性能提升了接近一个数量级。</li>
+<li>将MR换成Dremel，性能提升了两个数量级。</li>
+</ul>
+<p>树状执行结构：</p>
+<ul>
+<li>大量聚合场景多层节点的优势非常明显（每一层做部分聚合，避免串行处理太多下游节点的响应）。</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1586,216 +1708,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/07/30/apache-pulsar-versus-apache-kafka/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/07/30/apache-pulsar-versus-apache-kafka/" class="post-title-link" itemprop="url">Apache Pulsar Versus Apache Kafka读后</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-07-30 23:06:42" itemprop="dateCreated datePublished" datetime="2020-07-30T23:06:42+08:00">2020-07-30</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-23 17:13:05" itemprop="dateModified" datetime="2020-08-23T17:13:05+08:00">2020-08-23</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>只有33页的新书，可以从<a href="https://www.memsql.com/resources/ebook-oreilly-pulsar-vs-kafka" target="_blank" rel="noopener">MemSQL</a>上下载到。</p>
-<h2 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h2><p>Kafka broker既负责处理请求，也负责存储数据，因此：</p>
-<ul>
-<li>它是有状态的，对新node接管有要求：要有一份replica。</li>
-<li>移动topic需要复制数据，因此rebalance也很复杂。</li>
-<li>请求处理的压力与存储空间的压力耦合在一块，没办法灵活扩容。</li>
-<li>扩容时容易出现配置不一致与容量异构，导致管理成本高。</li>
-</ul>
-<p>Pulsar是计算存储分离的架构，存储层交给Apache BookKeeper，因此：</p>
-<ul>
-<li>broker是无状态的，迁移不需要复制数据，rebalance也非常容易（有内置的load balancer）。</li>
-<li>基于BookKeeper，实现了分布式存储，数据更安全。</li>
-<li>计算与存储节点的扩容是独立的。</li>
-</ul>
-<h3 id="Replication-Model"><a href="#Replication-Model" class="headerlink" title="Replication Model"></a>Replication Model</h3><p>Kafka是leader-follwer模型，因此：</p>
-<ul>
-<li>不发生failover和新增topic的话节点的数据分布是静态的，新节点加入后没办法立即分担压力。</li>
-</ul>
-<p>Pulsar是quorum-vote模型，因此：</p>
-<ul>
-<li>读写性能更好（压力更平均）。</li>
-<li>新节点加入后立即可以分担压力。</li>
-<li>failover处理更简单（转交给BookKeeper处理）。</li>
-</ul>
-<h2 id="Pub-Sub-Messaging"><a href="#Pub-Sub-Messaging" class="headerlink" title="Pub-Sub Messaging"></a>Pub-Sub Messaging</h2><p>Kafka与Pulsar有着非常类似的Log Abstraction，它们在Pub-Sub方面的区别在于对Traditional Messaging的处理方式。</p>
-<h3 id="Queues-and-Competing-Consumers"><a href="#Queues-and-Competing-Consumers" class="headerlink" title="Queues and Competing Consumers"></a>Queues and Competing Consumers</h3><p>Kafka中一个topic可以有多个partition，message按round-robin或按key分派给某个partition。但一个partition只能对应一个consumer，多出来的consumer只能闲置。这样应用方需要提前确定好要多少个partition。另外，向consumer group新增consumer还会触发rebalance这个topic对应的所有consumer（为什么？），期间整个message投递都会暂停。</p>
-<p>与传统的MessageQueue不同，Kafka不会重复向consumer投递未确认的message，需要应用方自己重试。</p>
-<p>Pulsar中与consumer group类似的概念叫subscription。shared subscription就是competing consumers，但不需要有partition与consumer的对应关系。新增consumer也不会触发rebalance。Pulsar中有partition，但控制message消费的维度是subscription，而不是partition。</p>
-<p>Pulsar的shared subscription支持：</p>
-<ul>
-<li>定期向consumer发送未确认的message。</li>
-<li>只确认单条message（对应确认某个offset之前的所有消息）。</li>
-<li>恢复单条message到未确认状态（允许这条message被其它人消费）。</li>
-</ul>
-<p>Pulsar还支持其它subscription模式：</p>
-<ul>
-<li>exclusive：对应topic只允许一个consumer。</li>
-<li>failover：允许一个活跃的consumer和多个不活跃的consumer。</li>
-<li>key_shared：对应key只允许一个consumer，这样能保序，且不需要引入partition。</li>
-</ul>
-<p>结论：</p>
-<ul>
-<li>Kafka可以用来实现work queue，但需要考虑的东西比较多。因此很多人另外使用传统的MQ来配合Kafka使用，这样增加了管理负担。</li>
-<li>Pulsar既支持Kafka的功能，也支持MQ的功能，不需要管理两个系统。</li>
-</ul>
-<h2 id="Log-Abstraction"><a href="#Log-Abstraction" class="headerlink" title="Log Abstraction"></a>Log Abstraction</h2><p>Kafka中，每个topic是一个log流（应该是partition维度吧？），topic不能分裂成多个给多个broker，或使用同一broker的多块盘，因此无法无限增大，需要扩容时只能增加盘的大小，在用本地盘时是有上限的。在迁移topic时需要做大量的数据复制，而且热迁移的运维也非常复杂。</p>
-<p>Pulsar中每个topic也是一个log流，但Pulsar把它分成了若干个segment，每个segment独立写入BookKeeper，这样整个log流的大小只受限于集群大小，在broker挂掉或新增时也不需要实际移动数据。另外不同segment分布在不同机器上，也加快了topic的恢复速度。</p>
-<p>使用BookKeeper也增加了Pulsar的数据安全性：数据每写入BookKeeper成功时就确保落盘了，而Kafka是定期flush，有failover时很难避免丢数据。如果Kafka配置成每笔写都flush，性能就会受到很大影响。</p>
-<p>得益于存储计算分离，Pulsar很容易就支持了分层存储，冷数据可以存到其它云存储介质中，进一步降低成本。另外应用可以因此做长时间的溯源，使用events来恢复最终状态。</p>
-<h2 id="Partitions"><a href="#Partitions" class="headerlink" title="Partitions"></a>Partitions</h2><p>Kafka中每个topic都分为一个或多个partition，partition数量就是这个topic的消费并行度。</p>
-<p>但随着软硬件性能的提升，现在一个topic可能只需要一个partition就可以满足性能需求了。但在Kafka中一个partition就只能对应一个consumer。</p>
-<p>Kafka中可以增加partition（如果是按key划分的partition，会导致相同key的message在增加前后落到不同的partition上，影响保序性），但不可以减少partition。</p>
-<p>Pulsar中partition是可选的，可以不用partition而支持多个consumer。使用partition是为了增加性能，或需要按key保序消费message。producer可以向topic投递，也可以直接向某个partition投递。consumer同理。与Kafka相同，Pulsar中partition也是只能增加不能减少。</p>
-<p>结论：Pulsar中可以像Kafka那样使用partition，但不用一上来就必须了解partition，这样显著降低了学习成本。</p>
-<h2 id="Performance"><a href="#Performance" class="headerlink" title="Performance"></a>Performance</h2><p><a href="https://oreil.ly/vGoPy" target="_blank" rel="noopener">GigaOm的一份报告</a>显示：</p>
-<ul>
-<li>Pulsar的吞吐是Kafka的150%。</li>
-<li>Pulsar的延时比Kafka低40%，且一致性等级更高。</li>
-<li>得益于更好的伸缩性，Pulsar在不同的message大小和partition数量下有着一致的结果。</li>
-</ul>
-<p><a href="https://oreil.ly/34h_v" target="_blank" rel="noopener">另一份基于OpenMessage的报告</a>有类似的结论。</p>
-<h2 id="Tenancy"><a href="#Tenancy" class="headerlink" title="Tenancy"></a>Tenancy</h2><p>Pulsar有namespace和ACL，支持多租户。Kafka不支持多租户，不同团队使用同一个Kafka集群时需要协调好。</p>
-<h2 id="Geo-Replication"><a href="#Geo-Replication" class="headerlink" title="Geo-Replication"></a>Geo-Replication</h2><p>Geo-replication是Pulsar一开始设计时就考虑到的功能。Pulsar中可以按namespace打开或关闭geo-replication，可以配置哪些topic可以或不可以replicate。producer还可以指定跳过哪些data center。</p>
-<p>Pulsar支持多种拓扑：active-standby、active-active、full-mesh、edge aggregation。</p>
-<p>Kafka中可以用MirrorMaker来做geo-replication，它是将一个data center的consumer和另一个data center的producer链接起来，不能动态配置，也不支持在两个data center间同步配置或subscription。</p>
-<p>另一个工具是Uber的uReplicator，它比MirrorMaker更好用，但本身是一个单独集群，有管理成本。</p>
-<p>Kafka也有商用方案，如Confluent Replicator。</p>
-<p>结论：Pulsar内置对geo-replication的良好支持，Kafka需要使用外部工具，且运维负担重。</p>
-<h2 id="Ecosystem"><a href="#Ecosystem" class="headerlink" title="Ecosystem"></a>Ecosystem</h2><p>Kafka本身是ASF控制的，但它的很多第三方工具由大公司控制，未来有开源协议变动的风险。</p>
-<p>Pulsar本身和主要工具都是由ASF控制的，未来协议变动的风险非常低。</p>
-<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>两个系统的对比：</p>
-<table>
-<thead>
-<tr>
-<th>Dimension</th>
-<th>Kafka</th>
-<th>Pulsar</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Architectural components</td>
-<td>ZooKeeper, Kafka broker</td>
-<td>ZooKeeper, Pulsar broker, BookKeeper</td>
-</tr>
-<tr>
-<td>Replication model</td>
-<td>Leader–follower</td>
-<td>Quorum-vote</td>
-</tr>
-<tr>
-<td>High-performance pub–sub messaging</td>
-<td>Supported</td>
-<td>Supported</td>
-</tr>
-<tr>
-<td>Message replay</td>
-<td>Supported</td>
-<td>Supported</td>
-</tr>
-<tr>
-<td>Competing consumers</td>
-<td>Supported with limitations</td>
-<td>Supported</td>
-</tr>
-<tr>
-<td>Traditional consuming patterns</td>
-<td>Not supported</td>
-<td>Supported</td>
-</tr>
-<tr>
-<td>Log abstraction</td>
-<td>Single node</td>
-<td>Distributed</td>
-</tr>
-<tr>
-<td>Tiered storage</td>
-<td>Not supported</td>
-<td>Supported</td>
-</tr>
-<tr>
-<td>Partitions</td>
-<td>Required</td>
-<td>Optional</td>
-</tr>
-<tr>
-<td>Performance</td>
-<td>High</td>
-<td>Higher</td>
-</tr>
-<tr>
-<td>Geo-replication</td>
-<td>Available through tool or external projects</td>
-<td>Built-in</td>
-</tr>
-<tr>
-<td>Community and related projects</td>
-<td>Large and mature</td>
-<td>Small and growing</td>
-</tr>
-<tr>
-<td>Open source</td>
-<td>Mixture of ASF and others</td>
-<td>All ASF</td>
-</tr>
-</tbody></table>
-<p>（附另一组对比：<a href="https://www.confluent.io/kafka-vs-pulsar/" target="_blank" rel="noopener">Kafka vs. Pulsar vs. RabbitMQ: Performance, Architecture, and Features Compared</a>）</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1869,14 +1781,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">64</span>
+          <span class="site-state-item-count">65</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">40</span>
+        <span class="site-state-item-count">41</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
