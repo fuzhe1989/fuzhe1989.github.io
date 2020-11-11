@@ -44,15 +44,15 @@
   };
 </script>
 
-  <meta name="description" content="原文：Dremel: interactive analysis of web-scale datasets  TL;DR这篇文章讲了两方面：  支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的Parquet）。 并行执行架构。  能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。 列式">
+  <meta name="description" content="原文：Dremel: interactive analysis of web-scale datasets  TL;DR这篇文章讲了两方面：  支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的Parquet）。 并行执行架构。  能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="[笔记] Dremel: interactive analysis of web-scale datasets">
 <meta property="og:url" content="http://fuzhe1989.github.io/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/index.html">
 <meta property="og:site_name" content="Fu Zhe&#39;s Blog">
-<meta property="og:description" content="原文：Dremel: interactive analysis of web-scale datasets  TL;DR这篇文章讲了两方面：  支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的Parquet）。 并行执行架构。  能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。 列式">
+<meta property="og:description" content="原文：Dremel: interactive analysis of web-scale datasets  TL;DR这篇文章讲了两方面：  支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的Parquet）。 并行执行架构。  能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2020-09-22T10:46:25.000Z">
-<meta property="article:modified_time" content="2020-09-22T10:46:22.386Z">
+<meta property="article:modified_time" content="2020-11-11T07:58:41.416Z">
 <meta property="article:author" content="Fu Zhe">
 <meta property="article:tag" content="笔记">
 <meta property="article:tag" content="Columnar">
@@ -203,10 +203,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-09-22 18:46:25 / 修改时间：18:46:22" itemprop="dateCreated datePublished" datetime="2020-09-22T18:46:25+08:00">2020-09-22</time>
+              <time title="创建时间：2020-09-22 18:46:25" itemprop="dateCreated datePublished" datetime="2020-09-22T18:46:25+08:00">2020-09-22</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:58:41" itemprop="dateModified" datetime="2020-11-11T15:58:41+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -228,6 +234,8 @@
 <li>并行执行架构。</li>
 </ul>
 <p>能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。</p>
+<a id="more"></a>
+
 <h2 id="列式存储"><a href="#列式存储" class="headerlink" title="列式存储"></a>列式存储</h2><h3 id="Repetion-Level和Definition-Level"><a href="#Repetion-Level和Definition-Level" class="headerlink" title="Repetion Level和Definition Level"></a>Repetion Level和Definition Level</h3><p>以下面这个proto为例。</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">message Document &#123;</span><br><span class="line">    required int64 DocId;</span><br><span class="line">    optional group Links &#123;</span><br><span class="line">        repeated int64 Backward;</span><br><span class="line">        repeated int64 Forward;</span><br><span class="line">    &#125;</span><br><span class="line">    repeated group Name &#123;</span><br><span class="line">        repeated group Language &#123;</span><br><span class="line">            required string Code;</span><br><span class="line">            optional string Country;</span><br><span class="line">        &#125;</span><br><span class="line">        optional string Url;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
@@ -398,14 +406,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">67</span>
+          <span class="site-state-item-count">68</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-count">42</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

@@ -52,7 +52,7 @@
 <meta property="og:description" content="原文地址 在售出1000万台设备，实际上是诸如传感器和显示器这样无数不同的应用和辅助设备后，可以说树莓派不仅仅是取得了成功，它还成为了一种程序员最喜爱的嵌入式实验平台。像是Pi zero这样的产品也在成为创造硬件产品的平台，且不会引入设计、构建、为车载设备写软件等方面的风险和开销。 同样地，我也认同Redis是一个程序员乐于去冒险、实验、构建新事物的平台。而且，能用于嵌入式&#x2F;物联网应用的设备，通常">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2018-03-17T07:05:18.000Z">
-<meta property="article:modified_time" content="2020-08-23T09:14:20.608Z">
+<meta property="article:modified_time" content="2020-11-11T08:00:39.051Z">
 <meta property="article:author" content="Fu Zhe">
 <meta property="article:tag" content="Redis">
 <meta property="article:tag" content="Linux">
@@ -210,7 +210,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-23 17:14:20" itemprop="dateModified" datetime="2020-08-23T17:14:20+08:00">2020-08-23</time>
+                <time title="修改时间：2020-11-11 16:00:39" itemprop="dateModified" datetime="2020-11-11T16:00:39+08:00">2020-11-11</time>
               </span>
 
           
@@ -229,6 +229,8 @@
 <p>同样地，我也认同Redis是一个程序员乐于去冒险、实验、构建新事物的平台。而且，能用于嵌入式/物联网应用的设备，通常会有暂时或长期存储数据的需求，像是从传感器接收到的数据，需要在这台设备上运算的数据，或是要发往远程服务器的数据。Redis正在加入一种Stream数据类型，非常适合流式数据和时间序列存储，撰写本文时（2017年初）这个特性快要完成了，后续工作会在接下来几周内开始。Redis现存的数据结构，以及新增的Stream类型，以及它较小的内存使用，以及它即使在小型硬件（低功耗）上也能提供相当不错的性能，都让Redis看起来非常适合应用在树莓派，进而是其它小型ARM设备上。中间缺失的部分也很明显：在树莓派上把Redis跑起来。</p>
 <p>树莓派的一个很酷的特点就是，它的开发环境不像过去的嵌入式系统那样，它上面跑的就是正常的Linux，还包括各种Debian系的工具。简单地说在树莓派上适配Redis不算很困难。Linux程序移植到树莓派上最常见的问题就是性能或内存占用不匹配，但在Redis上这不是问题，因为它本身就被设计为：空实例只占用1MB内存，且查询请求会走内存，因此它足够快，也不会给闪存太高的压力，而且在需要持久化时，它只会用AOF（Append Only File）。但树莓派上用的是ARM处理器，意味着我们要小心处理未对齐的内存访问。</p>
 <p>本文会展示我为了让Redis能愉快地跑在树莓派上都做了什么，我会试着给出一个如何应对那些不能透明地处理非对齐内存访问的平台上（不像x86）的概述。</p>
+<a id="more"></a>
+
 <h1 id="关于ARM处理器"><a href="#关于ARM处理器" class="headerlink" title="关于ARM处理器"></a>关于ARM处理器</h1><p>将Redis移植到ARM的过程中，最有趣的事情就是，ARM处理器不太喜欢未对齐的内存访问。如果你一直在用高阶语言，你可能不太了解内存对齐。历史上许多处理器都不能读写地址不是字长整数倍的内存数据。所以如果字长是4字节（32位处理器下），你可以读写0x4、0x8等等地址的数据，但0x7就不行。如果你真这么做了，取决你的CPU和配置，有时程序会抛异常，有时是奇怪的行为。</p>
 <p>之后x86统治了世界，大家几乎忘了这件事（除非要用SSE指令时，不过这些指令也有不需要对齐的版本）。当然，一开始大家没有真的忘记这件事，因为x86处理器可以读写未对齐的内存而不出错，但会带来性能损失：跨字长边界的一次读写可能被拆成两次读写。但近期的x86优化将非对齐访问的性能损失降到了最低，几乎与对齐访问相当，现在非对齐访问对x86来说真的不是事儿了。</p>
 <p>直到ARMv5，ARM平台上非对齐访问还是会引发奇怪的非预期行为，文档是这么说的：“如果地址不是4的整数倍，LDR指令会返回一个旋转后的结果，而不是真的跨字长读取。通常这个结果不符合程序员的预期。”旋转当然不是程序员预期的。初代树莓派用的已经是ARMv6了，它能处理非对齐访问，当然会带来性能损失。但它在处理未对齐的多倍字长的指令时会抛异常，因总线错误而终止程序，或求助于内核（后面会详述）。这意味着Redis在树莓派上运行的时候不会马上挂掉，因为Redis大多数访问都恰好是一个字长。但随着时间推移，编译器产生了多倍字长的读写指令以加速运算，或是Redis自己也会试着读写未对齐的64位数据。理论程序会崩溃，当然Linux还能帮上点忙。</p>
@@ -397,14 +399,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">67</span>
+          <span class="site-state-item-count">68</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-count">42</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

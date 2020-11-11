@@ -44,12 +44,12 @@
   };
 </script>
 
-  <meta name="description" content="WiscKey: Separating Keys from Values in SSD-Conscious Storage WiscKey是一个基于LSM的KV存储引擎，特点是：针对SSD的顺序和随机读写都高效的特点，Key和Value分开存储以最小化IO放大效应。YCSB场景中它比LevelDB和RocksDB都快。 1 介绍目前的KV存储引擎中，对写性能要求比较高的大多数都采用了LSM，典型的">
+  <meta name="description" content="WiscKey: Separating Keys from Values in SSD-Conscious Storage WiscKey是一个基于LSM的KV存储引擎，特点是：针对SSD的顺序和随机读写都高效的特点，Key和Value分开存储以最小化IO放大效应。YCSB场景中它比LevelDB和RocksDB都快。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="WiscKey: Separating Keys from Values in SSD-Conscious Storage [读后整理]">
 <meta property="og:url" content="http://fuzhe1989.github.io/2017/05/19/translate-wisckey/index.html">
 <meta property="og:site_name" content="Fu Zhe&#39;s Blog">
-<meta property="og:description" content="WiscKey: Separating Keys from Values in SSD-Conscious Storage WiscKey是一个基于LSM的KV存储引擎，特点是：针对SSD的顺序和随机读写都高效的特点，Key和Value分开存储以最小化IO放大效应。YCSB场景中它比LevelDB和RocksDB都快。 1 介绍目前的KV存储引擎中，对写性能要求比较高的大多数都采用了LSM，典型的">
+<meta property="og:description" content="WiscKey: Separating Keys from Values in SSD-Conscious Storage WiscKey是一个基于LSM的KV存储引擎，特点是：针对SSD的顺序和随机读写都高效的特点，Key和Value分开存储以最小化IO放大效应。YCSB场景中它比LevelDB和RocksDB都快。">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/5b78ca83c52c5b4192e519e20157e27d.png">
 <meta property="og:image" content="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/4315680a5aa8255553f857246a736655.png">
@@ -68,7 +68,7 @@
 <meta property="og:image" content="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/46fc014b6942ad83064b245f7e873928.png">
 <meta property="og:image" content="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/3e2417f38b0b0e0d6d2c5166ee6dd2d0.png">
 <meta property="article:published_time" content="2017-05-19T02:03:07.000Z">
-<meta property="article:modified_time" content="2020-10-11T10:27:35.895Z">
+<meta property="article:modified_time" content="2020-11-11T08:01:34.085Z">
 <meta property="article:author" content="Fu Zhe">
 <meta property="article:tag" content="Database">
 <meta property="article:tag" content="KV">
@@ -227,7 +227,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-10-11 18:27:35" itemprop="dateModified" datetime="2020-10-11T18:27:35+08:00">2020-10-11</time>
+                <time title="修改时间：2020-11-11 16:01:34" itemprop="dateModified" datetime="2020-11-11T16:01:34+08:00">2020-11-11</time>
               </span>
 
           
@@ -243,6 +243,8 @@
       
         <p>WiscKey: Separating Keys from Values in SSD-Conscious Storage</p>
 <p>WiscKey是一个基于LSM的KV存储引擎，特点是：针对SSD的顺序和随机读写都高效的特点，Key和Value分开存储以最小化IO放大效应。YCSB场景中它比LevelDB和RocksDB都快。</p>
+<a id="more"></a>
+
 <h2 id="1-介绍"><a href="#1-介绍" class="headerlink" title="1 介绍"></a>1 介绍</h2><p>目前的KV存储引擎中，对写性能要求比较高的大多数都采用了LSM，典型的有BigTable/LevelDB/Cassandra/HBase/RocksDB/PNUTS/Riak。LSM相比其它索引树（如B树）的主要优势在于，它的写都是顺序写。B树在有少量修改时，都可能产生大量的随机写，不管是SSD还是SATA上都表现不佳。</p>
 <p>为了保证写性能，LSM会不停的批量把KV对写成文件；为了保证读性能，LSM还需要不停的做背景compaction，把这些文件合并成单个按Key有序的文件。这就导致了相同的数据在它的生命期中被反复读写。一个典型的LSM系统中数据的IO放大系数可以达到50倍以上。</p>
 <p>LSM的成功在于，它充分利用了SATA磁盘顺序IO性能远超随机IO的特点（100倍以上），只要IO放大不超过这个数字，那么用顺序IO来替代随机IO就是成功的。</p>
@@ -508,14 +510,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">67</span>
+          <span class="site-state-item-count">68</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-count">42</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

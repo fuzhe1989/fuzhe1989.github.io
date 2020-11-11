@@ -56,7 +56,7 @@
 <meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/supervision_tree.png">
 <meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/sentinel_nodes.png">
 <meta property="article:published_time" content="2018-05-17T15:35:06.000Z">
-<meta property="article:modified_time" content="2019-12-28T04:45:41.022Z">
+<meta property="article:modified_time" content="2020-11-11T07:59:37.342Z">
 <meta property="article:author" content="Fu Zhe">
 <meta property="article:tag" content="异步">
 <meta property="article:tag" content="并发">
@@ -219,7 +219,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+                <time title="修改时间：2020-11-11 15:59:37" itemprop="dateModified" datetime="2020-11-11T15:59:37+08:00">2020-11-11</time>
               </span>
 
           
@@ -239,6 +239,8 @@
 <p>本章我会描述actor模型的四个主要变体：经典actor模型、基于进程的actor模型、通信事件循环模型、以及活动对象模型。我会试着强调体现了这些模型的历史上和现代的语言，以及程序员需要注意的编程哲学和取舍，从而理解并最好的利用这些模型。</p>
 <p>尽管actor模型早在20世纪70年代就开始了，正如许多近期发表的论文和系统显示，它仍在发展，并被纳入到今天的编程语言中。有些健壮的工业级actor系统正被用于赋能大规模可伸缩分布式系统，例如Akka被用于服务PayPal的十亿级的事务，Erlang被用于为WhatsApp的上亿用户发送消息，而Orleans被用于服务Halo4的数百万玩家。围绕着监控、错误处理、actor生命周期管理，有许多不同方式去构建一个工业级的actor框架，后面会详述。</p>
 <p>对于我们介绍的actor模型，一个重点就在这个问题中：“为什么要传递消息，特别是为什么要用actor模型？”考虑到有那么多分布式编程模型，有人可能会问，为什么这个模型在最初提出时这么重要？为什么它促进了当今广泛使用的高级语言、系统和库？我们将在这一章看到，actor模型的一些最明显的优点包括了actor状态的隔离、可伸缩性、以及简化程序员对系统的推理难度。</p>
+<a id="more"></a>
+
 <h1 id="原始actor模型"><a href="#原始actor模型" class="headerlink" title="原始actor模型"></a>原始actor模型</h1><p>actor模型最早被1973年的“A Universal Modular ACTOR Formalism for Artificial Intelligence”引入，作为人工智能研究中的一种计算方法。它的最初目标是用一种能安全地跨工作站并发分布的通信方式来建模并行计算。这篇文章几乎没有假设实现细节，而是定义了一种高级消息传递通信模型。Gul Agha随后发展了这种模型，他专注于将actor作为并发面向对象编程的基础。这项工作收录在“Actors: A Model of Concurrent Computation in Distributed Systems”中。</p>
 <p>actor被定义为计算中的独立单元，相互状态隔离。这些单元有两种核心性质：</p>
 <ul>
@@ -571,14 +573,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">67</span>
+          <span class="site-state-item-count">68</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-count">42</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

@@ -176,6 +176,86 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/" class="post-title-link" itemprop="url">[笔记] Hive: a warehousing solution over a map-reduce framework</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-29 21:30:09" itemprop="dateCreated datePublished" datetime="2020-09-29T21:30:09+08:00">2020-09-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:59:08" itemprop="dateModified" datetime="2020-11-11T15:59:08+08:00">2020-11-11</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.303.2572&rep=rep1&type=pdf" target="_blank" rel="noopener">Hive: a warehousing solution over a map-reduce framework</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Hive在MapReduce模型上实现了支持类SQL查询的数据仓库，它的改进点主要为：</p>
+<ul>
+<li>自己维护了元数据，从而允许了其它的所有优化。</li>
+<li>数据在物理上切分为partition和bucket，避免了扫描全量数据。</li>
+<li>实现了各种operator，从而支持了大多数关系型操作。</li>
+</ul>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -199,10 +279,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-09-27 22:46:41 / 修改时间：22:46:26" itemprop="dateCreated datePublished" datetime="2020-09-27T22:46:41+08:00">2020-09-27</time>
+              <time title="创建时间：2020-09-27 22:46:41" itemprop="dateCreated datePublished" datetime="2020-09-27T22:46:41+08:00">2020-09-27</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:59:28" itemprop="dateModified" datetime="2020-11-11T15:59:28+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -220,45 +306,14 @@
 </blockquote>
 <h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章为MapReduce模型增加了一步Merge，增强了Join的能力。原理如图。</p>
 <p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-01.jpg" alt=""></p>
-<h2 id="Merge-Impementation"><a href="#Merge-Impementation" class="headerlink" title="Merge Impementation"></a>Merge Impementation</h2><p>merge动作会在所有reducer结束后启动。MapReduceMerge允许定制以下行为：</p>
-<ul>
-<li><p>Partition Selector。它的输入是左右两个数据源的reducer编号列表，输出是这个merger处理哪些reducer。</p>
-<p>  <img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-02.jpg" alt=""></p>
-</li>
-<li><p>Processor。它是在左右数据集上执行merge，可以用来实现hash-join等。它与Merger互斥。</p>
-</li>
-<li><p>Merger。它是逐条执行merge，输入是左右各一条记录，输出是join后的结果。</p>
-<p>  <img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-03.jpg" alt=""></p>
-</li>
-<li><p>Iterator。它可以定义在迭代过程中左右数据集上的iterator如何前进，从而实现不同的join。</p>
-<p>  <img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-04.jpg" alt=""><br>  <img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-05.jpg" alt=""><br>  <img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-06.jpg" alt=""></p>
-</li>
-</ul>
-<h2 id="Map-Reduce-Merge实现关系运算"><a href="#Map-Reduce-Merge实现关系运算" class="headerlink" title="Map-Reduce-Merge实现关系运算"></a>Map-Reduce-Merge实现关系运算</h2><ul>
-<li>Projection：只通过mapper即可。</li>
-<li>Aggregation：只通过reducer即可。</li>
-<li>Generalized Selection：mapper、reducer、merger都可以参与实现。如果selection只涉及源数据，只需要mapper；如果涉及aggregation后的结果，需要reducer；如果跨数据源，需要merger。</li>
-<li>Join：通过merger实现。</li>
-<li>Set Union：reducer负责去重，merger负责将来自两个源的有序数据组合起来。</li>
-<li>Set Difference：类似于set union。</li>
-<li>Cartesian Product：每个merger处理一个左源的reducer和所有右源的reducer。</li>
-</ul>
-<h2 id="Map-Reduce-Merge实现Join"><a href="#Map-Reduce-Merge实现Join" class="headerlink" title="Map-Reduce-Merge实现Join"></a>Map-Reduce-Merge实现Join</h2><h3 id="Sort-Merge-Join"><a href="#Sort-Merge-Join" class="headerlink" title="Sort-Merge Join"></a>Sort-Merge Join</h3><ul>
-<li>Map：根据range切分源数据，交给reducer。</li>
-<li>Reduce：排序。</li>
-<li>Merge：从左右选取覆盖相同key range的reducer进行一次遍历。</li>
-</ul>
-<h3 id="Hash-Join"><a href="#Hash-Join" class="headerlink" title="Hash Join"></a>Hash Join</h3><ul>
-<li>Map：根据hash value切分源数据。</li>
-<li>Reduce：将数据根据hase value聚合起来。</li>
-<li>Merger：使用Processor，本地构建一个hash table。</li>
-</ul>
-<h3 id="Block-Nested-Loop-Join"><a href="#Block-Nested-Loop-Join" class="headerlink" title="Block Nested-Loop Join"></a>Block Nested-Loop Join</h3><ul>
-<li>Map：与hash join相同。</li>
-<li>Reduce：与hash join相同。</li>
-<li>Merge：与hash join相同，但已默认实现。</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -300,10 +355,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-09-23 16:54:37 / 修改时间：16:55:06" itemprop="dateCreated datePublished" datetime="2020-09-23T16:54:37+08:00">2020-09-23</time>
+              <time title="创建时间：2020-09-23 16:54:37" itemprop="dateCreated datePublished" datetime="2020-09-23T16:54:37+08:00">2020-09-23</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:57:20" itemprop="dateModified" datetime="2020-11-11T15:57:20+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -320,33 +381,14 @@
 <p>原文：<a href="http://www.cl.cam.ac.uk/~ey204/teaching/ACS/R212_2014_2015/papers/lakshman_ladis_2009.pdf" target="_blank" rel="noopener">Cassandra: a decentralized structured storage system</a></p>
 <p>可以参考<a href="https://static.last.fm/johan/nosql-20090611/cassandra_nosql.pdf" target="_blank" rel="noopener">Cassandra: structured storage system on a P2P network</a>加深理解。</p>
 </blockquote>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Cassandra的目标是：</p>
-<ul>
-<li>伸缩性，集群能承载的吞吐随着规模线性增加。</li>
-<li>容错性，大规模集群出错是常态。</li>
-<li>可用性，即使出现网络分区，也要能提供服务（类似于Dynamo）。</li>
-<li>跨机房数据复制。</li>
-<li>高写入吞吐。</li>
-</ul>
-<p>Cassandra的目标应用是Facebook的Inbox搜索，具有写入压力大、跨地域、不需要强一致等特点。</p>
-<h2 id="Data-Model"><a href="#Data-Model" class="headerlink" title="Data Model"></a>Data Model</h2><p>Cassandra的数据模型类似于BigTable，也是<code>&lt;rowkey, column, timestamp&gt;</code>，ColumnFamily和SuperColumn的叫法不同，但其实是一样的。</p>
-<blockquote>
-<p>后续版本中SuperColumn已经没有了，叫法不同，没有根本变化。</p>
-</blockquote>
-<h2 id="System-Architecture"><a href="#System-Architecture" class="headerlink" title="System Architecture"></a>System Architecture</h2><p>Cassandra在节点间的机制上类似于Dynamo，同样去中心化、使用一致性hash、使用gossip协议来传播成员列表、读写使用quorum协议。在节点内的存储上类似于BigTable，同样使用了WAL、MemTable、Compaction。</p>
-<h3 id="Partitioning"><a href="#Partitioning" class="headerlink" title="Partitioning"></a>Partitioning</h3><p>Cassandra使用了保序的一致性hash算法。</p>
-<p>为了解决原始的一致性hash分布不均匀的问题，Dynamo为每个node分配了多个virtual node，而Cassandra则是根据负载情况微调（参考Chord），原因是简单。</p>
-<blockquote>
-<p>后续版本中Cassandra也使用了virtual node。</p>
-</blockquote>
-<h3 id="Replication"><a href="#Replication" class="headerlink" title="Replication"></a>Replication</h3><p>Cassandra中每个key会有一个对应的coordinator node来管理，除此之外还需要选择N-1个node用于replication。选择的策略有很多种，可以考虑rack或datacenter。Cassandra会使用ZooKeeper选出一个leader来管理这些信息。</p>
-<h3 id="Membership"><a href="#Membership" class="headerlink" title="Membership"></a>Membership</h3><p>Cassandra使用了<a href="https://dspace.jaist.ac.jp/dspace/bitstream/10119/4784/1/IS-RR-2004-010.pdf" target="_blank" rel="noopener">The ϕ Accrual Failure Detector</a>方法来检测哪些node有问题。它也是基于gossip协议的，每T秒每个node会选择另一个node通信，然后更新本地的统计数据，并通过gossip协议与其它node交换。</p>
-<p>Accrual Failure Detector的特别之处在于它是基于概率的，ϕ为1表示判断出错概率为10%，2表示出错概率为1%，3表示出错概率为0.1%。当阈值设置为5时，Cassandra可以在10-15秒内检测到错误。</p>
-<h3 id="Bootstrapping"><a href="#Bootstrapping" class="headerlink" title="Bootstrapping"></a>Bootstrapping</h3><p>node首次启动时，会在环上随机找个位置，并持久化到本地和ZooKeeper上，随后通过gossip将自身的存在传播到整个集群。一个集群最初会有若干个contact points，称为seeds，保存在配置文件中或ZooKeeper上，这是node首选的位置。</p>
-<h3 id="Scaling-the-Cluster"><a href="#Scaling-the-Cluster" class="headerlink" title="Scaling the Cluster"></a>Scaling the Cluster</h3><p>新node会分走已有node负责的部分数据，这部分数据会通过kernel-kernel复制，未来可能考虑同时从多个replica并行传输以提高速度。</p>
-<h3 id="Local-Persistence"><a href="#Local-Persistence" class="headerlink" title="Local Persistence"></a>Local Persistence</h3><p>这部分Cassandra与BigTable非常类似，Cassandra会在内存中维护一些索引以加速查询。</p>
-<h3 id="Implementation-Details"><a href="#Implementation-Details" class="headerlink" title="Implementation Details"></a>Implementation Details</h3><p>Cassandra在读写上使用quorum协议，写入可以选择同步写或异步写。写失败和读的时候都可能触发repair。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/23/cassandra-a-decentralized-structured-storage-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -388,10 +430,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-09-22 18:46:25 / 修改时间：18:46:22" itemprop="dateCreated datePublished" datetime="2020-09-22T18:46:25+08:00">2020-09-22</time>
+              <time title="创建时间：2020-09-22 18:46:25" itemprop="dateCreated datePublished" datetime="2020-09-22T18:46:25+08:00">2020-09-22</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:58:41" itemprop="dateModified" datetime="2020-11-11T15:58:41+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -413,62 +461,14 @@
 <li>并行执行架构。</li>
 </ul>
 <p>能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。</p>
-<h2 id="列式存储"><a href="#列式存储" class="headerlink" title="列式存储"></a>列式存储</h2><h3 id="Repetion-Level和Definition-Level"><a href="#Repetion-Level和Definition-Level" class="headerlink" title="Repetion Level和Definition Level"></a>Repetion Level和Definition Level</h3><p>以下面这个proto为例。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">message Document &#123;</span><br><span class="line">    required int64 DocId;</span><br><span class="line">    optional group Links &#123;</span><br><span class="line">        repeated int64 Backward;</span><br><span class="line">        repeated int64 Forward;</span><br><span class="line">    &#125;</span><br><span class="line">    repeated group Name &#123;</span><br><span class="line">        repeated group Language &#123;</span><br><span class="line">            required string Code;</span><br><span class="line">            optional string Country;</span><br><span class="line">        &#125;</span><br><span class="line">        optional string Url;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>Dremel会存储以下列：</p>
-<ul>
-<li><code>DocId</code></li>
-<li><code>Links.Backward</code></li>
-<li><code>Links.Forward</code></li>
-<li><code>Name.Language.Code</code></li>
-<li><code>Name.Language.Country</code></li>
-<li><code>Name.Url</code></li>
-</ul>
-<p>不同记录的相同列会存储在一起。</p>
-<p>问题是如何用这些列来还原这些记录呢？考虑到<code>optional</code>和<code>repeated</code>字段，我们需要能分辨：</p>
-<ul>
-<li>前后两个<code>Links.Forward</code>属于一条记录还是两条记录。</li>
-<li>前后两个<code>Name.Language.Country</code>属于一条记录的一个<code>Name</code>还是两个<code>Name</code>还是两条记录。</li>
-</ul>
-<p>光靠列值自身是没办法做到的。</p>
-<p>Dremel引入了两个概念：Definition Level（DL）和Repetition Level（RL）。</p>
-<p>DL指，一个路径上有多少个<code>optional</code>或<code>repeated</code>字段被定义了，如<code>DocId</code>的DL为0，<code>Links.Backward</code>的DL为1，<code>Name.Language.Country</code>的DL为3。</p>
-<p>RL指，一个值是在它的路径的第几个<code>repeated</code>字段上在重复。这里的重复的范围是一条记录内，每条记录的这列的第一个值的RL总是0。以<code>Name.Language.Country</code>为例：</p>
-<ul>
-<li>如果RL为0，表示它与上一个值是跨记录的。如果上一个值属于当前记录，则要新开始一个记录。</li>
-<li>如果RL为1，表示它与上一个值是跨<code>Name</code>的。</li>
-<li>如果RL为2，表示它与上一个值是跨<code>Name.Language</code>的。</li>
-</ul>
-<p>如果某一层级下，一个<code>optional</code>或<code>repeated</code>字段未定义，但有和它平级的其它字段定义了，为了避免混淆，我们要插入一个<code>NULL</code>。这个<code>NULL</code>也是有DL和RL的。</p>
-<p>实际存储中：</p>
-<ul>
-<li>不需要显式存储<code>NULL</code>，只要DL小于字段的深度，就是<code>NULL</code>。</li>
-<li>DL总为0的字段不存储DL。</li>
-<li>RL也只在需要时存储，如DL为0隐含RL为0，则RL也不需要保存。</li>
-<li>DL和RL按实际使用的位数保存。</li>
-</ul>
-<p>同一列非<code>NULL</code>的值的DL都是相同的，但<code>NULL</code>的DL值可能不同，由此我们可以知道这个<code>NULL</code>来自哪一层。</p>
-<h3 id="反序列化"><a href="#反序列化" class="headerlink" title="反序列化"></a>反序列化</h3><p>Dremel会根据查询条件构建一个有限状态机（FSM），每个查询需要的列是一个状态，根据RL转换状态。</p>
-<h2 id="查询"><a href="#查询" class="headerlink" title="查询"></a>查询</h2><p>Dremel有一个RootServer来接收client请求，读取对应表的元数据，再将查询下发给中间节点，直到叶子节点执行。叶子节点会去扫描保存为tablet的列存数据。Dremel允许client指定只扫描完一定比例的tablet就返回，如98%，经常可以显著降低延时。</p>
-<p>Dremel的一些算子（如Top-K或Count-Distinct）使用了近似算法。</p>
-<p>Dremel有QueryDispatcher来分配节点，它还可以检测慢节点并重新分配交给慢节点执行的查询。</p>
-<h2 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h2><p>本地磁盘：</p>
-<ul>
-<li>只需要读很少的列的时候，列存的读取性能高于行存一个数量级。</li>
-<li>组装记录和解析非常耗费性能，分别导致处理时间加倍。（和C-Store的延迟物化结论一样）</li>
-<li>通常在读取数十列以上时列存的处理时间和行存差不多了，但不同数据集差异非常大，且列存不一定需要组装记录。</li>
-</ul>
-<p>MR和Dremel：</p>
-<ul>
-<li>MR将行存换成列存，性能提升了接近一个数量级。</li>
-<li>将MR换成Dremel，性能提升了两个数量级。</li>
-</ul>
-<p>树状执行结构：</p>
-<ul>
-<li>大量聚合场景多层节点的优势非常明显（每一层做部分聚合，避免串行处理太多下游节点的响应）。</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -510,10 +510,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-09-21 16:08:09 / 修改时间：16:08:32" itemprop="dateCreated datePublished" datetime="2020-09-21T16:08:09+08:00">2020-09-21</time>
+              <time title="创建时间：2020-09-21 16:08:09" itemprop="dateCreated datePublished" datetime="2020-09-21T16:08:09+08:00">2020-09-21</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:58:58" itemprop="dateModified" datetime="2020-11-11T15:58:58+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -538,36 +544,14 @@
 </ul>
 <p>结论：结合“A comparison of approaches to large-scale data analysis”的性能测试结果，HadoopDB相比Hadoop的分析性能好了一些，仍然达不到并行DBMS的水平，但验证了这个方向是有意义的。</p>
 <p>HadoopDB将Hive中对数据源的scan换成了单节点PostgreSQL的查询，但仍然是传输数据而不是传输逻辑，且还是要物化中间结果，这些提高了容错性，但显著降低了性能。</p>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>作者观察到的趋势：</p>
-<ul>
-<li>大规模分析的市场越来越大。</li>
-<li>shared-nothing架构因为其伸缩性，特别适合实现大型分析系统。</li>
-<li>典型分析workload的特点（大量scan、多维度聚合、星型join）也非常容易在shared-nothing系统中并行执行。</li>
-</ul>
-<p>但现在的并行DBMS的伸缩性并不好，节点数达到百级别就有点困难了，原因是：</p>
-<ul>
-<li>大规模系统的错误是常态，而并行DBMS的设计假设了错误很罕见。</li>
-<li>并行DBMS通常假设机器是同构的，而实际的大规模系统很难保证这一点。</li>
-<li>大规模系统的需求直到最近才多起来，因此大规模的并行DBMS没有得到过充分的测试，难以预料还有什么工程上的障碍。</li>
-</ul>
-<p>MapReduce可以支持非常高的规模，但它缺乏许多对结构化数据分析非常有用的特性，MR模型也不适合那种一次加载后多次处理的场景。</p>
-<p>HadoopDB就是要结合MapReduce和并行DBMS，用MapReduce作为通信层，将SQL翻译为MapReduce任务，尽可能多地下发查询给DBMS节点执行。</p>
-<p>HadoopDB的目标是尽可能地利用已有的开源资源，用Hadoop+PostgreSQL来实现。</p>
-<h2 id="HadoopDB的实现"><a href="#HadoopDB的实现" class="headerlink" title="HadoopDB的实现"></a>HadoopDB的实现</h2><p>HadoopDB提供了以下四个组件：</p>
-<ol>
-<li>DB Connector，允许TaskTracker访问DBMS。</li>
-<li>Catalog，维护DB的元数据。</li>
-<li>Data Loader，用于全局和本地的数据分区、加载数据到DBMS。它有global hasher和local hasher，前者用于将数据分为HDFS上的若干个文件，后者用于将HDFS的一个文件分区到本地文件系统中。通过两层分区，HadoopDB保证了每个chunk大小均匀，从而得到更好的负载均衡性。</li>
-<li>SQL to MapReduce to SQL Planner（SMS），将SQL转为MR任务，再将各个MR子任务转回SQL。SMS扩展自Hive。相比Hive，SMS可以利用collocation、相同partition key等信息下推尽可能多的信息到DBMS中，即Hive的scan加上filter、group by、join等操作，在SMS中可以结合到一个operator中完成。对于跨DBMS的操作，SMS看起来要走和Hive相同的operator，与底下的DBMS就没有关系了。</li>
-</ol>
-<h2 id="性能指标"><a href="#性能指标" class="headerlink" title="性能指标"></a>性能指标</h2><p>在加载阶段，HadoopDB的性能更接近于DBMS-X，相比Hadoop慢了很多。</p>
-<p>Grep任务中HadoopDB只比Hadoop略快一点点，原因是这个任务以扫描为主，HadoopDB只是省掉了实时的解析开销。</p>
-<p>Selection任务中，HadoopDB默认会将Rankings和UserVisits表一起分区，导致Rankings表被分成了20个只有50MB的chunk，20个map任务的调度开销显著降低了HadoopDB的性能。如果不分区Rankings表，HadoopDB可以利用它在pageRank列上的索引，显著提升了性能（超过了DBMS-X）。</p>
-<p>Aggregation任务中，在聚合度较高时，Hive使用了hash聚合，相比原生Hadoop性能提升了非常多；在聚合高较低时，Hive转而使用了基于sort的聚合策略，这就与原生Hadoop相同了，且Hive在保存中间结果时有额外开销，此时它的整体性能还差于原生Hadoop。PostgreSQL在两种场景下都使用了hash聚合，因此HadoopDB的性能超过了Hadoop。</p>
-<p>Join任务中，HadoopDB得益于使用索引和内建支持join，性能远高于Hadoop，接近于两种DBMS（差距仍然明显）。</p>
-<p>UDF任务中，几个系统的性能差不多。</p>
-<h2 id="容错性"><a href="#容错性" class="headerlink" title="容错性"></a>容错性</h2><p>文章测试了各个系统的正常执行时间，以及单错误节点、单慢节点时的执行时间，HadoopDB的容错性确实比DBMS要好很多。尴尬的是就算在有错误或慢节点时，DBMS的执行时间仍然远低于HadoopDB和Hadoop。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -617,7 +601,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-09-27 22:45:45" itemprop="dateModified" datetime="2020-09-27T22:45:45+08:00">2020-09-27</time>
+                <time title="修改时间：2020-11-11 15:55:42" itemprop="dateModified" datetime="2020-11-11T15:55:42+08:00">2020-11-11</time>
               </span>
 
           
@@ -647,44 +631,14 @@
 <li>灵活性差，难以处理非关系型数据。</li>
 </ul>
 <p>但本文指出，并行DBMS可以用更少的节点完成同样的任务，因此它不一定需要MapReduce那么强的容错能力。</p>
-<h2 id="并行DBMS"><a href="#并行DBMS" class="headerlink" title="并行DBMS"></a>并行DBMS</h2><p>并行DBMS可以并行处理的两个关键点：</p>
-<ol>
-<li>大多数表分片由多个节点服务。</li>
-<li>SQL优化器可以生成跨节点的查询计划。</li>
-</ol>
-<p>如果filter涉及了partition key，或者两个表join的key恰好是各自的partition key，则查询计划涉及的节点数会大大减少。</p>
-<p>join中的一张非常小的表可以冗余分布在多个节点上。如果join双方都比较大，则可以将其中一张表的数据hash后加载到另一张表涉及的节点上。</p>
-<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><ul>
-<li>schema：MapReduce看似不需要schema，很多人认为这是它的优点。但当MapReduce的输出会被多个应用共享时，它仍然需要一个schema，这个schema要放到一个大家都能看得到的地方，与数据分离。而且不同于DBMS，每个应用要自己操心如何管理维护schema。</li>
-<li>index：简单的MapReduce任务不需要index，但在需要的时候，每个开发者都要自己写一遍。</li>
-<li>编程模型：SQL模型比MR更高级，不需要开发者手写很低级的逻辑，因此MR社区又在MR模型之上引入了一些更高级的模型。</li>
-<li>数据分发：大规模DB的经验是将计算发送到数据端，而不是反过来。并行DBMS可以利用已有的统计数据，生成最优化的查询计划，最小化需要传输的数据量。而MR需要手写来实现。</li>
-<li>执行策略：MR的一大隐患是Map和Reduce任务间的数据流是M*N的，一旦任务数非常多的时候，会生成非常多的小文件。并行DBMS不会物化split文件，且用push而不是pull模式来传输数据。</li>
-<li>灵活性：MR显然是更灵活的，但DBMS通过UDF、存储过程、自定义聚合函数等特性也弥补了不少的差距。</li>
-<li>容错性：MR可以重试出错的子任务，而通常并行DBMS在某个子query失败时会令整个query失败。</li>
-</ul>
-<h2 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h2><p>文章关注了两个阶段的性能：数据加载、执行。</p>
-<p>无论是哪类任务，数据加载阶段MapReduce有着非常明显的优势，符合预期。</p>
-<p>执行阶段，两种DBMS都明显比MapReduce快。</p>
-<p>Hadoop在启动阶段耗费了10-25秒，严重影响了小数据集场景的性能。随着任务数增多，调度器的延时也在增加。</p>
-<p>Grep任务中，MR一半的时间花在了合并各个reducer的输出上了。当数据量增大时，Vertica相比DBMS-X的优势体现出来了，这主要归功于Vertica激进的压缩策略。</p>
-<p>Selection任务中，两种DBMS仍然明显快于MR，除了上述因素，新的差异在于DBMS有index，而MR没有。Vertica在这个场景中性能超过了DBMS-X一个数量级。但Vertica在节点增多后性能下降得非常厉害，原因是大量节点间的通信打爆了整个系统。这可能是因为Vertica使用了可靠的通信协议，带来了额外的开销。</p>
-<p>Aggregation任务中，两种DBMS仍然明显快于MR。Vertica在group非常多时性能相比DBMS-X没有优势，但在group较少时需要传输的数据量变少，它在扫描上的性能优势就体现出来了。</p>
-<p>Join任务中，两种DBMS的性能比MR好上两个数量级，有两方面原因：</p>
-<ol>
-<li>MR需要扫描所有数据，而DBMS可以利用index只读部分数据。另外MR读出数据还要再解析，而DBMS在加载时已经做完了这部分工作。</li>
-<li>DBMS可以利用join key就是join双方的partition key的特点，直接在各个节点本地join。</li>
-</ol>
-<p>UDF聚合任务中，三种系统的性能终于差不多了。DBMS需要per row调用UDF，UDF还会访问DB以外的文件，这显著增加了开销。</p>
-<h2 id="其它讨论"><a href="#其它讨论" class="headerlink" title="其它讨论"></a>其它讨论</h2><ul>
-<li>DBMS明显比MR更难部署。</li>
-<li>相比于DBMS，Hadoop的任务都是冷启动的，但这不是MR模型本身要求的。假如，如果允许重用JVM的话上述测试结果可以提升10%-15%。</li>
-<li>HDFS支持块级别和记录级别的压缩，但测试结果显示压缩没有提升，甚至可能降低了性能。Vertica的压缩很激进，当I/O为瓶颈时用一部分CPU换取I/O是值得的，也有比较好的效果。</li>
-<li>Hadoop相比DBMS更耗费CPU，原因是它需要解析和反序列化数据。</li>
-<li>DBMS在生成查询计划后，就只在必要时传输数据了，也不需要传输控制消息，这两点都可以明显降低开销。</li>
-<li>MR的上手难度非常低，但对于长期的任务，它的隐式成本就会体现出来（MR模型的表达能力、schema的管理等）。</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -734,7 +688,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-09-17 21:40:36" itemprop="dateModified" datetime="2020-09-17T21:40:36+08:00">2020-09-17</time>
+                <time title="修改时间：2020-11-11 16:01:10" itemprop="dateModified" datetime="2020-11-11T16:01:10+08:00">2020-11-11</time>
               </span>
 
           
@@ -757,131 +711,14 @@
 <li>文件普遍非常大，达到GB级别以上，要重新审视对I/O操作和块大小的预期。</li>
 <li>文件的追加写远多于覆盖写。</li>
 </ul>
-<h2 id="Design-Overview"><a href="#Design-Overview" class="headerlink" title="Design Overview"></a>Design Overview</h2><h3 id="Assumptions"><a href="#Assumptions" class="headerlink" title="Assumptions"></a>Assumptions</h3><ul>
-<li>整个系统由廉价易坏的硬件组成。</li>
-<li>典型文件大小在100MB以上。支持小文件但不做特殊优化。</li>
-<li>主要有两种读模式，大块顺序读和小块随机读。应用也可以自行将多个随机读排序转化为一次顺序读。</li>
-<li>要支持高效的并发追加写同一个文件。</li>
-<li>高吞吐优先于低延时。</li>
-</ul>
-<h3 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h3><p>一个GFS集群由单master和若干个chunkserver组成。文件由固定大小的chunk组成。</p>
-<p>master负责维护：</p>
-<ul>
-<li>所有metadata，包括namespace、ACL、file到chunk的映射、chunk当前所在的chunkserver。</li>
-<li>全局动作，包括chunk的lease管理和chunk的迁移。</li>
-</ul>
-<p>client的数据读写都直接与chunkserver通信，只在需要metadata时才与master通信。</p>
-<p>client和chunkserver都不缓存数据，前者不需要，后者通过Linux的page cache就可以达到目的了。</p>
-<h3 id="Single-Master"><a href="#Single-Master" class="headerlink" title="Single Master"></a>Single Master</h3><p>单master极大简化了设计，但要非常小心地避免它成为读写路径的瓶颈。client只在第一次访问一个chunk时找master要它的位置，之后会缓存这一信息，直接与对应的chunkserver通信完成读写。</p>
-<h3 id="Chunk-Size"><a href="#Chunk-Size" class="headerlink" title="Chunk Size"></a>Chunk Size</h3><p>GFS的chunk size默认为64MB，远大于传统文件系统的block size。大的chunk size的好处：</p>
-<ul>
-<li>减少了client与master的通信次数。</li>
-<li>client一次在大chunk上完成的操作数会更多，减少了每次与chunkserver建立TCP连接的开销。</li>
-<li>减少了master要维护的metadata。</li>
-</ul>
-<p>但大chunk使小文件经常只有非常少量的chunk，容易成为热点。一个场景是应用先写入一个单chunk的文件，之后大量job同时读取这个文件。解法是给这个文件分配更多的replica，同时应用端在job启动时加一个随机的延迟。</p>
-<h3 id="Metadata"><a href="#Metadata" class="headerlink" title="Metadata"></a>Metadata</h3><p>metadata主要为两类：</p>
-<ul>
-<li>namespace和file-chunk映射，修改会记录在operation log中。</li>
-<li>chunk的位置，不持久化，master启动时和有chunkserver加入时，master主动访问chunkserver得到。</li>
-</ul>
-<h4 id="In-Memory-Data-Structures"><a href="#In-Memory-Data-Structures" class="headerlink" title="In-Memory Data Structures"></a>In-Memory Data Structures</h4><p>master管理的所有metadata都常驻内存，好处略。隐患是chunk太多的话master的内存可能成问题（注：pangu1的常见问题），但相比而言给master机器加内存还是比较容易的。</p>
-<h4 id="Chunk-Locations"><a href="#Chunk-Locations" class="headerlink" title="Chunk Locations"></a>Chunk Locations</h4><p>master通过与chunkserver的心跳获得chunk位置，而不持久化这些信息，原因是：</p>
-<ul>
-<li>持久化的话就要保持master与chunkserver关于chunk位置的一致，考虑到chunkserver的扩缩容、failover、改名等情况，比较复杂。</li>
-<li>chunkserver才拥有chunk位置的最终话语权，比如chunk损坏了等。</li>
-</ul>
-<h4 id="Operation-Log"><a href="#Operation-Log" class="headerlink" title="Operation Log"></a>Operation Log</h4><p>operation log不仅记录事件，还充当一个逻辑时钟。</p>
-<p>checkpoint文件本身组织为B-tree，可以直接mmap到内存中访问。</p>
-<h3 id="Consistency-Model"><a href="#Consistency-Model" class="headerlink" title="Consistency Model"></a>Consistency Model</h3><h4 id="Guarantees-by-GFS"><a href="#Guarantees-by-GFS" class="headerlink" title="Guarantees by GFS"></a>Guarantees by GFS</h4><p>一个文件区域在被修改后，如果所有client从无论哪个replica总是看到相同的状态，称其为一致的；如果不光是一致的，client知道修改后的状态，称其为确定的。</p>
-<p>成功的串行修改总是确定的，成功的并行修改是一致但不确定的，失败的修改是不一致的。</p>
-<p>一次成功的追加写至少会写入一份数据，并返回确定区域的offset。</p>
-<p>GFS通过两点保证多次成功的修改后，被修改的文件区域是确定的，包含最后一次写入的内容：</p>
-<ul>
-<li>所有replica应用相同的修改顺序。</li>
-<li>使用chunk version来标识哪些replica已过期。</li>
-</ul>
-<p>过期的repilca不会参与后续的读写，后面会被gc掉。</p>
-<p>在client的chunk位置的cache过期前，有一个小的时间窗口client可能读到过期数据。但因为过期的replica通常都提前结束了，client会与master通信，从而获取到最新的chunk位置。</p>
-<p>master会在chunk有replica损坏或过期后尽快恢复出一个新的replica，除非非常短时间内所有replica都损坏了，此时数据也只是丢失，而不是写坏了，应用可以得到确定的异常，而不是错误的数据。</p>
-<h4 id="Implications-for-Applications"><a href="#Implications-for-Applications" class="headerlink" title="Implications for Applications"></a>Implications for Applications</h4><ul>
-<li>依赖追加写而不是覆盖写，从而可以只用checkpoint就知道哪块文件区域是确定的。</li>
-<li>记录应用自己的checkpoint，读的时候只读到最新的checkpoint，避免读到那些GFS认为成功写入但应用认为没有的区域。</li>
-<li>数据要能自检验、自识别，能知道哪些记录是无效的或重复的。</li>
-</ul>
-<h2 id="System-Interactions"><a href="#System-Interactions" class="headerlink" title="System Interactions"></a>System Interactions</h2><h3 id="Leases-and-Mutation-Order"><a href="#Leases-and-Mutation-Order" class="headerlink" title="Leases and Mutation Order"></a>Leases and Mutation Order</h3><p>master会为每个chunk挑选一个primary，primary负责决定这个chunk的所有修改的顺序。</p>
-<p>master与primary chunk间的lease默认为60s，但master可以提前结束lease（如禁止修改改名中的文件）。假设master与primary chunk断开了，它可以在当前lease过期后再挑选新的primary。</p>
-<p>client执行一次修改操作的过程（类似于2PC）：</p>
-<ol>
-<li>client找master要chunk对应的replica，此时如果这个chunk没有primary，master会临时授予一个。</li>
-<li>client将数据推给所有replica，不需要考虑顺序。chunkserver会将这些数据缓存在LRU队列中（如果过期了后续会导致请求失败）。</li>
-<li>client向primary发送写请求，primary为所有它收到还未处理的数据分配sequence number，并在本地执行修改。</li>
-<li>primary将写请求转发给所有replica，每个replica按相同顺序执行这些写请求。</li>
-<li>secondary回复primary。</li>
-<li>primary回复client。</li>
-</ol>
-<p>任何replica的失败都会使写请求失败，文件的对应区域此时是不一致的。GFS的client默认会重试请求（如何处理留下来的不一致区域？）。</p>
-<p>如果一次写跨chunk，GFS会将其分为多次写，可能导致并发写的数据交织在一起（追加写）或相互覆盖（覆盖写），即一致但未定义。</p>
-<h3 id="Data-Flow"><a href="#Data-Flow" class="headerlink" title="Data Flow"></a>Data Flow</h3><p>为了充分利用整个集群的网络带宽，数据在不同chunkserver间是串行传输的，每个chunkserver会把数据发送给离自己最近的还没收到数据的chunkserver。这里距离是直接用IP地址计算出来的。</p>
-<h3 id="Atomic-Record-Appends"><a href="#Atomic-Record-Appends" class="headerlink" title="Atomic Record Appends"></a>Atomic Record Appends</h3><p>primary接收到一个atomic append请求时，它先判断当前chunk是否有足够空间，如果没有的话，它会先补全当前chunk，再返回client一个可重试的错误。否则primary先在本地追加，再告诉secondary具体的offset，最后回复client。</p>
-<p>如果任一replica写失败，整个请求就失败了，client重试可能导致不同repilca不完全一致：每个replica上可能写了一次或多次或不完整的记录。GFS不保证每个replica完全一致，它只保证数据至少被原子写入一次。成功的请求表明数据一定在所有replica上写到了相同的offset上；每个replica的数据长度都至少等于这条记录的结束位置，因此任何后续的记录都会写到更高的offset或新chunk上（不会覆盖老数据）。追加写保证会得到确定（因此一致）的结果，而交替的覆盖写则是不一致（因此不确定）的。</p>
-<h3 id="Snapshot"><a href="#Snapshot" class="headerlink" title="Snapshot"></a>Snapshot</h3><p>master收到snapshot请求时，先取消所有涉及到的chunk的lease，保证后续写请求都必须先与master通信。之后master将snapshot记入opeartion log，再复制源文件或文件树的metadata。新创建出来的snapshot文件指向与源文件相同的chunk。</p>
-<p>client后续要写snapshot过的chunk C时，它会先找master，master发现C有多个引用，于是要求所有持有C的replica的chunkserver复制出一个C’，再为C’挑选一个primary，此后的流程与正常写相同。</p>
-<h2 id="Master-Operation"><a href="#Master-Operation" class="headerlink" title="Master Operation"></a>Master Operation</h2><h3 id="Namespace-Management-and-Locking"><a href="#Namespace-Management-and-Locking" class="headerlink" title="Namespace Management and Locking"></a>Namespace Management and Locking</h3><p>GFS没有使用树形结构来维护namespace，而是将所有namespace保存在一个表中，每条记录的key就是完整path，如”/d1/d2/…/dn/leaf”对应着”/d1”、”/d1/d2”、”/d1/d2/…/dn/leaf”等一系列key。每条记录对应一个读写锁，在访问一个路径时，要持有它的所有前缀记录的读锁。文件创建不需要持有前缀记录的写锁，只要读锁就足够保证前缀记录不被删除了。</p>
-<p>这一性质的一大优点是它允许在同一目录内并发地修改。</p>
-<h3 id="Replica-Placement"><a href="#Replica-Placement" class="headerlink" title="Replica Placement"></a>Replica Placement</h3><p>chunk的replica位置服务于两个目的：</p>
-<ul>
-<li>最大化数据可靠性和可用性；</li>
-<li>最大化网络带宽利用率。</li>
-</ul>
-<p>因此要将replica分布于不同rack的机器上，从而避免某个rack出问题导致整个chunk数据丢失，也有利于读的时候充分利用整个rack的网络带宽。代价就是写的时候数据要流经多个rack。</p>
-<h3 id="Creation-Re-replication-Rebalancing"><a href="#Creation-Re-replication-Rebalancing" class="headerlink" title="Creation, Re-replication, Rebalancing"></a>Creation, Re-replication, Rebalancing</h3><p>新创建chunk时位置选择的考虑：</p>
-<ul>
-<li>磁盘空闲的chunkserver优先；</li>
-<li>控制每个chunkserver上新创建的chunk不要太多，避免后续流量集中在这个chunkserver上；</li>
-<li>分散在不同rack上。</li>
-</ul>
-<p>一旦master发现某个chunk的replica少了，就会触发re-replication。它的优先级是看replica少了几份，chunk是否活跃，以及是否阻塞了client的请求。</p>
-<p>master定期会做rebalance，但不会直接填满新加入的chunkserver，而是渐进式的。</p>
-<h3 id="Garbage-Collection"><a href="#Garbage-Collection" class="headerlink" title="Garbage Collection"></a>Garbage Collection</h3><p>文件被删除时，master先记录到operation log中，再将文件rename为一个名字包含删除时间戳的隐藏文件。之后master会定期扫描这些文件，删除超过若干天的就被真正删除掉。master给chunkserver的心跳回复中会包含chunkserver持有的哪些chunk需要被删除。</p>
-<p>通过这种异步的、基于状态对比的、批量通知的方式，GFS的回收可以处理多种情况造成的垃圾，简化了流程，也平摊了开销，缺点就是回收延迟比较大。补救措施是，隐藏文件被删除时会立即执行删除、用户可以指定强制删除、用户可以指定某个路径下的文件不参与replication。</p>
-<h3 id="Stale-Replica-Detection"><a href="#Stale-Replica-Detection" class="headerlink" title="Stale Replica Detection"></a>Stale Replica Detection</h3><p>对于每个chunk，master都维护了一个version，每次授予lease时增加，master和replica都会持久化这个version。master如果遇到了比它自己记录的更大的version，可能是master之前failover过了，master会将自己记录的version提升上去；如果遇到了更小的version就会认为这个replica过期了，变成垃圾了。</p>
-<p>master在回复replica位置给client时，也会带上这个version，从而避免client访问过期的replica。</p>
-<h2 id="Fault-Tolerance-and-Diagnosis"><a href="#Fault-Tolerance-and-Diagnosis" class="headerlink" title="Fault Tolerance and Diagnosis"></a>Fault Tolerance and Diagnosis</h2><p>GFS的容量决定了错误是常态。</p>
-<h3 id="High-Availability"><a href="#High-Availability" class="headerlink" title="High Availability"></a>High Availability</h3><h4 id="Fast-Recovery"><a href="#Fast-Recovery" class="headerlink" title="Fast Recovery"></a>Fast Recovery</h4><p>master和chunkserver不区分正常退出和意外退出，都走一样的快速恢复流程。</p>
-<h4 id="Chunk-Replication"><a href="#Chunk-Replication" class="headerlink" title="Chunk Replication"></a>Chunk Replication</h4><ul>
-<li>不同namespace可以有不同的replication level。</li>
-<li>master会尽快复制replica不足的chunk。</li>
-<li>正在探索奇偶校验码、纠删码等其它冗余方案，这是基于GFS追加和读远多于小块随机写的场景的。</li>
-</ul>
-<h4 id="Master-Replication"><a href="#Master-Replication" class="headerlink" title="Master Replication"></a>Master Replication</h4><p>master的修改要等到自身和所有replica的operation log落盘才算提交成功。</p>
-<p>master的replica是shadow而不是mirror，状态可能会落后于primary，但它们也可以提供非最新的读能力。</p>
-<p>shadow replica也会用与primary相同的顺序执行修改，也会从chunkserver获取chunk列表，只有新创建的chunk和被回收的chunk必须从primary处得知。</p>
-<h3 id="Data-Integrity"><a href="#Data-Integrity" class="headerlink" title="Data Integrity"></a>Data Integrity</h3><p>GFS一个集群会有大量磁盘，时常会有磁盘错误，但一一比较每个chunk replica很不现实。而且不同replica也可能不一致。因此chunkserver会通过checksum来校验chunk是否正确。</p>
-<p>chunk的每个block都有checksum，是常驻内存的，读的时候会校验。这对性能的影响非常小，因为对比checksum不会有I/O，而计算checksum的开销会被I/O平摊掉。client会按block大小对齐读的范围。</p>
-<p>追加写的时候直接基于旧的checksum计算新的checksum。如果之前这个block状态已经不一致了，checksum不对，后续读的时候会发现。</p>
-<p>覆盖写需要读出整个范围的block重新计算checksum。</p>
-<p>chunkserver会在空闲时挑选一些不活跃的chunk校验数据。</p>
-<h1 id="Experiences"><a href="#Experiences" class="headerlink" title="Experiences"></a>Experiences</h1><p>GFS发展过程中遇到的问题：</p>
-<ul>
-<li>后续才增加了权限和配额的支持。</li>
-<li>磁盘驱动版本。</li>
-<li>Linux 2.2的<code>fsync()</code>有性能bug。</li>
-<li>Linux一个进程读写页面时有一个大的读写锁，加载page和通过<code>mmap</code>更新page互斥。后续通过将<code>mmap</code>改为<code>pread</code>解决。</li>
-</ul>
-<blockquote>
-<p>pangu1也是单master，与GFS的区别主要在于：</p>
-<ul>
-<li>似乎没有primary chunk的概念。</li>
-<li>master会记录chunk的长度。</li>
-</ul>
-<p>pangu1中文件分成了LogFile、NormalFile、以及一个可以随机写的File（不记得名字了）。</p>
-<p>NormalFile类似于GFS的File，链式replication，只支持追加写。它的主要的写接口是<code>append()</code>、<code>commit()</code>和<code>truncate()</code>，<code>append</code>写入的数据不会改变master端记录的size，这个是在<code>commit</code>时确定的。当出现写失败时，不同replica可能不一致，此时可以通过<code>truncate</code>到上次<code>commit</code>时的offset来解决这种不一致。对于<code>commit</code>超时的情况，client需要重新打开文件，触发master主动获取各个replica的size。</p>
-<p>LogFile是专门针对小的record设计的类型，星型写，只支持追加写，不需要额外的<code>commit</code>，也不支持<code>truncate</code>。它的size更新逻辑似乎是如果三份都成功，则不立即更新；当写失败时，client需要重新打开文件，触发master主动封存当前chunk，此时master会确认chunk的size。</p>
-<p>master也会在与chunkserver的日常通信过程中确认chunk的size。</p>
-<p>pangu2将单master按功能拆成若干种master node，从而解决了单master内存爆炸的问题。另外不同的文件类型也统一掉了，具体的细节不清楚。</p>
-</blockquote>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/15/the-google-file-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -923,10 +760,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-09-01 12:23:11 / 修改时间：12:23:56" itemprop="dateCreated datePublished" datetime="2020-09-01T12:23:11+08:00">2020-09-01</time>
+              <time title="创建时间：2020-09-01 12:23:11" itemprop="dateCreated datePublished" datetime="2020-09-01T12:23:11+08:00">2020-09-01</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:59:51" itemprop="dateModified" datetime="2020-11-11T15:59:51+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -943,75 +786,14 @@
 <p>原文：<a href="http://pages.cs.wisc.edu/~yxy/cs839-s20/papers/hstore_lookingglass_2008.pdf" target="_blank" rel="noopener">OLTP Through the Looking Glass, and What We Found There</a> </p>
 </blockquote>
 <p>本文观点：随着硬件的发展和需求的变化，OLTP需要有新的设计；测量传统OLTP架构中各部分对性能的影响。</p>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>自从70年代以来OLTP系统的架构就没有太大的变化，但两个趋势使重新设计OLTP系统变得必要：</p>
-<ol>
-<li>硬件的发展。CPU算力的发展使一个事务只需要几ms或更短时间；内存的廉价化使很多DB可以整个放到内存中。</li>
-<li>需求的变化。很多应用不需要那么完整的事务支持。</li>
-</ol>
-<p>本文测试了以下模块：</p>
-<ul>
-<li>logging，包括undo和redo log。</li>
-<li>locking，指2PL。</li>
-<li>latching，指具体的各种mutex。将事务处理改成单线程就可以去掉很多mutex。</li>
-<li>buffer management，指page和cache管理。</li>
-</ul>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f1.jpg" alt="TPC-C New Order场景指令数分布"></p>
-<h2 id="Single-Threading-in-OLTP-Systems"><a href="#Single-Threading-in-OLTP-Systems" class="headerlink" title="Single Threading in OLTP Systems"></a>Single Threading in OLTP Systems</h2><p>如果内存足够大，OLTP系统不再需要多线程：</p>
-<ul>
-<li>不再有disk wait。</li>
-<li>不再有user wait：事务几乎都使用存储过程。</li>
-<li>OLTP事务足够简单，几百ms就可以完成；长时间的事务主要由OLAP服务。</li>
-</ul>
-<p>为了充分利用多核资源，可以使多进程+单线程，每个进程是一个site。</p>
-<p>网络可能是个瓶颈，但很多应用可以将事务范围限制在一个site内，从而避免网络影响。</p>
-<h2 id="High-Availability-vs-Logging"><a href="#High-Availability-vs-Logging" class="headerlink" title="High Availability vs. Logging"></a>High Availability vs. Logging</h2><p><a href="http://www.vldb.org/conf/2006/p703-lau.pdf" target="_blank" rel="noopener">LM06</a>表明至少在data warehouse中，使用standby足以恢复数据。<a href="http://acm.mementodepot.org/pubs/books/3226595/3226595.3226637/3226595.3226637.pdf" target="_blank" rel="noopener">SMA+07</a>表明OLTP系统也可以这样，通过其它节点而不是redo log恢复数据。</p>
-<h2 id="Transaction-Variants"><a href="#Transaction-Variants" class="headerlink" title="Transaction Variants"></a>Transaction Variants</h2><p>一些应用认为可用性比事务语义更重要，因此更倾向于最终一致性。snapshot isolation的流行也表明用户愿意放宽事务语义来换取性能。</p>
-<p>一些研究表明有些限制了用法的事务可以显著简化事务：假如所有事务都先执行完所有读再执行所有写，且保证在读阶段结束后不abort，就不需要undo log了。</p>
-<h2 id="Removing-Components"><a href="#Removing-Components" class="headerlink" title="Removing Components"></a>Removing Components</h2><p>移除logging：</p>
-<ol>
-<li>避免执行过程中产生I/O请求：group commit，增大buffer size以保证过程中不flush。</li>
-<li>注释掉所有准备和写log record的代码。</li>
-<li>避免产生LSN。</li>
-</ol>
-<p>移除locking：</p>
-<ol>
-<li>修改LockManager，所有调用直接返回。</li>
-<li>修改钉住record的函数，在一个目录下查找record，并通过B-tree索引访问。</li>
-</ol>
-<p>移除latcing：</p>
-<ol>
-<li>修改所有mutex，所有调用直接返回。</li>
-<li>避免请求mutex。</li>
-</ol>
-<p>移除buffer manager调用：</p>
-<ol>
-<li>创建record时直接malloc，而不是通过page allocation。</li>
-<li>没有直接移除buffer manager的代码，而是尽量简化了逻辑。</li>
-</ol>
-<p>其它优化：</p>
-<ol>
-<li>单独优化了B-tree的key为未压缩的整数的场景（对应下图中的“Btree keys”）。</li>
-<li>为目录查找增加了一个cache（对应下图中的“dir lookup”）。</li>
-<li>增大page size到32KB（对应下图中的“small page”）从而降低B-tree高度。</li>
-<li>通过将所有事务放到一个session中，移除了每个事务启动和结束session的开销（对应下图中的“Xactions”）。</li>
-</ol>
-<h2 id="Performance-Study"><a href="#Performance-Study" class="headerlink" title="Performance Study"></a>Performance Study</h2><p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f5.jpg" alt="Payment场景指令数分布"></p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f6.jpg" alt="New Order场景指令数分布"></p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f7.jpg" alt="New Order场景指令数详细分布"></p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f8.jpg" alt="New Order场景指令数与周期数对比"></p>
-<p>两个观察：</p>
-<ol>
-<li>单个部分的优化效果并不明显，最明显的也不过30%。</li>
-<li>多个优化一起的效果就很明显了。一个单线程处理事务、所有事务都是读写两阶段的、通过其它节点恢复数据的OLTP系统与当前的系统会非常不一样。</li>
-</ol>
-<h2 id="Implications-for-Future-OLTP-Engines"><a href="#Implications-for-Future-OLTP-Engines" class="headerlink" title="Implications for Future OLTP Engines"></a>Implications for Future OLTP Engines</h2><ol>
-<li>并发控制。测试结果表明动态locking对性能影响非常大，但不是所有系统都可以串行执行事务，因此最佳的并发控制方法仍然很有研究价值。</li>
-<li>多核支持。多线程导致需要使用latch，实现高效的多线程并发系统需要新的设计。也可以通过虚拟化来实现每个site一个核，单线程。另外还可以考虑单个query内并行执行。</li>
-<li>传统的replication是基于log的active-passive架构，它的缺点是：除非使用2PC，否则secondary与primary很难保持事务一致，因此secondary没办法服务需要事务一致的读请求；failover不是立即生效的；logging对性能有影响，占用了20%左右的周期数。基于log的传统设计的考虑是在secondary上恢复log的成本要远低于执行事务。但基于内存的系统的执行事务成本也是很低的，允许我们使用多个active secondary，每个secondary同步执行事务。</li>
-<li>弱一致性。最终一致性加上事务一致性。</li>
-<li>cache友好的B-tree。</li>
-</ol>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1053,10 +835,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-08-31 12:29:30 / 修改时间：12:30:15" itemprop="dateCreated datePublished" datetime="2020-08-31T12:29:30+08:00">2020-08-31</time>
+              <time title="创建时间：2020-08-31 12:29:30" itemprop="dateCreated datePublished" datetime="2020-08-31T12:29:30+08:00">2020-08-31</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:57:34" itemprop="dateModified" datetime="2020-11-11T15:57:34+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -1072,23 +860,16 @@
           <blockquote>
 <p>原文：<a href="http://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2017/2010/Papers/sigmod08-columstore-abadi.pdf" target="_blank" rel="noopener">Column-Stores vs. Row-Stores: How Different Are They Really?</a> </p>
 </blockquote>
-<p>本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。</p>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。</p>
 <p>本文针对的场景：星型的data warehouse，OLAP。</p>
-<h2 id="针对RowStore的优化技术"><a href="#针对RowStore的优化技术" class="headerlink" title="针对RowStore的优化技术"></a>针对RowStore的优化技术</h2><h3 id="垂直分片"><a href="#垂直分片" class="headerlink" title="垂直分片"></a>垂直分片</h3><p>每列对应一个分片，每个分片存储一列数据加主键。重新组合relation的时候要join涉及的列。</p>
-<h3 id="全部索引化"><a href="#全部索引化" class="headerlink" title="全部索引化"></a>全部索引化</h3><p>每列建一个索引。查询的时候分别在每个索引上应用谓词，再在内存中join结果。对于那些没有谓词的列，可以将其与同query的有谓词的列组成一个索引以避免扫描整个索引。</p>
-<h3 id="物化视图"><a href="#物化视图" class="headerlink" title="物化视图"></a>物化视图</h3><p>创建好一些物化视图，只包含query需要的列，避免加载不需要的列。</p>
-<h2 id="针对ColumnStore的优化技术"><a href="#针对ColumnStore的优化技术" class="headerlink" title="针对ColumnStore的优化技术"></a>针对ColumnStore的优化技术</h2><h3 id="压缩"><a href="#压缩" class="headerlink" title="压缩"></a>压缩</h3><p>列存的压缩效果往往远好于行存，原因是同一列数据的局部性更好，墒更低。而且列存可以用像RLE这样的不需要解压缩就能扫描的压缩算法。</p>
-<p>一列排序好的数据的压缩效果会非常好，列存比较容易实现排序，而行存因为同一列不是连续排列的，这种排序性很难被利用上。</p>
-<h3 id="延迟物化"><a href="#延迟物化" class="headerlink" title="延迟物化"></a>延迟物化</h3><p>同一个relation的不同列在被加载上来之后，最原始的做法是直接组合成relation，再运算。这样列存与行存就只是存储格式的区别了。我们还可以尽量延迟组合物化的时间，在此之前完成尽量多的操作。一列数据可以表示为数组、位图等数据结构，可以做非常高效的操作。延迟物化的好处：物化前先进行过滤和组合可以避免掉一些不必要的物化；避免不必要的解压缩；cache更友好；更容易应用按块迭代；固定长度的列操作更高效，延迟物化可以避免少量变长列影响其它列的操作。</p>
-<h3 id="按块迭代"><a href="#按块迭代" class="headerlink" title="按块迭代"></a>按块迭代</h3><p>算子一次处理一个block，函数调用次数更少，不需要额外的提取操作，如果是固定长度的列，可以以数组形式处理。</p>
-<h3 id="隐式join"><a href="#隐式join" class="headerlink" title="隐式join"></a>隐式join</h3><p>对于星型data warehouse，处理query时比较常见的做法是先join fact table和最具选择性的维表，再在fact table上做aggregation，之后再针对每个谓词join不同的维表。</p>
-<p>另一种延迟join的做法是先在维表上应用谓词，再将结果与fact table join，这样能得到两组选中的位置，一组来自维表，一组来自fact table，从维表的位置中我们能得到其它需要的列（但通常是乱序的）。这样依次处理完所有维表，再最终与fact table join得到想要的relation。</p>
-<p>本文引入了另一种方法，隐式join。它也是延迟join，但会最小化需要乱序提取的值。它将join改写为应用在fact table上的谓词，这些谓词会通过hash查找（值来自各个维表应用谓词的结果）或区间谓词等方式求值。不同列的隐式join可以同时进行，直到最终选出想要的relation后再与各个维表进行join。</p>
-<h3 id="区间谓词"><a href="#区间谓词" class="headerlink" title="区间谓词"></a>区间谓词</h3><p>如果应用过谓词后得到了某一列上连续的区间，我们可以将hash查找改写为一个区间上的IN谓词。这种优化没办法应用在非排序列上。对于原本排序好的列，一些重排序操作也会打乱它们的顺序，此时可以应用字典编码来重新给这些列赋值，以保持其有序性，从而可以继续应用这种优化。</p>
-<h2 id="性能对比"><a href="#性能对比" class="headerlink" title="性能对比"></a>性能对比</h2><p>RowStore的三种模拟ColumnStore的优化都没办法得到特别好的效果。垂直分片只在选择的列少于1/4时有一定优势，超过之后它的空间上的额外开销（重复存储的主键）影响了影响。完全index要求fact table在应用谓词前一定要与维表join。物化视图有效果，但效果仍赶不上ColumnStore。</p>
-<p>ColumnStore的优化方法中，按块迭代提升了5%到50%的性能。隐式join提升了50%到75%的性能，主要是区间谓词的贡献。压缩提升了2倍性能，且仍有上升空间（多维度排序维表）。对于一些不需要解压缩就能过滤的场景，压缩的性能提升可以达到10倍。延迟物化提升了3倍性能。</p>
-<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>只是将RowStore改造为按列存储是达不到完全针对列存优化的ColumnStore的性能的。这种性能差异的主要因素是压缩和延迟物化，次要因素是按块迭代和隐式join。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1130,10 +911,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-08-28 11:59:16 / 修改时间：11:59:54" itemprop="dateCreated datePublished" datetime="2020-08-28T11:59:16+08:00">2020-08-28</time>
+              <time title="创建时间：2020-08-28 11:59:16" itemprop="dateCreated datePublished" datetime="2020-08-28T11:59:16+08:00">2020-08-28</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 16:00:59" itemprop="dateModified" datetime="2020-11-11T16:00:59+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -1148,7 +935,8 @@
       
           <blockquote>
 <p>原文：<a href="https://www.usenix.org/event/osdi06/tech/full_papers/burrows/burrows_html/" target="_blank" rel="noopener">The Chubby lock service for loosely-coupled distributed systems</a></p>
-<p>本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。</p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。</p>
 <p>论证过程：</p>
 <ol>
 <li>如何实现强一致：Paxos。</li>
@@ -1158,329 +946,14 @@
 <li>如何提高可用性：粗粒度锁，client在session过期后有一个grace period。</li>
 <li>未来可以做哪些改进：使用proxy和partitioning进一步提升服务规模。</li>
 </ol>
-</blockquote>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Chubby是一个<strong>锁服务</strong>。通过Chubby，不同client可以实现临界区，或达成共识。Chubby的主要设计目的是可靠性、可用性（服务大量普通商用机器）、语义容易理解，次要目的是吞吐和存储容量。Chubby提供了类似于文件系统的API（每个操作都会读写整个文件），建议式锁和事件通知。</p>
-<p>Chubby预期提供<strong>粗粒度</strong>的同步，尤其是选举leader。</p>
-<p>Chubby内核是Paxos算法。</p>
-<h2 id="Design"><a href="#Design" class="headerlink" title="Design"></a>Design</h2><h3 id="Rationale"><a href="#Rationale" class="headerlink" title="Rationale"></a>Rationale</h3><p>为什么不实现一个Paxos库（client会成为一个Paxos系统的一个node），而是实现一个外部的锁服务：</p>
-<ul>
-<li>应用一开始可能对可用性没那么高要求，等到后面再想接入Paxos库就困难了（比如要重新实现一个Paxos需要的状态机）；而接入一个外部的锁不需要做很多修改。</li>
-<li>许多应用需要有办法能知道当前的共识是什么（谁是leader、某块数据是什么），外部服务可以提供一致的cache，而库只能实现基于时间过期的cache。</li>
-<li>开发者更熟悉基于锁的API。</li>
-<li>使用Paxos库会导致replica数量与client数量成正比，而外部服务将其解耦开，只需要少量机器运行Chubby就可以满足大量机器的一致性需求。</li>
-</ul>
-<p>基于以上理由产生的两个关键决策：</p>
-<ul>
-<li>锁服务而不是Paxos库或服务。</li>
-<li>提供小文件的读写服务以广播和获取共识结果，而不是实现第二种服务（name service）。</li>
-</ul>
-<p>一些根据使用场景而做出的决策：</p>
-<ul>
-<li>需要支持一个Chubby file被数千个client读取，最好不需要大量机器。</li>
-<li>需要提供事件通知，这样client不需要轮询结果。</li>
-<li>需要有cache来支持大量client轮询。</li>
-<li>需要一致性cache以降低开发者理解难度。</li>
-<li>需要支持ACL。</li>
-</ul>
-<p>Chubby不打算支持细粒度锁（通常只持有若干秒或更短时间），原因：</p>
-<ul>
-<li>粗粒度锁的获取频率更低，降低server压力。</li>
-<li>受server failover影响的client更少（粗粒度锁在failover期间client很可能不需要与server交互）。</li>
-</ul>
-<p>应用可以基于Chubby的粗粒度锁自己实现细粒度锁：通过Chubby lock来维持若干个app lock server，每个app lock server管理若干个app lock，与app client之间通过lease维持。</p>
-<h3 id="System-structure"><a href="#System-structure" class="headerlink" title="System structure"></a>System structure</h3><p>Chubby通常有5个replica，之间使用共识协议算法选举master。master与其它replica之间的lease为若干秒。每个replica都维护一个小DB，但只有master提供读写服务。</p>
-<p>client通过DNS获取replica列表，与非master的replica通信时会被告知master地址。</p>
-<p>如果有replica挂掉数小时没有恢复，它会被自动替换掉，更新DNS，master从而知道replica列表变动。</p>
-<h3 id="Files-directories-and-handles"><a href="#Files-directories-and-handles" class="headerlink" title="Files, directories, and handles"></a>Files, directories, and handles</h3><p>Chubby提供的文件路径类似于：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;ls&#x2F;foo&#x2F;wombat&#x2F;pouch</span><br></pre></td></tr></table></figure>
-
-<p>其中<code>ls</code>表示lock service，<code>foo</code>是cell name（如果是<code>local</code>表示访问应用所在的cell）。</p>
-<p>Chubby因此可以被其它文件系统使用，可以使用现成的工具，极大降低了教育成本。</p>
-<p>Chubby与UNIX文件系统间的设计差异是为了降低分布难度：不同的目录可能被不同的Chubby集群服务，因此：</p>
-<ul>
-<li>不支持跨目录的文件移动；</li>
-<li>不支持目录修改时间；</li>
-<li>避免依赖于路径的权限机制（文件权限只取决于文件自身而不是目录权限）；</li>
-<li>为了方便缓存meta数据，不显示最近访问时间。</li>
-</ul>
-<p>文件或目录都被称为node，不同的node有不同的路径，不存在软硬链接。永久的node需要显式删除，临时的node在没有client使用时自动删除。临时node通常用于临时文件或标识client存活。</p>
-<p>node的meta数据包含三类ACL（读、写、修改ACL），这些ACL在node创建时从它的父node处继承来（可覆盖）。ACL本身也是文件，存放在每个cell的固定路径下。Chubby的ACL机制类似于Plan9的groups。</p>
-<p>node的meta数据中来包含4个单调增的64位整数：</p>
-<ul>
-<li>instance number，重复创建node时增加；</li>
-<li>content generation number，文件被写入时增加；</li>
-<li>lock generation number，node的锁被持有时增加；</li>
-<li>ACL generation number，node的ACL名字发生变化时增加。</li>
-</ul>
-<p>Chubby也提供了每个文件的checksum，可以用来检测文件内容变化。</p>
-<p>client持有的handle包含：</p>
-<ul>
-<li>标识handle是否创建完成的位，这样只在创建handle时做完整的权限检查。</li>
-<li>sequence number，允许master检查这是不是之前master创建的handle。</li>
-<li>打开文件时使用的模式，允许新master重建handle对应的状态。</li>
-</ul>
-<h3 id="Locks-and-sequencers"><a href="#Locks-and-sequencers" class="headerlink" title="Locks and sequencers"></a>Locks and sequencers</h3><p>Chubby提供的lock都是建议式的读写锁。不提供强制锁的原因：</p>
-<ul>
-<li>应用可能使用Chubby保护lock对应的文件之外的资源。</li>
-<li>通过查看被锁住的文件来debug或做维护工作。</li>
-<li>相信开发者，强制锁也没办法保护错误或恶意的使用。</li>
-</ul>
-<p>分布式锁常见的一个问题是一个client先获得锁，进一步操作时已经丢掉锁了但自己不知道，最终导致数据错误。常见解法是使用sequence number。</p>
-<p>Chubby默认不使用sequence number（开销大），但允许client获取锁时同时也获得一个sequencer（包含lock name、mode、generation number的字符串），client后续操作可以带上这个sequencer从而允许server检测lock是否还有效。</p>
-<p>对于早期的不支持sequencer的Chubby服务，有另一种机制，在一个lock holder挂掉后不立即允许其它client获取，而是等一段时间（如1分钟），这样避免出错的client破坏整个系统。</p>
-<h3 id="Events"><a href="#Events" class="headerlink" title="Events"></a>Events</h3><p>client在创建handle时可以订阅若干事件，包括：</p>
-<ul>
-<li>文件内容修改；</li>
-<li>子node的增删改（从而可以监控临时文件）；</li>
-<li>Chubby master自己的failover，表明可能有其它event丢失，client要自己处理这种情况，比如重新扫描文件；</li>
-<li>handle和lock不可用；</li>
-<li>锁被人获取成功；</li>
-<li>与另一个client的锁请求冲突。</li>
-</ul>
-<p>事件投递晚于事件发生。</p>
-<p>最后两个事件很少被用到：</p>
-<ul>
-<li>client通常不仅要知道选举结果产生了，还要知道leader是谁，因此它直接订阅文件内容修改就好了；</li>
-<li>订阅另一个client的锁请求冲突可以实现一种场景，即当前持有锁的client提前释放锁，但实践中没有应用这么用。</li>
-</ul>
-<h3 id="API"><a href="#API" class="headerlink" title="API"></a>API</h3><ul>
-<li><code>open</code>：返回handle。</li>
-<li><code>close</code>：不会失败，调用后不再允许使用该handle（进程可能会挂掉）。</li>
-<li><code>poison</code>：使该handle的后续操作失败，可以跨线程使用。</li>
-<li><code>GetContentsAndStat</code>：返回文件数据和meta。</li>
-<li><code>GetStat</code>：只返回meta。</li>
-<li><code>ReadDir</code>：返回目录的子结点的名字和meta。</li>
-<li><code>SetContents</code>：覆盖整个文件，可以传入content generation number以实现CAS。</li>
-<li><code>SetACL</code>：设置文件的ACL。</li>
-<li><code>Delete</code>：删除没有子结点的结点。</li>
-<li><code>Acquire</code>、<code>TryAcquire</code>、<code>Release</code>：与锁相关。</li>
-<li><code>GetSequencer</code>：返回sequencer。</li>
-<li><code>CheckSequencer</code>：检测sequencer是否有效。</li>
-</ul>
-<h3 id="Caching"><a href="#Caching" class="headerlink" title="Caching"></a>Caching</h3><p>client有一个文件内容和node meta的一致的写穿透的cache。master与client间通过lease维护cache，因此master知道client可能cache了什么。当文件内容或meta变动时，master会向可能缓存了这个文件的client发送invalidation。invalidation包含在了KeepAlive请求中，client收到后会在下次KeepAlive请求中回复master。文件内容或meta的修改要等到master获得了所有client的回复或cache lease过期后才生效。</p>
-<p>如果client不回复invalidation，master就认为这个node不能缓存，这样invalidation只需要一轮RPC。Chubby的场景下读远多于写，因此可以这么做。另一个方案是阻塞住对这个node的后续操作，从而避免太多对这个node的操作击垮master，但会增加延迟。</p>
-<p>Chubby的cache协议只失效，不更新，从而简化设计，也避免了访问过一个文件的client就要接收这个文件的后续的无穷无尽的更新消息。</p>
-<p>Chubby没有选择更弱化的一致性cache是因为那样的cache很难使用。那些需要client在每个消息中都交换sequence number的方案不适用于已经存在多套通信协议的环境。</p>
-<p>client还会cache handle，因此一个client重复<code>open</code>一个文件时，会返回相同的handle，避免每次都发RPC给master。</p>
-<p>Chubby协议允许client缓存lock，即在lock失效后继续持有lock，直到另一个client冲突再主动释放。</p>
-<h3 id="Sessions-and-KeepAlives"><a href="#Sessions-and-KeepAlives" class="headerlink" title="Sessions and KeepAlives"></a>Sessions and KeepAlives</h3><p>只要client与master之间的session有效，client的handl、lock、cache都有效。如果client不持有任何handle且1分钟以上无调用，session自动失效。</p>
-<p>master延长client的lease timeout的情况：</p>
-<ul>
-<li>创建session时</li>
-<li>master发生failover时</li>
-<li>回复KeepAlive时</li>
-</ul>
-<p>master收到KeepAlive时会hold，直到当前lease快过期时再回复。client收到回复后会立即发送下个KeepAlive。</p>
-<p>master会把event和invalidation也加到KeepAlive的回复中，保证了client如果不告知invalidation是否成功，就没办法保有session。</p>
-<p>client自己也维护一个local lease timeout，比master的lease timeout略大一点点（包含KeepAlive网络传输时间）。一旦local lease过期，client就会清空cache，等待grace period（45秒）后如果仍不能收到master回复，client就假设session已失效。</p>
-<h3 id="Fail-overs"><a href="#Fail-overs" class="headerlink" title="Fail-overs"></a>Fail-overs</h3><p>master一旦丢掉了master资格，就会清空掉session、handle、lock的内存状态。但session timer会直到新master产生才结束（不立即让client的session失效）。这样如果client能在grace period与新master建立通信，它的所有现存session都不会受影响。</p>
-<p>在grace period中，client会阻塞住应用调用，以避免应用看到不一致的数据。</p>
-<p>新master产生后通过读取持久化数据以及从client获取数据来重建内存状态。</p>
-<p>新master要执行的操作：</p>
-<ul>
-<li>选择新的epoch给client后续API使用。</li>
-<li>可以回复master-location请求。</li>
-<li>从DB中读取session和lock，将session lease延长至前一个master可能达到的最大值。</li>
-<li>可以回复client的KeepAlive请求，但不做其它session相关的操作。</li>
-<li>向每个session发送failover事件，收到的client会清空cache。</li>
-<li>等待直到每个client要么告知了failover事件已收到，要么session过期。</li>
-<li>可以执行任何操作。</li>
-<li>将上一个master创建的handle延长至当前epoch。在当前epoch内该handle不可重建，从而避免网络上飘的请求创建出已经close的handle。</li>
-<li>等待一段时间后删除没人打开的临时文件。client在收到failover事件后应该重新刷新临时文件的handle。但如果某个持有该临时文件的client的session过期了，临时文件可能不会立即删除。</li>
-</ul>
-<h3 id="Database-implementation"><a href="#Database-implementation" class="headerlink" title="Database implementation"></a>Database implementation</h3><p>Chubby一开始使用BDB，但不需要那么完整的功能，同时BDB的replication带来了过高的风险，最终Chubby选择了实现一个简化版的使用WAL和snapshot的DB。</p>
-<h3 id="Backup"><a href="#Backup" class="headerlink" title="Backup"></a>Backup</h3><p>Chubby会定期把DB的snapshot写入另一个cell的GFS上。</p>
-<h3 id="Mirroring"><a href="#Mirroring" class="headerlink" title="Mirroring"></a>Mirroring</h3><p>Chubby可以在一个cell上镜像另一个cell的若干文件。<code>/ls/global/master</code>在各个cell都有镜像，路径为<code>/ls/cellname/slave</code>。</p>
-<h2 id="Mechanisms-for-scaling"><a href="#Mechanisms-for-scaling" class="headerlink" title="Mechanisms for scaling"></a>Mechanisms for scaling</h2><p>Chubby为了提高伸缩性而采取的部分措施：</p>
-<ul>
-<li>多创建cell，保证不同client可以就近访问Chubby。</li>
-<li>master在高负载时可能会把lease timeout从12秒上调到60秒。</li>
-<li>Chubby client会缓存文件数据、meta、文件不存在、handle等，以降低rpc call。</li>
-<li>有server将Chubby协议转换为更简单的协议如DNS。</li>
-</ul>
-<p>Proxy和Partitioning是已设计但未实现的功能，原因是目前压力还没那么大：</p>
-<ul>
-<li>一个数据中心的机器数量有限。</li>
-<li>硬件性能的提升也会带来Chubby容量的提升。</li>
-</ul>
-<h3 id="Proxies"><a href="#Proxies" class="headerlink" title="Proxies"></a>Proxies</h3><p>Proxy可以处理KeepAlive和读请求，但不能处理写请求。使用Proxy会降低可用性，Proxy和Chubby master不可用都会导致client受影响。</p>
-<h3 id="Partitioning"><a href="#Partitioning" class="headerlink" title="Partitioning"></a>Partitioning</h3><p>一个Chubby cell可以分为N个partition，每个目录根据其路径的hash只由一个partition服务，这样目录与父目录可能在不同partition上。</p>
-<p>需要跨partition的操作：</p>
-<ul>
-<li>访问ACL。但ACL非常适合缓存（数据量小、修改极少）。</li>
-<li>删除目录时可能需要跨partition以确认它为空。</li>
-</ul>
-<p>partitioning可以降低读写的压力，但每个client仍然要与多数partition保持KeepAlive，因此KeepAlive的压力没办法降低。</p>
-<h2 id="Use-surprises-and-design-errors"><a href="#Use-surprises-and-design-errors" class="headerlink" title="Use, surprises and design errors"></a>Use, surprises and design errors</h2><h3 id="Use-and-behaviour"><a href="#Use-and-behaviour" class="headerlink" title="Use and behaviour"></a>Use and behaviour</h3><p>一些结论：</p>
-<ul>
-<li>多数（60%）文件需要按名字访问。</li>
-<li>配置、ACL、元数据文件很常见。</li>
-<li>缓存文件不存在的信息是很重要的。</li>
-<li>平均每个被缓存的文件有10个client使用。</li>
-<li>很少的client会持有锁，共享锁很罕见。锁主要用在选举leader和数据分片上。</li>
-<li>RPC主要由KeepAlive贡献。</li>
-</ul>
-<p>9次服务中断：</p>
-<ul>
-<li>网络维护：4次。</li>
-<li>未知网络链路问题：2次。</li>
-<li>软件错误：2次。</li>
-<li>过载：1次。</li>
-</ul>
-<p>6次丢失数据：</p>
-<ul>
-<li>DB软件错误：4次。</li>
-<li>误操作：2次。</li>
-</ul>
-<p>上调lease timeout可以降低KeepAlive的压力。group commit可以降低写压力，但通常不需要。</p>
-<p>Chubby伸缩性的关键不是server性能，而是降低通信次数。</p>
-<h3 id="Java-clients"><a href="#Java-clients" class="headerlink" title="Java clients"></a>Java clients</h3><p>略</p>
-<h3 id="Use-as-a-name-service"><a href="#Use-as-a-name-service" class="headerlink" title="Use as a name service"></a>Use as a name service</h3><p>用作name service时，对比DNS，Chubby的优势是一致性cache，不需要设置TTL。但Chubby也会遇到性能问题，尤其是大量job启动时，此时可以用batch name lookup来缓解。</p>
-<p>Chubby cache的一致性已经超出了name service需要的程度，因此可以使用专门为name service设计的协议转换server来进一步降低Chubby的负载。</p>
-<h3 id="Problems-with-fail-over"><a href="#Problems-with-fail-over" class="headerlink" title="Problems with fail-over"></a>Problems with fail-over</h3><p>Chubby的旧的failover方案需要master在创建session时写DB，使用BDB时写入压力太大，Chubby选择只在session第一次执行写（包括open和lock）操作时写DB。但这带来一个问题，readonly的session不在DB中，在master发生failover后很可能已经失效了，存在一个窗口期client可能读到过期的数据。</p>
-<p>新方案中master不会在DB中记录session，而是在启动后等待最长可能的lease timeout，保证在此期间没有与master建立连接的client的session过期。这也允许proxy来管理与client的session。</p>
-<h3 id="Abusive-clients"><a href="#Abusive-clients" class="headerlink" title="Abusive clients"></a>Abusive clients</h3><ul>
-<li>应用接入前review很重要。用户经常没办法预计业务增长速度，因此review时要找出使开销线性化的因素，想办法弥补。</li>
-<li>多数文档中缺乏性能方面的建议，导致一个调用了Chubby的接口未来被其它应用误用。</li>
-<li>一开始Chubby没有缓存handle和文件不存在，导致<code>open</code>开销很大，经常有业务反复<code>open</code>。</li>
-<li>一开始Chubby没有限制文件大小，导致有应用拿它作为存储用。最终Chubby上线了256KB的文件大小限制。</li>
-<li>有应用拿Chubby作为PubSub用，但Chubby的重一致性导致了它不适合这个场景。</li>
-</ul>
-<h3 id="Lessons-learned"><a href="#Lessons-learned" class="headerlink" title="Lessons learned"></a>Lessons learned</h3><ul>
-<li>开发者经常忽视可用性：<ul>
-<li>Chubby稍有波动就可能导致应用出现严重问题。</li>
-<li>服务在线与服务可用之间有差别。如Chubby的global cell的总在线时间是超过local cell的，但从某个client来看，global cell的可用性却低于local cell，因为local cell与client之间网络通常不会分区，它们的维护时间通常也是重合的。</li>
-<li>Chubby提供了master failover的事件，但发现应用经常收到这个event后直接crash。</li>
-<li>Chubby提供了三种机制：接入前review；client中提供接口以自动处理Chubby中断；为Chubby中断提供事后报告。</li>
-</ul>
-</li>
-<li>可以不实现细粒度锁。</li>
-<li>将KeepAlive与invalidation合并可以强制client一定要回复invalidation，否则session就会过期，但这样就给KeepAlive的协议选择带来了压力。TCP的退避重试可能会影响到lease timeout，因此Chubby选择了用UDP发送KeepAlive。</li>
-</ul>
-<h2 id="Comparison-with-related-work"><a href="#Comparison-with-related-work" class="headerlink" title="Comparison with related work"></a>Comparison with related work</h2><p>略</p>
-<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>略</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
         
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/08/13/explore-the-world-0002/" class="post-title-link" itemprop="url">随便看看 0002</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2020-08-13 15:37:57 / 修改时间：15:37:18" itemprop="dateCreated datePublished" datetime="2020-08-13T15:37:57+08:00">2020-08-13</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a href="https://www.zhihu.com/question/406623513/answer/1338119623" target="_blank" rel="noopener">如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎</a></p>
-<blockquote>
-<p>从停机问题角度看待这个悖论，很有意思。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/410908068/answer/1379726440" target="_blank" rel="noopener">李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎</a></p>
-<blockquote>
-<p>李白的生平。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/58835500/answer/1374006629" target="_blank" rel="noopener">《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎</a></p>
-<blockquote>
-<p>而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读<a href="https://www.sohu.com/a/305206459_574698" target="_blank" rel="noopener">今天通知明天要，只能是假报告</a>。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/411958013/answer/1388346437" target="_blank" rel="noopener">31 省养老金已全部上调，你父母的退休工资比自己的在职工资高吗？ - 王海的回答 - 知乎</a></p>
-<blockquote>
-<p>现阶段养老基金投资实践中，负债端最大的问题就是资金短期化，委托规模低，资产负债不匹配这三点。</p>
-</blockquote>
-<p><a href="https://zhuanlan.zhihu.com/p/166552504" target="_blank" rel="noopener">揭阳食物中毒案中，为什么一碗河粉就能要人命？ - 厨房人类的文章 - 知乎</a></p>
-<blockquote>
-<p>河粉、米粉不能久放，木耳不能泡太长时间，在外面吃少点这些东西。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/409372180/answer/1384298523" target="_blank" rel="noopener">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 塔列朗的回答 - 知乎</a></p>
-<blockquote>
-<p>凡尔赛条约最大的失误，就是在侮辱德国的同时，没有伤害德国基本盘；讽刺的是，从事后看，凡尔赛合约在保留德国基本盘的同时，彻底摧毁了中欧及东南欧的强权，德国的战略态势相比于1914年反而还好了，中欧和东南欧没有了任何制衡力量。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/409372180/answer/1365283381" target="_blank" rel="noopener">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 路易-拿破仑的回答 - 知乎</a></p>
-<blockquote>
-<p>凡尔赛条约的一个典型特点是它在政治上非常宽松，另一个特点是在经济惩罚上非常严厉。在赔款以外，凡尔赛体系在民族自决这一原则上的“真双标”也是“屈辱”说的一个助推剂。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/357966552/answer/1021968782" target="_blank" rel="noopener">如何评价电影《1917》？ - 电影榨汁的回答 - 知乎</a></p>
-<blockquote>
-<p>《1917》中的行军路线、所属部队和战役历史。</p>
-</blockquote>
-<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a href="https://zhuanlan.zhihu.com/p/163236128" target="_blank" rel="noopener">浅谈OLAP系统核心技术点 - neoReMinD的文章 - 知乎</a></p>
-<blockquote>
-<p>不错的科普，参考文献很棒。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/312019918/answer/608965942" target="_blank" rel="noopener">作为 IT 行业的过来人，你有什么话想对后辈说的？ - 二律背反的回答 - 知乎</a></p>
-<blockquote>
-<p>世界上没有技术驱动型公司；IT领域最重要的是经验而不是你有多聪明；能大规模商用的技术，都不需要智商；要有分享精神；现代管理学的精髓，就是让每个人都变得可替代；程序员工作创造的价值，至少一半是通过文档体现出来才对。</p>
-<p>评论里对什么是技术驱动吵了起来。我的理解：做决定时，技术 or 市场，这条线该划在哪，无论什么公司，总会有一些决定偏向市场，程序员要接受这些决定，但这不妨碍我们尝试把线往技术那边推一推。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/411917655/answer/1385638325" target="_blank" rel="noopener">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 崔晨的回答 - 知乎</a></p>
-<p><a href="https://www.zhihu.com/question/411917655/answer/1388596024" target="_blank" rel="noopener">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 大宽宽的回答 - 知乎</a></p>
-<blockquote>
-<p>shell的历史包袱；奇怪的设计一定是有原因的。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/20405888/answer/15040566" target="_blank" rel="noopener">如何理解「面向对象编程的精髓在于将操作绑定在数据上」？ - 冯东的回答 - 知乎</a></p>
-<blockquote>
-<p>data structure over procedure。</p>
-</blockquote>
-<p><a href="https://zhuanlan.zhihu.com/p/166345772" target="_blank" rel="noopener">关于程序员的59条搞笑但却真实无比的编程语录 - 动力节点的文章 - 知乎</a></p>
-<blockquote>
-<p>很多条很有道理。</p>
-</blockquote>
-<p><a href="https://www.theverge.com/2018/7/16/17577654/amazon-prime-day-website-down-deals-service-disruption" target="_blank" rel="noopener">Amazon’s website crashed as soon as Prime Day began</a></p>
-<blockquote>
-<p>Amazon在2018年的一次崩溃。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/67858225/answer/1091344044" target="_blank" rel="noopener">如何看待sqlite作者放弃sqlite4的开发，说使用LSM Tree是一种失败？ - auxten的回答 - 知乎</a></p>
-<blockquote>
-<p>重点关注其中Dr. D. Richard Hipp关于测试的看法。</p>
-<p>100％MC / DC只是一个阈值，一个很高的阈值，一个易于测量且难以作弊的门槛。100％MC / DC 的主要好处之一并不是每个分支都经过测试，而是你必须编写如此多的测试，然后你就可以发现问题，并修复了许多你从未想过的问题。</p>
-</blockquote>
-
       
     </div>
 
@@ -1568,14 +1041,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">67</span>
+          <span class="site-state-item-count">68</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-count">42</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

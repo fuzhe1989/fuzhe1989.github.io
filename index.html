@@ -176,6 +176,86 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/dynamo-amazons-highly-available-key-value-store/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store/" class="post-title-link" itemprop="url">[笔记] Dynamo: amazon's highly available key-value store</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-11-11 17:49:12 / 修改时间：17:49:14" itemprop="dateCreated datePublished" datetime="2020-11-11T17:49:12+08:00">2020-11-11</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://dl.acm.org/doi/abs/10.1145/1323293.1294281" target="_blank" rel="noopener">Dynamo: amazon’s highly available key-value store</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Dynamo是一种去中心化的KV分布式存储系统。它的主要设计目标是：</p>
+<ul>
+<li>高可用性（always writable）。</li>
+<li>高可伸缩性。</li>
+<li>高性能（低延时）。</li>
+<li>面向异构机器。</li>
+</ul>
+<p>为此Dynamo在CAP中选择了AP，牺牲了一部分的一致性（最终一致）。针对潜在的数据修改的冲突，Dynamo将选择权交给了用户，读取会返回一个“vector clock”，由用户自己解决冲突。</p>
+<p>另外为了避免单点问题影响可用性，Dynamo选择了去中心化架构，所有节点都是相同地位的，通过一致性哈希决定数据分片，通过gossip协议在不同节点间同步节点列表和所管理的数据范围。</p>
+<p>Dynamo使用了quorum协议（即R+W&gt;N）来读写不同replica的数据。为了进一步提升集群发生错误时的可用性，Dynamo使用了“sloppy quorum”以允许少数派节点也可以临时写入数据，因此造成的数据冲突由上面提到的vector clock来解决。</p>
+<p>Dynamo与BigTable是同一个时期非常不同的两种技术选择，前者看重可用性，后者看重一致性，且有着更复杂的数据模型。目前来看，用户似乎通常不太喜欢自己来解决数据冲突，默认的“last write win”策略已经够好了。对于只在一个datacenter内的后继系统来说，Dynamo有点过于复杂了，中心节点可以极大简化系统设计。但对于跨datacenter的系统，quorum的价值一下子提高了很多。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/dynamo-02.jpg" alt="Summary of techniques used in Dynamo"></p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/11/dynamo-amazons-highly-available-key-value-store/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/building-a-database-on-s3/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -201,7 +281,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2020-11-11 14:35:58 / 修改时间：14:36:00" itemprop="dateCreated datePublished" datetime="2020-11-11T14:35:58+08:00">2020-11-11</time>
+              <time title="创建时间：2020-11-11 14:35:58 / 修改时间：15:55:58" itemprop="dateCreated datePublished" datetime="2020-11-11T14:35:58+08:00">2020-11-11</time>
             </span>
 
           
@@ -229,50 +309,14 @@
 </ul>
 <p>本文的目的是在保证可用性和资源利用率的前提下，探索如何将DB的性质尽可能多地搬到云上。</p>
 <p>结论：显然只是一次实验，验证了使用S3作为共享存储的可行性，但实用性不高。如果换成EBS的话可能更好一些。它的PU queue有点像Bw-tree。</p>
-<h2 id="依赖的AWS服务"><a href="#依赖的AWS服务" class="headerlink" title="依赖的AWS服务"></a>依赖的AWS服务</h2><p>EC2和S3忽略。</p>
-<p>Simple Queueing System（SQS）是一种不保证顺序的队列服务，每个client在调用<code>receive</code>获取若干条消息后，SQS会锁住这些消息，等待client后续调用<code>delete</code>，或超时解锁。</p>
-<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/build-s3-01.png" alt="Shared-disk Architecture"></p>
-<p>这套架构假设client的数量可能达到百万这个量级。为了保证任何client挂掉都不会阻塞其它client，client不会去拿阻塞的锁，且都是无状态的。</p>
-<p>为了保证可用性，这套架构采用最终一致性，client可以缓存数据，也不支持完整的事务。</p>
-<p>与S3有关的有两层，RecordManager和PageManager。client只与前者以Record为单位交互，S3只与后者以Page为单位交互。除此之外，PU queue（Pending Update queue）负责序列化log record、Lock queue负责确保同时只有一个client能应用log record、Atomic Queue负责保证client不会只写入一个commit的不完整内容。</p>
-<p>这些模块可以组合出不同的一致性级别。</p>
-<h3 id="RecordManager与PageManager"><a href="#RecordManager与PageManager" class="headerlink" title="RecordManager与PageManager"></a>RecordManager与PageManager</h3><p>RecordManager向client暴露基于record的API，但内部会将这些record组成page，由PageManager管理。</p>
-<p>每个collection对应S3的一个bucket，每个page对应一个S3的一个object。</p>
-<p>PageManager会在本地有一个buffer pool（内存或本地存储），其中每个page可以有状态和TTL，过期的page被访问时会通过S3的<code>get-if-modified</code>请求来更新。client的修改开始时只应用到本地的page上，在commit时会将所有更新写进S3或PU queue，并将所有状态为modified的page置为unmodified。abort时会清除这些modified page。</p>
-<h3 id="Logging和B-tree"><a href="#Logging和B-tree" class="headerlink" title="Logging和B-tree"></a>Logging和B-tree</h3><p>S3上的数据组织为B树，每个节点对应一个object，实现上采用了<a href="https://dl.acm.org/doi/abs/10.1145/319628.319663" target="_blank" rel="noopener">B-link tree</a>，即每个节点会包含指向同级兄弟节点的指针（这里是URI）（具体原理不清楚）。</p>
-<p>B树的root的URI会在创建collection时生成，之后保持不变。</p>
-<p>log record分为insert、delete、update三种，都要保证是幂等的：</p>
-<ul>
-<li><code>(insert, key, payload)</code></li>
-<li><code>(delete, key)</code>，如果要实现undo log，这里还需要记录<code>beforeimage</code>。</li>
-<li><code>(update, key, afterimage)</code>，update必须要与具体的page关联。如果要实现undo log，这里还需要记录<code>beforeimage</code>。</li>
-</ul>
-<h3 id="Security"><a href="#Security" class="headerlink" title="Security"></a>Security</h3><p>为了安全性考虑，数据可以加密后存进S3，且不同page可以用不同的key（记录到page header中），这样可以允许不同client只能访问不同的page。</p>
-<h2 id="commit协议"><a href="#commit协议" class="headerlink" title="commit协议"></a>commit协议</h2><p>为了保证不同的一致性级别，这篇文章提出了三种commit协议：basic、monotomic、atomic。</p>
-<p>三种协议都可以分为两个阶段：</p>
-<ul>
-<li>client将log record写入SQS。</li>
-<li>应用log record到S3（称为checkpointing）。</li>
-</ul>
-<p>其中第一步成功就被视为commit成功，只是数据还不可见。client可以继续干别的去了，等待数据异步可见。</p>
-<h3 id="Basic协议"><a href="#Basic协议" class="headerlink" title="Basic协议"></a>Basic协议</h3><p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/build-s3-02.png" alt="Shared-disk Architecture"></p>
-<p>在Basic协议中，B树的每个叶子节点对应一个PU queue，里面是对这个page的所有update，另外B树本身还有一个PU queue，里面是所有insert和delete。</p>
-<p>每个PU queue对应一个Lock queue，里面有一个元素。负责checkpointing的client会尝试去获取这个元素，如果获取成功，表明此刻只有它自己在操作这个PU queue，它就会开始应用log record到本地，之后如果没有timeout，再将新page更新到S3上并删除PU queue中应用过的log record。如果已经timeout了，则放弃更改。</p>
-<p>如果在更新到S3之后和删除PU queue中的record之间client挂了，这些record可能被应用两次，可能导致同一个key的值不一致（因为SQS不严格保序？），此时需要使用monotonic协议。</p>
-<p>checkpointing的触发间隔会影响数据的可见延时，但越小的checkpointing，整体的开销越大。</p>
-<p>默认是写时定期checkpoint，但为了避免有只写一次的page永远不更新，可以允许reader也能checkpoint。</p>
-<h3 id="Atomic协议"><a href="#Atomic协议" class="headerlink" title="Atomic协议"></a>Atomic协议</h3><p>如果一个client在commit一半时挂了，可能只写了部分内容到S3。为了解决这个问题，保证所有更新要么都成功，要么都失败，我们可以增加一个Atomic Queue。</p>
-<p>client每次commit时，先将所有log record写入自己的Atomic queue，最后再写一条表示所有record都写成功的commit record，里面包含commit id和record数量。之后再走正常的commit流程。</p>
-<p>如果client failover，它会检查Atomic queue，将其中不完整的事务对应的record都删掉，再重新commit完整的事务。</p>
-<p>注意，这里只保证了提交的all or none，不保证atomic的可见性。</p>
-<h3 id="一致性级别"><a href="#一致性级别" class="headerlink" title="一致性级别"></a>一致性级别</h3><p>以下讨论几种一致性级别该如何实现：</p>
-<ul>
-<li>Monotonic reads：一旦读到x，后续只会读到x或比x更新的值。client可以在本地记录每个page id上次读到的version，这样如果这个page读到了更旧的version，client可以重新从S3中读取。</li>
-<li>Monotonic writes：每个client的update record中可以记录一个client维度的counter，这样在checkpointing时可以按<code>(client, counter)</code>排序，将乱序的record留在PU queue中等待下一轮处理。</li>
-<li>Read your writes：client更新过x后，后续只会读到x或比x更新的值。默认满足。</li>
-<li>Write follows read：同一个client先读到x，后更新，只会取代x或比x更新的值。</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/11/building-a-database-on-s3/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -322,7 +366,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 13:16:53" itemprop="dateModified" datetime="2020-11-11T13:16:53+08:00">2020-11-11</time>
+                <time title="修改时间：2020-11-11 15:59:24" itemprop="dateModified" datetime="2020-11-11T15:59:24+08:00">2020-11-11</time>
               </span>
 
           
@@ -349,48 +393,14 @@
 <li>与DBMS用户依赖的工具不兼容。</li>
 </ol>
 <p>（因此之后若干年大家用高度的热情将这两者又统一起来了）</p>
-<h2 id="MapReduce是一种倒退"><a href="#MapReduce是一种倒退" class="headerlink" title="MapReduce是一种倒退"></a>MapReduce是一种倒退</h2><p>DB社区40年来达成的共识：</p>
-<ul>
-<li>要有schema。</li>
-<li>schema要与应用分离。</li>
-<li>要用高阶语言。</li>
-</ul>
-<p>有了schema，DB才可以确保输入都是合法的。而MapReduce没办法保证这点，应用可能被非预期的数据搞挂掉。</p>
-<p>schema要与应用分离，这样新应用的开发者直接看一下schema就可以，而不需要先检查一遍数据，或找到旧应用的代码 —— 而MapReduce的用户天天就在做着这样的事情。</p>
-<p>70年代的时候DB社区有过所谓的“Great Debate”，争论关系模型和CODASYL模型（一种网络模型）哪个更好，访问DB的代码该写成什么样：</p>
-<ul>
-<li>表达你想要什么（关系模型），或</li>
-<li>表达你用于访问数据的算法（CODASYL）。</li>
-</ul>
-<p>结论就是关系模型更易于写、维护、理解。CODASYL被批评“是访问DBMS的汇编语言”。而MapReduce就类似于CODASYL，是一种低阶语言，表达做什么，而不是要什么。</p>
-<p>MapReduce的拥护者可能质疑说MapReduce就是针对那些没有schema的数据，但实际上map和reduce就在依赖数据中有你要的字段。</p>
-<p>基于BigTable或HBase的MapReduce程序也有这些问题，每行数据都可能有不同的schema，而且它们还没有logical view，不能解耦应用schema与数据schema。</p>
-<h2 id="MapReduce是糟糕的实现"><a href="#MapReduce是糟糕的实现" class="headerlink" title="MapReduce是糟糕的实现"></a>MapReduce是糟糕的实现</h2><p>现代的DBMS都有比如B-tree实现的索引，可以用来减少搜索空间（经常可以减少两个数量级以上）。但MapReduce没有索引，只能暴力搜索。</p>
-<p>有种观点是MapReduce的价值在于它的并行执行，但从80年代以来已经有了很多的并行DBMS，如Gamma、Bubba、Grace、Teradata。</p>
-<p>MapReduce的其它缺点还包括数据倾斜与数据交换的效率低下。</p>
-<p>并行DBMS社区针对数据倾斜问题做了很多研究，已经有了一些方案，而MapReduce目前还没有采用。</p>
-<p>MapReduce在M个map任务和N个reduce任务之间要做M*N次数据交换，M和N很大时会带来非常多的磁盘访问（对网络带宽的要求也很高）。这也是并行DBMS不经常物化中间结果的原因。MapReduce依赖这些物化的中间结果来实现良好的容错性，因此MapReduce后续能否改成推/拉模型还不明朗。</p>
-<p>MapReduce的数据分区和自定义函数也不新奇：前者早有研究，后者在80年代的Postgres就已经支持了。</p>
-<h2 id="MapReduce缺少特性"><a href="#MapReduce缺少特性" class="headerlink" title="MapReduce缺少特性"></a>MapReduce缺少特性</h2><p>以下是现代DBMS必备，但MapReduce缺少的特性：</p>
-<ul>
-<li>批量载入（Bulk loader）。</li>
-<li>索引。</li>
-<li>更新。</li>
-<li>事务。</li>
-<li>完整性约束（Integrity constraints）。</li>
-<li>引用约束（Referential constraint）。</li>
-<li>视图。</li>
-</ul>
-<h2 id="MapReduce不兼容于DBMS的工具"><a href="#MapReduce不兼容于DBMS的工具" class="headerlink" title="MapReduce不兼容于DBMS的工具"></a>MapReduce不兼容于DBMS的工具</h2><p>现代DBMS依赖的工具：</p>
-<ul>
-<li>报告生成工具。</li>
-<li>BI工具。</li>
-<li>数据挖掘工具。</li>
-<li>复制工具。</li>
-<li>DB设计工具。</li>
-</ul>
-<p>（但现在都有了）</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/08/map-reduce-a-major-step-backwards/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -432,10 +442,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-10-22 17:38:03 / 修改时间：17:38:52" itemprop="dateCreated datePublished" datetime="2020-10-22T17:38:03+08:00">2020-10-22</time>
+              <time title="创建时间：2020-10-22 17:38:03" itemprop="dateCreated datePublished" datetime="2020-10-22T17:38:03+08:00">2020-10-22</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:59:31" itemprop="dateModified" datetime="2020-11-11T15:59:31+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -454,101 +470,14 @@
 <h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Megastore结合了NoSQL的扩展性和RDBMS的便利性，支持局部的ACID、多datacenter间的无缝failover。</p>
 <p>Megastore在每个datacenter有一个instance，数据存储在对应的Bigtable中，instance之间使用Paxos协调。</p>
 <p>从性能指标来看读写延时有点高，平均在100ms以上。</p>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Megastore的设计目标：</p>
-<ul>
-<li>高扩展性。</li>
-<li>能支持快速开发。</li>
-<li>低延时。</li>
-<li>提供前后一致（consistent）的数据视图。</li>
-<li>高可用。</li>
-</ul>
-<p>传统RDBMS难以满足扩展性的要求，而NoSQL则缺少一致性，开发成本高。</p>
-<p>Megastore结合了这两者，将数据分片后各自单独replicate，分片内提供ACID，分片间提供有限的一致性。</p>
-<p>Megastore还使用了Paxos来同步各个datacenter的数据，而不只是用Paxos来选master或同步metadata。</p>
-<h2 id="Toward-Availability-and-Scale"><a href="#Toward-Availability-and-Scale" class="headerlink" title="Toward Availability and Scale"></a>Toward Availability and Scale</h2><ul>
-<li>针对可用性，Megastore实现了同步的、容错的、针对远距离链路优化的log replicator。</li>
-<li>针对扩展性，Megastore将数据切分为很多小分片，每个分片独立有log，存储在各个instance对应的Bigtable中。</li>
-</ul>
-<h3 id="Replication"><a href="#Replication" class="headerlink" title="Replication"></a>Replication</h3><p>Megastore放弃了那些可能丢数据、或不保证ACID、或需要有很重的master（避免单点不可用）的replication策略。</p>
-<p>Megastore使用了Paxos，但做了一些扩展，允许：读任意足够新的本地replica；写只需要一轮往返。</p>
-<p>另外Megastore每个分片使用单独的log也是为了提高Paxos的扩展性。</p>
-<h3 id="Partitioning-and-Locality"><a href="#Partitioning-and-Locality" class="headerlink" title="Partitioning and Locality"></a>Partitioning and Locality</h3><p>Megastore中每个数据分片称为一个entity group，entity group内支持1PC的ACID，之间只支持2PC或异步通信（最终一致）。注意这里的异步通信是在逻辑的不同分片间的，而不是物理上不同datacenter之间，后者是同步且强一致的。</p>
-<p>局部索引支持ACID，全局索引支持最终一致。</p>
-<p>不同应用分片策略不同：</p>
-<ul>
-<li>Email根据account。</li>
-<li>Blog需要根据不同维度，比如profile、blog、blog的唯一标识。有些操作会跨不同entity group，需要选择用2PC还是异步通信。</li>
-<li>Maps可以根据经纬度分片，如果分得过细，跨分片的操作会太多；如果分得过粗则总吞吐有限。</li>
-</ul>
-<p>Megastore的数据存储在Bigtable上，同一分片的数据对应在Bigtable的连续的行上。用户可以参与指定数据的存储方式。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-01.jpg" alt=""></p>
-<h2 id="A-Tour-of-Megastore"><a href="#A-Tour-of-Megastore" class="headerlink" title="A Tour of Megastore"></a>A Tour of Megastore</h2><h3 id="API-Design-Philosophy"><a href="#API-Design-Philosophy" class="headerlink" title="API Design Philosophy"></a>API Design Philosophy</h3><p>规范化的关系schema依赖于查询时join，因此不适合Megastore：</p>
-<ul>
-<li>join的延时难以预测。</li>
-<li>Megastore中读远多于写，因此将工作从读移到写是合算的。</li>
-<li>Bigtable适合存储和查询分级的数据。</li>
-</ul>
-<p>使用分级布局和声明式的反规范化有助于消除大多数的join。用户需要的时候可以自己在应用代码中实现join，比如有用户自己基于并行查询实现了outer join。</p>
-<p>（作者给了一些Megastore不支持join的理由，但不是很有说服力）</p>
-<h3 id="Data-Model"><a href="#Data-Model" class="headerlink" title="Data Model"></a>Data Model</h3><p>Megastore中数据按表 - entity - property来组织。每个property可以是基础类型，也可以是protobuf对象，可以是required、optional、repeated。</p>
-<p>表可以是entity root表，或是child表。每个child表都有可以唯一标识root表中entity的外键。</p>
-<p>每个entity对应Bigtable上的一行。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">CREATE SCHEMA PhotoApp;</span><br><span class="line"></span><br><span class="line">CREATE TABLE User &#123;</span><br><span class="line">  required int64 user_id;</span><br><span class="line">  required string name;</span><br><span class="line">&#125; PRIMARY KEY(user_id), ENTITY GROUP ROOT;</span><br><span class="line"></span><br><span class="line">CREATE TABLE Photo &#123;</span><br><span class="line">  required int64 user_id;</span><br><span class="line">  required int32 photo_id;</span><br><span class="line">  required int64 time;</span><br><span class="line">  required string full_url;</span><br><span class="line">  optional string thumbnail_url;</span><br><span class="line">  repeated string tag;</span><br><span class="line">&#125; PRIMARY KEY(user_id, photo_id),</span><br><span class="line">  IN TABLE User,</span><br><span class="line">  ENTITY GROUP KEY(user_id) REFERENCES User;</span><br><span class="line"></span><br><span class="line">CREATE LOCAL INDEX PhotosByTime</span><br><span class="line">  ON Photo(user_id, time);</span><br><span class="line"></span><br><span class="line">CREATE GLOBAL INDEX PhotosByTag</span><br><span class="line">  ON Photo(tag) STORING (thumbnail_url);</span><br></pre></td></tr></table></figure>
-
-<p><code>IN TABLE User</code>表示所有Photo entity都会直接存储在User对应的Bigtable表中，且物理上与User entity相连。这样可以拍平分级的join。</p>
-<p>索引既可以定义在任意property上，也可以定义在protobuf对象的内部字段上。局部索引适用于entity group内部，会与主表entity同步原子更新。全局索引跨entity group，但更新是异步的。</p>
-<p>使用<code>STORING</code>可以减少索引反查主表的次数。</p>
-<p>定义在repeated property上的索引，每个不同的property value对应一个索引行，与主表entity是N:1的关系。</p>
-<p>索引可以内联到更上层主表中，此时索引项相当于上层主表entity的一个repeated property。如将PhotosByTime定义为内联到User的索引，这样每个User对应若干项PhotosByTime。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-02.jpg" alt=""></p>
-<p>每个entity group的metadata和log也会保存到entity root对应的Bigtable表的一行中，这样可以原子更新。</p>
-<h3 id="Transactions-and-Concurrency-Control"><a href="#Transactions-and-Concurrency-Control" class="headerlink" title="Transactions and Concurrency Control"></a>Transactions and Concurrency Control</h3><p>Megastore中的事务是先将修改写进entity group对应的WAL中，再更新Bigtable表。</p>
-<p>Megastore使用了MVCC来保证修改的原子性：所有修改都完成后再提升readable version。</p>
-<p>Megastore提供了三种读级别：</p>
-<ul>
-<li>Current：确保readable version提升到当前的committed version。</li>
-<li>Snapshot：使用当前readable version。</li>
-<li>Inconsistent：无视readable version，直接读，可能读到不一致或不完整的数据（但能避免读entity group metadata？）。</li>
-</ul>
-<p>写事务总是先做一次current read来确定下个log位置，然后将所有修改打包为一个entry，使用更大的timestamp，再通过Paxos提交。使用一个server来批量提交所有写事务能避免冲突。</p>
-<p>完整的事务周期：</p>
-<ul>
-<li>读metadata。</li>
-<li>读应用数据。</li>
-<li>使用Paxos提交。</li>
-<li>更新Bigtable表。</li>
-<li>清理垃圾数据。</li>
-</ul>
-<p>跨entity group的操作可以走异步消息队列，但也可以使用2PC，虽然Megastore不推荐应用依赖于2PC。</p>
-<h2 id="Replication-1"><a href="#Replication-1" class="headerlink" title="Replication"></a>Replication</h2><p>Megastore的Paxos不依赖于某个master，任意replica都可以服务读写请求。</p>
-<p>为了保证读请求大多数情况下可以只读本地，Megastore在每个instance中增加了一个coordinator，它记录了哪些entity group的本地replica足够新。写请求负责在有写失败时通知coordinator将对应的entity group去掉。</p>
-<p>原生的Paxos的写需要两轮往返，通常的优化是基于master，master可以把上个请求的ACCEPT和下个请求的PREPARE合并为一个请求，这样变成一轮。Megastore不想要master带来的单点可用性问题。相反，它使用了leader。每个entity group的每个replica有一套单独的Paxos来选出一个特殊的leader，leader可以直接发起proposal为0的ACCEPT，其它writer仍然要走正常的两轮Paxos协议。</p>
-<p>应用写本地Bigtable不需要走replication server。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-03.jpg" alt=""></p>
-<p>replication log中每个log entry对应Bigtable中的一个cell，Megastore允许某个replica的log中间有空洞，这样刚failover的replica可以尽快参与到投票中。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-04.jpg" alt=""></p>
-<p>在做current read时，至少有一个replica的readable version要追上committed version，称为catch up。完整过程：</p>
-<ul>
-<li>读本地的coordinator判断当前entity group是否足够新。</li>
-<li>获取committed version并选择replica：<ul>
-<li>如果本地replica足够新就读本地。</li>
-<li>否则走正常的Paxos读。</li>
-</ul>
-</li>
-<li>触发对应replica的catch up。</li>
-<li>如果选择的是本地replica，且完成了catch up，则向coordinator发送一个请求来判断entity group是否健康。应用不需要等待这个请求返回，如果失败了后续的读请求还会自动重试。</li>
-<li>读数据。</li>
-</ul>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-05.jpg" alt=""></p>
-<p>写流程：</p>
-<ol>
-<li>询问leader是否接受当前log entry作为0号proposal，如果是，直接跳到步骤3。</li>
-<li>向每个replica发送PREPARE。</li>
-<li>询问其它replica是否接受当前proposal。</li>
-<li>与拒绝或失败的replica对应的coordinator通信，移除这个entity group。</li>
-<li>更新接受的replica对应的Bigtable。</li>
-</ol>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/22/mega-store-providing-scalable-highly-available-storage-for-interactive-services/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -590,10 +519,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-10-16 20:00:43 / 修改时间：20:00:45" itemprop="dateCreated datePublished" datetime="2020-10-16T20:00:43+08:00">2020-10-16</time>
+              <time title="创建时间：2020-10-16 20:00:43" itemprop="dateCreated datePublished" datetime="2020-10-16T20:00:43+08:00">2020-10-16</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:58:52" itemprop="dateModified" datetime="2020-11-11T15:58:52+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -617,87 +552,14 @@
 <li>可以生成优化的MapReduce程序。</li>
 </ul>
 <p>（FlumeJava这套框架目前仍在被大量使用，但底下应该已经不是MapReduce了。）</p>
-<h2 id="The-FlumeJava-Library"><a href="#The-FlumeJava-Library" class="headerlink" title="The FlumeJava Library"></a>The FlumeJava Library</h2><p>FlumeJava提供了几个核心类：</p>
-<ul>
-<li><code>PCollection&lt;T&gt;</code>：一个不可变序列。</li>
-<li><code>PTable&lt;K, V&gt;</code>：一个不可变的multi-map。</li>
-<li><code>PObject&lt;T&gt;</code>：单个Object。</li>
-</ul>
-<p>这几个类都是惰性求值的。</p>
-<p>基础转换关系：</p>
-<ul>
-<li><code>PCollection.&lt;T&gt;parallelDo(fn&lt;T, U&gt;, collectionOf(...))</code> -&gt; <code>PCollection&lt;U&gt;</code>。</li>
-<li><code>PCollection.&lt;T&gt;parallelDo(fn&lt;T, Pair&lt;K, V&gt;&gt;, tableOf(...))</code> -&gt; <code>PTable&lt;K, V&gt;</code>。</li>
-<li><code>PTable.&lt;K, V&gt;groupByKey()</code> -&gt; <code>PTable&lt;K, Collection&lt;V&gt;&gt;</code>。</li>
-<li><code>PTable.&lt;K, Collection&lt;V&gt;&gt;combineValues(fn&lt;V, U&gt;)</code> -&gt; <code>PTable.&lt;K, U&gt;</code>。</li>
-<li><code>flatten(Collection&lt;PCollection&lt;T&gt;&gt;)</code> -&gt; <code>PCollection&lt;T&gt;</code>，新序列的元素直接来自各个输入，不会发生拷贝。</li>
-<li><code>PCollection.&lt;T&gt;asSequentialCollection()</code> -&gt; <code>PObject&lt;Collection&lt;T&gt;&gt;</code>。</li>
-<li><code>PTable.&lt;K, V&gt;asSequentialCollection()</code> -&gt; <code>PObject&lt;Collection&lt;Pair&lt;K, V&gt;&gt;&gt;</code>。</li>
-<li><code>PCollection.&lt;T&gt;combine(fn&lt;T, U&gt;)</code> -&gt; <code>PObject&lt;U&gt;</code>。</li>
-<li><code>operate(PObject&lt;T&gt;, fn&lt;T, U&gt;)</code> -&gt; <code>PObject&lt;U&gt;</code>。</li>
-</ul>
-<p>衍生出<code>join()</code>：</p>
-<ul>
-<li><code>parallelDo</code>：<code>PTable&lt;K, Vi&gt;</code> -&gt; <code>PTable&lt;K, TaggeeUnion2&lt;V1, V2&gt;&gt;</code>。</li>
-<li><code>flatten</code>。</li>
-<li><code>groupByKey</code>：<code>PTable&lt;K, TaggeeUnion2&lt;V1, V2&gt;&gt;</code> -&gt; <code>PTable&lt;K, Collection&lt;TaggeeUnion2&lt;V1, V2&gt;&gt;&gt;</code>。</li>
-<li><code>parallelDo</code>：<code>PTable&lt;K, Collection&lt;TaggeeUnion2&lt;V1, V2&gt;&gt;&gt;</code> -&gt; <code>PTable&lt;K, Tuple2&lt;Collection&lt;V1&gt;, Collection&lt;V2&gt;&gt;&gt;</code>。</li>
-</ul>
-<p>top()：</p>
-<ul>
-<li><code>parallelDo</code>。</li>
-<li><code>groupByKey</code>。</li>
-<li><code>combineValues</code>。</li>
-</ul>
-<h2 id="Optimizer"><a href="#Optimizer" class="headerlink" title="Optimizer"></a>Optimizer</h2><h3 id="合并parallelDo"><a href="#合并parallelDo" class="headerlink" title="合并parallelDo"></a>合并<code>parallelDo</code></h3><p>合并后的<code>parallelDo</code>可以有多个输出。</p>
-<p>可以合并连续的<code>parallelDo</code>，以及同一个输入的不同下游<code>parallelDo</code>。</p>
-<p><code>combineValues</code>是另一种形式的<code>parallelDo</code>，因此也可以一起合并掉。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-01.jpg" alt=""></p>
-<h3 id="MapShuffleCombineReduce（MSCR）"><a href="#MapShuffleCombineReduce（MSCR）" class="headerlink" title="MapShuffleCombineReduce（MSCR）"></a>MapShuffleCombineReduce（MSCR）</h3><p>可以将<code>parallelDo</code>、<code>groupByKey</code>、<code>combineValues</code>、<code>flatten</code>合并为一个MapReduce作业，称为MapShuffleCombineReduce（MSCR）。</p>
-<p>一个MSCR有M个输入（每个对应一种map操作）和R个输出（每个可以包含shuffle、combine、reduce阶段）。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-02.jpg" alt=""></p>
-<p>注意shuffle发生在<code>groupByKey</code>之前。</p>
-<h3 id="合并MSCR。"><a href="#合并MSCR。" class="headerlink" title="合并MSCR。"></a>合并MSCR。</h3><p>如果多个<code>groupByKey</code>操作有相同的上游（可以是合并后的一个<code>parallelDo</code>的不同输出），称它们相关。</p>
-<p>多个相关的<code>groupByKey</code>可以合并为一个MSCR，这些<code>groupByKey</code>上游的<code>parallelDo</code>合并进MSCR，对应一个输入，每个<code>groupByKey</code>对应一个输出。如果MSCR的某个输出只被<code>comineValues</code>或<code>parallelDo</code>消费，这个操作也可以合并进来（<code>parallelDo</code>也可以合并进下个MSCR的输入）。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-03.jpg" alt=""></p>
-<p>最后孤立的<code>parallelDo</code>会被转换为平凡的MSCR，这样最终执行计划只剩下MSCR、<code>fatten</code>、<code>operate</code>。</p>
-<h3 id="整体优化"><a href="#整体优化" class="headerlink" title="整体优化"></a>整体优化</h3><p>整体优化的顺序：</p>
-<ol>
-<li>下移<code>flatten</code>，将它下面的<code>parallelDo</code>复制到每个输入上，即将<code>parallelDo(flatten(A, B))</code>转为<code>flatten(parallelDo(A), parallelDo(B))</code>，这样能创造更多的合并<code>parallelDo</code>的机会。</li>
-<li>如果<code>groupByKey</code>后面跟着<code>combineValues</code>，可以将<code>combineValues</code>视为普通的<code>parallelDo</code>，从而参与<code>parallelDo</code>的合并。</li>
-<li>如果两个<code>groupByKey</code>中间是一个或多个<code>parallelDo</code>，我们需要找一个边界，将它们切成两个MSCR。优化器会沿着这条路径估计每步产生的<code>PCollection</code>的大小，从最小的那个位置切开。</li>
-<li>合并<code>parallelDo</code>。</li>
-<li>合并与转换MSCR。</li>
-</ol>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-04.jpg" alt=""></p>
-<h3 id="限制"><a href="#限制" class="headerlink" title="限制"></a>限制</h3><p>目前FlumeJava没有做：</p>
-<ul>
-<li>静态分析用户代码。</li>
-<li>修改用户代码。</li>
-<li>公共表达式消除。</li>
-<li>移除不必要的<code>groupByKey</code>。</li>
-</ul>
-<h2 id="Executor"><a href="#Executor" class="headerlink" title="Executor"></a>Executor</h2><p>FlumeJava可以根据数据大小决定是本地运行，还是启动远端的MapReduce作业。</p>
-<h2 id="Lumberjack的教训"><a href="#Lumberjack的教训" class="headerlink" title="Lumberjack的教训"></a>Lumberjack的教训</h2><p>FlumeJava之前，Google还开发过一个类似的语言Lumberjack：</p>
-<ul>
-<li>适合表达并行pipeline。</li>
-<li>隐式并行。</li>
-<li>函数式。</li>
-<li>精巧的多态类型系统。</li>
-<li>局部类型推导。</li>
-<li>轻量tuple和record类型。</li>
-<li>匿名函数作为一等公民。</li>
-<li>拥有强大的静态优化器，包含了内联、数据流分析等常规优化，以及合并并行循环等非常规优化。</li>
-<li>编译为中间代码，最终可以生成Java字节码或机器码。</li>
-</ul>
-<p>它的问题在于：</p>
-<ul>
-<li>隐式并行违反了用户的习惯。相比之下，FlumeJava代码写起来更多，但更好理解，它有一个<code>PCollection</code>到<code>Collection</code>和<code>parallelDo</code>到<code>iterator</code>的明显的边界。FlumeJava的“命令式为主”的接口加上不可变结构也更符合用户的习惯。</li>
-<li>Lumberjack的静态优化器没办法根据运行期数据进行优化。FlumeJava的动态优化器带来的开销是非常有限的，但运行期优化却有着非常大的优势。</li>
-<li>基于Lumberjack开发高效完整的系统比基于FlumeJava更难，更花时间。</li>
-<li>新颖阻碍着被接受。FlumeJava是Java的一个库，极大降低了用户接入的成本。</li>
-</ul>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -739,10 +601,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-10-14 16:56:10 / 修改时间：18:51:21" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
+              <time title="创建时间：2020-10-14 16:56:10" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 16:01:05" itemprop="dateModified" datetime="2020-11-11T16:01:05+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -769,68 +637,14 @@
 <p>本文观点是在这套架构上小修小补已经不够了，我们需要全新的设计。</p>
 <p>尤其是传统RDBMS想用一套系统满足全部需求的想法已经过时了。</p>
 <p>H-Store针对OLTP场景，打破了上面这种架构，主要是充分利用大内存和多节点，结合对OLTP场景的若干假设，省掉log和lock相关的很多机制，从而大幅度提升了性能。</p>
-<h2 id="OLTP-Design-Considerations"><a href="#OLTP-Design-Considerations" class="headerlink" title="OLTP Design Considerations"></a>OLTP Design Considerations</h2><ol>
-<li>内存：随着内存容量上升，很大的OLTP数据库也可以整个放到内存中，而旧的设计是面向磁盘的，没办法充分利用内存的特点，新的设计需要将内存放到比磁盘更高优先级的位置。</li>
-<li>多线程和并发控制：假如所有数据都在内存中，则OLTP的事务通常都比较短，此时多线程在延时方面的优势就不明显了，使用单线程可以去掉并发控制、并发数据结构，整体架构更可靠，性能也更好。</li>
-<li>网格计算和停机升级：未来shared-nothing架构会是主流，多个节点只通过网络连接在一起；且用户不太可能接受停机升级，新的DBMS需要有能力不停机扩缩容和升级，比如在节点间复制数据的同时还不影响事务，这些能力不太可能加到已有系统上。</li>
-<li>高可用：新的系统需要用热备或p2p来达到高可用，这样的系统中log可以非常简化，只需要undo log而不需要redo log，且undo log也只需要在内存中而不需要持久化。</li>
-<li>不需要大量手动开关：新的系统要有self-everything（self-healing，self-maintaining，self-tuning）的能力。</li>
-</ol>
-<h2 id="Transaction-Processing-and-Environment-Assumptions"><a href="#Transaction-Processing-and-Environment-Assumptions" class="headerlink" title="Transaction, Processing and Environment Assumptions"></a>Transaction, Processing and Environment Assumptions</h2><p>为了实现这样的新系统，以下结论就很明显了：</p>
-<ul>
-<li>持久化的redo log明显是性能瓶颈，即使有group commit，也会给每个事务带来若干ms的开销。</li>
-<li>没有了redo log后，DBMS的输入输出接口——JDBC/ODBC——就是瓶颈了。作者推荐将应用逻辑全都写为像存储过程一样内置在DBMS里的形式，而不要用传统的交互式的C/S模式。</li>
-<li>如有可能，省略掉undo log。</li>
-<li>尽量削减传统的动态数据锁的开销，这是瓶颈之一。</li>
-<li>多线程锁的开销也不可小视，鉴于大内存容量和短事务的特性，我们可以单线程运行，从而以非常低的代价省掉这部分开销。</li>
-<li>尽量避免使用2PC。</li>
-</ul>
-<h3 id="Transaction-and-Schema-Characteristics"><a href="#Transaction-and-Schema-Characteristics" class="headerlink" title="Transaction and Schema Characteristics"></a>Transaction and Schema Characteristics</h3><p>H-Store要求只能用预定义好的Transaction类，每个类的SQL是固定的，可以有运行期参数，不能有显式的停顿，SQL中涉及到的表必须在注册Transaction类时已存在。</p>
-<p>作者注意到很多OLTP场景都有着明显的树型结构，root表与子表有着1:n的join关系，这样可以让子表与root表使用相同partition策略，就可以保证在一个节点上执行equi-join了。</p>
-<p>如果在此基础上，一个transaction类中的所有命令都可以在相同节点完成，我们称这个应用为constrained tree application（CTA）。CTA的价值在于它的执行不会受到其它节点的影响（除了因replication同步导致的）。</p>
-<p>如果CTA中所有transaction的所有命令，除了有root上的相等性判断外，还对一个或多个子表的primary key有相等性判断，则我们还可以在整棵树上做更细粒度的分区。</p>
-<p>OLTP应用很多都可以直接设计成CTA，或者分解为多个CTA。另一类技术是如何把非CTA应用也变成单节点的。作者这里提到两种方法：</p>
-<ol>
-<li>只读的表可以复制到各个节点上，如果去掉这种表之后应用变成了CTA，则加上复制后的只读表它仍然会是CTA。</li>
-<li>另一类应用是one-shot，其中的所有事务都可以并发执行而不需要跨节点的通信，且后面SQL也不会用到前面SQL的结果。这种事务就可以分解为若干个单节点的命令。</li>
-</ol>
-<p>应用经常可以通过垂直分区实现one-shot（不更新的列复制到每个节点），如TPC-C。</p>
-<p>一些应用是两阶段的（或可以转为两阶段），即先是只读阶段，再是只写阶段，如TPC-C。H-Store通过挖掘两阶段的应用从而消除undo-log。</p>
-<p>如果两阶段的应用还保证了只读阶段在所有的节点上运行最终得到同样的继续还是abort的决定，这种应用称为强两阶段应用。</p>
-<p>如果两个事务的任意单节点子计划交错执行都会得到相同的结果（假设都提交），则称这两个事务是可交换的。如果一个事务类与其它所有事务类（包括自己）都是可交换的，则称这样的事务类是sterile。</p>
-<h2 id="H-Store-Sketch"><a href="#H-Store-Sketch" class="headerlink" title="H-Store Sketch"></a>H-Store Sketch</h2><p>每个H-Store节点被分为若干个虚拟节点，每个虚拟节点对应一个cpu核，单线程执行预定义好的事务类。与C-Store类似，H-Store中没有redo log，undo log也只在需要时用到。</p>
-<p>H-Store会在定义事务类时应用基于开销的优化器将SQL转换为查询计划。这里假设了OLTP中很少有多路join（即使有，也通常满足树型要求）、group by、聚合。</p>
-<p>事务类的查询计划可以是：</p>
-<ul>
-<li>单节点的。</li>
-<li>one-shot的。</li>
-<li>普通的，节点间可能需要传递中间结果，后面SQL的参数可能依赖前面SQL的结果。此时H-Store使用Gamma风格的执行模型，最开始处理事务的节点作为协调者。</li>
-</ul>
-<p>对于普通事务，H-Store还会计算事务的深度，即节点间消息传递的次数。</p>
-<p>H-Store有工具自动化设计分区、replication位置、需要索引的字段。为了实现高可用，每个分区都需要有一个或多个伙伴，它们包含相同信息，但可以有不同的形式（如不同的排序）。</p>
-<p>自动化工具的目的是令尽可能多的事务能单节点运行。</p>
-<p>H-Store会保证所有replica的更新满足事务性质，因此读命令可以选择任一replica，而写命令需要发给所有replica。</p>
-<p>每个事务在执行时会收到一个时间戳，格式为<code>(site_id, local_unique_timestamp)</code>，这样给定<code>site_id</code>的顺序，时间戳就满足全序关系了。H-Store需要各个节点的本地时间尽量保持同步。</p>
-<p>H-Store可以利用以下信息来简化并发控制和提交协议：</p>
-<ul>
-<li>单节点/one-shot：如果所有事务类都是单节点或one-shot的，则每个事务都可以直接发给各个replica执行。如果其中有非sterile的事务，节点在执行事务前需要等一小会（考虑网络延迟）以保证事务是按时间戳顺序执行的，从而保证各个replica上事务执行顺序相同。同样地，这样的事务类保证了所有repilca要么都commit，要么都abort，这样各个replica可以只看本地结果决定是commit还是abort。此时我们不需要redo log、并发控制、分布式提交。</li>
-<li>两阶段：（如果所有事务类都是两阶段的，）不需要有undo-log，结合上面这条，此时所有事务相关的机制都不需要了。</li>
-<li>sterile：如果所有事务类都是sterile，那么所有事务可以不做并发控制地正常执行，甚至不需要关心不同replica上事务执行的顺序。但如果事务涉及了多个节点，不能保证这些节点都commit或都abort，此时就需要使用2PC了。如果所有事务类都是强两阶段的，就可以省掉2PC。</li>
-<li>其它情况：此时一定要有某种并发控制手段。最常用的并发控制手段是动态锁，但H-Store基于以下原因反对动态锁：<ul>
-<li>事务持续时间短，乐观方法要好于动态锁之类的悲观方法。</li>
-<li>H-Store已经把事务分解为单节点的命令，每个命令没有阻塞地单线程运行，就更倾向于乐观方法了。</li>
-<li>作者假设H-Store可以一次看到全部事务类，可以利用这些全局信息来减小并发控制的开销。</li>
-<li>设计良好的系统中事务冲突和死锁都非常少，此时要求应用开发者来移除这些意外也是合理的（不要为了小概率事件牺牲整体性能）。</li>
-</ul>
-</li>
-</ul>
-<p>H-Store会针对每个不满足各种优化条件的事务类找出所有与它冲突的事务类，在执行时会找一个协调者，其它节点在执行时也会等一小段时间看是否有与之冲突的、时间戳更小的事务到达，之后：</p>
-<ul>
-<li>如果没有这样的冲突的、时间戳更小的事务，执行子计划。</li>
-<li>abort掉子计划并告知协调者。</li>
-</ul>
-<p>如果abort频率太高，H-Store会降级到其它策略，比如多等一会，或使用标准的乐观锁控制。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -872,10 +686,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-10-11 18:18:37 / 修改时间：18:18:38" itemprop="dateCreated datePublished" datetime="2020-10-11T18:18:37+08:00">2020-10-11</time>
+              <time title="创建时间：2020-10-11 18:18:37" itemprop="dateCreated datePublished" datetime="2020-10-11T18:18:37+08:00">2020-10-11</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 16:00:44" itemprop="dateModified" datetime="2020-11-11T16:00:44+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -899,30 +719,14 @@
 <li>支持导入已有的脚本，且可传递参数。</li>
 <li>编译期支持基于开销进行优化，重写执行计划；运行期也支持优化，比如按rack做预聚合。</li>
 </ul>
-<h2 id="语法"><a href="#语法" class="headerlink" title="语法"></a>语法</h2><p>SCOPE支持两种语法，既可以直接写成类似SQL的形式：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">SELECT query, COUNT(*) AS count</span><br><span class="line">FROM &quot;search.log&quot; USING LogExtractor</span><br><span class="line">GROUP BY query</span><br><span class="line">HAVING count &gt; 1000</span><br><span class="line">ORDER BY count DESC;</span><br><span class="line">OUTPUT TO &quot;qcount.result&quot;;</span><br></pre></td></tr></table></figure>
-
-<p>也可以使用声明式语法：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">e &#x3D; EXTRACT query</span><br><span class="line"> FROM “search.log&quot;</span><br><span class="line"> USING LogExtractor;</span><br><span class="line">s1 &#x3D; SELECT query, COUNT(*) as count</span><br><span class="line"> FROM e</span><br><span class="line"> GROUP BY query;</span><br><span class="line">s2 &#x3D; SELECT query, count</span><br><span class="line"> FROM s1</span><br><span class="line"> WHERE count &gt; 1000;</span><br><span class="line">s3 &#x3D; SELECT query, count</span><br><span class="line"> FROM s2</span><br><span class="line"> ORDER BY count DESC;</span><br><span class="line">OUTPUT s3 TO “qcount.result&quot;;</span><br></pre></td></tr></table></figure>
-
-<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/scope-01.jpg" alt=""></p>
-<p>SCOPE是建立在Cosmos分布式执行平台之上的（参考<a href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/">Dryad</a>）。</p>
-<h2 id="SCOPE语言"><a href="#SCOPE语言" class="headerlink" title="SCOPE语言"></a>SCOPE语言</h2><p>SCOPE提供了EXTRACT和OUTPUT两条指令来定义输入和输出：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">EXTRACT column[:&lt;type&gt;] [, …]</span><br><span class="line">FROM &lt; input_stream(s) &gt;</span><br><span class="line">USING &lt;Extractor&gt; [(args)]</span><br><span class="line">[HAVING &lt;predicate&gt;]</span><br><span class="line"></span><br><span class="line">OUTPUT [&lt;input&gt;</span><br><span class="line"> [PRESORT column [ASC | DESC] [, …]]]</span><br><span class="line">TO &lt;output_stream&gt;</span><br><span class="line">[USING &lt;Outputter&gt; [(args)]]</span><br></pre></td></tr></table></figure>
-
-<p>用户可以用C#实现自己的Extractor和Producer来扩展这两条指令。</p>
-<p>SCOPE还支持SELECT和JOIN，其中FROM子句支持嵌套，但不支持子查询。但用户可以用OUTER JOIN来绕开这一限制，如下面的SQL：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">SELECT Ra, Rb</span><br><span class="line">FROM R</span><br><span class="line">WHERE Rb &lt; 100</span><br><span class="line"> AND (Ra &gt; 5 OR EXISTS(SELECT * FROM S</span><br><span class="line"> WHERE Sa &lt; 20</span><br><span class="line"> AND Sc &#x3D; Rc))</span><br></pre></td></tr></table></figure>
-
-<p>可以改写为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">SQ &#x3D; SELECT DISTINCT Sc FROM S WHERE Sa &lt; 20;</span><br><span class="line">M1 &#x3D; SELECT Ra, Rb, Rc FROM R WHERE Rb &lt; 100;</span><br><span class="line">M2 &#x3D; SELECT Ra, Rb, Rc, Sc</span><br><span class="line"> FROM M1 LEFT OUTER JOIN SQ ON Rc &#x3D;&#x3D; Sc;</span><br><span class="line">Q &#x3D; SELECT Ra, Rb FROM M2</span><br><span class="line"> WHERE Ra &gt; 5 OR Rc !&#x3D; Sc;</span><br></pre></td></tr></table></figure>
-
-<p>SCOPE脚本中还可以直接调用C#表达式，如：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">R1 &#x3D; SELECT A+C AS ac, B.Trim() AS B1</span><br><span class="line"> FROM R</span><br><span class="line"> WHERE StringOccurs(C, “xyz”) &gt; 2</span><br><span class="line"></span><br><span class="line">#CS</span><br><span class="line">public static</span><br><span class="line">int StringOccurs(string str, string ptrn)</span><br><span class="line">&#123;</span><br><span class="line"> int cnt&#x3D;0; int pos&#x3D;-1;</span><br><span class="line"> while (pos+1 &lt; str.Length) &#123;</span><br><span class="line"> pos &#x3D; str.IndexOf(ptrn, pos+1) ;</span><br><span class="line"> if (pos &lt; 0) break;</span><br><span class="line"> cnt++;</span><br><span class="line"> &#125;</span><br><span class="line"> return cnt;</span><br><span class="line">&#125;</span><br><span class="line">#ENDCS</span><br></pre></td></tr></table></figure>
-
-<p>其中<code>#CS</code>和<code>#ENDCS</code>中间可以直接嵌入C#代码。</p>
-<p>用户还可以自己定制PROCESS、REDUCE、COMBINE三类算子，从而实现类似于<a href="2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/">MapReduceMerge</a>的操作。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -964,10 +768,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-10-11 15:25:21 / 修改时间：15:27:02" itemprop="dateCreated datePublished" datetime="2020-10-11T15:25:21+08:00">2020-10-11</time>
+              <time title="创建时间：2020-10-11 15:25:21" itemprop="dateCreated datePublished" datetime="2020-10-11T15:25:21+08:00">2020-10-11</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:58:46" itemprop="dateModified" datetime="2020-11-11T15:58:46+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -991,26 +801,14 @@
 <li>支持按网络拓扑插入中间节点做部分聚合。</li>
 </ul>
 <p>Dryad属于是底层框架，用户真正用到的还是上面的框架，类似于MapReduce和Sawzall的关系。</p>
-<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p>Dryad有一个JobManager负责调度，每台机器上有一个daemon负责起进程和监控，还有name server可以查询机器和机器的位置。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/dryad-01.jpg" alt=""></p>
-<p>Dryad底下也有一个类似于GFS的共享存储，顶点间默认用它来通信，但也可以使用TCP Pipe和in-memory FIFO。</p>
-<p>后两种通信方式性能更高，但因为是同步通信，可能有死锁问题，比如接收端顶点未启动。</p>
-<h2 id="操纵DAG"><a href="#操纵DAG" class="headerlink" title="操纵DAG"></a>操纵DAG</h2><p>Dryad可以处理以下对DAG的修改：</p>
-<ul>
-<li>增加顶点。</li>
-<li>组合两个DAG以增加边。</li>
-<li>合并两个DAG。</li>
-</ul>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/dryad-02.jpg" alt=""></p>
-<h2 id="执行"><a href="#执行" class="headerlink" title="执行"></a>执行</h2><p>Dryad中有逻辑DAG和物理DAG，逻辑DAG里的一个stage可能对应物理DAG的一组顶点，这样来简化监控和处理。</p>
-<p>Dryad只负责顶点间纯字节流的通信，具体的序列化和反序列化由应用自己负责。</p>
-<p>一台机器可以根据自己的负载能力一次接受多个顶点，这些顶点程序会在一个进程中，通过in-memory FIFO进行通信。这样不需要把不同顶点真的合并在一起，简化了处理，又保证了它们不会跨进程、机器通信，提高了性能。</p>
-<p>每个stage对应一个stage manager，它可以在运行期从JM获得各个顶点的运行情况，从而做一些比较复杂的操作，比如冗余运行这个stage中比较慢的节点。</p>
-<h2 id="优化"><a href="#优化" class="headerlink" title="优化"></a>优化</h2><p>大多数数据中心的网络都是两层结构，机器直连rack的交换机，rack的交换机再连主交换机。Dryad可以根据网络拓扑，在原有的DAG中插入中间层进行部分聚合。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/dryad-03.jpg" alt=""></p>
-<p>也可以复制更多的中间顶点以提高整体的并行度。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/dryad-04.jpg" alt=""></p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1060,7 +858,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-10-11 15:26:50" itemprop="dateModified" datetime="2020-10-11T15:26:50+08:00">2020-10-11</time>
+                <time title="修改时间：2020-11-11 15:59:15" itemprop="dateModified" datetime="2020-11-11T15:59:15+08:00">2020-11-11</time>
               </span>
 
           
@@ -1080,41 +878,14 @@
 <h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章讲的是如何优化Hadoop在异构环境下的任务调度性能。</p>
 <p>任务调度的关键在于如何让长尾任务尽快完成。MapReduce会在最后阶段冗余运行长尾任务，Google的数据显示这么做能提升44%的任务响应速度。</p>
 <p>Hadoop的调度策略是冗余运行最慢的任务，而这篇文章提出的LATE（Longest Approximate Time to End)策略则是找最可能最慢结束的任务。在异构环境下LATE可以让任务响应速度达到Hadoop原有策略的2倍。</p>
-<h2 id="Hadoop的探测运行机制"><a href="#Hadoop的探测运行机制" class="headerlink" title="Hadoop的探测运行机制"></a>Hadoop的探测运行机制</h2><p>Hadoop会给每个任务打一个0-1的分。map任务的分数就是它读取的input file的比例。reduce任务的分数分为三部分：copy、sort、reduce，每部分占1/3，乘上各自完成比例，最后累加起来。</p>
-<p>之后Hadoop会统计所有任务的平均分，小于这个平均分减一个阈值（默认0.2）的任务会被认为是慢任务，调度器同时最多探测运行一个慢任务。同构环境中任务通常是一波一波开始结束的，因此这种调度策略运行结果很好。</p>
-<p>但它做了几个假设：</p>
-<ol>
-<li>各节点执行速度差不多。</li>
-<li>任务的分数随运行时间线性增长。</li>
-<li>在空闲的节点上启动一个探测任务是没有开销的。</li>
-<li>任务的分数就代表着它的完成度，尤其对于reduce任务，它的copy、sort、reduce三阶段工作量是相同的。</li>
-<li>任务倾向于一波一波结束，因此分数低的任务很可能是慢任务。</li>
-<li>同类型（map或reduce）的任务间工作量差不多。</li>
-</ol>
-<p>异构环境下1和2不一定成立，即使是同构环境下3、4、5也不一定成立，还会拖慢Hadoop，Yahoo因此就在某些任务上关掉了探测执行。Facebook不对reduce任务启用探测执行。</p>
-<p>3在资源共享情况下不成立，不同任务间可能竞争网络和磁盘，且如果同时有多个作业执行，作业之间也会有资源竞争。</p>
-<p>4的问题是reduce任务的不同阶段工作量往往差别很大，典型的MapReduce任务的copy阶段工作量最大，因为它需要所有map任务的输出。可能出现的场景，30%的reduce任务完成了copy后迅速完成了后2阶段，分数从1/3直接变成了1，此时平均分是0.53，所有其它reduce任务都落后于平均分0.2，都变成了慢任务。实际场景中可以有80%的reduce任务被探测运行了。</p>
-<p>5的问题是分数低的任务可能刚刚启动。</p>
-<p>6取决于任务切分策略，理想情况下是的，但即使工作量分配不均匀，只要能找准慢任务，多探测运行几个慢任务也不坏。</p>
-<p>最后，0.2的阈值意味着只要分数过了0.8的任务都不会被认为是慢任务。</p>
-<h2 id="异构环境"><a href="#异构环境" class="headerlink" title="异构环境"></a>异构环境</h2><ol>
-<li>大型数据中心的机器难以保证配置相同（逐次更新换代）。</li>
-<li>软硬件问题导致不同机器执行速度不同。</li>
-<li>虚拟化。</li>
-</ol>
-<h2 id="LATE"><a href="#LATE" class="headerlink" title="LATE"></a>LATE</h2><p>LATE仍然统计各任务的分数，之后计算得到速度<code>progress rate = progress score / T</code>（T是任务已运行时间）和完成所需时间<code>(1 - progress score) / progress rate</code>。</p>
-<p>LATE还会统计各节点的分数（节点上所有运行过的任务的分数之和），从而找出慢节点，避免调度探测任务到这些慢节点上。</p>
-<p>LATE有两个关键参数：</p>
-<ul>
-<li>SpeculativeCap，同时最多有多少个探测任务运行。</li>
-<li>SlowTaskThreshold，速度慢于此值的任务才是慢任务。</li>
-</ul>
-<p>LATE会拒绝分配探测任务给慢节点，并在适当时候找出可能最晚结束的任务分配给快节点探测运行。</p>
-<p>LATE分配探测的map任务时不考虑局部性，作者假设map阶段正常的任务都是读本地盘的，这些探测任务的网络竞争应该很小。</p>
-<p>这种策略可能导致的一个问题：任务A的分数更高，但进入了运行较慢的阶段，任务B还没进入这个阶段，分数更低但速度更快，按前面的公式任务B会先执行完。但我们知道B到了下一阶段也会慢下来。这篇文章没有考虑解决这个问题。</p>
-<p>想要解决这一问题可能需要历史统计数据。</p>
-<p>反过来，如果后面阶段快于前面阶段则没有问题。</p>
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1156,10 +927,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-10-09 11:21:22 / 修改时间：19:30:58" itemprop="dateCreated datePublished" datetime="2020-10-09T11:21:22+08:00">2020-10-09</time>
+              <time title="创建时间：2020-10-09 11:21:22" itemprop="dateCreated datePublished" datetime="2020-10-09T11:21:22+08:00">2020-10-09</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 16:01:40" itemprop="dateModified" datetime="2020-11-11T16:01:40+08:00">2020-11-11</time>
+              </span>
 
           
 
@@ -1175,334 +952,14 @@
           <blockquote>
 <p><a href="https://book.douban.com/subject/35034359/" target="_blank" rel="noopener">数据压缩入门</a></p>
 </blockquote>
-<h2 id="并非无趣的一章"><a href="#并非无趣的一章" class="headerlink" title="并非无趣的一章"></a>并非无趣的一章</h2><p>适合游戏数据的压缩：</p>
-<ol>
-<li>无损：去掉重复数据（lz）；熵压缩（Huffman，算术编码）</li>
-<li>有损：降精度，图像视频压缩，音频压缩</li>
-</ol>
-<p><a href="https://www.youtube.com/watch?v=Eb7rzMxHyOk&list=PLOU2XLYxmsIJGErt5rrCqaSGTMyyqNt2H" target="_blank" rel="noopener">Compressor Head - Youtube</a></p>
-<p>5类压缩算法：变长编码，统计压缩，字典编码，上下文模型，多上下文模型</p>
-<p>压缩数据的两个思路：</p>
-<ol>
-<li>减少符号数量（字母表尽可能小）</li>
-<li>用更少的位数对更常见的符号进行编码</li>
-</ol>
-<p><a href="https://www.pingdom.com/blog/the-web-in-1996-1997" target="_blank" rel="noopener">The web back in 1996-1997</a></p>
-<p>BWT是压缩dna信息最有效的格式</p>
-<h2 id="突破熵"><a href="#突破熵" class="headerlink" title="突破熵"></a>突破熵</h2><p><a href="http://www.rosettacode.org/" target="_blank" rel="noopener">Rosetta Code</a></p>
-<p>一组符号的香农熵是表示一个符号最小的位数</p>
-<p>通过利用真实数据的两个性质，很可能把数据压缩得比熵小</p>
-<p>突破熵：改变数据的表示形式</p>
-<p>增量编码</p>
-<p>字典编码器</p>
-<p>排列（无重复）通常很难压缩</p>
-<p>通过消除编码法压缩排列</p>
-<p>数据压缩的艺术，就在于将数据转换为熵值更小的新的表现形式</p>
-<p>对压缩进行评价时熵不是一个好指标（除了统计压缩）</p>
-<p>柯尔莫戈洛夫复杂度（Kolmogorov complexity），为了准确地生成数据，需要的生成程序的大小。如果生成程序很小，可以用它代替数据本身。逻辑综合（logic synthesis），程序综合（program synthesis）</p>
-<h2 id="VLC"><a href="#VLC" class="headerlink" title="VLC"></a>VLC</h2><p>给定一组符号，将最短的编码分配给最常见的符号</p>
-<p>编码需满足前缀性质</p>
-<p>整数转为VLC的方法称为通用编码（universal codes）。越小的数字编码越短。还有唯一可译码（uniquely decodable codes）与非奇异码（nonsingular codes）</p>
-<p>一元码：编码N为N个1加1个0。</p>
-<p>Elias Gamma编码：</p>
-<ol>
-<li>x= 2^N + L</li>
-<li>用一元码编码N</li>
-<li>用固定长度二进制码编码L</li>
-</ol>
-<p>Elias delta</p>
-<p>Elias omega</p>
-<p>VLC的问题：</p>
-<ol>
-<li>不按字节对齐</li>
-<li>大整数的长度超过固定编码</li>
-<li>按位解码慢</li>
-</ol>
-<p>variant算法：Google用在LevelDB中的按字节vlc</p>
-<p>避免压缩整数（escaping for compressed integers）</p>
-<h2 id="统计编码"><a href="#统计编码" class="headerlink" title="统计编码"></a>统计编码</h2><p>通过数据集中符号出现的概率确定唯一的新的变长编码，有时被称为熵编码</p>
-<p>哈夫曼编码，总是将码表放在数据流前面一起传输，避免解码时创建码表</p>
-<p><a href="https://www.ted.com/talks/robert_lang_the_math_and_magic_of_origami" target="_blank" rel="noopener">TED: The math and magic of origami</a></p>
-<p>哈夫曼编码的问题：单个符号的编码长度总是整数，当符号出现概率不是2的负整数幂时达不到最优</p>
-<p>算术编码：将整个输入流转换为长度很长的数值</p>
-<p>区间编码：绕开算术编码的专利限制</p>
-<p>算术编码过程：</p>
-<ol>
-<li>初始区间为[0, 1)</li>
-<li>将当前区间按各符号概率进行分割</li>
-<li>读入一个符号，选择对应的字区间，更新当前区间</li>
-<li>重复</li>
-</ol>
-<p>最终输出最后一个区间中任意一个数（二进制位数最少的）</p>
-<p>ANS（asymmetric numeral systems）是新编码算法，压缩率和算术编码接近，性能和哈夫曼编码接近</p>
-<p><a href="https://ieeexplore.ieee.org/document/7170048" target="_blank" rel="noopener">The Use of Asymmetric Numeral Systems as an Accurate Replacement for Huffman Coding</a></p>
-<ol>
-<li>创建转换表，每个符号一列，按概率自左向右排列</li>
-<li>填入数值，满足：<ol>
-<li>唯一</li>
-<li>每列升序</li>
-<li>大于该行行号（从1开始）</li>
-<li>每列值的个数满足乘以maxVal后等于该符号的出现概率</li>
-<li>每个cell的值除以行号近似等于该符号的出现概率</li>
-</ol>
-</li>
-<li>实际使用时从maxVal开始</li>
-</ol>
-<p>变种：有限状态熵（finite state entropy）</p>
-<h2 id="自适应统计编码"><a href="#自适应统计编码" class="headerlink" title="自适应统计编码"></a>自适应统计编码</h2><p>前一章的统计编码需要先遍历数据计算符号的概率，有两个问题：</p>
-<ol>
-<li>不同部分的符号概率不同（局部偏态），数据量大的话偏差增大。</li>
-<li>流数据没办法先遍历。</li>
-</ol>
-<p>局部性很重要（locality matters）。</p>
-<p>最优方式分割数据流是NP完全问题，因此我们要做的是自动重置统计编码：如果期望的熵与实际编码位数出现显著差异，则重置概率表。</p>
-<p>通常统计压缩的步骤：</p>
-<ol>
-<li>遍历数据流并计算概率。</li>
-<li>根据概率生成VLC。</li>
-<li>再次遍历数据流真正压缩。</li>
-</ol>
-<p>动态VLC编码：</p>
-<ol>
-<li>读取符号。</li>
-<li>输出对应码字。</li>
-<li>更新符号的概率和码字。</li>
-</ol>
-<p>解码：</p>
-<ol>
-<li>读取码字。</li>
-<li>输出符号。</li>
-<li>更新符号的概率和码字。</li>
-</ol>
-<p>编解码过程中遇到第一次出现的符号时，使用一个特殊的LITERAL符号对应的码字，后面再跟着这个符号的原始编码。</p>
-<p>初始概率表只有LITERAL，概率为100%。</p>
-<p>监视平均位数，如果与熵值的差别超过阈值，表明数据模式发生了变化，需要重置。</p>
-<p>自适应算术编码可以使用类似方法。</p>
-<p>自适应Huffman编码（参见<a href="https://dl.acm.org/doi/10.1145/31846.42227" target="_blank" rel="noopener">Design and Analysis of Dynamic Huffman Codes</a>）。</p>
-<h2 id="字典转换"><a href="#字典转换" class="headerlink" title="字典转换"></a>字典转换</h2><p>统计压缩接受任何符号；字典转换接收的是符号集，并重新定义要使用的符号以减少生成的数据流的熵。</p>
-<p>字典转换实际是一个数据流的预处理，之后数据流会更小，压缩率更高。之后还可以做统计编码。</p>
-<p>字典转换的中心问题是分词。</p>
-<p>LZ算法向前查找当前单词是否出现过，因此：</p>
-<ol>
-<li>数据流前半部分新单词很多，后半部分匹配的概率大。</li>
-<li>向前匹配可以找出最长的匹配词。</li>
-</ol>
-<p>当前位置左边叫搜索缓冲区（search buffer），是已经处理过的符号；右边叫先行缓冲区（look ahead buffer）。</p>
-<p>匹配过程类似于字符串查找的bm算法。</p>
-<p>考虑到性能和局部性，需要有滑动窗口，search buffer通常有几万B，look ahead buffer通常只有几十B。</p>
-<p>匹配完成后算法输出&lt;offset, len&gt;。或者&lt;offset, len, C&gt;，其中C是原始符号，表示匹配失败。</p>
-<p>LZ将数据流转换为了记号流，之后可以继续使用统计编码，如把offset/len/C分成三组再分别编码。</p>
-<h2 id="上下文数据转换"><a href="#上下文数据转换" class="headerlink" title="上下文数据转换"></a>上下文数据转换</h2><p>上下文转换：给定一组相邻的符号集，对其进行变换以易于压缩。</p>
-<p>最重要的3种转换方法：</p>
-<ol>
-<li>行程编码（run-length coding，RLE）</li>
-<li>增量编码（delta coding）</li>
-<li>Burrows-Wheeler transform，BWT</li>
-</ol>
-<p>RLE主要针对连续出现的相同符号聚类的现象。它会用包含符号值和重复次数的tuple替换单个符号连续的“行程”。编码就是找到一个符号，向前看看行程有多长。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AAAABCCCC -&gt; [A,4][B,1][C,4]</span><br></pre></td></tr></table></figure>
-
-<p>B是短行程，因此直接输出字面值B。为了区分字面值后有没有次数，在整个输出流前面加上一个bitmap，长度为符号数，1表示有次数，0表示无次数。</p>
-<p>一般来说数据流中交错出现字面值是会出问题的。</p>
-<p>压缩时字面值和次数分开压缩，解码时根据bitmap选择。</p>
-<p>通常认为RLE是单字符上下文模型。一种新的RLE：TurboRLE。</p>
-<p>增量编码是将数据转换为delta的过程。</p>
-<p>减法增量编码可能出现负数，影响效率。可以用XOR代替，保证没有负数，但不一定会缩小delta的范围。</p>
-<p>参照系（frame of reference，FOR）增量编码，即找一个参照值，将所有值减去参照值，从而缩小范围。</p>
-<p>为了处理离群值，使用修正的参照系增量编码（Patched Frame of Reference Delta Coding，PFOR）：</p>
-<ol>
-<li>选择位宽b</li>
-<li>用b位对每个值编码</li>
-<li>当遇到的值位数超过b时，将这个值单独存起来</li>
-</ol>
-<p>为了还原，需要存离群值的位置。可以将离群值的低b位留在原数据流中，只存储其余位，这样可以进一步压缩离群值。</p>
-<p>编码后可以进一步用统计编码压缩。</p>
-<p>前移编码（move-to-front coding，MTF）更多考虑在较短的窗口内某个特定符号的出现次数。</p>
-<p>预期：每出现一个符号，短时间内它可能还会出现很多次。</p>
-<p>MTF是局部自适应的。它维护一个SortedArray，保存所有出现过的符号。每遇到一个符号，输出它在Array中的索引，并将它移到Array最前面（索引0）。</p>
-<p>为了避免离群符号打乱Array，可以：</p>
-<ol>
-<li>向前K个位置。最常见的K为1。</li>
-<li>出现C次再前移。</li>
-</ol>
-<p>MTF是最简单的动态统计转换形式之一。它会输出很多0和1，因此很适合配合统计编码或RLE。</p>
-<p>BWT通过打乱数据流次序来让重复的子串聚集，从而利于后续压缩方法。</p>
-<p>BWT需要维护一张表，保存输入流的所有移位排列，之后：</p>
-<ol>
-<li>表中加入原始流。</li>
-<li>依次将原始流向右rotate1位，加入表，直到操作完一轮。</li>
-<li>按字典序排序表。</li>
-<li>依次输出每行最后一个字符，即组成原始流的一种新排列，且通常有更好的聚集性。</li>
-</ol>
-<p>如BANANA转换为NNBAAA。另一个重要数据是原始流在排序后的索引值，如3。</p>
-<p>BWT的优点是可逆，且开销极小。</p>
-<p>恢复过程：</p>
-<ol>
-<li>将NNBAAA排序为AAABNN。</li>
-<li>与NNBAAA配对组合为NA/NA/BA/AB/AN/AN，再次排序</li>
-<li>重复以上过程，直到每个子串长度达到6，此时原始流就在它的索引位置。</li>
-</ol>
-<p>应用BWT时需要先对数据分块，如1MB。BWT压缩文本的性能不如gzip，但非常适合压缩DNA数据。</p>
-<p>最常见的组合是BWT输出给MTF，再用统计编码。</p>
-<p>不用RLE的原因是RLE对干扰敏感，而MTF不敏感。</p>
-<h2 id="数据建模"><a href="#数据建模" class="headerlink" title="数据建模"></a>数据建模</h2><p>多上下文编码算法的基本概念：考虑最后观察到的几个符号以确定当前符号的理想编码位数。</p>
-<p>可以认为统计编码算法就是一阶马尔可夫链。</p>
-<p>通过为每个前面出现过的符号增加一张符号码字对应表，可以创建二阶马尔可夫链。</p>
-<p>应用马尔可夫链编码和解码时，随着读取输入流，动态调整一阶和二阶表。可以组合之前的自适应编码方法。</p>
-<p>实际不会用原始的马尔可夫链来压缩，一个问题是高阶马尔可夫表需要的内存和计算太多。</p>
-<p>值得注意的衍生算法：部分匹配预测算法（prediction by partial matching，PPM）和上下文混合算法（context mixing）。</p>
-<p>PPM的一种构造方法：使用trie记录原始串的所有子串和出现次数。之后依次为每个节点生成概率表。匹配时先按N阶上下文匹配，如果发现概率为0则用N-1阶重试。如果N减为0，则遇到了不认识的新子串，输出转义码。对转义码的不同处理产生了不同的PPM算法。</p>
-<p>大多数PPM算法的N为5或6。</p>
-<p>上下文混合算法，即为了找出给定符号的最佳编码，使用两个或更多的统计模型。</p>
-<p>对数据压缩来说，相邻性很重要，LZ、RLE、Delta Encoding、BWT都是基于假设：数据的相邻性与最佳编码方式有关。</p>
-<p>但相邻性和局部性都只是上下文的最简单方式，不是唯一的方式。</p>
-<p>模型是用来识别和描述符号之间的关系。需要处理的数据类型不同，模型也会不同。</p>
-<p>PAQ（一种上下文混合算法）包含模型：</p>
-<ol>
-<li>n元语法（n-grams），指之前的n个字符。</li>
-<li>整词n元语法（whole-word n-grams），忽略大小写和非字母字符。</li>
-<li>稀疏上下文，由前面的8位或16位字节的高字节位组成（对多媒体文件很有用）。</li>
-<li>二维上下文（对图像、表、电子表格很有用），行的长度由找出的重复字节模式的步长决定。</li>
-<li>只针对特定文件类型的特殊模型。</li>
-</ol>
-<p>将不同模型的输出结合的方法：</p>
-<ol>
-<li>线性混合（linear mixing），将各个模型的预测值加权平均。权重是静态的。</li>
-<li>逻辑混合，使用神经网络来更新权重，缺点是内存占用大，运算复杂。</li>
-</ol>
-<p>移动设备很难应用上下文混合算法。只有当数据量很大时它才能发挥作用。</p>
-<h2 id="换个话题"><a href="#换个话题" class="headerlink" title="换个话题"></a>换个话题</h2><p>大多数多媒体数据压缩都是有损压缩算法。</p>
-<p>通用压缩是用来处理除多媒体数据之外的数据的。</p>
-<h2 id="评价数据压缩"><a href="#评价数据压缩" class="headerlink" title="评价数据压缩"></a>评价数据压缩</h2><p>ZPAQ：文本压缩率高，但内存占用和运算量大。</p>
-<p>LZMA：内存占用高。</p>
-<p>JPG、Ｈ.264在大多数客户端都有硬件支持。GZIP有专用芯片。</p>
-<p>WebP的压缩率和图片质量都好于JPEG，但最初版本解码时间长，现在改善了。</p>
-<p>GZIP流行的一个主要原因是大小合适，解码快。</p>
-<h2 id="压缩图像数据"><a href="#压缩图像数据" class="headerlink" title="压缩图像数据"></a>压缩图像数据</h2><p>大多数人分辨不出图片质量75和90的区别，前者文件大小只有后者的一半，适合作为默认上传值。75以下会影响体验。</p>
-<p>量化（quantization）和区块化（blocking）是导致图像压缩出现视觉问题的最常见形式。</p>
-<p>评价图像质量的指标：峰值信噪比（peak signal-to-noise ratio，PSNR）和结构相似性（structural similarity index，SSIM）。</p>
-<p>PSNR计算的是去噪之后经过均方处理的原始值与压缩后的值的误差</p>
-<p>SSIM考虑了人眼的感知情况，比较了源图像与压缩后图像的边缘相似性，计算更复杂。</p>
-<p>PNG：无损（使用GZIP等算法），支持透明度、元数据块（对用户无用）。</p>
-<p>JPEG：有损，不支持透明度，支持元数据块。有广泛的硬件支持。</p>
-<p>GIF：有损，支持透明度、动画。第一步将图像颜色数降到256，第二步使用LZW无损压缩。</p>
-<p>WebP：介于PNG和JPEG之间，支持有损或无损、透明度。</p>
-<p>GPU可以直接渲染以下格式而无需解压：DXT、ETC、PVR。它们适合用于游戏中。</p>
-<p>矢量格式：描述如何生成图像，能精准缩放，不适合高质量图像。SVG。</p>
-<h2 id="序列化数据"><a href="#序列化数据" class="headerlink" title="序列化数据"></a>序列化数据</h2><p>二进制序列化格式相比JSON/XML等可读格式的真正优点是可以产生更好的压缩效果，有时后续还可以用GZIP等通用压缩算法进一步处理。</p>
-<p>对于大的序列化文件，将结构的数组转换为数组的结构极为重要。</p>
-<p>组织数据以便高效获取。服务端返回的数据不需要客户端重新组合。</p>
-<p>将数据切分为适当的压缩形式。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/09/understanding-compression/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
         
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/" class="post-title-link" itemprop="url">[笔记] Hive: a warehousing solution over a map-reduce framework</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2020-09-29 21:30:09 / 修改时间：21:30:53" itemprop="dateCreated datePublished" datetime="2020-09-29T21:30:09+08:00">2020-09-29</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.303.2572&rep=rep1&type=pdf" target="_blank" rel="noopener">Hive: a warehousing solution over a map-reduce framework</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Hive在MapReduce模型上实现了支持类SQL查询的数据仓库，它的改进点主要为：</p>
-<ul>
-<li>自己维护了元数据，从而允许了其它的所有优化。</li>
-<li>数据在物理上切分为partition和bucket，避免了扫描全量数据。</li>
-<li>实现了各种operator，从而支持了大多数关系型操作。</li>
-</ul>
-<h2 id="Data-Model"><a href="#Data-Model" class="headerlink" title="Data Model"></a>Data Model</h2><p>Hive中数据被组织为：</p>
-<ul>
-<li>Table：逻辑上为record序列，用户可以自定义序列化和反序列化方法。每个表对应HDFS上的一个目录。Hive也支持外部表。</li>
-<li>Partition：按若干列的值将表分成多个子目录，如<code>/wh/T</code>按列ds和ctry切分，其中一个子目录为<code>/wh/T/ds=20090101/ctry=US</code>。</li>
-<li>Bucket：每个partition的数据可以进一步按某一列的hash值分为若干个bucket，每个bucket为一个文件。</li>
-</ul>
-<p>Hive支持基本类型以及array和map。</p>
-<h2 id="Query-Language"><a href="#Query-Language" class="headerlink" title="Query Language"></a>Query Language</h2><p>Hive使用HiveQL，支持<code>load</code>和<code>insert</code>，不支持<code>update</code>和<code>delete</code>。HiveQL支持一次select出来的结果给后续多个语句使用。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/hive-01.jpg" alt=""></p>
-<h2 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h2><h3 id="Metastore"><a href="#Metastore" class="headerlink" title="Metastore"></a>Metastore</h3><p>Hive的Metastore需要随机读写的能力，因此不用HDFS存储，而是用其它DB或文件系统。</p>
-<p>Metastore支持为每个partition设置序列化反序列化方法，这样可以平滑升级data schema。</p>
-<h3 id="Compiler"><a href="#Compiler" class="headerlink" title="Compiler"></a>Compiler</h3><p>Hive的compile流程：</p>
-<ul>
-<li><p>Parser将QL转换为parse tree。</p>
-</li>
-<li><p>Semantic Analyzer将parse tree转换为基于block的内部query形式。它会读取metastore获取表的元数据，展开<code>select *</code>，检查列名、类型、进行隐式类型转换等。</p>
-</li>
-<li><p>Logical Plan Generator将内部query形式转换为logic operator tree。</p>
-</li>
-<li><p>Optimizer会按以下方式重写logic plan：</p>
-<ul>
-<li><p>将多个有相同join key的join合并为一个实现多路join的mr任务。</p>
-</li>
-<li><p>增加repartition operator用于join、groupby、自定义的mr操作，它也是map和reduce的分隔线。</p>
-</li>
-<li><p>尽早移除不需要的列，将predicate前推到离扫描更近的地方。</p>
-</li>
-<li><p>去掉不需要的partition和bucket。</p>
-<p>用户可以用以下方式帮助Optimizer：</p>
-</li>
-<li><p>针对数量特别多的groupby，提供部分聚合operator。</p>
-</li>
-<li><p>针对有倾斜的groupby，提供repartition operator。</p>
-</li>
-<li><p>在map阶段而不是reduce阶段执行join。</p>
-</li>
-</ul>
-</li>
-<li><p>Physical Plan Generator将logic plan转换为physical plan。它先基于分隔operator（repartition和union all）将logic plan分为若干部分，再将每部分转为map或reduce任务。</p>
-</li>
-</ul>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/hive-02.jpg" alt=""></p>
-
       
     </div>
 
@@ -1590,14 +1047,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">67</span>
+          <span class="site-state-item-count">68</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-count">42</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

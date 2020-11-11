@@ -52,7 +52,7 @@
 <meta property="og:description" content="原文：Real-world Concurrency  你可能不需要真的去写多线程的代码。但如果你需要的话，一些关键原则能帮助你掌握这项“魔法”。  软件从业者们可能因为近期微处理器的发展而对软件行业的未来产生恐惧，这种恐惧情有可原。尽管摩尔定律继续存在（晶体管密度依然每18个月翻倍），但因为难以解决的物理限制和实际的工程考虑，新增的晶体管密度不再花在提高时钟频率上了，而是用于在一块CPU晶元上放置">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2018-04-27T16:25:08.000Z">
-<meta property="article:modified_time" content="2019-12-28T04:45:41.016Z">
+<meta property="article:modified_time" content="2020-11-11T08:00:35.046Z">
 <meta property="article:author" content="Fu Zhe">
 <meta property="article:tag" content="并发">
 <meta property="article:tag" content="翻译">
@@ -210,7 +210,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+                <time title="修改时间：2020-11-11 16:00:35" itemprop="dateModified" datetime="2020-11-11T16:00:35+08:00">2020-11-11</time>
               </span>
 
           
@@ -232,6 +232,8 @@
 <p>作为长期处于并发系统第一线的从业者，我们希望为这场总会陷入歇斯底里的争论注入一些现实的冷静（如果不是来之不易的智慧的话）。尤其是，我们希望能回答一个本质的问题：并发性的扩散对你开发的软件意味着什么？也许有点遗憾，这个问题的答案既不简单又不普适——你的软件与并发之间的关系取决于它物理上在哪执行，它在抽象栈中的位置，以及围绕它的经济模型。</p>
 <p>考虑到许多软件项目现在都有位于不同抽象层次、跨越不同架构的组件，你可能会发现即使对于你自己写的软件，上面问题的答案也不只一个，而是多个：你可能可以留一些代码永远串行执行，而另一些需要高度并行化且显式多线程执行。再令答案复杂一些，我们会认为你的很多代码不会整整齐齐地属于这两类之一：它可能在本质上是串行的但在某些层次上需要注意并发性。</p>
 <p>尽管我们断言需要并行的代码要比某些人恐惧的更少，但必须要承认写并行代码仍然是一种魔法。因此我们也给出了开发高并行度的系统需要的具体实现技术。因此，本文有些二分：我们既认为大多数代码可以（且应该）实现并发，且不需要显式的并行化，同时还要为那些必须写显式并行代码的人解释实现技术。本文半是禁欲的训诫，半是爱经的指导。</p>
+<a id="more"></a>
+
 <h1 id="一些历史因素"><a href="#一些历史因素" class="headerlink" title="一些历史因素"></a>一些历史因素</h1><p>在我们讨论与今天应用有关的并发前，探索并发执行的历史是很有帮助的。即使在60年代——世界仍处于计算机时代的黎明时——人们已经开始清楚单个中央处理单元去处理单个指令流是对系统性能不必要的限制。在计算机设计者们试验不同的方案来绕过这个限制时，1961年Burroughs B5000提出了最后被证明是前进方向的一种方案：互不相干的多个CPU执行多个不同的执行流，但共享内存。就这点而言（以及其它点上）B5000至少领先时代10年。直到80年代对多进程的需要才逐渐被广大研究人员所了解，他们在这十年中探索了一致性缓存协议（例如Xerox Dragon和DEC Firefly），并行操作系统的原型（例如运行在AT&amp;T 3B20A上的多处理器Unix），并开发了并行数据库（例如威斯康星大学的Gamma）。</p>
 <p>到了90年代，80年代研究者们种下的种子产生了实用系统的果实，许多计算机公司（例如Sun、SGI、Sequent、Pyramid）在对称多处理器上投入了大量的赌注。这些投在并发硬件上的赌注也使下注在并发软件上变得必要——如果操作系统不能并行执行，系统中的其它程序也不能——这些公司开始意识到他们的操作系统需要围绕着并发执行的概念重写。这些重写发生在90年代早期，新系统在这十年内陆续发布；其中产生的技术今天可以在像OpenSolaris、FreeBSD、Linux这样的开源操作系统中看到。</p>
 <p>就在这些计算机公司在多进程上投入大量赌注时，许多数据库厂商也在豪赌高并行度的关系型数据库；包括Oracle、Teradata、Tandem、Sybase、和Informix的后来者需要用并发来获得对当时统治了事务处理的主流厂商的性能优势。与操作系统类似，这项工作在80年代后期和90年代早期开始，并在这十年中逐渐改善。</p>
@@ -391,14 +393,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">67</span>
+          <span class="site-state-item-count">68</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">41</span>
+        <span class="site-state-item-count">42</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
