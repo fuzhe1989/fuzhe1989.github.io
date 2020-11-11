@@ -176,6 +176,348 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/07/cpp-object-model-alignment/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/03/07/cpp-object-model-alignment/" class="post-title-link" itemprop="url">C++对象模型（一）Alignment</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-07 20:31:30" itemprop="dateCreated datePublished" datetime="2018-03-07T20:31:30+08:00">2018-03-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="word"><a href="#word" class="headerlink" title="word"></a>word</h1><p>第一个概念，word（字）。</p>
+<p>word是cpu领域的一个重要概念，它被定义为cpu使用数据的一个自然单位（natural unit），cpu的很多数据长度都与其相关，比如：</p>
+<ul>
+<li>通常cpu的大多数寄存器长度为一个word。</li>
+<li>通常cpu最大寻址空间为一个word（即指针大小通常是一个word）。</li>
+<li>总线宽度通常为一个word，即cpu单次读写内存的量通常最大为一个word。</li>
+<li>很多cpu每条指令的长度也为一个word。</li>
+</ul>
+<p>32位/64位cpu中的32位和64位就是指它的字长（word-length或word-size）为32位或64位。</p>
+<p>这里不详细介绍不同cpu的word的具体含义。我们说一下word对内存读写的影响：</p>
+<ul>
+<li>早期的cpu通常只能沿着一个word的边界读写数据，如果一次读/写操作的目标地址不是字长的整数倍，cpu会报错。</li>
+<li>现代的X86 cpu可以在任意地址读写数据，但如果目标地址不是字长的整数倍，底层会将这次操作按word分界分成多个读写操作，对性能有明显影响。</li>
+<li>X86-64 cpu可以在任意地址读写数据，且不会有明显的性能影响。</li>
+</ul>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/alignment.png" alt="alignment"></p>
+<p>上图的第一个例子，我们按alignment存放了1个int（4字节数据），cpu只需要一次内存操作就可以完成存取。而第二个例子中，cpu需要两次内存操作来完成int的存取。</p>
+<p>现代的cpu通常有多个字长概念（word、1/2word、1/4word等），针对不同的数据长度，可以有不同的字长。X86和X86-64对长度为1/2/4/8字节的数据，其字长也为1/2/4/8字节。</p>
+<h1 id="alignment和padding"><a href="#alignment和padding" class="headerlink" title="alignment和padding"></a>alignment和padding</h1><p>第二个概念，alignment。</p>
+<p>考虑到数据不按word边界存放可能引起的问题，编译器在排列变量时，会尽量将其按对应的字长来排列。这种行为就被称为对齐（alignment），而因为alignment导致的数据间产生未使用的空洞，则被称为填充（padding）。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">char</span> c;</span><br><span class="line">    <span class="keyword">int16_t</span> i16;</span><br><span class="line">    <span class="keyword">int32_t</span> i32;</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"c:%ld i16:%ld i32:%ld i64:%ld\n"</span>, &amp;c, &amp;i16, &amp;i32, &amp;i64);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在我的环境下（X86-64，gcc4.8.5），输出为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">c:140730763468703 i16:140730763468700 i32:140730763468696 i64:140730763468688</span><br></pre></td></tr></table></figure>
+
+<p>可以看到<code>i16</code>与<code>c</code>之间有2字节的padding，<code>i32</code>与<code>i16</code>之间有2字节的padding，<code>i64</code>与<code>i32</code>之间有4字节的padding，实际上是这么排列的：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">char</span> c;</span><br><span class="line"><span class="keyword">char</span> padding0[<span class="number">2</span>];</span><br><span class="line"><span class="keyword">int16_t</span> i16;</span><br><span class="line"><span class="keyword">char</span> padding1[<span class="number">2</span>];</span><br><span class="line"><span class="keyword">int32_t</span> i32;</span><br><span class="line"><span class="keyword">char</span> padding2[<span class="number">4</span>];</span><br><span class="line"><span class="keyword">int64_t</span> i64;</span><br></pre></td></tr></table></figure>
+
+<h1 id="struct的alignment"><a href="#struct的alignment" class="headerlink" title="struct的alignment"></a>struct的alignment</h1><p>struct的alignment规则很简单：</p>
+<ul>
+<li>空struct的size与alignment均为1。</li>
+<li>非空的struct，其alignment为各成员的alignment的最大值。其最后一个成员后面若有需要，也要padding。</li>
+</ul>
+<p>注意第2条规则，会导致struct占用的空间比我们预期的更多，例子：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>它的自然大小为10B（1+8+1），但考虑到alignment的影响，真实大小却是24B（8+8+8）！</p>
+<p>因此<code>S</code>的真实布局为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">char</span> padding0[<span class="number">7</span>]；</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">    <span class="keyword">char</span> padding1[<span class="number">7</span>];</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>而当<code>S</code>作为其它struct的成员时，它的size和alignment分别是24和8，会影响到上层struct的alignment。</p>
+<p>适当的重新排列<code>S</code>的成员，可以显著减小它的size：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>此时它的真实布局为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">    <span class="keyword">char</span> padding[<span class="number">6</span>];</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>S</code>的size减小到了16B。</p>
+<h1 id="与alignment有关的编译器扩展"><a href="#与alignment有关的编译器扩展" class="headerlink" title="与alignment有关的编译器扩展"></a>与alignment有关的编译器扩展</h1><p>这里只介绍gcc的相关扩展。</p>
+<p>gcc允许我们用<code>__attribute__</code>来修饰变量，其中用于改变alignment的有以下几种。</p>
+<p>注意：修改alignment可能会影响ABI兼容性和可移植性，通常不推荐。</p>
+<h2 id="aligned"><a href="#aligned" class="headerlink" title="aligned"></a>aligned</h2><p>语法1：<code>__attribute__ ((aligned (size_in_byte)))</code>，显式指定alignment。注意：指定比默认更小的alignment是无效的，会被编译器忽略。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">int</span> x __attribute__ ((aligned (<span class="number">16</span>))) = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> x[<span class="number">2</span>] __attribute__ ((aligned (<span class="number">8</span>)));</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">R</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c;</span><br><span class="line">&#125; __attribute__ ((aligned (<span class="number">8</span>)));</span><br></pre></td></tr></table></figure>
+
+<p>语法2：<code>__attribute__ ((aligned))</code>，让编译器选择可能的最大alignment，对64位环境而言通常是8。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">R</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c;</span><br><span class="line">&#125; __attribute__ ((aligned));</span><br></pre></td></tr></table></figure>
+
+<h2 id="packed"><a href="#packed" class="headerlink" title="packed"></a>packed</h2><p>语法：<code>__attribute__ ((packed))</code>，表示该变量或struct选择可能的最小alignment，对64位环境而言通常是1。</p>
+<p>下面这个struct，加上<code>packed</code>后其大小变为10，与其自然大小相等：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="编译选项"><a href="#编译选项" class="headerlink" title="编译选项"></a>编译选项</h2><p>编译时如果加上<code>-fpack-struct</code>，则默认所有变量和struct都会按<code>packed</code>处理。</p>
+<p>如果加上<code>-Wpadded</code>，则编译器增加padding的地方会有warning。注意只包含struct场景。</p>
+<h1 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h1><ul>
+<li><a href="https://wr.informatik.uni-hamburg.de/_media/teaching/wintersemester_2013_2014/epc-14-haase-svenhendrik-alignmentinc-paper.pdf" target="_blank" rel="noopener">Alignment in C</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Word_(computer_architecture)" target="_blank" rel="noopener">Wiki - Word</a></li>
+<li><a href="https://gcc.gnu.org/onlinedocs/gcc-3.2/gcc/Variable-Attributes.html" target="_blank" rel="noopener">Specifying Attributes of Variables</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/05/high-concurrency-work/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/03/05/high-concurrency-work/" class="post-title-link" itemprop="url">高并发工作</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-05 13:56:37" itemprop="dateCreated datePublished" datetime="2018-03-05T13:56:37+08:00">2018-03-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>大体来讲，我们每个人头上都不会只有一项工作，很可能在某阶段，头上会有N项工作。我们当然希望这些工作能按部就班的、一项一项的顺序完成。但现实是残酷的，总有些工作会depend其它人，而不得不暂停下来；也总有些工作每天都有人催，需要尽快完成。所以，结论就是每个人都需要高并发工作，也需要知道怎么实现高并发工作。</p>
+<p>有种观点是，编程中的所有概念都是人类活动的延续，反映了人类自己的思维方式与组织架构。这句话反过来说也不无道理，即人类的思维方式与组织架构，往往可以从编程中找到对应的概念。</p>
+<p>某种程度上，实现高并发工作的方法与实现高并发编程是类似的。本文就参照高并发编程的一些要素，来分析一下如何达到高并发工作。</p>
+<h1 id="目标导向"><a href="#目标导向" class="headerlink" title="目标导向"></a>目标导向</h1><p>当说到高并发编程时，首先就要讲清楚，高并发的目的是高吞吐，还是低延时。很多时候这两个目标是冲突的：高吞吐往往意味着要异步化，而异步化往往意味着不能及时拿到结果，也就意味着不能实现低的延时。</p>
+<p>同样，高并发工作也需要先明确目标，是要尽量提高工作的吞吐（即单位时间完成更多的工作），还是降低工作的延时（尤其是老板们关注的工作）。</p>
+<h2 id="高吞吐"><a href="#高吞吐" class="headerlink" title="高吞吐"></a>高吞吐</h2><p>高吞吐的重点是异步化和不要等，即：当任务depend别人时，给他发消息，之后切到其它任务，直到他回复。</p>
+<p>然而现实中只是这样往往达不到真正的高吞吐：</p>
+<ul>
+<li>人是复杂的，你不催他，甚至不催他老大，或直接当面看着他干活，他不一定会理你，你永远等不到回复。</li>
+<li>有时不当面讲或者打电话，你需要花很久才能理解他，或者让他理解你，时间都浪费了。</li>
+<li>即使上面说的问题都没遇到，也可能出现老板觉得你的工作没有体现出优先级，不给你分配任务，或者直接开了你的情况，不给你高吞吐的机会。</li>
+</ul>
+<p>如果把每个人都比拟为一个程序的模块，我们往往不得不与这样的模块打交道：</p>
+<ul>
+<li>可能丢消息，需要不停重试，有时还需要发工单寻求人工帮助。</li>
+<li>接口设计不合理，一个请求需要多次交互。</li>
+<li>即使消息保证不丢，接口上也只需要一次交互即可，我们仍然可能遇到一个响应很慢的模块，导致整个任务超时。</li>
+</ul>
+<p>可是真遇到这种模块又能怎么样呢？</p>
+<ul>
+<li>要么，我们可以换个类似功能的其它模块，对应换个接口人。</li>
+<li>要么，投诉给维护者，让他改。</li>
+<li>更多情况下，我们没办法换用其它模块，也不一定能得到维护者的响应，只好自己多做准备，多查询状态，或者去调用那些开销大但保证响应速度的接口。</li>
+</ul>
+<p>总之彻底的高吞吐导向是有问题的，对于高优先级的任务还是要考虑低延时的。</p>
+<h2 id="低延时"><a href="#低延时" class="headerlink" title="低延时"></a>低延时</h2><p>一般想达到低延时的重点是要同步，要等，即：当任务depend别人时，给他打电话，每天催，还不行就催他老板，或者老板的老板，还不行就坐到他旁边看着他干活。</p>
+<p>但这样的结果就是：</p>
+<ul>
+<li>每当depend别人时，整体吞吐就大幅度下降：你的时间都花在催人上了，哪有时间干其它活。</li>
+<li>给人一种很push，很tough的印象，别人会不愿意与你合作。</li>
+<li>因为吞吐低，从而做的事情少，从而催人以外的能力不容易提高。某些人甚至达到了“催人以外能力为零”。</li>
+</ul>
+<p>当然上面这些也不见得是坏事，因为：</p>
+<ul>
+<li>老板很开心，吩咐下去的任务每天都有进展，满足他的成就感。</li>
+<li>容易表现出一种很忙的样子，比如大半夜还在公司，还给别人打电话。</li>
+<li>易于把责任推给别人，不是我不做，是他不做。</li>
+</ul>
+<p>从单个任务的角度，你保证了它的延时；但从执行单元（即你这个人）的角度，你浪费了宝贵的时间在同步等待上，影响了吞吐。</p>
+<p>当然，如果不是要求绝对的低延时，而是指定deadline，那么通过定期非阻塞轮询的方法，还是能在不怎么影响吞吐的情况下达到相对低延时的。</p>
+<p>总之追求低延时要适度，根据自己和合作伙伴的实际情况、任务的优先级来。</p>
+<h1 id="高并发的要素"><a href="#高并发的要素" class="headerlink" title="高并发的要素"></a>高并发的要素</h1><p>首先说明：</p>
+<ul>
+<li>本文的目标是高优先级任务相对低延时，低优先级任务高吞吐。</li>
+<li>本文主要针对开发工作，或许对其它工作也有一定帮助，或许没有。</li>
+</ul>
+<h2 id="提高单线程能力"><a href="#提高单线程能力" class="headerlink" title="提高单线程能力"></a>提高单线程能力</h2><p>实现高并发，最简单、也是最直接的方法就是，提高能力，让自己处理单个任务变快。比如：</p>
+<ul>
+<li>提高架构设计能力。</li>
+<li>提高编码能力。</li>
+<li>提高语言表达能力、文档能力，讨论的时候节省时间。</li>
+<li>提高防御能力，比如更多的防御性编程，更多的测试，越早暴露问题，整体上花的时间越少。</li>
+</ul>
+<p>然而光是单线程能力强还不够，一个任务所需时间只要不是足够短，总有被其它任务打断的时候，此时就需要考虑后面的要素。</p>
+<h2 id="保证上下文完整，便于切换"><a href="#保证上下文完整，便于切换" class="headerlink" title="保证上下文完整，便于切换"></a>保证上下文完整，便于切换</h2><p>当一个任务被打断时，我们最先要想到的就是，过一会怎么恢复？比如你正在coding或线上变更或写一份文档，此时马总喊你开会，你该做些什么，来保证两个小时后你能尽快切换回原来这个任务？</p>
+<p>答案就是把必要的信息记下来，形成一个完整的上下文。</p>
+<p>有些人记忆力比较好，光靠脑子就可以回忆起每件事的进度。这就好像我们把上下文记在寄存器里，快，但容量有限，且易丢失。</p>
+<p>更多的人会选择把进度记在纸上，或者本地文档中。就好像我们把上下文记在内存或磁盘中。这样可能显得有些繁琐，需要时不时的记些东西。但它的好处是容量比较大，更容易保持上下文完整，后续总结时也比较方便。它的另一个好处，是比较易于把进度分享给其它人：记在纸上的话，拿给其它人看；记在文档中，直接发给其它人就可以了。</p>
+<p>如果考虑到与人分享的话，另一个可能更棒的选择就是把进度记录在一个在线平台上，比如用gitlab来记录代码和文档，用任务系统来记录任务（似乎也可以记录文档）。</p>
+<p>而做好记录，也有助于下面要素的实现。</p>
+<h2 id="读写分离，获取状态无阻塞"><a href="#读写分离，获取状态无阻塞" class="headerlink" title="读写分离，获取状态无阻塞"></a>读写分离，获取状态无阻塞</h2><p>再完整的上下文，当发生任务切换时仍然是有成本的：</p>
+<ul>
+<li>需要花时间找回上下文（如打开文档、打开任务链接、打开与某人的IM聊天记录等）。</li>
+<li>对于外部的可变的状态，需要依次确认其当前状态（如代码是否有新的commit、接口人是否休假或离职、公司是否有新政策等）。</li>
+<li>在真正做事情之前，还要把上下文映射到大脑中，才能重新建立思路。</li>
+</ul>
+<p>所以，切换越少，开销越低，性能越好。</p>
+<p>但是，只要有与人合作的项目，合作方就有需求定期获取你的状态。常规的状态获取比如IM上问，或者电话，或者直接当面问，对你来说也是一次任务切换，就可能会有上面的各种成本。如果你做好了记录，比如每小时都把进度更新到任务上，或者每改完一个函数/类都单独commit到dev branch上，甚至把想法也写上去，那么合作方在很多时候完全不需要问你，他直接看这些记录就好了。</p>
+<p>换句话说，你要令自己的状态随时可被外界读取，同时这种读取要对你的工作透明，即读写分离。</p>
+<p>一种比较理想的状态就是你专注于自己的事情一整天，每当有一点进展时就随手记在对应的任务里，一天过去了，没有人找你，没有人打断你，但晚上的日报里还清晰地展示了你当前的工作进度（可能有一两个小时的误差，但不重要）。如果长期处于这种状态，你的效率能不高吗？</p>
+<h2 id="拆分任务"><a href="#拆分任务" class="headerlink" title="拆分任务"></a>拆分任务</h2><p>一般来说，越长的任务，涉及的元素越多，上下文越复杂，越容易被打断。上下文复杂，说明切换成本高；容易被打断，说明切换次数多。这两点加起来简单就是高并发工作的噩梦。</p>
+<p>这个时候，主动把长（大）的任务拆为多个相对独立的短（小）任务，可能效果更好。因为：</p>
+<ul>
+<li>每个小任务涉及的元素比较少，切换成本低，切换次数也更少。</li>
+<li>小任务更易观察到进展，给人更多的成就感，也给合作方/老板更多的信心。</li>
+<li>拆分过程本身也是对大任务的梳理，如果一个大任务拆不开，很可能表明你还没想清楚。</li>
+<li>需求总是会变的，船小好调头，大任务做到一半的时候，如果需求变了就很难调整了。（而此时小任务可能已经做完好几个了，没损失。）</li>
+<li>拆成小任务后，我们对其中的切换是有心理预期的，而相比大任务，很多切换是无预期，突然的。有心理预期的任务切换就可以提前记录，大脑提前准备，切换成本更低。</li>
+</ul>
+<p>另一方面，即使对于相对完整的、中间不depend别人的长任务，也可以考虑拆分为多个短任务。举个例子，你要开发一个新功能，需要写文档、写功能代码、写测试代码、交给其他同学review。一种做法是都完成之后再提交review，这样就产生了一个相对较长的任务。过程中你很happy，无切换地完成了10000字的文档和20000行代码的review，然后你把文档和review发给其他reviewer，你们都傻眼了。reviewer表示卧槽怎么突然来了这么一大坨东西，这周计划里没这项啊，而且都不知道从哪看起，看了后面忘前面。你表示为啥reviewer一直在问我东西，不会自己看文档吗？为啥一个review给他一周了他还没看完，他不看完我要干等着吗？</p>
+<p>但如果你主动把任务拆开，一块一块的写，一块一块的review，先review文档和设计，再review测试代码（TDD），再review功能代码，整个过程就可控得多了。这种就是任务流水线化。</p>
+<h2 id="保持适当的时间片长度"><a href="#保持适当的时间片长度" class="headerlink" title="保持适当的时间片长度"></a>保持适当的时间片长度</h2><p>我们定义每个任务单次连续处理时间最短为它的一个时间片。当你处于高并发工作状态时，往往意味着你在频繁切换手头正在做的任务，这时你就要小心了，你给每个任务分配的时间片是否足够长。如果分配的时间片过短，这次任务切换带来的收益可能还没有任务切换本身的开销大，这就得不偿失了。</p>
+<p>而过长的时间片也不一定好。正如上节所说，任务过长反倒可能影响进度，而单次处理时间过长有着同样的问题。一种工作方法推荐每半小时到一小时主动中断一次，这样的周期令大脑兴奋，但又不会因长时间兴奋而疲惫。另外，我们连续工作一小时后，经常也会遇到一些暂时没解法的问题，此时主动切换一下，有助于大脑换个角度思考，可能更容易想出问题的解法。最后，前面也提到了，我们有计划的切换任务，能有效减少切换成本，也有助于形成自己的工作节奏。</p>
+<h2 id="减少使用同步交流工具"><a href="#减少使用同步交流工具" class="headerlink" title="减少使用同步交流工具"></a>减少使用同步交流工具</h2><p>需要对方实时响应的交流工具就是同步交流工具，最典型的就是电话和当面讲。</p>
+<p>而不需要对方实时响应的交流工具就是异步交流工具，最典型的就是邮件。IM也可以算是异步交流工具，如果你设置了消息免打扰的话。</p>
+<p>同步交流工具的优点：</p>
+<ul>
+<li>低延时。</li>
+<li>对于邮件或文档里讲不清楚的问题，电话可能会讲的更清楚，传递更多信息量。</li>
+</ul>
+<p>同步交流工具的缺点：</p>
+<ul>
+<li>极大影响吞吐。</li>
+<li>很少给人思考的时间，容易事后发现交流过程中传递了错误的信息。而邮件等工具则让人有思考的时间，可以反复推敲后再回应。</li>
+</ul>
+<p>同步交流工具必不可少，但从高并发角度来讲不适合过多使用。</p>
+<h2 id="将外部请求队列化"><a href="#将外部请求队列化" class="headerlink" title="将外部请求队列化"></a>将外部请求队列化</h2><p>即使我们记录了很完整的上下文，努力降低切换成本，最后还是会发现，我们没办法同时保持太多未完成的任务。可以将我们的并发处理能力量化为N，即我们最多可以保持N个任务的上下文（当然执行单元还是1），此时如果外界再有任务过来，就要考虑将这些任务放在一个队列里，而不要随意切换到新任务上。</p>
+<p>简单来说，就是：</p>
+<ul>
+<li>首先，要给自己评估一个N，即最多同时只能开始N个任务。</li>
+<li>当又有外部请求，即又加了一个任务时：<ul>
+<li>如果这个任务不那么紧急，就加到队列里，不要立刻做。</li>
+<li>如果这个任务紧急，你又觉得自己没办法同时处理N+1个任务，要么丢掉一个已经开始的低优先级任务，要么将一个低优先级任务交给其它执行单元（同事），要么拒绝这个新任务。</li>
+</ul>
+</li>
+</ul>
+<p>然而队列里的任务也不是随便的，就那么放在队列里就OK的。我们要给这个任务，以及这个任务的需求方一个承诺（Promise），或者说deadline。之后我们可以定期在中断时遍历这些任务的状态，把接近或超过deadline的任务的优先级提高，然后看一下要不要应用上面的规则。</p>
+<p>毕竟绝大多数任务是只要deadline，而不是非得同步做的。通过这种方式，我们将同步任务转化为了异步任务，从而避免了过多的不必要的切换。</p>
+<p>最后还是要强调，我们给需求方承诺（Promise），意味着需求方也得到了一个预期（Future），如果我们没有及时处理这个任务，我们自己就成了前面所说的“坏模块”。越多的人觉得你是“坏模块”，换掉这个模块的需求越强，收益越大，可能性也就越大。</p>
+<h2 id="定期轮询你的下游"><a href="#定期轮询你的下游" class="headerlink" title="定期轮询你的下游"></a>定期轮询你的下游</h2><p>即使不考虑我们设定的时间片，生理上我们每天都会有几次固定的中断时间（吃饭、下班、睡觉）。在这种中断的时候，你不妨主动问一下你的合作方，你交给他们的任务怎么样了。</p>
+<p>人还是很复杂的，总有丢消息、超时的时候，通过定期的轮询，你可以尽量减少这些意外对你带来的损失。对于你是聚合者的任务（如项目负责人、日报或周报负责人等），轮询本身就是你的工作的一部分。</p>
+<p>我们要注意的是，如何减小轮询对你，对你的合作方的影响。如前面所说，同步请求对每个人都有着巨大的开销，所以，如何把轮询异步化就很重要了。这里我们又要讲到Future和Promise了。</p>
+<ul>
+<li>如果你的合作方承诺定期主动在任务上更新状态，即他采用了“读写分离”法，则你获得了“定期看他的记录即可”的Future，那么你的轮询对他而言不存在，对你而言只是简单的文档浏览，开销还是很低的。</li>
+<li>如果你的合作方不承诺及时更新状态，你就需要主动同步联系他，此时你需要承诺这种联系发生的周期和时间，这样他获得一个定期被打断的预期，可以降低切换成本，也不会在被打断时对你这个人产生太多怨气。</li>
+</ul>
+<p>更多情况下，合作方没办法保证在任务上及时更新状态，你也不想定期去主动问他进度，你希望的是他承诺一个时间，完成后通知你。这就是“设置回调”。</p>
+<h2 id="设置回调"><a href="#设置回调" class="headerlink" title="设置回调"></a>设置回调</h2><p>对于大多数任务，我们没有太紧迫的需求，只是希望对方完成后能有个通知，此时我们就要设置回调，即与合作方讲清楚任务完成后该记在哪，通知谁。</p>
+<p>这里的“记在哪，通知谁”就是要设置回调的目标，是：</p>
+<ul>
+<li>文档或任务或bug记录。</li>
+<li>邮件或IM或电话通知你。</li>
+<li>邮件或IM或电话通知其它人。</li>
+</ul>
+<p>其中目标一本身就是异步的，理想情况下它是最好的选择，后续如果有其它人需要接手任务，也应该是由任务系统来通知，而不是你或者任务的上个owner。但在任务系统或工作流不完善的时候，就需要任务的上个owner通知下个owner，而不通过你。如果你完全不需要关注任务的后续进展，这种方法是很好的，也避免影响到你。但现实中往往会发生任务交接过程中就被丢掉的情况，意味着这种工作流可能不适合你或你的团队。此时为了保证任务能完成，可能把回调指向自己是最好的方案。</p>
+<p>回调发生的时间点往往不由你控制，也就意味着你正在处理的任务很可能被打断，发生被动切换。为了降低被动切换的影响，你需要尽量让回调的处理批量化。</p>
+<h2 id="选择主动中断点，批量处理回调"><a href="#选择主动中断点，批量处理回调" class="headerlink" title="选择主动中断点，批量处理回调"></a>选择主动中断点，批量处理回调</h2><p>前面提到，我们一天中总有一些主动的中断点，如果把对回调的处理选在这些时间，就能有效的降低处理回调的开销。显然，我们是在异步处理回调，且很可能是批量处理。</p>
+<p>想要批量处理回调，重点就是选择适当的回调方式，即你在设置回调时，要和合作方讲清楚，用你指定的方式通知你：</p>
+<ul>
+<li>最好的方式就是通过任务系统来通知，你每天定点看几次任务系统的通知，其它时间完全不看，就不会受非预期的回调的影响了。</li>
+<li>其次是通过邮件，你也可以很方便的选择不看。</li>
+<li>再次是IM系统，这样往往会产生一个未读消息，比较讨厌。如果关掉IM呢，又可能会错过高优先级的、需要同步处理的消息。</li>
+<li>再次是通过电话，往往意味着一次同步请求。</li>
+<li>最差就是当面讲，不光时间同步，空间上也要同步。当然有些情况下当面讲反倒可能节省时间，因为它传递了最多的信息量。但我仍然不推荐当面讲，对吞吐的影响实在太大了。</li>
+</ul>
+<h2 id="不要偷偷修改行为"><a href="#不要偷偷修改行为" class="headerlink" title="不要偷偷修改行为"></a>不要偷偷修改行为</h2><p>这点与高并发没什么直接关系，但它也会严重影响我们的并发性。对代码来说，注释/文档与行为不一致是非常讨厌的，意味着你无法预期一个操作的行为。而对任务处理来说，不按规定/承诺办事是最可怕的，意味着上面说的所有方法都是无效的，合作方的每次状态更新都不可信，你都需要亲自再检查一遍。这种行为害人害己，当团队里有这样的人时，及时清理掉才是最该做的。</p>
+<h2 id="不要过早优化"><a href="#不要过早优化" class="headerlink" title="不要过早优化"></a>不要过早优化</h2><p>编程领域的一句至理名言是“不要过早优化”，一种理解是不要提前做优化而影响代码的可读性、可维护性，而是要在拿到充分的性能数据，有数据支撑后，再针对关键路径做优化。同样，我们也不要为了实现高并发工作，而提前打乱自己或团队的工作节奏，同样应该先有数据支撑。</p>
+<h1 id="理想的高并发工作"><a href="#理想的高并发工作" class="headerlink" title="理想的高并发工作"></a>理想的高并发工作</h1><p>理想的高并发工作方式因人，因团队而异。对很多人来说，有一个强大的任务系统，有一群接受异步通信的需求方（意味着你不会被意外打断），有一群能给出可信承诺的合作方（包括需求方）的话，完全可以合理的按自己的工作节奏来处理任务。这之后就是如何提高自己的内功和能力的事情了。</p>
+<p>上面这些点，说起来容易，做起来难。然而事情总是要一件一件去做的。先设定好大目标，再确定一条简略的路径，总是没错的。我对自己设定的路径是：</p>
+<ul>
+<li>做好记录，尤其是对于可能有其他人关心的状态，通过任务系统的各种机制来记录。</li>
+<li>万事先承诺，无论是承诺别人，还是要别人的承诺，总之过夜的事情都要有承诺。</li>
+<li>更多的使用异步交流工具，更少的使用同步交流工具。</li>
+<li>拆分好任务，尤其是depend其他人的任务。</li>
+<li>推己及人，自己不愿意被打断，就不要随意打断其他人，比如无论什么优先级的事情都直接电话。</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/01/30/future-promise/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1604,367 +1946,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/" class="post-title-link" itemprop="url">Effective Modern C++ 笔记 Chapter 6: Lamba表达式 (Item 31-34)</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2017-09-06 23:50:01" itemprop="dateCreated datePublished" datetime="2017-09-06T23:50:01+08:00">2017-09-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>虽然lambda表达式只是C++11中的语法糖，但它对C++编程的影响是巨大的。没有lambda，STL中的”_if”算法（诸如<code>std::find_if</code>、<code>std::remove_if</code>、<code>std::count_if</code>等）通常局限于最平凡的谓语；但有了lambda，我们就可以方便地写出复杂的谓语来配合这些算法了。类似的例子也发生在需要比较函数的STL算法上，例如<code>std::sort</code>、<code>std::nth_element</code>、<code>std::lower_bound</code>等。STL之外，我们可以通过lambda快速地为<code>std::unique_ptr</code>和<code>std::shared_ptr</code>写出自定义的销毁器，为线程API的条件变量写出条件谓语。标准库之外，lambda也允许我们快速完成一个回调函数、接口适配函数，以及只在一处调用的上下文相关函数。</p>
-<p>澄清两个名词：</p>
-<ul>
-<li><p>“lambda表达式”就是一个表达式，是下面代码中的加粗部分：</p>
-<blockquote>
-<p>std::find_if(container.begin(), container.end(), <strong>[](int val) { return 0 &lt; val &amp;&amp; val &lt; 10; }</strong>);</p>
-</blockquote>
-</li>
-<li><p>closure(闭包)是通过lambda创建的一个运行时对象。根据不同的捕获模式，closure持有被捕获数据的拷贝或引用。在上面的例子中，在运行时我们通过lambda表达式创建了一个closure并作为第三个参数传给了<code>std::find_if</code>。</p>
-</li>
-<li><p>closure class(闭包类)是一个closure的实现类。编译器会为每个lambda表达式生成一个唯一的closure class，lambda表达式中的代码会成为这个类的成员函数的可执行代码。</p>
-</li>
-</ul>
-<p>lambda通常用于一次使用的场景。但closure通常是可复制的，因此一个lambda表达式可能会对应着多个closure，这些closure的类型是相同的：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">int</span> x;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">auto</span> c1 = [x](<span class="keyword">int</span> y) &#123; <span class="keyword">return</span> x * y &gt; <span class="number">55</span>; &#125;;</span><br><span class="line"><span class="keyword">auto</span> c2 = c1;</span><br><span class="line"><span class="keyword">auto</span> c3 = c2;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
-
-<h2 id="Item31-避免用默认捕获模式"><a href="#Item31-避免用默认捕获模式" class="headerlink" title="Item31: 避免用默认捕获模式"></a>Item31: 避免用默认捕获模式</h2><p>C++11中有两种默认捕获模式：引用模式和值模式。默认的引用模式会导致孤悬引用。默认的值模式会让你以为自己可以避免这个问题（实际上没有），以为你的closure是自包含的（不一定）。</p>
-<p>引用模式下closure会包含它所在作用域的局部变量和参数的引用，但如果这个closure的生命期长过这些局部变量和参数，它包含的这些引用就成了孤悬引用。一个例子：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> FilterContainer = <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::function&lt;<span class="keyword">bool</span>(<span class="keyword">int</span>)&gt;&gt;;</span><br><span class="line">FilterContainer filters;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">addDivisorFilter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> calc1 = computeSomeValue1();</span><br><span class="line">    <span class="keyword">auto</span> calc2 = computeSomeValue2();</span><br><span class="line">    <span class="keyword">auto</span> divisor = computeDivisor(calc1, calc2);</span><br><span class="line">    filters.emplace_back([&amp;](<span class="keyword">int</span> value) &#123; <span class="keyword">return</span> value % divisor == <span class="number">0</span>; &#125;); <span class="comment">// danger! ref to divisor will dangle!</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>如果显式捕获<code>divisor</code>的引用，问题仍然存在：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">filters.emplace_back([&amp;divisor](<span class="keyword">int</span> value) &#123; <span class="keyword">return</span> value % divisor == <span class="number">0</span>; &#125;);</span><br></pre></td></tr></table></figure>
-
-<p>但相比默认捕获模式，现在我们更容易发现这里的问题。</p>
-<p>有时候我们知道一个closure只在当前作用域范围内使用，不会传播出去，是不是用默认捕获模式就是安全的呢？例如：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> C&gt;</span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">workWithContainer</span><span class="params">(<span class="keyword">const</span> C&amp; container)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> calc1 = computeSomeValue1();</span><br><span class="line">    <span class="keyword">auto</span> calc2 = computeSomeValue2();</span><br><span class="line">    <span class="keyword">auto</span> divisor = computeDivisor(calc1, calc2);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">using</span> ContElemT = <span class="keyword">typename</span> C::value_type;</span><br><span class="line">    <span class="keyword">using</span> <span class="built_in">std</span>::begin;</span><br><span class="line">    <span class="keyword">using</span> <span class="built_in">std</span>::end;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">std</span>::all_of(</span><br><span class="line">        begin(container), end(container),</span><br><span class="line">        [&amp;](<span class="keyword">const</span> ContElemT&amp; value) &#123; <span class="keyword">return</span> value % divisor == <span class="number">0</span>; &#125;)) &#123;</span><br><span class="line">        ...</span><br><span class="line">    ) <span class="keyword">else</span> &#123;</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这段代码本身没什么问题，但你没办法保证不会有人把这段代码拷贝到其它地方，没注意这里有个默认的引用捕获，结果出现孤悬引用。</p>
-<p>长期来看，显式列出引用捕获的变量更好。</p>
-<p>题外话，C++14允许我们用<code>auto</code>来修饰lambda的参数，令代码更简洁：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (<span class="built_in">std</span>::all_of(</span><br><span class="line">    begin(container), end(container),</span><br><span class="line">    [&amp;](<span class="keyword">const</span> <span class="keyword">auto</span>&amp; value) &#123; <span class="keyword">return</span> value % divisor == <span class="number">0</span>; &#125;))</span><br></pre></td></tr></table></figure>
-
-<p>应对上面问题的一种方法是用默认的值捕获模式：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">filters.emplace_back([=](<span class="keyword">int</span> value) &#123; <span class="keyword">return</span> value % divisor == <span class="number">0</span>; &#125;);</span><br></pre></td></tr></table></figure>
-
-<p>但这并不是解决孤悬引用的万能良药。如果你值模式捕获了一个指针，结果还是一样的。</p>
-<p>有人会认为用智能指针就能避免这个问题。看这个例子：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Widget</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">addFilter</span><span class="params">()</span> <span class="keyword">const</span></span>;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">int</span> divisor;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">void</span> Widget::addFilter() <span class="keyword">const</span> &#123;</span><br><span class="line">    filters.emplace_back([=](<span class="keyword">int</span> value) &#123; <span class="keyword">return</span> value % divisor == <span class="number">0</span>; &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这段代码只能说大错特错。</p>
-<p>捕获只会发生在lambda所在的作用域的非static的局部变量上（包括参数）。在<code>Widget::addFilter</code>中，<code>divisor</code>不是局部变量，它不能被捕获。如果把默认捕获去掉，直接用<code>[]</code>，代码就编译不过去了。如果我们显式写<code>[divisor]</code>，仍然编译不过去。</p>
-<p>但上面这段代码为什么可以编译成功？因为它捕获了<code>this</code>。下面是它的等价代码：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> Widget::addFilter() <span class="keyword">const</span> &#123;</span><br><span class="line">    <span class="keyword">auto</span> currentObjectPtr = <span class="keyword">this</span>;</span><br><span class="line">    filters.emplace_back(</span><br><span class="line">        [currentObjectPtr](<span class="keyword">int</span> value) &#123;</span><br><span class="line">            <span class="keyword">return</span> value % currentObjectPtr-&gt;divisor == <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>现在我们回过头来看智能指针的情况：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> FilterContainer = <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::function&lt;<span class="keyword">bool</span>(<span class="keyword">int</span>)&gt;&gt;;</span><br><span class="line">FilterContainer filters;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">doSomeWork</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> pw = <span class="built_in">std</span>::make_unique&lt;Widget&gt;();</span><br><span class="line">    pw-&gt;addFilter();</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><code>std::unique_ptr</code>也改变不了我们捕获了一个孤悬的<code>this</code>指针的结局。</p>
-<p>正确做法是什么？将成员变量拷贝一份为局部变量，再捕获进去：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> Widget::addFilter() <span class="keyword">const</span> &#123;</span><br><span class="line">    <span class="keyword">auto</span> divisorCopy = divisor;</span><br><span class="line">    filters.emplace_back(</span><br><span class="line">        [divisorCopy] (<span class="keyword">int</span> value) &#123;</span><br><span class="line">            <span class="keyword">return</span> value % divisorCopy == <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在此基础上，如果你真的想用默认的值捕获模式，也可以接受。但为什么要冒这个险呢？如果不用默认捕获，我们早就可以发现<code>divisor</code>是成员变量不可捕获了。</p>
-<p>C++14中，更好的方式是用泛型lambda捕获（见Item32）：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> Widget::addFilter() <span class="keyword">const</span> &#123;</span><br><span class="line">    filters.emplace_back(</span><br><span class="line">        [divisor = divisor] (<span class="keyword">int</span> value) &#123;</span><br><span class="line">            <span class="keyword">return</span> value % divisor == <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    );</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>默认值捕获模式的另一个缺点是它让我们以为closure是自包含的，但它却不能确保这点。因为closure不光依赖于局部变量，还会依赖静态存储区的对象。这些对象可以在lambda中使用，但无法被捕获：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">addDivisorFilter</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">auto</span> calc1 = computeSomeValue1();</span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">auto</span> calc2 = computeSomeValue2();</span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">auto</span> divisor = computeDivisor(calc1, calc2);</span><br><span class="line">    filters.emplace_back([=](<span class="keyword">int</span> value) &#123; <span class="keyword">return</span> value % divisor == <span class="number">0</span>; &#125;); <span class="comment">// captures nothing! refers to above static</span></span><br><span class="line">    ++divisor;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>粗心的读者会被<code>[=]</code>误导，以为所有变量都被捕获了。但实际上什么都没有被捕获。当调用<code>++divisor</code>时，<code>addDivisorFilter</code>创建的所有closure中的<code>divisor</code>都增加了。</p>
-<p>这些问题通过显式捕获都可以提前发现，而用了默认捕获模式，却被藏了起来，等到上线时再boom。</p>
-<h2 id="Item32-使用初始化捕获来将对象移动到closure中"><a href="#Item32-使用初始化捕获来将对象移动到closure中" class="headerlink" title="Item32: 使用初始化捕获来将对象移动到closure中"></a>Item32: 使用初始化捕获来将对象移动到closure中</h2><p>有时候我们想把一个对象移动到closure中，比如一个只能移动的对象（<code>std::unique_ptr</code>或<code>std::future</code>），或是移动的代价远小于复制的对象（比如大多数的STL容器），这个时候默认的引用捕获和值捕获都无法做到。C++14提供了一种方式，叫“初始化捕获”，能满足这一需求。C++11无法直接实现，但后面会介绍一种间接实现的方式。</p>
-<p>C++标准委员会没有选择添加一种默认的移动捕获模式，而是增加“初始化捕获”，是因为后者的使用方式非常灵活，移动捕获只是它能做到的一件事情，事实上它几乎能做到其它捕获模式能做的所有事情。</p>
-<p>初始化捕获能让你指定：</p>
-<ol>
-<li>（closure class中）数据成员的名字。</li>
-<li>这个数据成员的初始化表达式。</li>
-</ol>
-<p>一个例子：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Widget</span>;</span></span><br><span class="line">...</span><br><span class="line"><span class="keyword">auto</span> pw = <span class="built_in">std</span>::make_unique&lt;Widget&gt;();</span><br><span class="line">...                                     <span class="comment">// confiture *pw</span></span><br><span class="line"><span class="keyword">auto</span> func = [pw = <span class="built_in">std</span>::move(pw)] &#123; <span class="keyword">return</span> pw-&gt;isValidated() &amp;&amp; pw-&gt;isArchived(); &#125;;</span><br></pre></td></tr></table></figure>
-
-<p><code>pw = std::move(pw)</code>中，<code>=</code>左边的是数据成员的名字，它的作用域就是这个closure；右边是它的初始化式，它的作用域就是closure所在的作用域。</p>
-<p>注意看有注释那行，如果在lambda前不需要修改<code>*pw</code>，就可以省掉这个变量，直接放到初始化捕获式中：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> func = [pw = <span class="built_in">std</span>::make_unique&lt;Widget&gt;()] &#123;...&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>如果你想在C++11中实现移动捕获，该怎么做？</p>
-<p>一种做法是自己把closure class写出来：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">IsValAndArch</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">using</span> DataType = <span class="built_in">std</span>::<span class="built_in">unique_ptr</span>&lt;Widget&gt;;</span><br><span class="line">    explicit IsValAndArch(DataType&amp;&amp; ptr): pw(std::move(ptr)) &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">operator</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> pw-&gt;isValidataed() &amp;&amp; pw-&gt;isArchived();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    DataType pw;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">auto</span> func = IsValAndArch(<span class="built_in">std</span>::make_unique&lt;Widget&gt;());</span><br></pre></td></tr></table></figure>
-
-<p>但这种方法需要写的代码太多了，有没有简单一点的呢？还真有，就是使用<code>std::bind</code>结合lambda，我们需要做的是：</p>
-<ol>
-<li>将对象移动的结果放到<code>std::bind</code>创建的函数对象中。</li>
-<li>令lambda接受上面这个“被捕获”的对象的引用。</li>
-</ol>
-<p>初始化捕获版本：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">double</span>&gt; data;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">auto</span> func = [data = <span class="built_in">std</span>::move(data)] &#123;...&#125;;</span><br></pre></td></tr></table></figure>
-
-<p><code>std::bind</code>+lambda版本：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">double</span>&gt; data;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">auto</span> func = <span class="built_in">std</span>::bind(</span><br><span class="line">    [](<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">double</span>&gt;&amp; data) &#123;...&#125;,</span><br><span class="line">    <span class="built_in">std</span>::move(data)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
-
-<p>函数对象中会保存每个参数的拷贝，我们使用了<code>std::move</code>，因此是移动生成了<code>data</code>的拷贝。之后lambda接受这个拷贝的const引用，就可以达到类似初始化捕获的效果了。</p>
-<p>默认情况下closure class的<code>operator()</code>会被认为是const，因此我们在lambda中无法修改捕获的对象。这时我们可以给lambda添加上<code>mutable</code>标识符，令它可以修改捕获的对象：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> func = <span class="built_in">std</span>::bind(</span><br><span class="line">    [](<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">double</span>&gt;&amp; data) <span class="keyword">mutable</span> &#123;...&#125;,</span><br><span class="line">    <span class="built_in">std</span>::move(data)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
-
-<p>上面的第二个例子同样可以用<code>std::bind</code>+lambda实现：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> func = <span class="built_in">std</span>::bind(</span><br><span class="line">    [](<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">unique_ptr</span>&lt;Widget&gt;&amp; pw) &#123;...&#125;,</span><br><span class="line">    <span class="built_in">std</span>::make_unique&lt;Widget&gt;()</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
-
-<h2 id="Item33-在auto-amp-amp-类型的参数上使用decltype从而进行完美转发"><a href="#Item33-在auto-amp-amp-类型的参数上使用decltype从而进行完美转发" class="headerlink" title="Item33: 在auto&amp;&amp;类型的参数上使用decltype从而进行完美转发"></a>Item33: 在<code>auto&amp;&amp;</code>类型的参数上使用<code>decltype</code>从而进行完美转发</h2><p>C++14的一项引入注目的新功能就是泛型lambda，即lambda的参数可以用<code>auto</code>来修饰。它的实现很直接：closure class的<code>operator()</code>是个模板函数。给定下面的lambda：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> f = [](<span class="keyword">auto</span> x) &#123;<span class="keyword">return</span> normalize(x);&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>对应的closure class的<code>operator()</code>为：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">SomeClosureClass</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="keyword">auto</span> <span class="title">operator</span><span class="params">()</span><span class="params">(T x)</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> normalize(x);</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>上面的例子中，如果<code>normalize</code>处理左值参数和右值参数的方式上有区别，那么我们写的还不算对，应该用上完美转发。这么需要对代码做两处修改：</p>
-<ol>
-<li><code>x</code>需要是一个普适引用。</li>
-<li><code>normalize</code>的实参要使用<code>std::forward</code>。</li>
-</ol>
-<p>大致上代码需要改成这个样子：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> f = [](<span class="keyword">auto</span>&amp;&amp; x) &#123; <span class="keyword">return</span> normalize(<span class="built_in">std</span>::forward&lt;???&gt;(x)); &#125;;</span><br></pre></td></tr></table></figure>
-
-<p>这里的问题就是<code>std::forward</code>的实例化类型是什么。通常的完美转发我们能有一个模板参数<code>T</code>，但在泛型lambda中我们只有<code>auto</code>。closure class的模板函数中有这个<code>T</code>，但我们没办法用上它。</p>
-<p>Item28解释了左值参数传给普适引用后变成左值引用，而右值参数传给普适引用后变成右值引用。我们要的就是这个效果，而这就是<code>decltype</code>能给我们的（参见Item3）。</p>
-<p>Item28中同样解释了当右值参数传给普适引用后，我们得到的<code>T</code>是无引用的，而<code>delctype(x)</code>是带右值引用的，这会影响<code>std::forward</code>吗？</p>
-<p>看<code>std::forward</code>的实现：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function">T&amp;&amp; <span class="title">forward</span><span class="params">(remove_reference_T&lt;T&gt;&amp; param)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;T&amp;&amp;&gt;(param);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>将<code>T</code>替换为<code>Widget</code>，得到：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Widget&amp;&amp; <span class="title">forward</span><span class="params">(Widget&amp; param)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;Widget&amp;&amp;&gt;(param);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>将<code>T</code>替换为<code>Widget&amp;&amp;</code>，得到：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Widget&amp;&amp; &amp;&amp; <span class="title">forward</span><span class="params">(Widget&amp; param)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;Widget&amp;&amp; &amp;&amp;&gt;(param);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>应用引用折叠，得到：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Widget&amp;&amp; <span class="title">forward</span><span class="params">(Widget&amp; param)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;Widget&amp;&amp;&gt;(param);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>与<code>T</code>为<code>Widget</code>的版本完全一样！这说明<code>decltype</code>就是我们想要的。</p>
-<p>因此我们的完美转发版本的最终代码为：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> f = [](<span class="keyword">auto</span>&amp;&amp; x) &#123;</span><br><span class="line">    <span class="keyword">return</span> normalize(<span class="built_in">std</span>::forward&lt;<span class="keyword">decltype</span>(x)(x)&gt;);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>C++14同样支持变长的泛型lambda：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> f = [](<span class="keyword">auto</span>&amp;&amp;... xs) &#123;</span><br><span class="line">    <span class="keyword">return</span> normalize(<span class="built_in">std</span>::forward&lt;<span class="keyword">decltype</span>(xs)&gt;(xs)...);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<h2 id="Item34-优先使用lambda而不是std-bind"><a href="#Item34-优先使用lambda而不是std-bind" class="headerlink" title="Item34: 优先使用lambda而不是std::bind"></a>Item34: 优先使用lambda而不是<code>std::bind</code></h2><p><code>std::bind</code>实际上早在TR1时已经进入C++标准库，那时候它还是<code>std::tr1::bind</code>。总之很多人已经用了它很多年了，要放弃它并不容易。但C++11中，lambda在绝大多数场景中都要比<code>std::bind</code>好，而在C++14k，这种优势还在变大。</p>
-<p>倾向于用lambda的最主要原因是lambda更易读。首先是背景代码：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> Time = <span class="built_in">std</span>::chrono::steady_clock::time_point;</span><br><span class="line"><span class="keyword">enum</span> <span class="class"><span class="keyword">class</span> <span class="title">Sound</span> &#123;</span>Beep, Siren, Whistle&#125;;</span><br><span class="line"><span class="keyword">using</span> Duration = <span class="built_in">std</span>::chrono::steady_clock::duration;</span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">setAlarm</span><span class="params">(Time t, Sound s, Duration d)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>lambda版本：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> setSoundL = [](Sound s) &#123;</span><br><span class="line">    <span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>::chrono;</span><br><span class="line">    setAlarm(steady_clock::now() + hours(<span class="number">1</span>), s, seconds(<span class="number">30</span>));</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>看起来就像是个非常正常的函数，其中我们很清晰的看到了<code>setAlarm</code>是如何被调用的。C++14中我们可以用一些字面值让代码更易懂：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> setSoundL = [](Sound s) &#123;</span><br><span class="line">    <span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>::chrono;</span><br><span class="line">    <span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>::literals;</span><br><span class="line">    setAlarm(steady_clock::now() + <span class="number">1</span>h, s, <span class="number">30</span>s);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p><code>std::bind</code>版本：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>::chrono;</span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>::literals;</span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>::placeholders; <span class="comment">// needed for use of "_1"</span></span><br><span class="line"><span class="keyword">auto</span> setSoundB = <span class="built_in">std</span>::bind(setAlarm, steady_clock::now() + <span class="number">1</span>h, _1, <span class="number">30</span>s);</span><br></pre></td></tr></table></figure>
-
-<p>一个不熟悉<code>std::bind</code>的用户可能很难发现<code>setAlarm</code>是在哪被调用的，<code>_1</code>看起来也很奇怪，更不好理解<code>std::bind</code>的第二个参数为什么是<code>setAlarm</code>的第一个参数。</p>
-<p>上面说的都是可读性上的问题，但在正确性上<code>std::bind</code>版本也有些问题。在lambda版本中，我们知道<code>steady_clock::now() + 1h</code>是<code>setAlarm</code>的参数，它会在调用<code>setAlarm</code>时被求值。但在<code>std::bind</code>中，这个表达式是<code>std::bind</code>的参数，它是在我们生成bind对象时就被求值了，而此时我们还不知道什么时候才会调用<code>setAlarm</code>！</p>
-<p>Fix方案就是把<code>std::bind</code>中的表达式继续用<code>std::bind</code>拆开，直到这个表达式的每项操作都是用<code>std::bind</code>表示的：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> setSoundB = <span class="built_in">std</span>::bind(</span><br><span class="line">    setAlarm,</span><br><span class="line">    <span class="built_in">std</span>::bind(</span><br><span class="line">        <span class="built_in">std</span>::plus&lt;&gt;(),</span><br><span class="line">        <span class="built_in">std</span>::bind(steady_clock::now),</span><br><span class="line">        <span class="number">1</span>h),</span><br><span class="line">    _1,</span><br><span class="line">    <span class="number">30</span>s</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
-
-<p>如你所见，有点丑。题外话，这里的<code>std::plus&lt;&gt;</code>是C++14新增的语法，即标准操作符模板的模板类型可以省略。在C++11中，不支持这种语法，必须写成<code>std::plus&lt;steady_clock::time_point&gt;</code>。</p>
-<p>如果<code>setAlarm</code>还有重载版本，新问题又产生了。假设另一个版本是：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">setAlarm</span><span class="params">(Time t, Sound s, Duration d, Volume v)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>对于lambda版本来说，工作正常，因为重载决议会选出正确的版本。而对于<code>std::bind</code>版本来说，编译会失败，编译器不知道该用哪个版本，它得到的只有一个函数名字，而这个名字本身是二义的。为了让<code>std::bind</code>能使用正确的版本，我们需要显式转换：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> SetAlarm3ParamType = <span class="keyword">void</span> (*)(Time, Sound, Duration);</span><br><span class="line"><span class="keyword">auto</span> setSoundB = <span class="built_in">std</span>::bind(</span><br><span class="line">    <span class="keyword">static_cast</span>&lt;SetAlarm3ParamType&gt;(setAlarm),</span><br><span class="line">    <span class="built_in">std</span>::bind(</span><br><span class="line">        <span class="built_in">std</span>::plus&lt;&gt;(),</span><br><span class="line">        <span class="built_in">std</span>::bind(steady_clock::now),</span><br><span class="line">        <span class="number">1</span>h</span><br><span class="line">    ),</span><br><span class="line">    _1,</span><br><span class="line">    <span class="number">30</span>s</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
-
-<p>接下来是性能问题。<code>setSoundL</code>的背后是一个closure class，lambda函数体就是它的<code>operator()</code>函数，因此我们调用<code>setSoundL</code>就是在调用一个对象的定义体的函数，而我们知道这种函数是可以内联的。而<code>std::bind</code>的内部保存了<code>setAlarm</code>的函数指针，后面会用这个函数指针来调用<code>setAlarm</code>，这种调用方式很难有机会内联。这就产生了一些性能差异。（不知道这里为什么没有提lambda和<code>std::bind</code>在保存捕获的变量时的方式不同对性能的影响，如果捕获的都是栈上结构，lambda可以不涉及内存分配，而<code>std::bind</code>一定会有内存分配）</p>
-<p>下一个差异在于我们用lambda可以很轻松写出临时用的短函数，而用<code>std::bind</code>就很困难：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> betweenL = [lowVal, highVal](<span class="keyword">const</span> <span class="keyword">auto</span>&amp; val) &#123;</span><br><span class="line">    <span class="keyword">return</span> lowVal &lt;= val &amp;&amp; val &lt;= highVal;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">auto</span> betweenB = <span class="built_in">std</span>::bind(</span><br><span class="line">    <span class="built_in">std</span>::logical_and&lt;&gt;(),</span><br><span class="line">    <span class="built_in">std</span>::bind(<span class="built_in">std</span>::less_equal&lt;&gt;(), lowVal, _1),</span><br><span class="line">    <span class="built_in">std</span>::bind(<span class="built_in">std</span>::less_equal&lt;&gt;(), _1, highVal)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
-
-<p>C++11下两个版本要长一点：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> betweenL = [lowVal, highVal](<span class="keyword">int</span> val) &#123;</span><br><span class="line">    <span class="keyword">return</span> lowVal &lt;= val &amp;&amp; val &lt;= highVal;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">auto</span> betweenB = <span class="built_in">std</span>::bind(</span><br><span class="line">    <span class="built_in">std</span>::logical_and&lt;<span class="keyword">bool</span>&gt;(),</span><br><span class="line">    <span class="built_in">std</span>::bind(<span class="built_in">std</span>::less_equal&lt;<span class="keyword">int</span>&gt;(), lowVal, _1),</span><br><span class="line">    <span class="built_in">std</span>::bind(<span class="built_in">std</span>::less_equal&lt;<span class="keyword">int</span>&gt;(), _1, highVal)</span><br><span class="line">);</span><br></pre></td></tr></table></figure>
-
-<p>怎么看起来都是lambda版本更清爽。</p>
-<p>接下来的差异是，我们很难搞清楚<code>std::bind</code>中参数是如何传递的。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> <span class="class"><span class="keyword">class</span> <span class="title">CompLevel</span> &#123;</span>Low, Normal, High&#125;;</span><br><span class="line"><span class="function">Widget <span class="title">compress</span><span class="params">(<span class="keyword">const</span> Widget&amp; w, CompLevel lev)</span></span>;</span><br><span class="line"></span><br><span class="line">Widget w;</span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>::placeholders;</span><br><span class="line"><span class="keyword">auto</span> compressRateB = <span class="built_in">std</span>::bind(compress, w, _1);</span><br></pre></td></tr></table></figure>
-
-<p>上面这段代码中，为了把<code>w</code>传给<code>compress</code>，我们要把<code>w</code>保存到bind对象中，但它是怎么保存的？值还是引用？答案是值（可以用<code>std::ref</code>和<code>std::cref</code>来传引用），但知道答案的唯一方式就是熟悉<code>std::bind</code>是如何工作的，而在lambda中，变量的捕获方式是明明白白写在那的。</p>
-<p>另一个问题是当我们调用bind对象时，它的参数是如何传给底层函数的？即<code>_1</code>是传值还是传引用？答案是传引用，因为<code>std::bind</code>会使用完美转发。</p>
-<p>以上几种差异说明了C++14下lambda在各方面几乎完爆<code>std::bind</code>。但在C++11中，<code>std::bind</code>有两项本领是lambda做不到的：</p>
-<ul>
-<li><p>移动捕获：参见Item32。</p>
-</li>
-<li><p>多态函数对象：<code>std::bind</code>会完美转发它的参数，因此它可以接受任意类型的参数，因此它可以绑定一个模板函数：</p>
-  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">PolyWidget</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">operator</span><span class="params">()</span><span class="params">(<span class="keyword">const</span> T&amp; param)</span> <span class="keyword">const</span></span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">PolyWidget pw;</span><br><span class="line"><span class="keyword">auto</span> boundPW = <span class="built_in">std</span>::bind(pw, _1);</span><br><span class="line"></span><br><span class="line">boundPW(<span class="number">1930</span>); </span><br><span class="line">boundPW(<span class="literal">nullptr</span>); </span><br><span class="line">boundPW(<span class="string">"Rosebud"</span>);</span><br></pre></td></tr></table></figure>
-
-<p>  C++11的lambda无法做到这点。但C++14的可以：</p>
-  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> boundPW = [pw](<span class="keyword">const</span> <span class="keyword">auto</span>&amp; param) &#123;pw(param);&#125;;</span><br></pre></td></tr></table></figure>
-
-</li>
-</ul>
-<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
-<li><a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Chapter1 类型推断 (Item 1-4)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">Chapter2 auto (Item 5-6)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">Chapter3 现代C++（Item 7-10)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm11-14/">Chapter3 现代C++（Item 11-14)</a></li>
-<li><a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/">Chapter3 现代C++（Item 15-17)</a></li>
-<li><a href="/2017/07/27/effective-modern-cpp-chapter4-iterm18-22/">Chapter4 智能指针 (Item 18-22)</a></li>
-<li><a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">Chapter5 右值引用、移动语义、完美转发（Item 23-26)</a></li>
-<li><a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Chapter5 右值引用、移动语义、完美转发（Item 27-30)</a></li>
-<li><a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">Chapter6: Lamba表达式 (Item 31-34)</a></li>
-<li><a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/">Chapter7: 并发API (Item 35-37)</a></li>
-<li><a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">Chapter7: 并发API (Item 38-40)</a></li>
-<li><a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">Chapter8: 杂项 (Item 41-42)</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/09/05/how-to-call-method-of-base-class-in-template/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2017/09/05/how-to-call-method-of-base-class-in-template/" class="post-title-link" itemprop="url">C++：模板类中如何调用其模板基类中的函数</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2017-09-05 14:32:37" itemprop="dateCreated datePublished" datetime="2017-09-05T14:32:37+08:00">2017-09-05</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h2><p>下面这段代码：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;string&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> <span class="keyword">const</span> <span class="built_in">std</span>::<span class="function"><span class="built_in">string</span>&amp; <span class="title">Method</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base2</span>:</span> <span class="keyword">public</span> Base&lt;T&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="built_in">std</span>::<span class="built_in">cout</span> &lt;&lt; <span class="string">"Func:"</span> &lt;&lt; Method() &lt;&lt; <span class="built_in">std</span>::<span class="built_in">endl</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Derived</span>:</span> <span class="keyword">public</span> Base2&lt;<span class="keyword">double</span>&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">const</span> <span class="built_in">std</span>::<span class="function"><span class="built_in">string</span>&amp; <span class="title">Method</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">static</span> <span class="keyword">const</span> <span class="built_in">std</span>::<span class="function"><span class="built_in">string</span> <span class="title">s</span><span class="params">(<span class="string">"Derived"</span>)</span></span>;</span><br><span class="line">        <span class="keyword">return</span> s;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Derived d;</span><br><span class="line">    d.Func();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在gcc4.1.2下编译会有这样的错误：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">test.cpp: In member function ‘void Base2&lt;T&gt;::Func() const’:</span><br><span class="line">test.cpp:14: error: there are no arguments to ‘Method’ that depend on a template parameter, so a declaration of ‘Method’ must be available</span><br><span class="line">test.cpp:14: error: (if you use ‘-fpermissive’, G++ will accept your code, but allowing the use of an undeclared name is deprecated)</span><br></pre></td></tr></table></figure>
-
-<h2 id="原因"><a href="#原因" class="headerlink" title="原因"></a>原因</h2><p>C++在对模板类和模板函数进行名字查找时，会分成两次进行：</p>
-<ol>
-<li>对于与模板参数无关的名字，或称无依赖名字，编译器会在看到这个模板的定义时查找名字。</li>
-<li>对于与模板参数有关的名字，或称有依赖名字，编译器会推迟检查，直到模板实例化时再查找名字。</li>
-</ol>
-<p>在我们的例子中，<code>Method</code>与模板参数无关，因此是无依赖名字，编译器会在看到<code>Base2</code>定义时查找名字。因为<code>Base</code>是个模板类，在这次查找时还没有实例化，因此编译器不会去<code>Base</code>中查找<code>Method</code>，只会在<code>Base2</code>的定义体中及外围作用域查找<code>Method</code>。</p>
-<p>上面的例子中，如果<code>Base</code>不是模板类，而是普通类：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> <span class="keyword">const</span> <span class="built_in">std</span>::<span class="function"><span class="built_in">string</span>&amp; <span class="title">Method</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>你会发现编译就正常了。</p>
-<h2 id="错误解法1：指定基类类型调用"><a href="#错误解法1：指定基类类型调用" class="headerlink" title="错误解法1：指定基类类型调用"></a>错误解法1：指定基类类型调用</h2><p>假如我们调用<code>Method</code>时指定基类类型，这样<code>Method</code>就变成有依赖名字了，是否可行？</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base2</span>:</span> <span class="keyword">public</span> Base&lt;T&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="built_in">std</span>::<span class="built_in">cout</span> &lt;&lt; <span class="string">"Func:"</span> &lt;&lt; Base&lt;T&gt;::Method() &lt;&lt; <span class="built_in">std</span>::<span class="built_in">endl</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>编译正常，运行一下：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;tmp&#x2F;ccgToaEX.o: In function &#96;Base2&lt;double&gt;::Func() const&#39;:</span><br><span class="line">test.cpp:(.text._ZNK5Base2IdE4FuncEv[Base2&lt;double&gt;::Func() const]+0x12): undefined reference to &#96;Base&lt;double&gt;::Method() const&#39;</span><br><span class="line">collect2: ld returned 1 exit status</span><br></pre></td></tr></table></figure>
-
-<p>为什么？因为我们指定了<code>Method</code>的类型，对<code>Method</code>的调用就是静态绑定，没有了动态绑定的效果，我们运行的<code>Method</code>就是基类版本，也就是没有定义的那个版本。</p>
-<h2 id="正确解法1：using基类中的名字"><a href="#正确解法1：using基类中的名字" class="headerlink" title="正确解法1：using基类中的名字"></a>正确解法1：using基类中的名字</h2><p>我们可以手动using基类中的名字，让名字查找时能看到<code>Method</code>，这样还表明<code>Method</code>是<code>Base&lt;T&gt;</code>中的成员，也就意味着<code>Method</code>依赖<code>T</code>，它就是一个有依赖名字，会推迟到实例化时再查找。这样我们仍然能让<code>Method</code>的调用是动态绑定：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base2</span>:</span> <span class="keyword">public</span> Base&lt;T&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">using</span> Base&lt;T&gt;::Method;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="built_in">std</span>::<span class="built_in">cout</span> &lt;&lt; <span class="string">"Func:"</span> &lt;&lt; Method() &lt;&lt; <span class="built_in">std</span>::<span class="built_in">endl</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>编译正常，运行结果：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Func:Derived</span><br></pre></td></tr></table></figure>
-
-<p>完成！</p>
-<h2 id="正确解法2：使用this调用"><a href="#正确解法2：使用this调用" class="headerlink" title="正确解法2：使用this调用"></a>正确解法2：使用<code>this</code>调用</h2><p>另一种解法是显式使用<code>this</code>，这样也可以将<code>Method</code>变成有依赖名字：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Base2</span>:</span> <span class="keyword">public</span> Base&lt;T&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="built_in">std</span>::<span class="built_in">cout</span> &lt;&lt; <span class="string">"Func:"</span> &lt;&lt; <span class="keyword">this</span>-&gt;Method() &lt;&lt; <span class="built_in">std</span>::<span class="built_in">endl</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>编译正常，运行结果：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Func:Derived</span><br></pre></td></tr></table></figure>
-
-<p>完成！</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2038,7 +2019,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">65</span>
+          <span class="site-state-item-count">67</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

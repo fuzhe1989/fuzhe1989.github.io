@@ -176,6 +176,408 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/c-store-a-column-oriented-dbms/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/13/c-store-a-column-oriented-dbms/" class="post-title-link" itemprop="url">[笔记] C-store: a column-oriented DBMS</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-08-13 12:12:32 / 修改时间：16:37:29" itemprop="dateCreated datePublished" datetime="2020-08-13T12:12:32+08:00">2020-08-13</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://dl.acm.org/doi/abs/10.1145/3226595.3226638" target="_blank" rel="noopener">C-store: a column-oriented DBMS</a></p>
+<p>本文idea：面向ad-hoc读优化的分布式DBMS。</p>
+<p>论证过程：</p>
+<ol>
+<li>面向ad-hoc读优化需要：<ol>
+<li>列存，以提高压缩和扫描效率；</li>
+<li>数据直接存成多种排序形式，从而应对ad-hoc查询；</li>
+<li>只读事务避免加锁，需要读写分离以及snapshot isolation。</li>
+</ol>
+</li>
+<li>列存需要仔细地编码数据，因此需要区分不同情况编码。</li>
+<li>数据存成projection需要考虑：<ol>
+<li>不同replica可以用不同的projection，这样既满足了安全性，又有机会提高性能；</li>
+<li>anchor table物理上不存在，就需要通过storage key和join index组合多个projection来还原一行数据；</li>
+</ol>
+</li>
+<li>读写分离要考虑：<ol>
+<li>分成WS和RS，这样两者可以用不同的存储结构，分别在写和读上达到最优；</li>
+<li>任意时间的MVCC开销太大，可以把时间分成epoch，一段一段推进；</li>
+<li>需要有一个将WS合并进RS的操作。</li>
+</ol>
+</li>
+<li>考虑到C-Store的主要场景是写特别少读特别多，可以：<ol>
+<li>不压缩WS中的数据；</li>
+<li>使用简化的2PC而不需要考虑吞吐问题。</li>
+</ol>
+</li>
+</ol>
+<p>感想：</p>
+<ol>
+<li>学术界的paper画风和工业界的确实不太一样，到处都是idea，但细推敲又觉得缺点什么。</li>
+<li>列存的核心问题就是编码。</li>
+<li>不同replica用不同projection确实是非常棒的idea，但这样要求DB和FS必须耦合在一起，很多情况下不现实。</li>
+<li>关于读写分离的几个idea很棒，MVCC是可以不用那么细粒度的。</li>
+</ol>
+</blockquote>
+<h2 id="Abstract"><a href="#Abstract" class="headerlink" title="Abstract"></a>Abstract</h2><p>C-Store是面向读优化的RDBMS，与当前面向写优化的RDBMS截然不同：</p>
+<ul>
+<li>列存 vs 行存</li>
+<li>内存中的数据与磁盘上的数据一样仔细紧凑地编码</li>
+<li>数据保存为若干个互有重叠的列存的projection，而不是传统的table和index</li>
+<li>保证了高可用性和对只读事务的snapshot isolation的非传统的事务实现</li>
+<li>大量结合使用B-tree和bitmap</li>
+</ul>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>传统的OLTP系统按行存，单次写就可以把一行所有字段写到磁盘上，面向写优化。</p>
+<p>ad-hoc查询需要面向读优化的系统。典型如data warehouse，运行模式是批量导入数据，之后长时间的ad-hoc查询。这类系统中使用列存会更高效。C-Store就是这样的系统。</p>
+<p>列存的优势在于，ad-hoc查询通常只需要少量列，使用列存可以只访问少量数据。但读优化的系统与写优化的系统在架构上还有其它区别。</p>
+<p>当前的DBMS通常将数据按字或字节对齐，这样对CPU，但CPU越来越快了，可以按两种方法用CPU换磁盘带宽：</p>
+<ul>
+<li>紧凑编码数据，如用6bit来表示州，而不是2Byte。</li>
+<li>紧凑排列数据，如一列的若干个值连续排列。</li>
+</ul>
+<p>DBMS最好能直接在压缩后的数据上查询，只在需要时解压数据。</p>
+<p>传统RDBMS使用B-tree存储table和index中的数据，这样对OLTP够用了，但在OLAP上不够高效。我们可以使用更高效的针对只读场景的存储结构。</p>
+<p>C-Store将数据保存为若干个projection，每个projection包含一行的部分列，不同的projection可以有相同列，但排序不同。因为每个projection都是排序的，压缩效率会比较高，这样数据保存多份的存储开销不会太大。</p>
+<p>C-Store使用若干台grid机器组成shard-nothing架构，数据分为多个partition保存在不同node上。</p>
+<p>C-Store一份数据会有若干个replica，但目的是高可用，缩短恢复时间，且不同replica可以是不同的projection（只要所有列都被覆盖到了）。这样同时兼顾了读优化和高可用。C-Store可以配置允许最多K个node出问题（目前还只支持K=1）。</p>
+<p>一个趋势是data warehouse也需要支持在线写入。但兼顾高效的在线写与ad-hoc查询是非常困难的。C-Store的作法是将存储分为Writeable Store（WS）与Read-optimized Store（RS），通过tuple mover将WS转为RS。</p>
+<p>Insert会发给WS，而Delete会同时发给WS和RS（要在RS中记录）。Update实现为一次Delete加Insert。Tuple mover过程借鉴了LSM的merge，将较小的WS数据与巨大的RS数据作merge生成新的RS（似乎过程中会复制所有数据）。</p>
+<p>为了支持事务而不影响读性能，C-Store对只读事务使用了snapshot isolation，只能读到历史数据。</p>
+<p>最后，面向列存的优化器设计与传统的行存系统也是非常不同的（但我不懂这个领域）。</p>
+<p>C-Store的创新点：</p>
+<ul>
+<li>WS加RS的混合结构，同时支持高效写与读。</li>
+<li>不同replica使用不同projection，查询时可以选择最适合的replica。</li>
+<li>高压缩的列存格式。</li>
+<li>面向列的优化器与执行器。</li>
+<li>足够多的projection可以保证K-safety下的高可用性和高性能。</li>
+<li>使用snapshot isolation以避免2PC和读锁。</li>
+</ul>
+<h2 id="Data-Model"><a href="#Data-Model" class="headerlink" title="Data Model"></a>Data Model</h2><p>C-Store中table只在逻辑上存在，实际存储的只有projection。所有projection都有相同的行数。每个projection都按sort key range分为若干个segment。</p>
+<p>为了能还原table，C-Store使用了两种数据：</p>
+<ul>
+<li>Storage Keys：一个segment内同一行数据的不同列都有着相同的storage key。Storage key实际是这行在这个RS内的编号，因此不需要真的存下来，通过这行的位置就可以计算得到。对应的WS中的storage key保证大于所有RS segment中的storage key。</li>
+<li>Join Indexes：Join index实际是一组index，帮助组合一系列projection的数据，最终得到完整的一行。Join index是segment级别的，格式为<code>{next_projection, sid, storage_key}</code>。</li>
+</ul>
+<blockquote>
+<p>后面大篇幅在讲如何选择一条路径来最小化join得到一行的开销。</p>
+</blockquote>
+<p>因为join index的维护代价比较大，C-Store推荐在实践中选择若干个projection包含全部列。</p>
+<p>为了能确定projection、segment、sort key、join index等该如何分配才能同时满足K-safety和性能，可以先训练C-Store集群，比如记录所有请求并回放。</p>
+<h2 id="RS"><a href="#RS" class="headerlink" title="RS"></a>RS</h2><p>RS中按列分别保存数据，每列中数据都按sort key的顺序排列。</p>
+<h3 id="Encoding-Schemes"><a href="#Encoding-Schemes" class="headerlink" title="Encoding Schemes"></a>Encoding Schemes</h3><p>每列的数据格式按两个维度（是否是sort key、有多少distinct value）分为四种情况：</p>
+<ol>
+<li>是sort key，只有很少distinct value：每个值表示为<code>(v, f, n)</code>，其中v是值，f是v第一次出现的位置，n是出现次数。之后用B-tree索引这些值。</li>
+<li>不是sort key，只有很少distinct value：每个值表示为<code>(v, b)</code>，其中b是bitmap，记录每个值出现的位置，如001101001，预期这个bitmap是稀疏的，可以用RLE编码。为了高效实现查找第i个值的操作，还需要一个B-tree index。</li>
+<li>是sort key，很多distinct value：每列差值编码，之后用B-tree索引这些值。</li>
+<li>不是sort key，很多distinct value：直接保存原始值，用B-tree索引。</li>
+</ol>
+<h3 id="Join-Indexes"><a href="#Join-Indexes" class="headerlink" title="Join Indexes"></a>Join Indexes</h3><p>join index就是一系列<code>(sid, storage_key)</code>，和其它存储没什么区别。</p>
+<h2 id="WS"><a href="#WS" class="headerlink" title="WS"></a>WS</h2><p>为了避免维护两套optimizer，WS也是列存格式，也有projection和join index。WS中storage key是显式分配的（RS中是推算出来的），初始值大于任意一个RS中最大的storage key。</p>
+<p>WS与RS的segment是一一对应的，因此<code>(sid, storage_key)</code>既可能指向RS也可能指向WS。</p>
+<p>WS通常比较小，因此数据不考虑压缩，每个projection直接用B-tree保存数据。</p>
+<h2 id="Storage-Management"><a href="#Storage-Management" class="headerlink" title="Storage Management"></a>Storage Management</h2><p>C-Store使用storage allocator分配segment给各个node，规则是：</p>
+<ul>
+<li>同一个projection的同一个segment的不同列应该分配在一起。</li>
+<li>join index segment应该与sender segment分配在一起。</li>
+<li>对应的WS和RS segment应该分配在一起。</li>
+</ul>
+<p>值比较大的列（若干MB）会单独保存。</p>
+<h2 id="Updates-and-Transaction"><a href="#Updates-and-Transaction" class="headerlink" title="Updates and Transaction"></a>Updates and Transaction</h2><p>一次insert会在每个projection的每列新增一个值，所有这些值有着相同的storage key，这个key是在收到insert的node上分配的。每个node使用unique_id+local_counter来生成全局唯一的storage key。所有node的local counter初始值都大于任意RS的storage key。</p>
+<p>WS目前使用了BerkeleyDB，未来考虑使用大的内存池来降低实际写磁盘的分摊开销。</p>
+<p>C-Store中只读事务使用snapshot isolation，需要指定在low water mark（LWM）到high water mark（HWM）之间的一个effective time。这样只读事务就不需要加锁了。</p>
+<p>Update事务使用传统的2PL。</p>
+<h3 id="Providing-Snapshot-Isolation"><a href="#Providing-Snapshot-Isolation" class="headerlink" title="Providing Snapshot Isolation"></a>Providing Snapshot Isolation</h3><p>对于一个只读事务选择的effective time（ET），一条记录当且仅当它的插入时间小于ET且删除时间大于ET时可见。为了减少空间开销，C-Store使用了epoch，每个epoch是一个固定长度的时间段，每个WS会用insertion vector（IV）保存一个epoch中的所有insert。Tuple mover能保证不会有记录在LWM之后插入RS，所以RS不需要有IV。类似地还有deleted record vector（DRV），每个projection中每个值都对应DRV中的一个值1或0，很明显DRV也可以用RLE编码。DRV也保存在WS中。</p>
+<h4 id="Maintaining-the-High-Water-Mark"><a href="#Maintaining-the-High-Water-Mark" class="headerlink" title="Maintaining the High Water Mark"></a>Maintaining the High Water Mark</h4><p>C-Store定期向每个WS发送epoch+1，之后等所有WS的上一个epoch的请求都处理完，再向每个segment发送HWM=epoch。</p>
+<p>C-Store会定期回收epoch以避免溢出，方法类似于TCP等协议。</p>
+<h3 id="Locking-based-Concurrency-Control"><a href="#Locking-based-Concurrency-Control" class="headerlink" title="Locking-based Concurrency Control"></a>Locking-based Concurrency Control</h3><p>C-Store中只有undo log，且实现了一种不严格的2PC（没有prepare），通过timeout实现了死锁检测。</p>
+<h4 id="Distributed-COMMIT-Processing"><a href="#Distributed-COMMIT-Processing" class="headerlink" title="Distributed COMMIT Processing"></a>Distributed COMMIT Processing</h4><p>C-Store中事务通过一个master来分配给各个worker，但没有prepare阶段，当需要commit时，它会等所有worker完成当前任务，然后要求worker commit或abort这个事务。一旦node完成了这个事务，就可以释放锁，删除undo log了。如果有node在需要commit时还没记下来undo log就挂了，它会在recovery阶段通过其它projection恢复状态。</p>
+<h4 id="Transaction-Rollback"><a href="#Transaction-Rollback" class="headerlink" title="Transaction Rollback"></a>Transaction Rollback</h4><p>C-Store记录logical log（statement），这样undo log的体积会远小于phisical log。在abort时它会从尾部开始扫描undo log，然后恢复状态。</p>
+<h3 id="Recovery"><a href="#Recovery" class="headerlink" title="Recovery"></a>Recovery</h3><p>如果node只是挂了，没有数据丢失，它只需要追上所有update就可以了。</p>
+<p>如果node的WS和RS都没了，它需要通过其它projection和join index来恢复数据，其中WS还需要能从其它projection获取IV和DRV。</p>
+<p>如果node的WS没了，但RS还在，只需要恢复WS。</p>
+<h4 id="Efficiently-Recovering-the-WS"><a href="#Efficiently-Recovering-the-WS" class="headerlink" title="Efficiently Recovering the WS"></a>Efficiently Recovering the WS</h4><p>需要恢复的WS要先选择一组覆盖它所有列的projection，这些projection的last tuple move时间早于要恢复的WS（保证IV和DRV完整），然后通过一组SQL获取数据。</p>
+<p>如果没有这样的projection（很罕见），WS要的数据就在其它RS中，可以要求tuple mover在执行时记录log，之后从log中恢复WS数据。</p>
+<h2 id="Tuple-Mover"><a href="#Tuple-Mover" class="headerlink" title="Tuple Mover"></a>Tuple Mover</h2><blockquote>
+<p>与LSM类似，略。</p>
+</blockquote>
+<h2 id="C-Store-Query-Execution"><a href="#C-Store-Query-Execution" class="headerlink" title="C-Store Query Execution"></a>C-Store Query Execution</h2><blockquote>
+<p>略</p>
+</blockquote>
+<h2 id="Performance-Comparison"><a href="#Performance-Comparison" class="headerlink" title="Performance Comparison"></a>Performance Comparison</h2><blockquote>
+<p>略</p>
+</blockquote>
+<h2 id="Related-Work"><a href="#Related-Work" class="headerlink" title="Related Work"></a>Related Work</h2><blockquote>
+<p>略</p>
+</blockquote>
+<h2 id="Conclusions"><a href="#Conclusions" class="headerlink" title="Conclusions"></a>Conclusions</h2><blockquote>
+<p>略</p>
+</blockquote>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/" class="post-title-link" itemprop="url">[笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-06 16:14:43" itemprop="dateCreated datePublished" datetime="2020-08-06T16:14:43+08:00">2020-08-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-13 12:14:40" itemprop="dateModified" datetime="2020-08-13T12:14:40+08:00">2020-08-13</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.68.9136&rep=rep1&type=pdf" target="_blank" rel="noopener">Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.</a></p>
+<p>本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。</p>
+<p>论证过程：</p>
+<ol>
+<li>过去若干年中DBMS厂家追求“One size fits all”，原因有若干。</li>
+<li>传统DBMS主要针对OLTP，处理模型为outbound，针对性优化短事务，重点在于ACID，这些特点并不适用于OLAP。</li>
+<li>随着streaming processing兴起，它需要完全不同的优化方向。</li>
+<li>未来使用DBMS的应用类型会越来越多，会有更多针对特定领域的DB engine出现。</li>
+</ol>
+<p>感想：</p>
+<ol>
+<li>任何优化都是有代价的，选择针对一个方向优化，就会在另一个方向平庸。甚至提供不同优化的开关也是有代价的，只要允许选择，代价就会存在。</li>
+<li>不同应用需要不同程度的一致性，但一套系统在架构设计时就要锚定某种一致性，它运行在其它一致性级别时只是稍有优化，而不会达到很理想的水平。</li>
+<li>如何控制DB与应用逻辑的耦合度，过高的耦合度会带来安全性、维护性上的问题，而过低的耦合度又会带来性能开销。存储过程，以及各种各样的UDF就是其中的粘合剂。</li>
+</ol>
+</blockquote>
+<h2 id="Abstract"><a href="#Abstract" class="headerlink" title="Abstract"></a>Abstract</h2><p>过去25年的DBMS发展可以总结为“One size fits all”：用一套DBMS架构支持不同需求和特点的数据应用。</p>
+<p>但这句话已经过时了，未来会有一组独立的db engine和统一的前端解析层。</p>
+<p>后面主要讨论流计算和数据仓库两个方向。</p>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>一开始的RDBMS主要针对“buniness data processing”，特点是：</p>
+<ul>
+<li>OLTP</li>
+<li>按行存储</li>
+<li>索引使用B-tree</li>
+<li>使用基于开销（cost-based）的优化器</li>
+<li>提供ACID</li>
+</ul>
+<p>1980年代的主流DBMS开始陷入“One size fits all”，想用一个系统提供所有DB服务，因为多个系统会导致以下问题：</p>
+<ul>
+<li>维护开销</li>
+<li>兼容性，应用需要适配的系统变多了</li>
+<li>销售问题，销售人员不知道该卖哪套产品给哪类客户</li>
+<li>市场问题，多个系统需要精准定位</li>
+</ul>
+<p>本文观点是这种思想已经过时了。</p>
+<h2 id="Data-warehousing"><a href="#Data-warehousing" class="headerlink" title="Data warehousing"></a>Data warehousing</h2><p>1990年代，企业需要将多个不同DB的数据导入一个data warehouse作分析。这些系统都是在线系统，直接在上面跑分析会拉长对其它用户的响应时间，而且分析往往想要历史趋势，需要关联不同系统的数据，这些都没办法被一个OLTP系统满足。</p>
+<p>几乎每个企业都会创建一个大的data warehouse，定期导入来自不同DB的数据。尽管这些系统要么超出预算，要么只满足了一部分需求，但还是物有所值的。</p>
+<p>Data warehouse与OLTP非常不同：前者面向ad-hoc查询优化（更复杂），后者面向更新优化。</p>
+<p>Data warehouse的标准实现方式（星型）：</p>
+<ul>
+<li>一个fact table保存每条记录的who、what、when、where</li>
+<li>若干个dimension table，保存fact table中记录要引用的各维度数据，fact table中使用foreign key来引用这些数据</li>
+</ul>
+<p>Data warehouse被认为更适合用bit-map作为索引，而OLTP则更适合使用B-tree。</p>
+<p>Data warehouse还经常使用materialized view作为一种优化手段，而OLTP则不然。</p>
+<p>很多DB提供商会同时提供data warehouse和OLTP系统，两者共用一套前端解析。这样能更好地实现那些只对其中一个系统有用的功能。例如OLTP系统习惯用2B来表示一个州（如CA），而data warehouse可以只用6b，从而减少bit-map大小。这样的需求是一套系统满足不了的。</p>
+<p>但在stream processing领域，一套前端解析也不够，不同系统需要从前端开始分开。</p>
+<h2 id="Stream-processing"><a href="#Stream-processing" class="headerlink" title="Stream processing"></a>Stream processing</h2><h3 id="Emerging-sensor-based-applications"><a href="#Emerging-sensor-based-applications" class="headerlink" title="Emerging sensor-based applications"></a>Emerging sensor-based applications</h3><p>这里讨论的stream processing似乎主要指实时处理大量传感器产生的数据，比如：</p>
+<ol>
+<li>军队需要能监控士兵、枪械、舰艇的状态，需要能查询历史数据，有aggregation。</li>
+<li>智能交通、地图类应用等。</li>
+</ol>
+<p>传统的DB没办法满足这些需求，需要专门的stream processing engine。</p>
+<h3 id="An-existing-applicaton-financial-feed-processing"><a href="#An-existing-applicaton-financial-feed-processing" class="headerlink" title="An existing applicaton: financial-feed processing"></a>An existing applicaton: financial-feed processing</h3><p>financial-feed指市场动态、特定新闻、完成的交易、投标、询价等实时数据的投递。</p>
+<p>例子：一家公司需要订阅多个finalcial feed，如果有某个feed延迟了就提醒交易员。他们不满足于自己实现的系统的性能，需要一个专门的stream processing engine。</p>
+<h2 id="Performance-discussion"><a href="#Performance-discussion" class="headerlink" title="Performance discussion"></a>Performance discussion</h2><p>StreamBase是能满足这个需求的stream processing engine，它可以在一台2005年的普通家用机上每秒处理160K条消息，而对应的DBMS系统只能处理900条。</p>
+<blockquote>
+<p>但这个产品已经死了。</p>
+</blockquote>
+<h3 id="“Inbound”-versus-“outbound”-processing"><a href="#“Inbound”-versus-“outbound”-processing" class="headerlink" title="“Inbound” versus “outbound” processing"></a>“Inbound” versus “outbound” processing</h3><p>传统DBMS的核心是不丢数据，它的处理模型称为“process-after-store”：</p>
+<ul>
+<li>插入数据</li>
+<li>构建索引并提交事务</li>
+<li>回复用户</li>
+</ul>
+<p>实时应用中，必须在处理前存储，显著增加了延时和处理每条消息的开销。可以用下面的处理模型来避开存储带来的瓶颈：</p>
+<ul>
+<li>处理过程中数据顺着网络和内存走</li>
+<li>读写存储都是可选的，且很多时间可以异步进行</li>
+</ul>
+<p>这种处理模型称为“inbound”，而传统DBMS的处理模型称为“outbound”。DBMS的trigger可以做一点inbound处理，但：</p>
+<ul>
+<li>trigger是事后补充的，有很多限制</li>
+<li>trigger的安全性没办法保证（如避免死循环）</li>
+<li>trigger不支持materialized view</li>
+<li>很多系统的trigger的性能都不好</li>
+</ul>
+<p>outbound系统使用pull模式，engine把数据从存储介质中拉出来，而inbound则是push模式，数据被上游模块主动推给下游模块。</p>
+<p>outbound系统存储数据，在其上执行查询；inbound系统存储查询，将数据流过这些查询。</p>
+<h3 id="The-correct-primitives"><a href="#The-correct-primitives" class="headerlink" title="The correct primitives"></a>The correct primitives</h3><p>SQL支持复杂的聚合，大概长这个样子：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="keyword">AVG</span>(salary)</span><br><span class="line"><span class="keyword">FROM</span> employee</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> department</span><br></pre></td></tr></table></figure>
+
+<p>最后一行被处理完之后会输出聚合结果。但这个特点不适合stream processing，后者没有所谓的结束。</p>
+<p>相对地，stream processing系统增加了time window概念，window有很多种，前一节的例子很适合用sliding window。</p>
+<p>StreamBase支持在带有两个参数的window上执行聚合：</p>
+<ul>
+<li>timeout：可以不等late data直接关闭window</li>
+<li>slack：直到满足条件再关闭window</li>
+</ul>
+<p>SQL也可以支持window，但这对存储没意义（因此outbound系统不太可能支持）。</p>
+<h3 id="Seamless-integration-of-DBMS-processing-and-application-logic"><a href="#Seamless-integration-of-DBMS-processing-and-application-logic" class="headerlink" title="Seamless integration of DBMS processing and application logic"></a>Seamless integration of DBMS processing and application logic</h3><p>传统的DBMS是client-server架构，应用代码与DBMS在不同的地址空间，交互会带来开销。但在StreamBase中，三类功能可以自由组合在一起：</p>
+<ul>
+<li>DBMS处理（filter、aggregation）</li>
+<li>模块间消息传递</li>
+<li>应用逻辑</li>
+</ul>
+<p>这种DBMS逻辑与程序功能的无缝结合在多年前已经出现在Rigel和Pascal-R中了。商业DBMS的存储过程只相当于非常受限的编程系统。Object-relational DB提供了比存储过程更强大的功能，但仍然不够灵活。</p>
+<p>stream processing engine也需要存储，如：</p>
+<ul>
+<li>引用数据</li>
+<li>转换表</li>
+<li>历史数据</li>
+</ul>
+<p>StreamBase嵌入了BerkeleyDB存储数据，访问成本远低于访问另一个DB server。</p>
+<p>传统DBMS基于安全性的考虑，必须要提供隔离机制。因此一个DBMS为了更好地支持实时应用，可能需要同时支持嵌入和非嵌入模型。这也在鼓励放弃“one size fits all”原则。</p>
+<p>回到我们的feed例子，这里数据都是来源于其它系统，stream processing和DBMS代码都是同一批人写的，就更没有理由继续支持传统DBMS了。</p>
+<h3 id="High-availability"><a href="#High-availability" class="headerlink" title="High availability"></a>High availability</h3><p>传统DBMS使用了基于log恢复状态的方案来实现高可用，这种方案在stream processing中有几个问题：</p>
+<ul>
+<li>恢复时间长，恢复期间没办法服务。</li>
+<li>为了避免丢数据，需要想办法缓存输入的数据流。</li>
+<li>只能恢复表数据，没办法恢复operator状态。如果要求所有operator都将自己状态保存到DB中，又会带来开销。</li>
+</ul>
+<p>一种替代方案是使用串联（Tandem-style）风格的模块对：遇到crash时，应用切换到热备份机器上，这样只需要很短时间就可以继续服务了。因此StreamBase关掉了BerkeleyDB的log。</p>
+<blockquote>
+<p>这里对比的是单机DB，不需要联想到分布式协议上。基本思想可能是用本地双写替代log。</p>
+</blockquote>
+<p>很多stream processing engine能接受恢复出不完整的数据。比如监控类应用，如果能接受处理时丢一些数据点，也就能接受恢复时丢一些数据点。而报警类应用能接受重复消息，但不能接受丢消息。</p>
+<h3 id="Synchronization"><a href="#Synchronization" class="headerlink" title="Synchronization"></a>Synchronization</h3><p>传统的DBMS使用ACID来隔离不同请求，在streaming系统中，没有多用户，因此可以只用简单的临界区就实现请求间的隔离，而不需要全功能的事务。</p>
+<h2 id="One-size-fits-all"><a href="#One-size-fits-all" class="headerlink" title="One size fits all?"></a>One size fits all?</h2><p>前面的例子表明StreamBase，这种与传统DBMS非常不同的系统，在处理实时数据上有多么巨大的优势。在其它领域我们也可以有这种专门的系统。</p>
+<h3 id="Data-warehouse"><a href="#Data-warehouse" class="headerlink" title="Data warehouse"></a>Data warehouse</h3><p>传统的OLTP DBMS是基于行的，行与行连续，面向写优化。Data warehouse需要面向读优化，因此列存储模式更高效。</p>
+<h3 id="Sensor-networks"><a href="#Sensor-networks" class="headerlink" title="Sensor networks"></a>Sensor networks</h3><p>传统DBMS在处理大量传感器产生的数据时不够高效，需要有更灵活、轻量的DB系统。</p>
+<blockquote>
+<p>NoSQL</p>
+</blockquote>
+<h3 id="Text-search"><a href="#Text-search" class="headerlink" title="Text search"></a>Text search</h3><p>需要：</p>
+<ul>
+<li>能处理大量append-only的写入</li>
+<li>能处理大量的ad-hoc读</li>
+<li>机器数多，容易出现错误，对可用性要求高</li>
+</ul>
+<blockquote>
+<p>ElasticSearch，Solr</p>
+</blockquote>
+<h3 id="Scientific-databases"><a href="#Scientific-databases" class="headerlink" title="Scientific databases"></a>Scientific databases</h3><blockquote>
+<p>类似于sensor networks</p>
+</blockquote>
+<h3 id="XML-databases"><a href="#XML-databases" class="headerlink" title="XML databases"></a>XML databases</h3><blockquote>
+<p>略</p>
+</blockquote>
+<h2 id="A-Comment-on-Factoring"><a href="#A-Comment-on-Factoring" class="headerlink" title="A Comment on Factoring"></a>A Comment on Factoring</h2><p>多数基于stream的应用需要三类服务：</p>
+<ul>
+<li>消息传输</li>
+<li>状态存储</li>
+<li>应用逻辑执行</li>
+</ul>
+<p>如果基于传统DBMS，一条消息需要6次网络传输。为了避免这些开销，stream processing engine需要能在一个进程内提供这三种能力。</p>
+<p>这就引出一个问题，当前基于模块（应用server、DBMS、ETL、消息总线、文件系统、web server等）来构建系统的作法是否是最优的。</p>
+<h2 id="Concluding-Remarks"><a href="#Concluding-Remarks" class="headerlink" title="Concluding Remarks"></a>Concluding Remarks</h2><p>未来会有许多领域特定的具有不同能力的db engine。未来的DBMS市场会非常有趣。未来会有大量新的，与“business data processing”模式非常不同的应用，看起来没有一套系统可以同时支持这些应用，“one size fits all”不太可能继续下去了。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/07/30/apache-pulsar-versus-apache-kafka/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1077,407 +1479,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/05/17/message-passing-and-the-actor-model/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/05/17/message-passing-and-the-actor-model/" class="post-title-link" itemprop="url">[翻译]消息传递与actor模型</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-05-17 23:35:06" itemprop="dateCreated datePublished" datetime="2018-05-17T23:35:06+08:00">2018-05-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>原文：<a href="http://dist-prog-book.com/chapter/3/message-passing.html" target="_blank" rel="noopener">Message Passing and the Actor Model</a></p>
-<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>自有分布式计算以来，人们就已经讨论过消息传递编程模型了，因此消息传递可以用于表示许多事情。Wikipedia上消息传递的宽泛定义包括了远程过程调用（RPC）和消息传递接口（MPI）等。另外，实践中的消息传递系统也受到了像是pi-calculus和CSP这些流行的进程演算（process-calculus）的启发。例如，Go的channel就是基于pi-calculus中消息通道作为一等公民的思想，而Clojure中的core.async库则是基于CSP。但今天人们谈起消息传递时，通常是指actor模型。作为一种通用的消息传递编程模型，它开端于20世纪70年代，并在今天用于构建大规模可伸缩系统。</p>
-<p>在消息传递编程模型领域，重要的不仅是考虑目前的研究现状，还包括历史上最初的关于消息传递和actor模型的论文，它们是更近期的论文描述的编程模型的源头。看看这些模型卡在了哪里，以及近期的论文都引用和指出了旧论文中的哪些不足，这些是很有启发性的。历史上有许多编程语言是围绕着消息传递设计的，特别是那些专注于actor模型和组织计算单元的语言。</p>
-<p>本章我会描述actor模型的四个主要变体：经典actor模型、基于进程的actor模型、通信事件循环模型、以及活动对象模型。我会试着强调体现了这些模型的历史上和现代的语言，以及程序员需要注意的编程哲学和取舍，从而理解并最好的利用这些模型。</p>
-<p>尽管actor模型早在20世纪70年代就开始了，正如许多近期发表的论文和系统显示，它仍在发展，并被纳入到今天的编程语言中。有些健壮的工业级actor系统正被用于赋能大规模可伸缩分布式系统，例如Akka被用于服务PayPal的十亿级的事务，Erlang被用于为WhatsApp的上亿用户发送消息，而Orleans被用于服务Halo4的数百万玩家。围绕着监控、错误处理、actor生命周期管理，有许多不同方式去构建一个工业级的actor框架，后面会详述。</p>
-<p>对于我们介绍的actor模型，一个重点就在这个问题中：“为什么要传递消息，特别是为什么要用actor模型？”考虑到有那么多分布式编程模型，有人可能会问，为什么这个模型在最初提出时这么重要？为什么它促进了当今广泛使用的高级语言、系统和库？我们将在这一章看到，actor模型的一些最明显的优点包括了actor状态的隔离、可伸缩性、以及简化程序员对系统的推理难度。</p>
-<h1 id="原始actor模型"><a href="#原始actor模型" class="headerlink" title="原始actor模型"></a>原始actor模型</h1><p>actor模型最早被1973年的“A Universal Modular ACTOR Formalism for Artificial Intelligence”引入，作为人工智能研究中的一种计算方法。它的最初目标是用一种能安全地跨工作站并发分布的通信方式来建模并行计算。这篇文章几乎没有假设实现细节，而是定义了一种高级消息传递通信模型。Gul Agha随后发展了这种模型，他专注于将actor作为并发面向对象编程的基础。这项工作收录在“Actors: A Model of Concurrent Computation in Distributed Systems”中。</p>
-<p>actor被定义为计算中的独立单元，相互状态隔离。这些单元有两种核心性质：</p>
-<ul>
-<li>它们能相互异步发送消息，以及</li>
-<li>它们有一个信箱保存收到的消息，任何时间都可以收取消息并排队处理。</li>
-</ul>
-<p>消息形式为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">(request: &lt;message-to-target&gt;</span><br><span class="line"> reply-to: &lt;reference-to-messenger&gt;)</span><br></pre></td></tr></table></figure>
-
-<p>actor会用通过值或逻辑语句指定的模式或规则来串行匹配消息的<code>request</code>字段，来尝试处理信箱中的消息。一旦有模式被匹配到了，就会做相应的计算，并将结果隐式返回给消息中<code>reply-to</code>字段中的发送者的引用。这是一种continuation，其中continuation指发给另一个actor的消息。这些消息是单向的，且不保证消息一定会被响应。actor模型如此通用的原因是它对系统几乎没有限制。异步和不保证消息送达使它能建模真实的分布式系统。例如，如果保证消息送达，这种模型的通用性会大大降低，只能建模包含复杂的消息送达协议的系统。跟其它许多模型相比，这种原始actor模型能力有限，但已经有了通过分布计算能力以允许更大计算并行度的早期思想。</p>
-<p>有趣的是，原始actor模型的论文是基于硬件环境的。他们几乎将actor模型描述为另一种机器架构。这篇文章描述了“actor机器”和“硬件actor”概念作为actor模型的上下文，这与我们对现代actor模型的看法完全不同，因为它抽象了许多我们完全不想处理的硬件细节。这种概念让人想起了类似于Lisp机器的东西，尽管它是专门用于人工智能计算的actor模型的。</p>
-<h1 id="经典actor模型"><a href="#经典actor模型" class="headerlink" title="经典actor模型"></a>经典actor模型</h1><p>在Agha的“Concurrent Object-Oriented Programming”中经典actor模型被形式化为一个计算单元。它扩展了初始的actor模型，保持了在隔离的计算单元和状态单元之间通过消息来做异步通信的思想。经典actor模型包含以下基本操作：</p>
-<ul>
-<li><code>create</code>：用一种行为的描述和一组参数（包括其它actor）来创建一个actor。</li>
-<li><code>send</code>：向其它actor发送消息。</li>
-<li><code>become</code>：将一个actor的当前行为替换为另一种行为。</li>
-</ul>
-<p>与原始actor模型一样，经典actor模型也通过异步的消息传递来进行通信。这些actor都是相互独立的计算单元，可以用于构建更高级的并发编程抽象。每个actor有唯一的地址，有独立的信箱或消息队列。在经典actor模型中，状态变化均由<code>become</code>操作来聚合完成。每当actor处理一条消息时，它会计算出一个行为，来响应它期望处理的下一种消息类型。<code>become</code>操作的参数是一个有名字的continuation <code>b</code>，表示actor应该被更新为的行为，以及其它应该传递给<code>b</code>的状态。</p>
-<p>这种continuation模型很灵活。你可以创建一个纯函数式的actor，每个新行为都与初始行为相同，也不会有状态传递。一个例子是下面的<code>AddOne</code>，它会根据一种固定的行为来处理消息。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">(define AddOne</span><br><span class="line">  [add-one [n]</span><br><span class="line">    (return (+ n  1))])</span><br></pre></td></tr></table></figure>
-
-<p>这种模型也能创建一个有状态的actor，它可以改变行为，并传递一个表示状态的对象。这种状态可以是许多操作的结果，这就允许在一个比变量赋值更高的层面聚合状态的更改。一个例子是“Concurrent Object-Oriented Programming”中给出的<code>BankAccount</code>。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">(define BankAccount</span><br><span class="line">  (mutable [balance]</span><br><span class="line">    [withdraw-from [amount]</span><br><span class="line">      (become BankAccount (- balance amount))</span><br><span class="line">      (return &#39;withdrew amount)]</span><br><span class="line">    [deposit-to [amount]</span><br><span class="line">      (become BankAccount (+ balance amount))</span><br><span class="line">      (return &#39;deposited amount)]</span><br><span class="line">    [balance-query</span><br><span class="line">      (return &#39;balance-is balance)]))</span><br></pre></td></tr></table></figure>
-
-<p>将actor看作有状态的continuation就允许它随着时间灵活地调整其行为，来响应系统中其它actor的动作。将状态和行为更改限制在<code>become</code>操作中改变了人们分析系统时所处的层级，将程序员从对状态更改中的相互干扰的担忧中释放出来。在上面的例子中，程序员只需要关心，在通过<code>become</code>操作来响应定义良好的消息类型的顺序队列时，每个账户的balance是如何变化的。</p>
-<p>如果你稍微看一下，这种actor的定义有点像Alan Kay对面向对象编程的原始定义。这个定义描述了一个系统，其中每个对象有一种行为，持有内存，互相之间通过发送和接收消息来通信，消息中可能包含其它对象或只是动作的触发器。Kay的思想很接近于我们今天认为的actor模型，而不太像我们今天认为的面向对象编程。也就是说，Kay在这种描述中的重点是设计消息传递和通信，它们决定了对象如何交互。</p>
-<blockquote>
-<p>重要的是“消息传递”——这就是Smalltalk/Squeak的核心所在（也是我们在Xerox PARC阶段从未完成的事情）。日语中有一个字，MA，意思是“介于两者之间的”，与之最接近的英语单词也许是“interstitial”。创造伟大且可成长的系统的关键更多的是在设计模块间如何通信的，而不是它们的内在属性和行为该是什么。</p>
-<p>Alan Kay</p>
-</blockquote>
-<h2 id="并发面向对象编程（1990）"><a href="#并发面向对象编程（1990）" class="headerlink" title="并发面向对象编程（1990）"></a>并发面向对象编程（1990）</h2><p>有人会说，actor模型在主流程序中的复兴开始于Gul Agha的工作。他的著作“A Model of Concurrent Computation in Distributed Systems”和随后的论文“Concurrent Object-Oriented Programming”中，提出用经典actor模型作为解决计算机领域两个趋势交叉问题的自然解决方案：分布式计算资源的增加和面向对象编程的普及。论文定义了并行的通用模式：并发流水线，分治，协作化解决问题。之后它专注于如何使用actor模型来以面向对象的风格解决这些问题，分布式的actor的对象会遇到的一些挑战，以及在通信和行为推理方面的策略与取舍。</p>
-<p>论文讨论了在这一领域正在实现解决方案的许多系统和语言，并开始从使用actor编程的程序员的角度指出其中的一些优点。论文中作为示例的一种核心语言是Rosette，但论文主要关注的是模型本身的潜力和收益。Agha声称使用对象的好处源于关注点的分离。</p>
-<blockquote>
-<p>通过将“做了什么”（抽象）与“怎么做的”（实现）的描述分离，对象概念提供了大规模编程中必要的模块性。事实证明，并发性是对象概念的自然结果。</p>
-<p>Gul Agha</p>
-</blockquote>
-<p>将关注点分成多个允许程序员更容易推理程序的行为，也允许程序员在程序中使用更灵活的抽象。</p>
-<blockquote>
-<p>值得注意的是，actor语言特别强调开发灵活的程序结构从而简化程序推理。</p>
-<p>Gul Agha</p>
-</blockquote>
-<p>这种灵活性被公认为是一种优势，并仍被现代actor系统所推崇。</p>
-<h2 id="Rosette"><a href="#Rosette" class="headerlink" title="Rosette"></a>Rosette</h2><p>Rosette既是使用actor实现并发面向对象编程的语言，也是管理这些actor使用和可访问的资源的实时系统。Agha在“Concurrent Object-Oriented Programming”中提到了Rosette，这篇论文中的示例代码就是用Rosette写的。Agha也是Rosette的论文的一名作者，因此很显然，Rosette就是经典actor模型的基础。它几乎定义了在并发面向对象编程这个语境下，经典actor模型该长成什么样子。</p>
-<p>Rosette背后的驱动力是为处理像搜索这样的问题提供策略，这些问题中程序员需要一种手段来控制资源该如何分配给子计算，从而优化组合爆炸时的性能。例如，在一个搜索问题中，你可能首先计算出一组希望进一步优化的初始结果。耗尽一切去优化每个结果的计算代价可能太高了，你希望基于一些指标挑出最好的一些结果并只处理这些。Rosette支持用并发来解决那些没有预先定义好的结构，而是依赖于一些启发方法来返回结果的计算密集型问题。Rosette用两种不同的方式使用actor。它们用不同的职责描述两个不同的层：</p>
-<ul>
-<li>接口层。这里实现资源监控和控制方面的机制。系统资源和硬件都被视为actor。</li>
-<li>系统环境。它由这样的actor组成：实际描述了并发应用的行为，并基于接口层实现了资源管理策略。</li>
-</ul>
-<p>Rosette语言有多种面向对象功能，其中许多我们在现代面向对象编程语言中都视为理所当然。它为可扩展和可重配置的系统实现了对象的动态创建和修改，支持继承，且对象按类组织。更有趣的特性是，在Rosette中并发是内置且声明式的，而不是像许多其它现代面向对象语言那样要显式使用。在Rosette中，并发性是程序结构和资源分配的内在属性。这与像Java这样的语言不同，在它们中所有的并发都是要非常明确表达出来的。“Java Concurrency in Practice”是讲Java并发模型讲的最好的书，尽管书里没讲到Java8引入的许多新的并发技术。声明式并发背后的驱动力来自分布式并发系统中的异构本质。不同的计算机和架构有着不同的并发特性，作者质疑强迫程序员根据特定的机器来调整其它机器的并发性会使重构程序变得困难。使用actor作为对并发和资源分布的更灵活且更自然的抽象，这种思想很重要，在许多actor系统中都能看到它的某种形式。</p>
-<p>Rosette中的actor被组织为三种类型，描述了系统中actor的不同方面：</p>
-<ul>
-<li>抽象类（Abstract class）指定了request、response、以及系统中可观察的action。这背后的思想是暴露出系统的更高级行为，但将实际的actor实现限制在系统的资源限制中。</li>
-<li>表现类（Representation class）指定了抽象类的实现中的资源管理特性。</li>
-<li>行为类（Behavior class）指定了给定抽象类和表现类后，actor的实际实现。</li>
-</ul>
-<p>这些类描绘了一个具体的面向对象抽象，以组织处理系统中实际约束的那些actor。它朝着“不仅仅处理信息流和系统行为，也处理底层的硬件和资源”的方向走了一步。Rosette的模型像是对每个生产环境的actor系统都不可避免要解决的那些问题的一种直接表达。</p>
-<h2 id="Akka"><a href="#Akka" class="headerlink" title="Akka"></a>Akka</h2><p>Akka努力将工业级的actor模型带到并不显式支持actor的JVM中。Akka最初是由Scala Actors发展而来，并将actor模型带给了JVM。它与Scala Actors有一些显著的变化，使得Akka值得一提，尤其是Akka还在活跃发展中而Scala Actors则不是了。一些重要变化的细节参见“On the Integration of the Actor Model in Mainstream Technologies: The Scala Perspective. ”。</p>
-<p>Akka与Scala Actors类似，但actor处理消息的语义不同。它提供了Java和Scala绑定的编程接口。Akka的<code>receive</code>操作定义了一个全局的消息处理器，它不会阻塞接收不匹配的消息，而是仅在有匹配的消息可处理时才被触发。它也不会把没有可匹配的模式的消息留在actor的信箱中，而是直接丢掉，并向系统推送一个事件。Akka的接口也提供了强封装，避免直接暴露actor的引用。它有一种受限的<code>ActorRef</code>接口，只提供了向真正的actor发送或转发消息的方法。此外，Akka还做了检查，保证在一个actor被创建之后，不会有对它的直接访问。某种程序上这解决了Scala Actors中的问题，即可以调用actor的公开方法，这打破了许多程序员期望从消息传递中得到的保证。这套系统并不完美，但大多数场景下它限制了程序员只能用一套受限的接口向actor发送消息。</p>
-<p>Akka的运行时也提供了相比Scala Actors更好的性能。它使用了一个单独的continuation闭包来处理一个actor的许多或全部消息，也提供了方法来修改这个全局的continuation。在JVM上这套机制能实现得更高效，而对比Scala Actors的continuation模型使用了控制流异常，会产生额外的开销。另外，Akka运行时还使用了非阻塞的消息插入和任务调度操作以提高性能。</p>
-<p>Akka是经典actor模型已为生产做好了准备的结果。它正在活跃发展，且确实被用于构建可伸缩系统了。Akka的生产用途稍后会详细描述。Akka成功到被移植到其它语言/运行时中。Akka.NET项目用C#和F#将Akka编程模型引入了.NET和Mono。Akka.js也已基于Scala.js，将Akka移植到了JavaScript上。</p>
-<h1 id="基于进程的actor"><a href="#基于进程的actor" class="headerlink" title="基于进程的actor"></a>基于进程的actor</h1><p>基于进程的actor模型本质上就是用进程来建模actor。这种观点大体上与经典actor模型类似，但两种模型在actor的生命期和行为管理上的语义有区别。第一种显式实现了这个模型的语言是Erlang，他们甚至在回顾中说，他们关于计算的观点与Agha的经典actor模型大体相似。</p>
-<p>基于进程的actor被定义为从开始运行到结束的计算过程，而不像经典actor模型中将actor定义为行为和行为之间转换逻辑的状态机。基于进程的actor在递归时也可能会有类似的行为转换的状态机，但在其上的编程感受却与使用<code>become</code>操作截然不同。</p>
-<p>这些actor使用<code>receive</code>原语来指定它在某个给定状态/时间点能接收的消息。<code>receive</code>语句有一些定义可接受的消息的概念，通常基于模式，条件，或类型。如果一条消息被匹配到了，就会执行相应的代码，否则actor会阻塞，直到它收到一条能处理的消息。它的<code>receive</code>的语义与之前描述的Akka的<code>receive</code>不同。Akka的<code>receive</code>只在actor收到知道怎么处理的消息时被触发。取决于语言实现，<code>receive</code>可能会显式指定消息类型，或对消息的值做某种模式匹配。</p>
-<p>有明确定义的生命期和使用<code>receive</code>来匹配消息的进程，体现这些核心概念的一个例子是Erlang写的一个简单的counter进程。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">counter(N) -&gt;</span><br><span class="line">  receive</span><br><span class="line">    tick -&gt;</span><br><span class="line">      counter(N+1);</span><br><span class="line">    &#123;From, read&#125; -&gt;</span><br><span class="line">      From ! &#123;self(), N&#125;,</span><br><span class="line">      counter(N)</span><br><span class="line">  end.</span><br></pre></td></tr></table></figure>
-
-<p>这个例子展示了用<code>receive</code>匹配两种不同消息的用法，<code>tick</code>会增加counter的值，而<code>{From, read}</code>中<code>From</code>是一个进程标识，<code>read</code>是一句话。为了回应使用类似于<code>CounterId ! tick</code>来向其发送<code>tick</code>消息的其它进程，counter进程使用一个累加的值来调用自己，这有点像<code>become</code>，但它使用了递归和一个参数值，而不是一个有名字的行为continuation和一些状态。如果counter收到了<code>{From, read}</code>形式的消息，它就会向来源处发送一个带有自身进程id和值的消息，再用相同值递归调用自己。</p>
-<h2 id="Erlang"><a href="#Erlang" class="headerlink" title="Erlang"></a>Erlang</h2><p>Erlang的基于进程的actor的实现获得了基于进程的actor模型的真谛。Erlang是第一个基于进程的actor模型。爱立信最开始发展这种模型是为了构建大型高可靠性高容错性的电信交换系统。Erlang的开发始于1985年，但它的编程模型今天还在用。Erlang模型的动机围绕着四个高容错程序需要的关键属性：</p>
-<ul>
-<li>进程隔离。</li>
-<li>进程间纯粹的消息传递。</li>
-<li>发现远程进程的错误。</li>
-<li>有能力决定哪类错误会导致进程崩溃。</li>
-</ul>
-<p>Erlang的研究者一开始就相信共享内存会阻碍容错性，他们将在进程间传递不可变的数据作为避免共享内存的解法。有种担忧是拷贝和传递数据开销会很大，但Erlang开发者将容错性视为比性能更重要的东西。这种模型是与其它actor系统和研究独立发展出来的，尤其是它的开始时间要比Agha的经典actor模型形式发表时间更早，但它最终得到了与Agha的经典actor模型非常相似的结论。</p>
-<p>Erlang的actor跑在轻量的相互隔离的进程上。它们看不到其它actor的内部，只能传递纯粹的不可变的消息。这里没有空悬指针或对象间的数据引用，真正地贯彻了在actor间传递不可变的分离的数据的思想，而不像许多早期的经典actor模型的实现一样，可以自由传递actor和数据的引用。</p>
-<p>Erlang实现了一个阻塞的<code>receive</code>操作作为处理信箱中消息的方法。它们对消息元组的值做匹配，从而描述给定actor能接收的消息类型。</p>
-<p>Erlang还试图将失败也加到编程模型中，因为分布式系统的一个核心假设就是机器和网络连接总是要失败的。Erlang通过两种原语，提供了进程之间相互监视的能力：</p>
-<ul>
-<li><code>monitor</code>：单向的无侵入的通知进程的失败/关闭。</li>
-<li><code>link</code>：双向的通知进程的失败/关闭，允许协同终止。</li>
-</ul>
-<p>这些原语可以用于构建复杂的监管体系，能将失败隔离处理，而不会令失败影响整个系统。监管体系几乎是actor世界中唯一存在的容错方案。几乎每个用于构建分布式系统的actor系统都用了类似的方法，看起来还奏效。Erlang的用于构建可靠容错的电信交换系统的哲学看起来可以广泛应用到分布式系统的容错问题中。</p>
-<p>下面是用Erlang写的一个进程的<code>monitor</code>例子：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">on_exit(Pid, F) -&gt;</span><br><span class="line">  spawn(fun() -&gt; monitor(Pid, F) end).</span><br><span class="line"></span><br><span class="line">monitor(Pid, F) -&gt;</span><br><span class="line">  process_flag(trap_exit, true),</span><br><span class="line">  link(Pid),</span><br><span class="line">  receive</span><br><span class="line">    &#123;&#39;EXIT&#39;, Pid, Why&#125; -&gt;</span><br><span class="line">      F(Why)</span><br><span class="line">end.</span><br></pre></td></tr></table></figure>
-
-<p>这里我们定义了两个进程：<code>on_exit</code>，简单地启动了一个<code>monitor</code>进程，在指定的进程id退出时去执行指定的函数，<code>monitor</code>使用<code>link</code>来接收给定进程id是否存在的消息，并用它退出的原因来调用前面给的函数。你可以想象将许多<code>monitor</code>和<code>link</code>串起来构建进程，它们相互监视失败，并根据失败行为执行恢复操作。</p>
-<p>值得注意的是，Erlang是通过Erlang虚拟机（BEAM）做到这些的，每个虚拟机是一个单独的OS进程，和与核数相同的OS线程数量。这些OS进程管理许多轻量的Erlang进程。Erlang虚拟机为Erlang进程实现了所有的并发性、监控、垃圾回收，几乎就在扮演操作系统本身。这与本单讲到的其它actor系统都不一样。</p>
-<h2 id="Scala-Actors"><a href="#Scala-Actors" class="headerlink" title="Scala Actors"></a>Scala Actors</h2><p>Scala Actors是将Erlang模型移植到新平台并增强的一个例子。Scala Actors将Erlang风格的轻量消息传递并发性带到了JAVM上，并将其集成到了重量级的线程/进程并发模型中。在Scala Actors的最初论文“an impedance mismatch between message-passing concurrency and virtual machines such as the JVM”中做了很好的说明。虚拟机通常会将线程映射到重量级的进程上，但这种轻量进程抽象减轻了程序员的负担，引出了更自然的抽象。作者声称“目前为止收集到的用户经验表明这个库令在基于JVM的系统上写并发程序相比之前的技术更容易理解”。</p>
-<p>这个模型的实现依赖于高效的actor到线程的多路复用。这种技术最初用在Scala的actor中，稍后被Akka采用。这种集成允许Actors调用能阻塞底层线程的方法时不使actor阻塞。这点很重要，考虑一个事件驱动的系统中，处理器运行在线程池中，事件处理器不能冒着饿死线程池的风险而阻塞线程。结果就是Scala Actors增强了Erlang的模型，为JVM引入了一种新的轻量级并发原语。在Erlang的元组值匹配的基础上，Scala的模式匹配允许对消息做更高级的模式匹配，进一步增强了Erlang模型。Scala Actors中actor都是<code>Any =&gt; Unit</code>类型，意味着它们本质上是没有类型的。它们可以接收任意类型，再在可能有副作用的前提下做匹配。这种行为可能会有问题，像是Cloud Haskell和Akka这样的系统就是针对这点做增强。Akka尤其直接借鉴了Scala Actors的工作，现在已经成为了Scala程序员的标准actor框架。</p>
-<h2 id="Cloud-Haskell"><a href="#Cloud-Haskell" class="headerlink" title="Cloud Haskell"></a>Cloud Haskell</h2><p>Cloud Haskell是Haskell的一个扩展，它本质上是在Haskell上实现了一个增强版本的Erlang的计算的消息传递模型。它利用Haskell的函数式编程模型中的纯粹性、类型、monad上的优点增强了Erlang模型。Cloud Haskell允许使用纯函数做远程计算，意味着这些函数是幂等的，可以在出错时重启或换到其它地方运行，而不用担心副作用或回滚。单纯这点与Erlang差别不太大，后者会在隔离的内存环境中操作不可变的数据。</p>
-<p>Cloud Haskell相比Erlang最大的提升之一就是引入了有类型的通道来发送消息。这就保证了actor能处理的消息类型，而Erlang则做不到这点。在Erlang中，你有的只是基于值匹配去动态匹配，并祈祷错误类型的消息不要绕过你的系统。Cloud Haskell进程也能用多个有类型的通道在actor之间传递消息，而Erlang的actor之间只有一个无类型的通道。Haskell的monadic type使程序员能用可保证纯函数与IO不会混在一起的方式写代码。这就令推理系统的副作用变得容易了。Cloud Haskell在actor之间共享内存，这对有些应用是很有用的。听起来它可能会引发问题，但共享内存结构被类型系统藏了起来。最后，Cloud Haskell允许序列化函数闭包，意味着高阶函数可以在跨actor分布。这也意味着只要一个函数和它的环境是可序列化的，它们就可以被扔到远程执行，再无缝地在其它地方继续运行。这些对Erlang的增强令Cloud Haskell成为基于进程的actor模型中重要的一员。Cloud Haskell目前由Cloud Haskell Platform开发并维护，旨在提供使用Cloud Haskell构建和管理生产actor系统所需要的通用功能。</p>
-<h1 id="通信事件循环（Communicating-event-loops）"><a href="#通信事件循环（Communicating-event-loops）" class="headerlink" title="通信事件循环（Communicating event-loops）"></a>通信事件循环（Communicating event-loops）</h1><p>通信事件循环模型最早由E语言引入，旨在改变基于actor的系统中通信的粒度级别。之前描述的actor系统将通信组织在actor级别，而通信事件模型则将actor之间的通信放到了这些actor中对象的操作的上下文中。整个消息仍然引用更高层级的actor，但这些消息指向actor状态中更细粒度的操作。</p>
-<h2 id="E语言"><a href="#E语言" class="headerlink" title="E语言"></a>E语言</h2><p>E语言实现了一种接近于命令式面向对象编程的模型。在一个类似于actor的称为“vat”的计算节点中包含许多对象。vat中不仅包含对象，也包含一个用于所有内部对象的信箱，以及作用在这些对象上的方法的调用栈。有一个共享的消息队列和事件循环扮演跨actor的计算之间的抽象屏障。一个vat中，对象的实际引用被用于定位跨actor和在不同抽象层面操作的通信和计算。</p>
-<p>这马上就引起了其它担忧。在不同于actor-global层面分发引用时，怎么保证能得到actor模型提供的隔离的好处？毕竟，在多个地方引用一个actor内部的对象听起来就像是在重新制造共享内存的问题。这是用两种不同模式的执行方式解答的：立即和最终调用。</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/E_vat.png" alt=""></p>
-<p>这张图显示了一个E vat，包含了一个对象堆以及一个控制这些对象的方法执行的线程。这里的栈和队列表示了E中操作对象的两种不同的执行模式用到的消息。栈用于立即执行，而队列用于最终执行。立即调用被首先调用，新的立即调用会被加到栈顶。最终调用则随后从队列中取出执行。这些不同的消息传递模式在下面的vat之间的通信中被高亮显示。</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/E_account_spreadsheet_vats.png" alt=""></p>
-<p>这张图里我们能看到作用在vat内对象上的本地调用被立即栈处理。之后当有调用要跨vat时，它会被最终队列处理，并在未来某个时间投递给vat中适当的对象。</p>
-<p>E的引用状态定义了许多我们期望从actor那里得到的关于计算的隔离保证：</p>
-<ul>
-<li><code>Near reference</code>：它只会在相同vat的两个对象间使用，它既暴露了同步的立即调用，也暴露了异步的最终发送。</li>
-<li><code>Eventual reference</code>：这是跨vat边界的引用，只会暴露异步的最终发送，不会暴露同步的立即调用。</li>
-</ul>
-<p>两种引用的语义差别意味着只有相同vat中的对象之间能同步访问。一个<code>Eventual reference</code>最多能把消息异步发送到队列中，等待未来某个时间被处理。这意味着在一个vat的执行过程中，可以在vat内部对象的通信和跨vat的通信之间定义一定程度的时间隔离。</p>
-<p>下面的示例代码与前面的图有关，展示了两种不同语义的引用类型。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">def makeStatusHolder(var myStatus) &#123;</span><br><span class="line">  def myListeners :&#x3D; [].diverge()</span><br><span class="line"></span><br><span class="line">  def statusHolder &#123;</span><br><span class="line">    to addListener(newListener) &#123;</span><br><span class="line">      myListeners.push(newListener)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    to getStatus() &#123; return myStatus &#125;</span><br><span class="line"></span><br><span class="line">    to setStatus(newStatus) &#123;</span><br><span class="line">      myStatus :&#x3D; newStatus</span><br><span class="line">      for listener in myListeners &#123;</span><br><span class="line">        listener &lt;- statusChanged(newStatus)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  return statusHolder</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>上面创建一个<code>statusHolder</code>对象，并通过<code>to</code>定义了方法。像<code>statusHolder.setStatus(123)</code>这样的来自其它vat内部对象的方法调用会产生一个消息并被同步投递给这个对象。其它对象可以通过调用<code>statusHolder.addListener()</code>或<code>statusHolder &lt;- addListener()</code>来注册一个事件监听器，前者注册的是同步监听器，后者注册的是异步监听器。当<code>statusHolder</code>的值变化时，它们会被最终通知到。这是通过最终发送操作符<code>&lt;-</code>完成的。</p>
-<p>这种引用模型的动机来自希望在比传统的actor更细的粒度上工作。最简单的例子是你想要保证系统中其它actor能读到一个值，但不能写。用其它actor模型的话你会怎么做？你可能想创建一个只读的actor，不暴露一个写的消息类型，或为同时支持读写的actor创建只读的代理。在E中因为你可以分发对象的引用，你可以只将引用分发给读操作，而不用担心其它actor有写它的能力。这种更细粒度的引用令推理状态保证更容易了，因为你不再暴露指向整个actor的引用，而是actor的细粒度能力。细粒度引用也允许actor有部分失败和恢复。actor中的不同对象可以失败和重启，且不影响整个actor的健康。这很像Erlang中的监管体系，甚至意味着发给一个失败的对象的消息可以加到处理队列中，直到对象恢复后处理。这是其它actor系统没办法做到的，但却是E中对象级引用的自然结果。</p>
-<h2 id="AmbientTalk-2"><a href="#AmbientTalk-2" class="headerlink" title="AmbientTalk/2"></a>AmbientTalk/2</h2><p>AmbientTalk/2是通信事件循环actor模型的现代复兴，它作为一门分布式编程语言，重点是开发移动端p2p应用。这个想法最初是在AmbientTalk/1中实现的，其中actor被建模为了类似于ABCL/1中的主动对象，但AmbientTalk/2的actor更像E的vat。它的作者觉得不允许actor中的被动对象被其它actor引用这点限制了他们，因此他们选择用更丰富粒度的方法，允许被动对象间的远程交互和移动。</p>
-<p>AmbientTalk/2中的actor被表示成了事件循环。消息队列就是事件队列，消息就是事件，异步消息发送就是事件通知，对象方法就是事件处理器。事件循环串行处理队列中的消息以避免竞态。actor中的本地对象由actor持有，也只有它能直接执行这些对象的方法。与E类似，actor中的对象能同步或异步通信。仍然与E类似，对象在actor外面的引用只能用于异步通信。对象可以额外声明自己可序列化，意味着它们可以被复制并发送给其它actor，再当作本地对象使用。发生这种事情时，在原始对象与其拷贝间不存在维护关系。</p>
-<p>AmbientTalk/2使用事件循环模型以强制使用三种基本的并发控制属性：</p>
-<ul>
-<li>串行执行：事件队列中的事件是串行处理的，因此单个事件的处理对其它事件而言是原子的。</li>
-<li>非阻塞通信：一个事件循环不会挂起计算去等待其它事件循环，相反所有通信都严格按异步事件通知来进行。</li>
-<li>独占的状态访问：事件处理器（对象方法）和它们相关的状态从属于单个事件循环，事件循环可以访问对象的可变状态。其它事件循环的以身试法只能通过传递请求修改的事件通知来间接完成。</li>
-</ul>
-<p>所有这些解耦和计算隔离的最终结果就是它天然适应移动ad hoc网络。在这个领域，连接不稳定，范围有限，容易失败。去掉基于时间或同步的耦合很适合这个领域，而通信事件循环actor模型也适合于开发这些系统。AmbientTalk/2在通信事件循环模型之上还提供了额外的功能，例如服务发现。这些特性允许被创建彼此接近的actor的ad hoc网络可以广播它们的存在并广告可用于通信的公共服务。</p>
-<p>AmbientTalk/2最著名的就是作为通信事件循环actor模型在现代应用场景中的重新构想。这再次说明了actor模型的更广泛优势和其对解决分布式系统问题的适用性。</p>
-<h1 id="主动对象（Active-Objects）"><a href="#主动对象（Active-Objects）" class="headerlink" title="主动对象（Active Objects）"></a>主动对象（Active Objects）</h1><p>主动对象actor模型区分了两种不同的对象类型：主动对象和被动对象。每个主动对象有一个入口，定义了它懂的一组固定的消息。被动对象是在actor中实际被发送的对象，会被复制以保证隔离。这允许将actor通信相关的数据和actor状态行为相关的数据之间的关注点分开。主动对象模型最早由ABCL/1语言描述，其中将对象定义为具有状态和三种模式：</p>
-<ul>
-<li>休眠的：初始状态，没有计算，只是等待消息来激活actor的行为。</li>
-<li>活动的：该状态下，当actor收到满足其预定义的模式和限制的消息时，会触发计算。</li>
-<li>等待的：执行被阻塞的状态，此时actor是活跃的，但会等待直到收到某些类型或模式的消息后才继续计算。</li>
-</ul>
-<h2 id="ABCL-1语言"><a href="#ABCL-1语言" class="headerlink" title="ABCL/1语言"></a>ABCL/1语言</h2><p>ABCL/1语言实现了上面说的主动对象模型，它描述了一个作为对象集合的系统，通过并发传递消息来进行对象间的互动。ABCL/1的一个有趣的地方是它的显式多模式消息传递的思想。其它actor模型通常具有围绕着值、类型、或它们处理的消息模式的优先级的概念，通常通过它们的<code>receive</code>操作中的顺序来定义，但ABCL/1实现了两种不同模式有着不同语义的消息传递。它们在<code>ordinary</code>模式下有标准的排队消息，但更有趣的是它们有<code>express</code>模式的带有优先级的消息。当有对象收到一条<code>express</code>消息时，它会停掉其它正在做的<code>ordinary</code>消息的处理，并立即处理<code>express</code>消息。这允许actor在活动时接受高优先级的消息，也允许监控和打断actor。</p>
-<p>The language also offers different models of synchronization around message-passing between actors. Three different message-passing models are given that enable different use cases:<br>语言本身也围绕着actor间的消息传递提供了不同的同步模型。有三种用于不同场景的消息传递模型：</p>
-<ul>
-<li><code>past</code>：请求另一个actor完成一项任务，同时开始计算而不等任务完成。</li>
-<li><code>now</code>：等待消息被接收和收到回应。这扮演了actor之间基本的同步屏障。</li>
-<li><code>future</code>：类似于典型的future，继续计算，直到需要远程结果，之后阻塞直到收到远程结果。</li>
-</ul>
-<p>值得注意的是，所有这些模式都可以被表示为<code>past</code>风格的消息传递，只要消息的类型和响应结果的actor是已知的。</p>
-<p>这里的关键差别在于这些不同风格的actor如何管理它们的生命期。在主动对象风格中，生命期是对actor的消息或请求的结果，但在其它风格中，我们看到了更明显的生命期的概念和actor的创建和销毁。</p>
-<h2 id="Orleans"><a href="#Orleans" class="headerlink" title="Orleans"></a>Orleans</h2><p>Orleans采用了生命期独立于消息或请求的actor的概念，并将这种概念放到了云应用的环境中。Orleans通过被当作计算和行为的孤立单元且可为了伸缩性而有多个实例的actor（被称为“grain”）来实现的这点。这些actor也有持久化的能力，意味着它们有存储在持久存储介质中的持久状态，因此它们可以用于管理像用户数据这样的东西。</p>
-<p>Orleans有不同于其它actor系统的身份概念。在其它系统中actor可能指一种行为，而actor的实例可能指actor的身份，像是个人用户。在Orleans中actor表示持久的身份，而实际的实例事实上是这种身份的拷贝。</p>
-<p>程序员基本上会假设只有一个实体来处理一个actor收到的请求，但Orleans运行时中实际允许多个实例以进行扩展。这些实例会被调用以回应来自程序员的类似于RPC的调用，这些调用会立即返回一个异步的promise。</p>
-<p>在Orleans中，声明一个actor就像是定义其它实现了特定接口的类。这里的一个简单的例子是一个可以加入游戏的<code>PlayerGrain</code>。Orleans的actor（grain）接口的所有方法都必须返回<code>Task&lt;T&gt;</code>，因为它们都是异步的。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">public interface IPlayerGrain : IGrainWithGuidKey</span><br><span class="line">&#123;</span><br><span class="line">  Task&lt;IGameGrain&gt; GetCurrentGame();</span><br><span class="line">  Task JoinGame(IGameGrain game);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">public class PlayerGrain : Grain, IPlayerGrain</span><br><span class="line">&#123;</span><br><span class="line">  private IGameGrain currentGame</span><br><span class="line"></span><br><span class="line">  public Task&lt;IGameGrain&gt; GetCurrentGame()</span><br><span class="line">  &#123;</span><br><span class="line">     return Task.FromResult(currentGame);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  public Task JoinGame(IGameGrain game)</span><br><span class="line">  &#123;</span><br><span class="line">     currentGame &#x3D; game;</span><br><span class="line">     Console.WriteLine(&quot;Player &#123;0&#125; joined game &#123;1&#125;&quot;, this.GetPrimaryKey(), game.GetPrimaryKey());</span><br><span class="line">     return TaskDone.Done;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>与其它任何异步调用一样，调用一个actor的方法也是通过C#中的<code>await</code>关键字完成的。它既可以在客户端完成，也可以在另一个actor（grain）内部完成。两个场景中的调用看起来几乎一样，唯一的区别是客户端使用<code>GrainClient.GrainFactory</code>而actor直接使用<code>GrainFactory</code>。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">IPlayerGrain player &#x3D; GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(playerId);</span><br><span class="line">Task joinGameTask &#x3D; player.JoinGame(currentGame);</span><br><span class="line">await joinGameTask;</span><br></pre></td></tr></table></figure>
-
-<p>这里一个游戏的客户端拿到了特定玩家的引用，令这个玩家加入了当前游戏。这段代码看起来和某个开发者写过的其它的异步C#代码差不多，但它确实是一个actor系统，其中运行时抽象掉了许多细节。运行时管理所有actor的生命期，以响应来自客户端和系统中其它actor的请求，以及将actor的状态持久化到长期存储介质上。</p>
-<p>一个actor的多个实例可以同时运行和修改actor的状态。那么问题来了，怎么做到的？当要基于一个状态做点事情时，看到像是透明般地访问和修改相同状态的多份孤立拷贝而不引起问题，这不符合直觉。</p>
-<p>Orleans通过提供协调修改冲突的机制解决了这个问题。如果一个actor的多个实例修改了持久状态，它们需要通过某种有意义的方式协调成一致的状态。默认方式是“最后写入获胜”策略，但Orleans也暴露了创建细粒度协调策略的能力，以及许多公共的可协调数据结构。如果应用需要一个合适的协调算法，开发者可以使用Orleans实现一个。这些协调机制都是基于Orleans的事务的概念。</p>
-<p>Orleans中的事务是一种对参与计算的actor的不同实例进行因果推理的方式。因为在这个模型中，计算是为了响应单个外部请求而发生的，所以给定一个actor，其通过关联的actor进行的计算链总是包含每个actor的单个实例。这种实例的因果链就被当作一个事务。在做协调的时候Orleans使用这些事务加上当前实例的状态来协调到一个一致状态。</p>
-<p>所有这些都说明Orleans的以程序员为中心的贡献是它将运行和管理actor生命期上的关注点与数据如何在你的分布式系统中流动的关注点分开了。它用一种容错的方式做到了这点，对许多编程任务，你很可能不需要担心伸缩和协调数据以回应请求。它通过一个编程模型提供了actor模型的好处，该模型试图抽象掉在生产中使用actor时不必担心的细节。</p>
-<h1 id="为什么是actor模型"><a href="#为什么是actor模型" class="headerlink" title="为什么是actor模型"></a>为什么是actor模型</h1><p>actor编程模型通过以下方式为分布式系统的程序员提供了收益：允许更简单的行为推理；提供轻量级并发原语并能自然地扩展到许多机器上；允许系统组件间的松耦合，允许不中断服务的情况下做更改。actor能让程序员更容易推理它们的行为，因为actor之间根本上是隔离的。在写一个actor时，程序员只需要关心actor的行为和它收发的消息。这降低了程序员推理整个系统的需要。相反程序员只需要关注有限的东西，意味着他们能独立地确保行为正确性，而不需要担心发生他们不期望的相互作用。actor只提供了一种通信手段（消息传递），意味着程序员不用那么担心数据被并发修改了。数据只限于单个actor中的数据和已发送的消息，而不是整个系统中所有可访问的数据。</p>
-<p>actor是轻量的，意味着程序员通常不需要担心创建了多少个actor。相比其它并发单元，如线程或进程，程序员就要非常注意它们的数量，因为它们的创建开销很大，且能很快触到机器资源和性能的限制。</p>
-<blockquote>
-<p>没有一个轻量的进程抽象，使用者经常被迫以事件驱动方式编写部分的并发应用，从而使控制流变得晦涩，增加了程序员的负担。</p>
-<p>Philipp Haller</p>
-</blockquote>
-<p>不像线程或进程，actor也可以很容易地运行到其它机器上，因为它们是彻底隔离的。传统上这难以通过线程或进程实现，因为它们不能跨网络到其它机器上运行。消息可以跨网络传递，因此只要actor能发送和接收消息，它就不需要关心自己在哪运行。因为这个特性，actor伸缩性更好，也意味着它们天然是可分布到多台机器上的，从而满足系统的负载或可用性方面的需求。</p>
-<p>最后，因为actor是松耦合的，只依赖于与其它actor交互的一组输入和输出消息，就可以修改和升级它们的行为而不改变整个系统。例如，某个actor可以升级到一个更高效的算法，而只要它能处理的输入输出不变，系统中的其它部分就不用变。这种隔离性就与RPC、future、promise这样的并发编程方法形成了对比。这些模型强调在计算节点间更紧密的耦合，一个进程可以直接调用另一个进程的方法且能期望得到确定的结果。这意味着调用者和被调用者（调用的接收者）需要知道运行的代码，因此你失去了升级一个而不影响另一个的能力。这已成为了实践中的问题，因为它意味着随着你的分布式系统的复杂性提高，越来越多的组件相互链接到了一起。</p>
-<blockquote>
-<p>值得注意的是，actor语言尤其强调开发灵活的程序结构，从而简化程序推理。</p>
-<p>Gul Agha</p>
-</blockquote>
-<p>上面的紧耦合模型并不可取，因为分布式系统的一个关键特性就是可用性，越多的组件链接在一起，系统在做变更或升级时需要下线或停机的部分就越多。因其低成本和松耦合的特性，actor要优于其它的并发编程原语，如线程或RPC。actor也对程序员友好，减轻了程序员推理分布式系统的负担。</p>
-<h1 id="现代生产中的用法"><a href="#现代生产中的用法" class="headerlink" title="现代生产中的用法"></a>现代生产中的用法</h1><p>在审视分布式系统的编程模型时，重要是不要只盯着学术界，还要看看这种模型有哪些系统已经用于生产了。这能让我们了解actor系统中哪些功能真的有用，以及这些系统中存在的趋势。</p>
-<p>“On the Integration of the Actor Model in Mainstream Technologies: The Scala Perspective”为我们对主流平台上工业强度的actor实现的需求提供了一些见解。这些需求最早是在Scala Actors将actor模型引入主流软件工程时提出的，也包括了Akka在部署和提升它的工业级actor时的经验教训。</p>
-<ul>
-<li>基于库的实现：在真实场景中哪种并发抽象会获胜并不是显而易见的，不同的并发模型也许会用于解决不同的问题，因此将一种并发模型实现为库就引入了使用中的灵活性。</li>
-<li>高级领域特定语言：为了与专攻并发的语言竞争，就需要一门领域特定语言或类似的东西，否则你的抽象就会在惯用法和表达力上有欠缺。</li>
-<li>事件驱动的实现：actor需要轻量，意味着它们不能映射为一整个虚拟机线程或进程。对于大多数平台来说这就意味着要使用事件驱动模型。</li>
-<li>高性能：大多数使用actor的工业级应用都对性能高度敏感，高性能也允许更优雅的伸缩。</li>
-<li>灵活的远程actor：许多应用能受益于远程actor，它们可以透明地通过网络通信。部署机制上的灵活性也很重要。</li>
-</ul>
-<p>这些属性为我们分析一个actor系统能否在生产中取得成功打下了良好的基础。这些属性对于actor系统在生产中取得成功很重要，但还不足够。</p>
-<h2 id="错误处理"><a href="#错误处理" class="headerlink" title="错误处理"></a>错误处理</h2><p>人们在生产中使用actor系统的最重要的概念和原因之一，是它们支持错误处理与恢复。这种支持的根本是之前提到的actor之间互相监督的能力，以及让监督者接到失败的通知。“Designing Reactive Systems: The Role of Actors in Distributed Architecture”详细描述了当监督者收到它监督的某个actor失败时它能采用的四种常见恢复步骤。</p>
-<ul>
-<li>忽略错误并让actor继续运行。</li>
-<li>重启actor并重置其状态。</li>
-<li>彻底停掉这个actor。</li>
-<li>将问题上报给自身的监督者。</li>
-</ul>
-<p>基于这种策略，系统中所有actor都会有监督者，组成了一棵庞大的监督树。树的顶部是actor系统本身，可能配置了默认的恢复策略，如简单地重启actor。有意思的是这就解放了下面的actor，不需要自己处理错误了。这种哲学就转为了“actor总会失败”，我们需要其它显式的actor和方法来处理单个actor业务逻辑之外的失败。</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/supervision_tree.png" alt=""></p>
-<center>actor监督体系</center>
-
-<p>另一种可以自然地抛弃监督体系的容错方法是actor可以分布在一个集群内的不同机器（结点）上。</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/sentinel_nodes.png" alt=""></p>
-<center>跨集群结点的actor监督</center>
-
-<p>关键的actor可以被跨结点监视，意味着可以在集群内跨结点发现错误。这允许集群内其它actor很容易地对系统整体状态作出反应，而不只是本地机器的状态。这对分布式系统的很多问题都很重要，如负载均衡、数据/请求分区。它也允许错误在集群内其它机器上进行某种形式的恢复，如actor自动迁移到其它结点上，或重启失败的机器/结点。</p>
-<p>围绕着错误处理的灵活性是在生产系统使用actor的一个关键优势。监督意味着工作actor可以专注于业务逻辑，而错误处理actor可以专注于管理和恢复这些actor。actor也可以关注整个集群，并知晓整个分布式系统的状态。</p>
-<h2 id="actor作为框架"><a href="#actor作为框架" class="headerlink" title="actor作为框架"></a>actor作为框架</h2><p>在生产中的actor系统中，一个通用的趋势是可扩展的环境和工具。Akka，Erlang，和Orleans是可见于真实生产环境的主要actor系统，其原因是它们本质上扮演着一种框架，并帮你处理许多actor的常见问题。它们提供了对管理和监控actor的部署，以及处理像容错和负载均衡这样的每个分布式的actor系统都需要应对的模式或模块的支持。这允许程序员专注于他们自己领域的问题，而不是在监控、部署、组合方面的通用问题。</p>
-<p>Akka和Erlang提供了可组合的模块来将不同功能加到你的系统中。Akka提供了大量用于配置和监控由actor构建的分布式系统的模块和扩展。它们提供了许多工具来满足常见的使用和部署场景，这些都已被详细列出并形成文档。例如Akka包括处理下列常见问题的模块：</p>
-<ul>
-<li>通过监督体系提供容错性。</li>
-<li>跨actor的负载均衡路由。</li>
-<li>持久化，从而跨错误和重启保存和恢复actor状态。</li>
-<li>针对actor的测试框架。</li>
-<li>用于跨物理机器组合和分发actor的集群管理工具。</li>
-</ul>
-<p>另外它们还提供了对Akka扩展的支持，这是种能向Akka中加入你自己的功能的机制。Akka扩展非常强大，一些Akka的核心功能，如Typed Actor或Serialization都是用Akka扩展实现的。</p>
-<p>Erlang提供了开放电信平台（OTP），它是由一组被设计为帮助构建应用的模块和标准组成的框架。OTP从Erlang拿出了通用模式和组件，并将它们以库的形式提供出去，允许在开发新系统时重用代码和最佳实践。OTP库的一些例子是：</p>
-<ul>
-<li>一个实时分布式数据库。</li>
-<li>一个关系型数据库的接口。</li>
-<li>一个监控机器资源使用的框架。</li>
-<li>对与其它通信协议（如SSH）的交互支持。</li>
-<li>一个测试框架。</li>
-</ul>
-<p>Cloud Haskell也提供了类似于Erlang的OTP的东西，称为Cloud Haskell Platform。</p>
-<p>Orleans则不同，因为它是基于更命令式的风格和运行时构建的。它帮你在分布和伸缩actor方面做了很多工作，但它仍然是一个处理了很多分布式方面通用问题的框架，因此程序员才可以专注于构建他们系统本身的逻辑。Orleans会接管跨机器的actor分布，以及在负载增加时创建新的actor实例。另外，Orleans也会处理跨actor实例的一致性和actor数据的持久化问题。这些其它工业级的actor框架通过模块或扩展来解决的常见问题。</p>
-<h2 id="模块-VS-托管运行时方法"><a href="#模块-VS-托管运行时方法" class="headerlink" title="模块 VS 托管运行时方法"></a>模块 VS 托管运行时方法</h2><p>根据我的研究，有两种流行的方法来实现用于构建生产actor系统的框架。它们都是与actor系统元数据组织有关的高级哲学，是简单看一下基础的actor编程和执行模型时不会直接考虑到的设计哲学。可以将它们简单描述为“模块方法”和“托管运行时方法”。一种高级的类比是，模块方法类似于手动管理内在，而托管运行时方法则类似于垃圾回收。在模块方法中，你关心actor的生命周期和物理分配，而在托管运行时方法中你更关心自动实例化的actor之间的协调行为和持久状态的流程。</p>
-<p>Akka和Erlang都用模块方法来构建actor系统，意味着你用它们构建系统时，它们是你要构建的系统中的一小部分。你会显式处理actor的生命期和实例化，如何跨物理分布actor，以及如何均衡actor。其中有些问题可以用库来解决，但某种程序上你是在自己定义所有这些与actor有关的组织工作的行为。JVM或Erlang虚拟机不会帮你做这些。</p>
-<p>Orleans走了另一条被称我称为“托管运行时方法”的路。它提供了云端的运行时，试图将许多管理actor的细节抽象化，而不只是提供用于构建你自己抽象的小组件。它做到了这种程度，你不再需要直接管理actor的生命期，它们所处的机器，它们如何复制和伸缩的。相反你用更命令式的风格用actor编程。你不会显式实例化actor，相反你可以假设运行时会在回应请求时自动做掉这件事。你会去写处理类似于领域特定的实例间数据协调问题的策略，但你通常会将伸缩和分布actor实例的任务留给运行时。</p>
-<p>两种方法都在工业界取得了成功。Erlang有著名的电信交换的用例，且取得了成功。Akka有一个完整的页面，详细介绍了它在大型公司中的使用情况。Orleans已经被用作微软的大型游戏和应用的后台，服务于数百万服务。看起来模块方法更流行，但这里只有一个托管运行时方法的例子。在JVM或Erlang虚拟机上没有类似于Orleans的东西，因此事实上它在分布式编程社区中的暴光度不太高。</p>
-<h2 id="对比CSP"><a href="#对比CSP" class="headerlink" title="对比CSP"></a>对比CSP</h2><p>另一个备受关注的流行的消息传递模型是顺序通信处理（CSP）。CSP背后的基本思想是通过通道（channel）传递消息来完成进程间的并发通信。可能CSP最流行的现代实现是Go的channel。许多关于actor的界面级的讨论都简单地将actor视为传递消息的轻量级并发原语。这种缩放视角下CSP风格的channel和actor就类似了，但它忽略了许多细微差别，CSP实际上不能被视为一种actor框架。它们的核心差异在于CSP实现了一些进程间的同步通信，而actor模型完全解耦了发送者和接收者之间的通信。actor更独立，意味着更容易将actor运行在一个分布式环境中而不需要改变它们的语义。另外，actor模型中接收者的错误不会影响到发送者。在分布式系统中actor是更松耦合的抽象，而CSP强调紧耦合作为进程间通信的一种方式。将两者混为一谈就忽略上面这些差异，即actor与CSP处于完全不同的抽象层面上。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/04/28/real-world-concurrency/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/04/28/real-world-concurrency/" class="post-title-link" itemprop="url">[翻译] 并发的实践经验</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-04-28 00:25:08" itemprop="dateCreated datePublished" datetime="2018-04-28T00:25:08+08:00">2018-04-28</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>原文：<a href="https://queue.acm.org/detail.cfm?id=1454462" target="_blank" rel="noopener">Real-world Concurrency</a></p>
-<blockquote>
-<p><strong>你可能不需要真的去写多线程的代码。但如果你需要的话，一些关键原则能帮助你掌握这项“魔法”。</strong></p>
-</blockquote>
-<p>软件从业者们可能因为近期微处理器的发展而对软件行业的未来产生恐惧，这种恐惧情有可原。尽管摩尔定律继续存在（晶体管密度依然每18个月翻倍），但因为难以解决的物理限制和实际的工程考虑，新增的晶体管密度不再花在提高时钟频率上了，而是用于在一块CPU晶元上放置多个CPU核心。从软件角度看，这不是一个革命性的变化，而是一个渐进的变化：多核心CPU不是一种新范式，而是将旧范式（多进程）推向更广泛的发展。但根据近期有关这一话题的诸多文章和论文，有人可能会得出这一判断：并发编程的绽放是即将到来的灾难，所谓“免费午餐结束了”。</p>
-<p>作为长期处于并发系统第一线的从业者，我们希望为这场总会陷入歇斯底里的争论注入一些现实的冷静（如果不是来之不易的智慧的话）。尤其是，我们希望能回答一个本质的问题：并发性的扩散对你开发的软件意味着什么？也许有点遗憾，这个问题的答案既不简单又不普适——你的软件与并发之间的关系取决于它物理上在哪执行，它在抽象栈中的位置，以及围绕它的经济模型。</p>
-<p>考虑到许多软件项目现在都有位于不同抽象层次、跨越不同架构的组件，你可能会发现即使对于你自己写的软件，上面问题的答案也不只一个，而是多个：你可能可以留一些代码永远串行执行，而另一些需要高度并行化且显式多线程执行。再令答案复杂一些，我们会认为你的很多代码不会整整齐齐地属于这两类之一：它可能在本质上是串行的但在某些层次上需要注意并发性。</p>
-<p>尽管我们断言需要并行的代码要比某些人恐惧的更少，但必须要承认写并行代码仍然是一种魔法。因此我们也给出了开发高并行度的系统需要的具体实现技术。因此，本文有些二分：我们既认为大多数代码可以（且应该）实现并发，且不需要显式的并行化，同时还要为那些必须写显式并行代码的人解释实现技术。本文半是禁欲的训诫，半是爱经的指导。</p>
-<h1 id="一些历史因素"><a href="#一些历史因素" class="headerlink" title="一些历史因素"></a>一些历史因素</h1><p>在我们讨论与今天应用有关的并发前，探索并发执行的历史是很有帮助的。即使在60年代——世界仍处于计算机时代的黎明时——人们已经开始清楚单个中央处理单元去处理单个指令流是对系统性能不必要的限制。在计算机设计者们试验不同的方案来绕过这个限制时，1961年Burroughs B5000提出了最后被证明是前进方向的一种方案：互不相干的多个CPU执行多个不同的执行流，但共享内存。就这点而言（以及其它点上）B5000至少领先时代10年。直到80年代对多进程的需要才逐渐被广大研究人员所了解，他们在这十年中探索了一致性缓存协议（例如Xerox Dragon和DEC Firefly），并行操作系统的原型（例如运行在AT&amp;T 3B20A上的多处理器Unix），并开发了并行数据库（例如威斯康星大学的Gamma）。</p>
-<p>到了90年代，80年代研究者们种下的种子产生了实用系统的果实，许多计算机公司（例如Sun、SGI、Sequent、Pyramid）在对称多处理器上投入了大量的赌注。这些投在并发硬件上的赌注也使下注在并发软件上变得必要——如果操作系统不能并行执行，系统中的其它程序也不能——这些公司开始意识到他们的操作系统需要围绕着并发执行的概念重写。这些重写发生在90年代早期，新系统在这十年内陆续发布；其中产生的技术今天可以在像OpenSolaris、FreeBSD、Linux这样的开源操作系统中看到。</p>
-<p>就在这些计算机公司在多进程上投入大量赌注时，许多数据库厂商也在豪赌高并行度的关系型数据库；包括Oracle、Teradata、Tandem、Sybase、和Informix的后来者需要用并发来获得对当时统治了事务处理的主流厂商的性能优势。与操作系统类似，这项工作在80年代后期和90年代早期开始，并在这十年中逐渐改善。</p>
-<p>这些趋势的结果是，在90年代后期，并发系统已经在高性能计算机上取代了它们的单处理器前辈们：当1993年第一次公布前500台超级计算机的名单时，性能最高的单处理器机器只排到34位，超过80%的TOP500机器都是这样那样的处理器机器。到了1997年，单处理器机器从这份名单中彻底消失了。在超级计算机世界以外，许多面向事务的应用都可以随着CPU数量而扩展，允许用户不动架构就能实现扩展系统的梦想。</p>
-<p>90年代并发系统的崛起正逢另一趋势：CPU时钟频率持续增加的同时，主存速度没有跟上。为了应对相对较慢的内存，微处理器架构引入了更深（也更复杂）的流水线、缓存、和分支预测单元。即使这样，时钟频率本身也很快成为一种谎言：虽然CPU能够以广告中的速度运行，只有一小部分代码能真正实现（更别提超过）每条指令一个周期的速度——大多数代码要在一条指令上花费3、4、5（甚至更多）个周期。</p>
-<p>许多人看到这两个趋势——并发的崛起和增加时钟频率的无效化——得出合理的结论：与其将晶体管的预算花在“更快”但不会真的提高多少性能（且在功耗、发热、面积上有可怕的开销）的CPU上，为什么不利用并发软件崛起的优势，将晶体管用在一块晶元上多个（简单的）CPU核上呢？</p>
-<p>正是并发软件的成功促成了多处理器芯片的诞生，这是一个非常重要的历史点，值得再强调一次。有一种看法认为，是微处理器架构——出于恶意、懦弱、或绝望——将并发强加给软件的。实际上，正相反：是并发软件的成熟指引着设计师考虑在一块晶元上实现并发硬件。（读者可以参考最早的多处理器芯片——DEC的Piranha——来了解这种动机的详细讨论。）软件没准备好的话，今天这些多核处理器就不会具备商业可行性。如果有什么区别的话，被一些人谴责将要结束的“免费午餐”，事实上正在供应。一个人只需要饿了知道怎么吃就行！</p>
-<h1 id="并发是为了性能"><a href="#并发是为了性能" class="headerlink" title="并发是为了性能"></a>并发是为了性能</h1><p>从这次的历史回顾中得出的最重要结论是，并发一直被用于一个目的：提高系统性能。这点太显然了，似乎不值得说出来——如果并发不提高性能，为什么我们还要并发呢？——然而，尽管显而易见，并发性的存在理由却越来越被人们遗忘，就好像并发硬件的普及唤醒了大家对所有软件都必须用到所有可用的物理资源的焦虑。就像没有程序员会对超标量微处理器的流水线停顿抱有道德上的责任一样，也没有软件工程师只因为硬件支持并发就觉得自己有责任使用并发。相反，当且仅当我们需要提高系统性能时我们才应该想到并使用并发。</p>
-<p>并发执行能通过三种基本途径提高性能：它能降低延时（即令一项工作执行得更快）；它能隐藏延时（即允许系统在一项长延时操作的同时继续工作）；或能提高吞吐（即令系统能做更多工作）。</p>
-<p>使用并发来降低延时是高度问题相关的，因为它需要为要处理的任务准备一个并行算法。对于某些种类的问题——尤其是科学计算中遇到的——这很直接：工作可以被切分为先验的多个计算元素的任务集合。但很多这类的问题都是可以并行化的，它们不需要共享内存的紧密耦合——而且它们通常能够在小型机器的网格上更经济地执行，而不是使用更少的高度并发的机器。进一步，使用并发来降低延时需要单位工作执行的时间足够长，来平摊多个计算单元之间巨大的通信成本：你可以想象用并发来并行化4000万个元素——但仅仅处理40个元素的计算时间就不太能支付并行性的开销了。简而言之，并发能降低延时的程度更多地取决于问题而不是决心——而许多重要问题根本无法用并发来解决。</p>
-<p>对于无法并行化的长时间运行的操作，在它等待时可以通过并发执行来处理其它工作；在这个模型中，操作的延时没有减少，但它隐藏在整个系统的推进中了。当操作本身很可能被程序之外的东西——例如磁盘IO操作、DNS查询——阻塞时，用并发来隐藏延时就尤其吸引人了。但你也要非常小心：只是为了提升响应能力，并行程序可以变成一种巨大的复杂度负担。进一步，并发执行不是隐藏系统引发的延时的唯一方法：你也可以用非阻塞操作（例如异步IO）和事件循环（例如Unix的poll/select）在串行程序中达到同样的效果。因此，想要隐藏延时的程序员应该把并发当作一种选项，而不是必须。</p>
-<p>在问题不适合并行化，也没有能隐藏的延时时，并发执行的第三种提高性能的方法是提高整个系统的吞吐。你可以用多个并发执行的顺序逻辑来同时容纳更多的任务，而不需要用并行逻辑让单个操作更快。重要的是，一个使用并发来提高吞吐的系统不需要只包含（甚至大部分是）多线程代码。相反，系统中不共享状态的组件仍然可以完全是串行的，只是系统会并发执行这些组件的多个实例。这样系统中就只需要共享那些针对并行执行中的共享状态做了显式设计的组件，理想情况下只剩下那些已知的可以在并发环境中工作得很好的元素才需要共享：数据库和/或操作系统。</p>
-<p>为了做到这一点，在一个典型的MVC应用中，view（通常实现在JavaScript、PHP、或Flash环境中）和controller（通常实现在J2EE或Ruby on Rails环境中）可以只包含串行逻辑，且仍然可以达到很高程度的并发，只要model（通常实现为数据库）支持并发。已知大多数人不会自己写数据库（也几乎不会有人自己写操作系统），不显式创建线程或获取锁而构建一个高度并发、高度可伸缩性的MVC系统是很可能的（事实上已经有很多了）；这种并发性来自架构而不是实现。</p>
-<h1 id="展示魔法"><a href="#展示魔法" class="headerlink" title="展示魔法"></a>展示魔法</h1><p>假如你就是那个正在开发操作系统或数据库或其它必须显式并行化的代码的人呢？如果你把自己归类为少数要写这种代码的人，可能不需要警告你写多线程代码很难。事实上，这个领域在困难度上的名声已经导致有些人（错误地）总结不可能写出多线程代码：“没人知道该如何组织和维护依赖锁的大型系统”，一个近期（也是典型）的断言。写可伸缩且正确的多线程代码的部分困难度是缺乏有经验的从业者将其智慧付诸书面：口头传统代替了正式的写作导致这个领域笼罩在神秘之中。因此本着令这一领域对其它从业人员不再神秘的精神，我们提供了一组编写多线程代码的技巧。</p>
-<h2 id="分辨冷热路径"><a href="#分辨冷热路径" class="headerlink" title="分辨冷热路径"></a>分辨冷热路径</h2><p>如果要给那些必须开发并行系统的人一条建议，那就是要知道你需要哪些代码路径并行执行（所谓的热路径），哪些可以串行执行而不影响性能（所谓的冷路径）。以我们的经验，我们写的很多软件在并发执行方面都是冷的：它只在初始化、管控路径上、卸载等场景中被执行。将这些冷路径改造为高度并行化不光是浪费时间，还很危险：这些路径经常是并行化中最困难也最容易出错的部分。</p>
-<p>对于冷路径，锁的粒度尽量粗。不要怕你的子系统中有涵盖大量冷门操作的锁。相反，在热路径上——必须并发执行以得到最高吞吐的路径——你必须非常小心：锁的策略必须非常简单且粒度合适，你必须小心避免可能成为瓶颈的动作。如果你不知道给定的代码是否会是系统的热路径呢？在缺乏数据的情况下，宁可假设你的代码在冷路径上，并采用相应的粗粒度锁策略——但准备好被数据打脸。</p>
-<h2 id="直觉常常是错误的——靠数据说话"><a href="#直觉常常是错误的——靠数据说话" class="headerlink" title="直觉常常是错误的——靠数据说话"></a>直觉常常是错误的——靠数据说话</h2><p>以我们的经验，许多扩展性的问题是由于程序员一开始以为的（或期望的）旧路径实际是热路径。在新软件起步时，你会需要一些直觉来分辨冷热路径——但一旦你的软件可用了，甚至是原型状态，直觉的使命就结束了：你的直觉必须让位于数据。并发系统中收集数据本身就是一个难题。它需要你首先有一个充分并发执行的机器，从而突出扩展性的问题。等你有了这种物理资源，你还需要能给系统加类似于生产环境系统的压力。等机器有负载了，你必须有能动态地控制系统的基础设施，以找到任何扩展性问题的根源。</p>
-<p>第一个问题在过去尖锐：有段时间多处理器机器罕见到许多软件开发商都没办法接触到一台。幸运的是，随着多核CPU的崛起，这不再是个问题：没有任何理由找不到一台至少是双核的机器，而且只要一点点努力，大多数人都可以（2008年）把他们的代码跑在一台八核（双路四核）的机器上。</p>
-<p>但即使物理条件改善了，第二个问题——知道如何给系统加压力——却变糟了：生产部署越来越复杂，在开发中模拟其负载也变得困难且代价昂贵。你必须将负载的产生和模拟尽可能地当作第一优先级的问题；你越早在开发中解决这个问题，越早可以得到关键数据，这对你的软件有着巨大的意义。尽管测试压力应该尽量模拟生产压力，但时效性要比完全的精确更重要：达不到完美的负载模拟不应该阻碍你模拟负载，因为将多线程系统置于错误的负载之上要比完全没有负载好得多。</p>
-<p>一旦一个系统有了负载——开发环境或生产环境都行——如果没办法知道它的扩展性的障碍在哪，再开发软件就没意义了。在生产系统中找到扩展性的障碍需要你有能力安全地动态控制它的同步原语。在开发Solaris时，我们在这方面的需求非常强烈，因此我们中的一员（Bonwick）在1997年开发了一种技术（lockstat）来做到这点。这个工具马上就变得很重要——我们很快就开始想，没有它我们是怎么解决扩展性问题的——它也导致我们中的另一个人（Cantrill）进一步将动态插装推广为DTrace，一个几乎可用于任何生产系统的动态插装的工具，在2004年首次出现在Solaris中，已经被移植到了FreeBSD和Mac OS等许多其它系统中。（lockstat中的插装方法已经被重新实现为一个DTrace的provider，而这个工具本身也被重新实现为了一个DTrace consumer。）</p>
-<p>今天，动态插装不仅在继续为我们提供能找到阻碍系统扩展性因素的数据，也用于收集足够的数据以理解哪种技术最适合减少这种争用。设计新的锁策略原型代价昂贵，而人的直觉也常常出错；在分解一个锁或重构一个子系统以使其更加并行化之前，我们总是要努力把能证明这个子系统并行化的缺乏就在阻碍系统扩展性的数据拿到手。</p>
-<h2 id="知道什么时候应该分解锁，什么时候不应该"><a href="#知道什么时候应该分解锁，什么时候不应该" class="headerlink" title="知道什么时候应该分解锁，什么时候不应该"></a>知道什么时候应该分解锁，什么时候不应该</h2><p>全局锁很容易成为阻碍扩展性的因素，当我们收集到能证明某个锁很热的数据时，想把它分解为每个CPU一把锁、一个锁的哈希表、每个数据结构一把锁等等，这些想法就很合理了。这可能是最终的正确解法，但在盲目朝着这条（复杂的）路径走之前，仔细检查一下这把锁保护下的任务：分解锁不是减少争抢的唯一方法，通过减少持有锁的时间可以（通常是）更简单地减少争抢。这可以通过算法的提高（许多扩展性的提高是通过把临界区的执行时间由O(N<sup>2</sup>降为O(N)来实现的！）或找出不需要在临界区中的动作来完成。后者有一个经典案例：如果数据显示你把时间花在了析构共享数据结构的元素上了，你可以把那些需要在临界区中析构的元素移出共享结构并保存起来，然后把它们的析构动作推迟到锁被释放后。因为这些数据已经在锁的保护下移出共享结构，就不会出现竞态（其它线程看到的数据的移除是原子的），而且锁的持有时间也降低了，却只增加了一点点实现复杂度。</p>
-<h2 id="警惕读写锁"><a href="#警惕读写锁" class="headerlink" title="警惕读写锁"></a>警惕读写锁</h2><p>在分解一个锁时，有一个新手会犯的错误：看到一个数据结构被大量读少量写，有人可能会想把互斥锁换成读写锁，以允许多个读者并发读。初看很合理，但除非锁的持有时间很长，否则这种方法的扩展性不会比互斥锁更好（事实上可能更差）。为什么？因为读写锁自己的状态必须原子更新，因为缺乏更复杂（空间效率更低）的同步原语，读写锁会使用单个word来保存读者的数量。因为读者数量必须原子更新，获取一把读锁和获取一把互斥锁需要完成相同的总线事务，总线上争抢也相同。</p>
-<p>仍然有许多场景中锁的持有时间远长于任何内存争抢的开销（例如在读锁下做IO操作），但你需要确保收集数据以确保它对扩展性的影响符合预期。即使在这些适用于读写锁的情况下，仍然需要注意阻塞语义。例如，如果读写锁实现为有写锁阻塞时获取读锁也会阻塞（常见的避免写者饿死的范式），你就不能递归地获取读锁：如果在上层获取读锁和递归下层获取读锁之间有写者阻塞了，就产生死锁了。这些不是说不能用读写锁——只是它们不应该被美化。</p>
-<h2 id="考虑每个CPU一把锁"><a href="#考虑每个CPU一把锁" class="headerlink" title="考虑每个CPU一把锁"></a>考虑每个CPU一把锁</h2><p>按CPU加锁（也就是按当前的CPU ID去获取锁）可以用于分散争抢，因为每个CPU的锁不太会有争抢（每个CPU同时只能运行一个线程）。如果锁的持有时间短，操作模式的一致性要求不同，就可以让线程在常见的情况（不需要一致性）下去抢CPU对应的锁，而在不常见的情况下去抢所有CPU的锁以达到一致性状态。考虑一个具体（且平凡）的例子：如果要实现一个全局的counter，经常更新但很少读，就可以将其实现为每个CPU一个counter，被CPU对应的锁保护。这样更新counter只需要更新CPU对应的counter，而在需要读的时候获取所有锁，将它们对应的counter值加起来。</p>
-<p>关于这项技术的两点说明：首先，只应在数据显示需要这么做时才用这项技术，因为它显然引入了很大的实现复杂度；其次，确保在冷路径上获取所有锁时使用相同的顺序：如果一种情况下按从低到高的顺序获取锁，另一种情况下按从高到低的顺序获取锁，就会（非常容易）发生死锁。</p>
-<h2 id="知道何时用broadcast，何时用signal"><a href="#知道何时用broadcast，何时用signal" class="headerlink" title="知道何时用broadcast，何时用signal"></a>知道何时用broadcast，何时用signal</h2><p>几乎所有条件变量的实现都允许线程等在一个条件变量上，或是被singal唤醒（此时只有一个睡眠中的线程会被唤醒）或是被broadcast唤醒（此时所有睡眠的线程都会被唤醒）。这两个概念有着微妙的语义差别：因为broadcast会唤醒所有等待中的线程，它通常应该被用于表明条件变化，而不是资源可用。如果在更适合用signal的地方用了broadcast，结果就是惊群效应：所有等待中的线程都会醒来，争抢保护条件变量的锁，然后（假设第一个抢到锁的线程也会消耗可用的资源）在它们发现资源已经被消耗后再次睡去。这种无谓的调度和锁活动会对性能产生严重影响，尤其是对基于Java的系统，notifyAll()（broadcast）似乎已经被确立为推荐模式；众所周知，将这些不必要的notifyAll()替换为notify()（signal）能获得可观的性能收益。</p>
-<h2 id="学会验尸"><a href="#学会验尸" class="headerlink" title="学会验尸"></a>学会验尸</h2><p>在关于并发的诸多预言中，死锁似乎尤为可怕，已经成为了基于锁的多线程编程中所有困难的化身。这种担心有点奇怪，因为死锁实际上是软件中最简单的异常状态：因为（根据定义）那些陷入死锁的线程停止工作，死锁实现了高效冻结整个系统运转的任务。为了调试死锁，你只需要一个线程列表，线程对应的调用栈，以及一些对系统本身的认识。这些信息包含在了一个对软件开发至关重要的状态快照中，其名字就反映了它在计算机早期的起源：核心转储（core dump）。</p>
-<p>调试core dump——验尸——对于实现并行系统的人来说是项基本技能：在高度并行的系统中问题不一定能重现，单个core dump经常是你仅有的调试手段。大多数调试器都支持调试core dump，其中许多还允许用户自定义扩展。我们鼓励从业者们理解他们的调试器对于调试core dump的支持（尤其是对并行程序）并开发针对他们系统的扩展。</p>
-<h2 id="设计可组合的系统"><a href="#设计可组合的系统" class="headerlink" title="设计可组合的系统"></a>设计可组合的系统</h2><p>针对基于锁的系统，批评者们最令人难堪的说法是，他们认为这些系统不可组合：“锁和条件变量不支持组件化编程。”，一个典型的厚颜无耻的说法，“锁导致没办法通过粘合小程序来构建大型程序”。当然，这种说法是错误的。只需要指出诸如数据库和操作系统这样的基于锁的系统的组合为了更大型的系统，却仍然完全不需要关心底层的锁。</p>
-<p>有两种方法可以使基于锁的系统完全可组合，每种都有各自的用武之地。第一种（也最明显），你可以将锁完全封装在子系统中。例如，在并发操作系统中，控制权永远不会在持有内核锁时返回到用户空间；用于实现系统本身的锁完全隐藏在了组成系统接口的系统调用接口后面。更普遍地，只要系统组件间有着清爽简洁的接口，这个模型就能工作：只要控制权不会带着锁返回给调用方，这个子系统就仍然可组合。</p>
-<p>第二种（可能反直觉），可以通过不要任何锁来获得并发性和组合性。这种情况下，一定没有全局的子系统状态——子系统状态必须封装进每个实例的状态中，且必须由子系统的使用者来保证这些子系统不会并行访问它们的实例。通过把加锁的责任交给子系统的用户，子系统本身就可以由不同的子系统和不同的上下文并发使用。一个具体的例子是在Solaris内核中广泛使用的AVL树的实现。与任何平衡二叉树一样，这个实现足够复杂，值得组件化，但通过不持有任何全局状态，这个实现可以被不同的子系统并发使用——唯一的限制就是对一个AVL树的操作必须串行化。</p>
-<h2 id="在mutex够用时就不要用信号量"><a href="#在mutex够用时就不要用信号量" class="headerlink" title="在mutex够用时就不要用信号量"></a>在mutex够用时就不要用信号量</h2><p>信号量是一种通用的同步原语，出自Dijkstra，可被用于实现广泛的行为。用信号量来代替mutex保护临界区听起来可能挺诱惑的，但这两者之间有一个重要的区别：与信号量不同，mutex有所有权语义——锁要么被持有，要么没被持有，且如果被持有了，也知道是谁持有的。而相反，信号量（和它的亲戚条件变量）没有所有权语义：当你等在一个信号量上时，没办法知道哪个线程正在阻塞它。</p>
-<p>在用于保护临界区时，这种所有权的缺失会导致一些问题。首先，没办法把被阻塞线程的调度优先级传给处于临界区中的线程。这种传递调度优先级的能力——优先级继承——在实时系统中非常关键，在缺少其它协议时，基于信号量的系统非常容易发生优先级反转。第二个因所有权缺失而导致的问题是，它剥夺了系统断言其自身的能力。例如，追踪所有权时，实现了线程阻塞的机器就可以检测到诸如死锁和递归获取锁等问题，就可以在检测到时触发严重的错误（以及重要的core dump）。最后，所有权的缺失导致调试更加麻烦。在多线程系统中一个常见问题是锁在某些错误的返回路径上没被放掉。追踪所有权时，你至少能有上个（犯错的）所有者的确凿证据——这就是没有正确放锁的路径的线索。没有所有权的话，你就没有线索，只能盯着代码、天花板、或是前方发呆。</p>
-<p>以上不是说不应该用信号量（事实上，有些问题特别适合于信号量的语义），只是在mutex就够用时就不应该用信号量了。</p>
-<h2 id="考虑用内存退休法来实现哈希表的按桶加锁"><a href="#考虑用内存退休法来实现哈希表的按桶加锁" class="headerlink" title="考虑用内存退休法来实现哈希表的按桶加锁"></a>考虑用内存退休法来实现哈希表的按桶加锁</h2><p>哈希表是性能关键的系统软件中常见的数据结构，有时必须要被并行访问。这种情况下，为每个哈希桶增加一把锁，在读者或写者遍历这个桶时加锁，看起来很直接。但问题是在改变表大小时：动态调整哈希表大小是其高效操作的关键，而调整大小就意味着改变包含哈希表的内存。即，在调整大小时指向哈希表的指针必须也改变——但我们不希望查找哈希表前先拿一把全局锁来决定当前的哈希表是哪个！</p>
-<p>这个问题有几种解法，但一个（相对）直接的解法是不要释放旧的哈希表关联的内存，而是令其退休。在调整大小时，要拿到所有桶的锁（用定义良好的顺序来避免死锁），然后分配新的哈希表，旧哈希表的内容重新哈希后插入到新表中。这之后，旧表不会被释放，而是放到一个旧哈希表的队列中。之后查找操作需要做轻微改动以保证操作正确：首先拿到对应桶的锁，然后检查当前哈希表的指针，并与刚刚用于确定桶的哈希表指针做对比。如果哈希表被改过了（即发生了resize），它就必须放掉锁重来一次查找（会获取新表中正确的桶的锁）。</p>
-<p>实现中有一些微妙的问题——哈希表的指针必须被声明为volatile，以及哈希表的大小必须保存在表中——但考虑到替代方案，其实现复杂度并不高，且（假设哈希表在resize时数量翻倍）内存开销也只是原来的两倍。举一个生产代码的例子，读者可以看Solaris中文件描述符锁的实现，可以在网上搜索“flist_grow”找到其源代码。</p>
-<h2 id="警惕伪共享"><a href="#警惕伪共享" class="headerlink" title="警惕伪共享"></a>警惕伪共享</h2><p>有多种不同的协议来在有缓存的多处理器系统中保持内存一致性。通常，这些协议规定，对于一个指定的内存线，只有一块缓存可以处于脏状态。如果另一块缓存想要写这个脏内存线，它必须先从之前的拥有缓存中读到并持有这个脏内存线。用于一致性（一致性粒度）的线的大小对并行软件有着非常重要的影响：因为同时只有一块缓存可以拥有一条内存线，你会希望避免这种场景，一个内存线中有两个（或多个）小的、不相交的数据结构，且会被不同的缓存并行访问。这种场景——称为伪共享——会导致其它方面可扩展的软件在扩展性上达不到最优。实践中最容易出这种问题的场景是当有人试图用一个锁的数组来减少争抢时：一个锁结构的大小通常不会超过一两个指针的大小，这通常远小于一致性粒度（通常在64字节上下）。不同的CPU获取不同的锁因此可能争抢相同的缓存线。</p>
-<p>很难动态发现伪共享：不只需要有总线分析器，还要有方法将总线的物理地址翻译为对软件有意义的虚拟地址，再基于此找到真正导致伪共享的结构。（整个过程非常费力且容易犯错，我们曾经试验过——有一些成功——用静态方法检查伪共享。）幸运的是，伪共享很少是系统扩展性的最大障碍，在多核系统（缓存更可能被不同CPU共享）中这甚至不是个问题。但这仍然是从业者需要警惕的问题，尤其是在创建希望被并行访问的数组时。（此时数组元素应该被填充为缓存线大小的整数倍。）</p>
-<h2 id="考虑用非阻塞的加锁来监控争抢"><a href="#考虑用非阻塞的加锁来监控争抢" class="headerlink" title="考虑用非阻塞的加锁来监控争抢"></a>考虑用非阻塞的加锁来监控争抢</h2><p>许多同步原语有着不同的入口点，以指定这种同步原语不可用时的不同行为：默认入口点通常会阻塞，而另一个入口点则会返回一个错误码。第二种变体有很多使用方式，但一个尤为有趣的方式是来监控它自身的争抢：当试图获取同步原语失败了，子系统就可以知道这里有争抢了。如果子系统有办法动态减少争抢，这种方法就特别有用了。例如，Solaris内核的内存分配器有每个CPU缓存的内存缓冲区。当某个CPU耗尽了它对应的缓存时，它必须从一个全局的池子里获取一组新的缓冲区。这种情况下，代码不是简单的加锁，而是先尝试加锁，在失败时增加一个counter（再通过阻塞的入口点拿锁）。如果counter达到了一个预设的阈值，每个CPU的缓存大小会增加，因此动态减少争抢。</p>
-<h2 id="当重新加锁时，考虑用版本号来检测状态变化"><a href="#当重新加锁时，考虑用版本号来检测状态变化" class="headerlink" title="当重新加锁时，考虑用版本号来检测状态变化"></a>当重新加锁时，考虑用版本号来检测状态变化</h2><p>当锁的顺序变得复杂时，有时你会需要先放一把锁，加另一个，再重新加第一个。这可以变得很复杂，因为第一个锁保护的状态可以在锁被放掉期间发生变化——而重新核实状态可能会消耗巨大、低效、甚至不可能。在这些情况下，考虑在数据结构中加个版本号；当数据结构发生变化时，就产生一个版本号。在放锁和重新拿锁的地方，必须在放锁前缓存版本号，在重新拿锁后检查版本号：如果相同，数据结构在放锁期间就没有变化，就可以继续处理；如果版本号变了，就意味着状态变了，需要相应处理（例如重新尝试更重的操作）。</p>
-<h2 id="只在必须的时候使用wait-free或lock-free结构"><a href="#只在必须的时候使用wait-free或lock-free结构" class="headerlink" title="只在必须的时候使用wait-free或lock-free结构"></a>只在必须的时候使用wait-free或lock-free结构</h2><p>在我们的职业生涯中，我们都曾在生产代码中实现过wait-free或lock-free结构，但我们只在因为正确性的原因而没办法加锁时才这么做。例子包括锁系统本身，跨中断级别的子系统，以及动态插装设施。这些受限的场景是例外，不是规则；在正常场景中，应避免使用wait-free和lock-free数据结构，因为它们的错误方式很野蛮（活锁要比死锁难调试得多），它们导致的复杂度上升和维护负担也很明显，且它们在性能上的收益通常为零。</p>
-<h2 id="准备接受成功的喜悦和失败的痛苦"><a href="#准备接受成功的喜悦和失败的痛苦" class="headerlink" title="准备接受成功的喜悦和失败的痛苦"></a>准备接受成功的喜悦和失败的痛苦</h2><p>令一个系统可扩展可以令人沮丧：直到所有扩展性的障碍都被移除掉之前系统都不会体现出可扩展，但通常没办法知道当前的障碍是不是最后一个。移除最后一个障碍令人难以置信的满足：随着这种变化，吞吐量最终会像通过一个打开的水闸一样在系统中涌出。而相反，令人心碎的是，你工作在分解复杂的锁上，最后发现虽然它是扩展性的障碍，但它仅仅是隐藏了另一个障碍，移除它只提高了一点点性能——可能一点都没有。最令人沮丧的是，你必须回到系统中收集数据：系统不能扩展是因为误解了障碍，还是因为遇到了新障碍？如果是后者，你会安慰于知道你的工作对获得扩展性是必要的——尽管不足够——以及有一天系统的吞吐会喷薄而出的荣耀还在等着你。</p>
-<h1 id="并发的自助餐"><a href="#并发的自助餐" class="headerlink" title="并发的自助餐"></a>并发的自助餐</h1><p>大家公认，写多线程代码很难：尽管我们试图阐明多年来的一些经验教训，但无论如何，它仍然很难。有些人变得对这种困难念念不忘，将即将到来的多核计算视为软件业的灾难。这种担心毫无理由，因为它忽视了事实上只有少数软件工程师真的需要写多线程代码：对于大多数人，可以站在已经实现高度并行的子系统的肩膀上来获得并发能力。实现数据库或操作系统或虚拟机的从业者仍将需要关注写多线程代码的细节，但对于其它每个人，面临的挑战不是如何实现这些组件，而是如何最好地使用它们来交付可扩展的系统。虽然午餐可能不是完全免费的，但实际上你可以随便吃，吃到饱——自助餐开着呢！</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1551,7 +1552,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">65</span>
+          <span class="site-state-item-count">67</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
