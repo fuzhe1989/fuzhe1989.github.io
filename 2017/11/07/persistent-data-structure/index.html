@@ -51,16 +51,16 @@
 <meta property="og:site_name" content="Fu Zhe&#39;s Blog">
 <meta property="og:description" content="Persistent Data StructurePersistent Data Structure，直译就是“持久性数据结构”。根据Wiki定义，如果一种数据结构，能保留它每一次被修改前的版本，就可以被称为“持久性数据结构”。而与之相对的就是Ephemeral Data Structure，即“暂存性数据结构”。 C++中，我们熟悉的数据结构大多数都属于暂存性数据结构，比如std::vector">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/persistent_set.png">
-<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/7to10.png">
-<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/7to10-tail.png">
+<meta property="og:image" content="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-01.png">
+<meta property="og:image" content="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-02.png">
+<meta property="og:image" content="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-03.png">
 <meta property="article:published_time" content="2017-11-07T15:29:27.000Z">
-<meta property="article:modified_time" content="2020-11-11T08:00:26.035Z">
+<meta property="article:modified_time" content="2020-11-18T02:55:56.680Z">
 <meta property="article:author" content="Fu Zhe">
 <meta property="article:tag" content="函数式编程">
 <meta property="article:tag" content="数据结构">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://7xipsa.com1.z0.glb.clouddn.com/persistent_set.png">
+<meta name="twitter:image" content="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-01.png">
 
 <link rel="canonical" href="http://fuzhe1989.github.io/2017/11/07/persistent-data-structure/">
 
@@ -78,6 +78,15 @@
   
 
 
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
 
 
 
@@ -214,17 +223,10 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 16:00:26" itemprop="dateModified" datetime="2020-11-11T16:00:26+08:00">2020-11-11</time>
+                <time title="修改时间：2020-11-18 10:55:56" itemprop="dateModified" datetime="2020-11-18T10:55:56+08:00">2020-11-18</time>
               </span>
 
           
-            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-eye"></i>
-              </span>
-              <span class="post-meta-item-text">阅读次数：</span>
-              <span id="busuanzi_value_page_pv"></span>
-            </span>
 
         </div>
       </header>
@@ -294,7 +296,7 @@
 </ul>
 <p>实现<a href="https://github.com/BartoszMilewski/Okasaki/blob/master/SimpleList/ListGC.h" target="_blank" rel="noopener">戳这里</a>。</p>
 <h1 id="Persistent-Map"><a href="#Persistent-Map" class="headerlink" title="Persistent Map"></a>Persistent Map</h1><p>Persistent Map的实现也是基于路径复制的。算法导论上有这么一道习题，清晰的体现了它的实现思路：</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/persistent_set.png" alt="Persistent Map"></p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-01.png" alt="Persistent Map"></p>
 <p>当我们插入或删除一个节点时，路径上的每个节点都需要被复制一次，因此这样的操作的开销是O(lgn)的。</p>
 <p>插入操作是很简单的：</p>
 <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Node* <span class="title">Insert</span><span class="params">(Node* root, <span class="keyword">const</span> T&amp; val)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!root) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Node(val, <span class="literal">nullptr</span>, <span class="literal">nullptr</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &lt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Node(root-&gt;mValue, Insert(root-&gt;mLeft, val), root-&gt;mRight);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &gt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> Node(root-&gt;mValue, root-&gt;mLeft, Insert(root-&gt;mRight, val));</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> root;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
@@ -306,7 +308,7 @@
 <p>对于红黑树而言，每次它平衡时，同样要复制涉及到的节点。每次平衡最多涉及3个节点，因此平衡的开销是O(1)。</p>
 <p>实现<a href="https://github.com/BartoszMilewski/Okasaki/blob/master/RBTree/RBTree.h" target="_blank" rel="noopener">戳这里</a>。不过这个实现没有删除功能。</p>
 <h1 id="Persistent-Vector"><a href="#Persistent-Vector" class="headerlink" title="Persistent Vector"></a>Persistent Vector</h1><p>Persistent Vector的基本思想与Persistent Map非常接近：你把Persistent Vector想象成以下标为Key的Map即可：</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/7to10.png" alt="Basic Persistent Vector"></p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-02.png" alt="Basic Persistent Vector"></p>
 <p>图中就是一个这样的Map，它有如下特点：</p>
 <ol>
 <li>分为内部节点和叶节点两类，其中数据都在叶节点上。</li>
@@ -320,7 +322,7 @@
 
 <h2 id="保留Tail节点来提高PushBack性能"><a href="#保留Tail节点来提高PushBack性能" class="headerlink" title="保留Tail节点来提高PushBack性能"></a>保留Tail节点来提高PushBack性能</h2><p>想想一个Persistent Vector执行PushBack的时候都发生了什么？从Root开始，一直复制到Tail叶节点。原因是当我们复制了一个子节点，我们就需要修改它的父节点，根据“修改即构造”原则，就需要重新构造一个父节点，从而一直到Root都要构造一遍。</p>
 <p>那么，假如Persistent Vector直接持有Tail节点呢？这样当它未满时，PushBack只要复制两个节点：Tail节点和Vector本身。当Tail节点已满时，我们才需要真正做一次PushBack。对于32个子节点的Persistent Vector来说，有31/32的PushBack是真正的O(1)操作，其它1/32的PushBack才需要O(lgn)。</p>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/7to10-tail.png" alt="Tail"></p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-03.png" alt="Tail"></p>
 <p>新的查找也很简单。为了配合查找，我们要记录下Tail节点的offset：</p>
 <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> lookup_index &lt; tail_offset:</span><br><span class="line">  <span class="comment"># tree_lookup = old lookup technique</span></span><br><span class="line">  <span class="keyword">return</span> tree_lookup(lookup_index)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">  <span class="keyword">return</span> tail[lookup_index - tail_offset]</span><br></pre></td></tr></table></figure>
 
@@ -493,7 +495,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">69</span>
+          <span class="site-state-item-count">71</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -538,26 +540,6 @@
   </div>
 
         
-<div class="busuanzi-count">
-  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
-    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
-      <span class="post-meta-item-icon">
-        <i class="fa fa-user"></i>
-      </span>
-      <span class="site-uv" title="总访客量">
-        <span id="busuanzi_value_site_uv"></span>
-      </span>
-    </span>
-    <span class="post-meta-divider">|</span>
-    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
-      <span class="post-meta-item-icon">
-        <i class="fa fa-eye"></i>
-      </span>
-      <span class="site-pv" title="总访问量">
-        <span id="busuanzi_value_site_pv"></span>
-      </span>
-    </span>
-</div>
 
 
 

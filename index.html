@@ -70,6 +70,15 @@
   
 
 
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
 
 
 
@@ -172,6 +181,159 @@
             
 
   <div class="posts-expand">
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/21/f1-query-declarative-querying-at-scale/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/21/f1-query-declarative-querying-at-scale/" class="post-title-link" itemprop="url">[笔记] F1 query: declarative querying at scale</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-11-21 13:49:45 / 修改时间：13:49:55" itemprop="dateCreated datePublished" datetime="2020-11-21T13:49:45+08:00">2020-11-21</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://dl.acm.org/doi/abs/10.14778/3229863.3229871" target="_blank" rel="noopener">F1 query: declarative querying at scale</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>F1 query是一种federated query processing平台，它的特点是：</p>
+<ol>
+<li>计算存储分离。</li>
+<li>支持不同的存储引擎，如BigTable、Spanner、Mesa等，因此称为federated query processing。</li>
+<li>使用三种不同的模式处理不同规模的query：单节点模式处理短的实时query；分布式模式处理中等query；远程模式使用MapReduce处理大型query。</li>
+<li>使用启发式的query optimizer。</li>
+</ol>
+<p>这里面最有价值的部分就是它如何融合不同的数据源与处理模式。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/21/f1-query-declarative-querying-at-scale/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/" class="post-title-link" itemprop="url">[笔记] Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-17 22:06:38" itemprop="dateCreated datePublished" datetime="2020-11-17T22:06:38+08:00">2020-11-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-18 10:55:56" itemprop="dateModified" datetime="2020-11-18T10:55:56+08:00">2020-11-18</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://research.google/pubs/pub42851/" target="_blank" rel="noopener">Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Mesa是一种面向Google Ads的特定模式数据的准实时数仓，而不是面向非常通用场景的离线数仓。Mesa的设计上偏向于高伸缩性和准实时响应，目标是保证简单query场景的高性能；相对地，Mesa不支持完整的ad-hoc查询（似乎也不支持SQL），可以支撑支持SQL的更上层系统（如MySQL、F1、Dremel）。</p>
+<p>Mesa依赖Google的Colossus、BigTable、MapReduce，数据被水平分片并复制到多个datacenter。Mesa会批量导入数据，每行数据都有version，使用MVCC，周期性提升可见的数据版本。为了保证跨datacenter的更新一致性，Mesa还使用了基于Paxos的同步协议。</p>
+<p>Mesa比较有特色的是它的聚合函数、数据版本管理、以及多datacenter同步。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
         
   
   
@@ -597,7 +759,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 15:58:52" itemprop="dateModified" datetime="2020-11-11T15:58:52+08:00">2020-11-11</time>
+                <time title="修改时间：2020-11-18 10:55:56" itemprop="dateModified" datetime="2020-11-18T10:55:56+08:00">2020-11-18</time>
               </span>
 
           
@@ -679,7 +841,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 16:01:05" itemprop="dateModified" datetime="2020-11-11T16:01:05+08:00">2020-11-11</time>
+                <time title="修改时间：2020-11-18 10:55:56" itemprop="dateModified" datetime="2020-11-18T10:55:56+08:00">2020-11-18</time>
               </span>
 
           
@@ -811,170 +973,11 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/" class="post-title-link" itemprop="url">[笔记] Dryad: Distributed Data-Parallel Programs from Sequential Building Blocks</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-11 15:25:21" itemprop="dateCreated datePublished" datetime="2020-10-11T15:25:21+08:00">2020-10-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 15:58:46" itemprop="dateModified" datetime="2020-11-11T15:58:46+08:00">2020-11-11</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://cse.buffalo.edu/~stevko/courses/cse704/fall10/papers/eurosys07.pdf" target="_blank" rel="noopener">Dryad: Distributed Data-Parallel Programs from Sequential Building Blocks</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Dryad是一个分布式批处理框架，相比MapReduce，它的特点是：</p>
-<ul>
-<li>支持多种operator组成的DAG，且支持组合多个DAG。</li>
-<li>DAG中多个顶点可以分配给一个进程。</li>
-<li>不同顶点间的消息传递不限于文件，还可以通过TCP和in-memory FIFO。</li>
-<li>支持按网络拓扑插入中间节点做部分聚合。</li>
-</ul>
-<p>Dryad属于是底层框架，用户真正用到的还是上面的框架，类似于MapReduce和Sawzall的关系。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/" class="post-title-link" itemprop="url">[笔记] Improving MapReduce Performance in Heterogeneous Environments</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-09 23:13:07" itemprop="dateCreated datePublished" datetime="2020-10-09T23:13:07+08:00">2020-10-09</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 15:59:15" itemprop="dateModified" datetime="2020-11-11T15:59:15+08:00">2020-11-11</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://static.usenix.org/event/osdi08/tech/full_papers/zaharia/zaharia.pdf" target="_blank" rel="noopener">Improving MapReduce Performance in Heterogeneous Environments</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章讲的是如何优化Hadoop在异构环境下的任务调度性能。</p>
-<p>任务调度的关键在于如何让长尾任务尽快完成。MapReduce会在最后阶段冗余运行长尾任务，Google的数据显示这么做能提升44%的任务响应速度。</p>
-<p>Hadoop的调度策略是冗余运行最慢的任务，而这篇文章提出的LATE（Longest Approximate Time to End)策略则是找最可能最慢结束的任务。在异构环境下LATE可以让任务响应速度达到Hadoop原有策略的2倍。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1043,7 +1046,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">69</span>
+          <span class="site-state-item-count">71</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1088,26 +1091,6 @@
   </div>
 
         
-<div class="busuanzi-count">
-  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
-    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
-      <span class="post-meta-item-icon">
-        <i class="fa fa-user"></i>
-      </span>
-      <span class="site-uv" title="总访客量">
-        <span id="busuanzi_value_site_uv"></span>
-      </span>
-    </span>
-    <span class="post-meta-divider">|</span>
-    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
-      <span class="post-meta-item-icon">
-        <i class="fa fa-eye"></i>
-      </span>
-      <span class="site-pv" title="总访问量">
-        <span id="busuanzi_value_site_pv"></span>
-      </span>
-    </span>
-</div>
 
 
 
