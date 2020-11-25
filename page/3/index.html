@@ -185,6 +185,89 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/" class="post-title-link" itemprop="url">[笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-21 16:08:09" itemprop="dateCreated datePublished" datetime="2020-09-21T16:08:09+08:00">2020-09-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:26:11" itemprop="dateModified" datetime="2020-11-21T23:26:11+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://people.eecs.berkeley.edu/~kubitron/courses/cs262a-F19/handouts/papers/vldb09-861.pdf" target="_blank" rel="noopener">HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章在尝试结合MapReduce（Hadoop）与DBMS（PostgreSQL），取MapReduce的伸缩性与容错性、DBMS的性能。</p>
+<p>实现：</p>
+<ul>
+<li>PostgreSQL作为Hadoop的DataNode。</li>
+<li>将SQL翻译为MR任务，</li>
+<li>通过兼容于JDBC的InputFormat将具体查询交给PostgreSQL执行。</li>
+</ul>
+<p>结论：结合“A comparison of approaches to large-scale data analysis”的性能测试结果，HadoopDB相比Hadoop的分析性能好了一些，仍然达不到并行DBMS的水平，但验证了这个方向是有意义的。</p>
+<p>HadoopDB将Hive中对数据源的scan换成了单节点PostgreSQL的查询，但仍然是传输数据而不是传输逻辑，且还是要物化中间结果，这些提高了容错性，但显著降低了性能。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -972,133 +1055,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/07/30/explore-the-world-0001/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/07/30/explore-the-world-0001/" class="post-title-link" itemprop="url">随便看看 0001</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-07-30 15:44:57" itemprop="dateCreated datePublished" datetime="2020-07-30T15:44:57+08:00">2020-07-30</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-13 15:05:43" itemprop="dateModified" datetime="2020-08-13T15:05:43+08:00">2020-08-13</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a href="https://www.zhihu.com/question/25648987/answer/31410048" target="_blank" rel="noopener">哥德尔定理是否支持不可知论？ - 罗心澄的回答 - 知乎</a></p>
-<blockquote>
-<p>数学意义上的「真」和「可证」是两个不重叠的概念。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/23289984/answer/24131288" target="_blank" rel="noopener">是否存在「可证明」的对于世界的解释？ - oldgoat的回答 - 知乎</a></p>
-<blockquote>
-<p>一般来说，仅根据经验事实就可以确认某个判断为真，这就叫做“证实”（verify），具有这种特征的判断就叫做可证实（verifiability）的。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/27528796/answer/1346097249" target="_blank" rel="noopener">如何简单清晰地解释哥德尔不完备定理？ - 叶青杰的回答 - 知乎</a></p>
-<blockquote>
-<p>哥德尔数与不动点。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/27528796/answer/246963736" target="_blank" rel="noopener">如何简单清晰地解释哥德尔不完备定理？ - LLLBK的回答 - 知乎</a></p>
-<blockquote>
-<p>他认为自己的不完全性定理表明，存在一些确实为真的东西是人为构造的逻辑系统无法达到的，这些确实为真的东西就是数学的理念世界，它们跟人无关，它们有自己确定的真值，不论人有没有去研究它。</p>
-</blockquote>
-<p><a href="https://www.nature.com/news/paradox-at-the-heart-of-mathematics-makes-physics-problem-unanswerable-1.18983" target="_blank" rel="noopener">Paradox at the heart of mathematics makes physics problem unanswerable</a></p>
-<blockquote>
-<p>凝聚态计算spectral gap，当模型为无限大小的2D平面时，无法预测计算是否能结束，即spectral gap是否存在。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/410353226/answer/1370123832" target="_blank" rel="noopener">如何看待南京一中高考成绩令部分家长不满，家长要求「校长下课」？ - 不想上吊王承恩的回答 - 知乎</a></p>
-<blockquote>
-<p>任何东西都是拥有了才有资格不在乎。像我这种工贼太多了，所以全世界的鸡蛋联合不起来，石头也不允许鸡蛋联合起来。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/408092992/answer/1353007308" target="_blank" rel="noopener">如何看待杭州某物业私自将业主别墅出租给《我和我的儿女们》剧组拍摄，业主看剧才发现是自己家这件事？ - stan的回答 - 知乎</a></p>
-<blockquote>
-<p>法律常识学习：侵权还是违约？无权代理还是无权处分？合同效力？剧组是否应当承担责任？</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/409332169/answer/1370797027" target="_blank" rel="noopener">为什么金属乐迷大多热衷于将金属从摇滚中独立出来？ - 远古邪恶小人物的回答 - 知乎</a></p>
-<blockquote>
-<p>摇滚乐是一场人类文化运动；类型文化总是具有原教旨倾向。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/410072393/answer/1365721848" target="_blank" rel="noopener">如何看待美国防长 7 月 21 日谈中美关系时，称「我们不是要寻找冲突」？ - 王子君的回答 - 知乎</a></p>
-<blockquote>
-<p>华盛顿的态度是：我们又不是到摊牌的地步，你们为什么反应这么激烈嘛；北京的态度是：你们不能老是把你们国情的代价转移给我们。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/60779831/answer/1367943371" target="_blank" rel="noopener">就目前（2017年）的国际局势来看，美国的联俄制中政策会取得成功吗? - 王子君的回答 - 知乎</a></p>
-<blockquote>
-<p>之所以折腾到今天，美俄还是冷眼互看，主要是内外都有阻力：外部反对；内部阻力。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/408451534/answer/1368146776" target="_blank" rel="noopener">如何评价睡前消息第147期？ - 离离图总裂夫的回答 - 知乎</a></p>
-<blockquote>
-<p>一个没有核心价值的威权主义组织，有两个问题：第一，领袖稍微不行就一堆破事，组织开始涣散。从商周到罗马以色列，再到俄罗斯台湾全都是这样；第二，没有产生合格领袖的机制。</p>
-<p>纲不举的结果，就是目不张。</p>
-<p>新加坡其实适合走西方议会制路线的。因为英、美的制度设计，本质就是一种精英寡头政治。西方议会政治建立在社会中产以上有着强共识，而且统治集团人数很少，和中产没有根本利益冲突的前提下。这种制度下，一旦社会出现分裂，立马就混不下去。</p>
-<p>要说西方真对我们有什么贡献的话，就是让中国人明白，有时候还是得放下过去。（避免路线依赖）</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/406597161/answer/1344659749" target="_blank" rel="noopener">如何看待「香港或被踢出 SWIFT 银行结算系统」的消息？如果属实，将会造成什么样的影响？ - Mason Wu的回答 - 知乎</a></p>
-<blockquote>
-<p>什么是SWIFT？为什么会有这个谣言？</p>
-</blockquote>
-<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a href="https://www.memsql.com/resources/ebook-oreilly-pulsar-vs-kafka" target="_blank" rel="noopener">O’Reilly eBook: Apache Pulsar Versus Apache Kafka - MemSQL</a></p>
-<blockquote>
-<p>只有33页的新书，各方面对比了一下Pulsar和Kafka，不是特别有新意。</p>
-</blockquote>
-<p><a href="https://www.zhihu.com/question/392213415/answer/1362966848" target="_blank" rel="noopener">为什么有线网络可以全双工，而无线网络只能半双工呢? - 甜草莓的回答 - 知乎</a></p>
-<blockquote>
-<p>同时同频（In-band）的无线全双工存在自干扰问题；解决方案收益不大且成本高（增加天线或增加隔离度）。</p>
-</blockquote>
-<p><a href="https://zhuanlan.zhihu.com/p/165144850" target="_blank" rel="noopener">deno fmt 从 prettier 切换到 dprint，性能提升 10+ 倍 - justjavac的文章 - 知乎</a></p>
-<blockquote>
-<p>Rust降维打击；wasm性能损耗不低。</p>
-</blockquote>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1172,7 +1128,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">73</span>
+          <span class="site-state-item-count">74</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
