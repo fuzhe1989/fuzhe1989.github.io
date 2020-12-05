@@ -210,7 +210,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2020-12-05 13:50:58 / 修改时间：13:52:22" itemprop="dateCreated datePublished" datetime="2020-12-05T13:50:58+08:00">2020-12-05</time>
+              <time title="创建时间：2020-12-05 13:50:58 / 修改时间：14:36:06" itemprop="dateCreated datePublished" datetime="2020-12-05T13:50:58+08:00">2020-12-05</time>
             </span>
 
           
@@ -227,7 +227,7 @@
           <h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>NoSQL系统中的一个常见问题就是写、读、compaction三类操作的资源争抢导致服务质量受到影响。这里脑洞一个方案，通过单独的FileMeta Service来管理文件的元数据与生命期，从而解耦前面三类操作，实现资源的隔离，提升服务质量。</p>
 <p>进一步地，分离三类操作后，我们甚至可以针对不同操作使用不同的分区策略，从而进一步解耦三类操作，释放出更高的能力。</p>
 <blockquote>
-<p>这个方案来源于我在阿里云Tablestore时的一次讨论。idea肯定不是新的，但还算原创。很遗憾之前没有机会实现这套方案。</p>
+<p>idea来源于我在阿里云Tablestore时的一次讨论，参考了Google的Procella和F1-lightning的实现方式。很遗憾之前没有机会实现这套方案。</p>
 </blockquote>
           <!--noindex-->
             <div class="post-button">
