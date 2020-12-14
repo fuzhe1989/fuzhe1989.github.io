@@ -185,6 +185,386 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2019/04/07/three-optimization-tips-for-cpp/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2019/04/07/three-optimization-tips-for-cpp/" class="post-title-link" itemprop="url">[笔记] Three Optimization Tips for C++</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2019-04-07 19:29:29" itemprop="dateCreated datePublished" datetime="2019-04-07T19:29:29+08:00">2019-04-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:29:13" itemprop="dateModified" datetime="2020-11-21T23:29:13+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://www.facebook.com/notes/facebook-engineering/three-optimization-tips-for-c/10151361643253920/" target="_blank" rel="noopener">Three Optimization Tips for C++</a></p>
+</blockquote>
+<p>建议：</p>
+<ul>
+<li>Prefer static linking and position-dependent code (as opposed to PIC, position-independent code).</li>
+<li>Prefer 64-bit code and 32-bit data.</li>
+<li>Prefer array indexing to pointers (this one seems to reverse every ten years).</li>
+<li>Prefer regular memory access patterns.</li>
+<li>Minimize control flow.</li>
+<li>Avoid data dependencies.</li>
+</ul>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/04/07/three-optimization-tips-for-cpp/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/07/22/cpp-use-mixin-to-get-better-performance/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/07/22/cpp-use-mixin-to-get-better-performance/" class="post-title-link" itemprop="url">C++：使用mixin获得比继承+组合更好的性能</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-07-22 17:00:52" itemprop="dateCreated datePublished" datetime="2018-07-22T17:00:52+08:00">2018-07-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-10-11 18:12:22" itemprop="dateModified" datetime="2020-10-11T18:12:22+08:00">2020-10-11</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>注：本文所使用编译器均为gcc4.1.2，即只能使用C++98标准。</p>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Node</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> mRow;</span><br><span class="line">    <span class="keyword">int</span> mCol;</span><br><span class="line">    <span class="keyword">int</span> mValue;</span><br><span class="line"></span><br><span class="line">    Node(<span class="keyword">int</span> row, <span class="keyword">int</span> col, <span class="keyword">int</span> value)</span><br><span class="line">        : mRow(row), mCol(col), mValue(value)</span><br><span class="line">    &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Iterator</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~Iterator() &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Node <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们有一个接口类<code>Iterator</code>，它有三个方法，可以返回<code>Node</code>类型的值。现在我们要用这个接口来遍历一个矩阵。</p>
+<p>矩阵的类型是<code>vector&lt;vector&lt;int&gt;&gt;</code>，我们有几种不同的遍历需求：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>这个方法返回一个最原始的<code>Iterator</code>，只是单纯遍历数据。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>RawIterator</code>基础上，只返回奇数。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>OddIterator</code>基础上，遍历过程中，在每行末尾加上<code>appendix</code>中的元素。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>AppendPerRowIterator</code>基础上，返回的每个<code>Node</code>的value都乘2。</p>
+<h2 id="测试程序"><a href="#测试程序" class="headerlink" title="测试程序"></a>测试程序</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    srand(time(<span class="literal">NULL</span>));</span><br><span class="line">    <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt; matrix;</span><br><span class="line">    <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; appendix;</span><br><span class="line">    PrepareMatrix(matrix, <span class="number">1000</span>, <span class="number">10000</span>);</span><br><span class="line">    PrepareAppendix(appendix, <span class="number">3</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int64_t</span> t0 = Measure(NewRawIterator(matrix));</span><br><span class="line">    <span class="keyword">int64_t</span> t1 = Measure(NewOddIterator(matrix));</span><br><span class="line">    <span class="keyword">int64_t</span> t2 = Measure(NewAppendPerRowIterator(matrix, appendix));</span><br><span class="line">    <span class="keyword">int64_t</span> t3 = Measure(NewDoubleIterator(matrix, appendix));</span><br><span class="line"></span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; <span class="string">"Raw:"</span> &lt;&lt; t0 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Odd:"</span> &lt;&lt; t1 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Append:"</span> &lt;&lt; t2 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Double:"</span> &lt;&lt; t3 &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们会在一个1000*10000的矩阵上测试各个<code>Iterator</code>。</p>
+<h2 id="基于继承-组合的实现"><a href="#基于继承-组合的实现" class="headerlink" title="基于继承+组合的实现"></a>基于继承+组合的实现</h2><p>上面的需求看起来很适合用继承+组合来实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RawIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">OddIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AppendPerRowIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    AppendPerRowIterator(Iterator* iter, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix);</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">DoubleIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">DoubleIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们用了4个派生自<code>Iterator</code>的新类型来实现不同的需求，除了<code>RawIterator</code>外，其它3种类型都是在组合了已有的<code>Iterator</code>基础上实现新功能，因此可以任意顺序组合。</p>
+<p>几个New函数的实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> RawIterator(matrix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    Iterator* rawIter = NewRawIterator(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> OddIterator(rawIter);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* oddIter = NewOddIterator(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> AppendPerRowIterator(oddIter, appendix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* appendIter = NewAppendPerRowIterator(matrix, appendix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> DoubleIterator(appendIter);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>测试结果为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:164311</span><br><span class="line">Odd:316020</span><br><span class="line">Append:436596</span><br><span class="line">Double:458733</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，每增加一层功能，调用延时就明显上涨了一截。有没有其它性能更好的方案了呢？</p>
+<h2 id="mixin"><a href="#mixin" class="headerlink" title="mixin"></a>mixin</h2><p>mixin是给一组基础类，每个都建模了一个抽象概念，且能直接组合成一个新的类，像乐高一样，满足需求。如果你新增了基础类，只要它是和其它基础类正交的，就可以扩展到这个组合类里。</p>
+<p>C++中的一种mixin方法是结合模板和继承，通过模板参数来组合基础类（见<a href="/2018/04/21/mixin/">通过mixin组合功能</a>）。</p>
+<p>在上面这个例子中，<code>RawIterator</code>是一个基础类，可以单独使用，而<code>OddIterator</code>、<code>AppendIterator</code>和<code>DoubleIterator</code>则是用来提供新的功能的，是mixin类，我们可以将这三个类型实现为模板类，以<code>OddIterator</code>为例：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    OddIterator(?)</span><br><span class="line">        : T(?) &#123;</span><br><span class="line">        MoveUntilOdd();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">Node <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::GetValue();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::IsValid();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        T::MoveNext();</span><br><span class="line">        MoveUntilOdd();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">MoveUntilOdd</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">while</span> (T::IsValid() &amp;&amp; T::GetValue().mValue % <span class="number">2</span> == <span class="number">0</span>) &#123;</span><br><span class="line">            T::MoveNext();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，新的<code>OddIterator</code>是通过继承自<code>T</code>来给<code>T</code>增加功能的，这有什么好处？摘取上文中的一段：</p>
+<blockquote>
+<p>不需要堆分配。<br>没有运行期检查null。<br>不需要显式管理生命期。<br>没有多余的虚函数定义及其调用。<br>编译器有机会做更多优化。</p>
+</blockquote>
+<p>似乎一切都很美好，除了代码有些怪异外。但我们还有一个问题没有解决：怎么构造<code>T</code>？</p>
+<h2 id="一种mixin的通用构造方法"><a href="#一种mixin的通用构造方法" class="headerlink" title="一种mixin的通用构造方法"></a>一种mixin的通用构造方法</h2><p>这是一个很大很复杂的课题，这里我只提出一种似乎可行的方式（至少本文的例子是没问题的）。</p>
+<p>我们要求每个mixin类型，及需要与这个mixin类型组合的基础类型内部，都定义一个Context类型，且有一个只有一个Context类型参数的构造函数。例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RawIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; mMatrix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span></span><br><span class="line">            : mMatrix(matrix) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="keyword">const</span> Context&amp; context)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; base)</span></span></span><br><span class="line">            : mBase(base) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    OddIterator(<span class="keyword">const</span> Context&amp; c)</span><br><span class="line">        : T(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AppendPerRowIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line">        <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; mAppendix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; base, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span></span><br><span class="line">            : mBase(base), mAppendix(appendix) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line">    AppendPerRowIterator(<span class="keyword">const</span> Context&amp; c)</span><br><span class="line">       : T(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br></pre></td></tr></table></figure>
+
+<p>通过这种方式，我们可以在不知道<code>T</code>的具体类型（也就不知道它到底有什么样的构造函数）的情况下，构造出组合类型。从而也获得了任意组合这些mixin顺序的能力。</p>
+<p>在C++11后，我们可以通过变长参数和继承构造函数的方式提供更优雅的mixin的通用构造方案，这是另外的话题，这里不展开了。</p>
+<p>在使用了上面的方法来构造mixin后，几个New函数的实现为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> RawIterator(c);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> OddIter(c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    AppendIter::<span class="function">Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> AppendIter(c2);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line">    <span class="keyword">typedef</span> DoubleIterator&lt;AppendIter&gt; DoubleIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    AppendIter::<span class="function">Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    DoubleIter::<span class="function">Context <span class="title">c3</span><span class="params">(c2)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> DoubleIter(c3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看起来还是很笨拙，但至少我们成功地把它们构造出来了。</p>
+<h2 id="mixin的性能"><a href="#mixin的性能" class="headerlink" title="mixin的性能"></a>mixin的性能</h2><p>重新编译，运行，基于mixin的结果为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:165505</span><br><span class="line">Odd:164377</span><br><span class="line">Append:187320</span><br><span class="line">Double:191260</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，在Raw结果不变的情况下（这是当然的），其它三种场景mixin方案的延时分别比继承+组合减少了48%、57%和58%，调用链越长，mixin方案的优势越大。</p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>本文提出了用mixin来解决功能组合的方案，且使用了Context类型来解决构造问题，相比常见的继承+组合的方案，mixin方案有着非常明显的性能优势。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/07/22/cpp-inline-member-function-in-cpp-file/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/07/22/cpp-inline-member-function-in-cpp-file/" class="post-title-link" itemprop="url">C++：在实现文件中内联小的成员函数</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-07-22 16:53:22" itemprop="dateCreated datePublished" datetime="2018-07-22T16:53:22+08:00">2018-07-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>注：本文所使用编译器均为gcc4.1.2。</p>
+<p>例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// file.h</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifndef</span> XXX_FILE_H</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> XXX_FILE_H</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">File</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">File</span><span class="params">(<span class="keyword">int</span> content)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">GetContent</span><span class="params">()</span></span>;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">IsLoaded</span><span class="params">()</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Load</span><span class="params">()</span></span>;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">bool</span> mIsLoaded;</span><br><span class="line">    <span class="keyword">int</span> mContent;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+
+<p>首先我们在file.h中定义了一个类型<code>File</code>。为了保持头文件简洁，我们这里只声明了各个成员函数，而将定义都放到实现文件中：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// file.cpp</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"file.h"</span></span></span><br><span class="line"></span><br><span class="line">File::File(<span class="keyword">int</span> content)</span><br><span class="line">  : mIsLoaded(<span class="literal">false</span>),</span><br><span class="line">    mContent(content) &#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">int</span> File::GetContent() &#123;</span><br><span class="line">    <span class="keyword">if</span> (!IsLoaded()) &#123;</span><br><span class="line">        Load();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> mContent;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">bool</span> File::IsLoaded() &#123;</span><br><span class="line">    <span class="keyword">return</span> mIsLoaded;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">void</span> File::Load() &#123;</span><br><span class="line">    mIsLoaded = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>接下来，我们在main.cpp中使用这个类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// main.cpp</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"file.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="function">File <span class="title">f</span><span class="params">(<span class="number">5</span>)</span></span>;</span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; f.GetContent() &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在这个很简单的例子中，我们要关注的是：对于简短的成员函数，将其实现放到.cpp中，而不是直接定义在类定义体中（也就是放到.h中<code>class File</code>内部），会不会损害性能？</p>
+<p>我们用<code>-O2</code>编译，再看一下其汇编指令：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">0000000000400840 &lt;_ZN4File10GetContentEv&gt;:</span><br><span class="line">  400840:   53                      push   %rbx</span><br><span class="line">  400841:   48 89 fb                mov    %rdi,%rbx</span><br><span class="line">  400844:   e8 d7 ff ff ff          callq  400820 &lt;_ZN4File8IsLoadedEv&gt;</span><br><span class="line">  400849:   84 c0                   test   %al,%al</span><br><span class="line">  40084b:   75 08                   jne    400855 &lt;_ZN4File10GetContentEv+0x15&gt;</span><br><span class="line">  40084d:   48 89 df                mov    %rbx,%rdi</span><br><span class="line">  400850:   e8 db ff ff ff          callq  400830 &lt;_ZN4File4LoadEv&gt;</span><br><span class="line">  400855:   8b 43 04                mov    0x4(%rbx),%eax</span><br><span class="line">  400858:   5b                      pop    %rbx</span><br><span class="line">  400859:   c3                      retq</span><br><span class="line">  40085a:   90                      nop</span><br><span class="line">  40085b:   90                      nop</span><br><span class="line">  40085c:   90                      nop</span><br><span class="line">  40085d:   90                      nop</span><br><span class="line">  40085e:   90                      nop</span><br><span class="line">  40085f:   90                      nop</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，<code>GetContent</code>里确实调用了<code>IsLoaded</code>和<code>Load</code>。</p>
+<p>我们知道，如果把<code>IsLoaded</code>和<code>Load</code>的定义放到类定义体内，这样的函数是默认内联的，<code>GetContent</code>中就不会真的去调用这两个函数。但现在，我们为了简洁，把它们的实现移到了.cpp中，导致了它们没有被内联，确实损害了性能。</p>
+<p>怎么既把小函数定义放到.cpp中，又能让它们在<code>GetContent</code>中内联呢？</p>
+<p>我们先把<code>IsLoaded</code>和<code>Load</code>的实现放到<code>GetContent</code>前面：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">bool</span> File::IsLoaded() &#123;</span><br><span class="line">    <span class="keyword">return</span> mIsLoaded;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">void</span> File::Load() &#123;</span><br><span class="line">    mIsLoaded = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">int</span> File::GetContent() &#123;</span><br><span class="line">    <span class="keyword">if</span> (!IsLoaded()) &#123;</span><br><span class="line">        Load();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> mContent;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这次编译的结果没有变，<code>IsLoaded</code>和<code>Load</code>没有内联。</p>
+<p>我们再在两个函数的定义前面加上<code>inline</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">inline</span> <span class="keyword">bool</span> File::IsLoaded() &#123;</span><br><span class="line">    <span class="keyword">return</span> mIsLoaded;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">inline</span> <span class="keyword">void</span> File::Load() &#123;</span><br><span class="line">    mIsLoaded = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">int</span> File::GetContent() &#123;</span><br><span class="line">    <span class="keyword">if</span> (!IsLoaded()) &#123;</span><br><span class="line">        Load();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> mContent;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这回编译结果变成了：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">0000000000400820 &lt;_ZN4File10GetContentEv&gt;:</span><br><span class="line">  400820:   80 3f 00                cmpb   $0x0,(%rdi)</span><br><span class="line">  400823:   75 03                   jne    400828 &lt;_ZN4File10GetContentEv+0x8&gt;</span><br><span class="line">  400825:   c6 07 01                movb   $0x1,(%rdi)</span><br><span class="line">  400828:   8b 47 04                mov    0x4(%rdi),%eax</span><br><span class="line">  40082b:   c3                      retq</span><br><span class="line">  40082c:   90                      nop</span><br><span class="line">  40082d:   90                      nop</span><br><span class="line">  40082e:   90                      nop</span><br><span class="line">  40082f:   90                      nop</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，<code>inline</code>起作用了，<code>GetContent</code>里面的函数调用都被抹平了。</p>
+<p>假如把<code>IsLoaded</code>和<code>Load</code>的实现加上<code>inline</code>，但放到<code>GetContet</code>后面，<code>inline</code>还会生效吗：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">int</span> File::GetContent() &#123;</span><br><span class="line">    <span class="keyword">if</span> (!IsLoaded()) &#123;</span><br><span class="line">        Load();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> mContent;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">inline</span> <span class="keyword">bool</span> File::IsLoaded() &#123;</span><br><span class="line">    <span class="keyword">return</span> mIsLoaded;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">inline</span> <span class="keyword">void</span> File::Load() &#123;</span><br><span class="line">    mIsLoaded = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>编译结果为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">0000000000400820 &lt;_ZN4File10GetContentEv&gt;:</span><br><span class="line">  400820:   80 3f 00                cmpb   $0x0,(%rdi)</span><br><span class="line">  400823:   75 03                   jne    400828 &lt;_ZN4File10GetContentEv+0x8&gt;</span><br><span class="line">  400825:   c6 07 01                movb   $0x1,(%rdi)</span><br><span class="line">  400828:   8b 47 04                mov    0x4(%rdi),%eax</span><br><span class="line">  40082b:   c3                      retq</span><br><span class="line">  40082c:   90                      nop</span><br><span class="line">  40082d:   90                      nop</span><br><span class="line">  40082e:   90                      nop</span><br><span class="line">  40082f:   90                      nop</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，即使我们把待<code>inline</code>的成员函数的实现放到调用处后面，这种<code>inline</code>仍然是生效的。</p>
+<p>结论：我们可以在成员函数的定义前显式加上<code>inline</code>，这样同文件的调用处就可以内联这个成员函数，去除多余的跳转，提升性能，且在同一个.cpp文件中待内联的函数与调用处的顺序不会影响内联的效果。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/05/17/message-passing-and-the-actor-model/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/05/17/message-passing-and-the-actor-model/" class="post-title-link" itemprop="url">[翻译]消息传递与actor模型</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-05-17 23:35:06" itemprop="dateCreated datePublished" datetime="2018-05-17T23:35:06+08:00">2018-05-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-11 15:59:37" itemprop="dateModified" datetime="2020-11-11T15:59:37+08:00">2020-11-11</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>原文：<a href="http://dist-prog-book.com/chapter/3/message-passing.html" target="_blank" rel="noopener">Message Passing and the Actor Model</a></p>
+<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>自有分布式计算以来，人们就已经讨论过消息传递编程模型了，因此消息传递可以用于表示许多事情。Wikipedia上消息传递的宽泛定义包括了远程过程调用（RPC）和消息传递接口（MPI）等。另外，实践中的消息传递系统也受到了像是pi-calculus和CSP这些流行的进程演算（process-calculus）的启发。例如，Go的channel就是基于pi-calculus中消息通道作为一等公民的思想，而Clojure中的core.async库则是基于CSP。但今天人们谈起消息传递时，通常是指actor模型。作为一种通用的消息传递编程模型，它开端于20世纪70年代，并在今天用于构建大规模可伸缩系统。</p>
+<p>在消息传递编程模型领域，重要的不仅是考虑目前的研究现状，还包括历史上最初的关于消息传递和actor模型的论文，它们是更近期的论文描述的编程模型的源头。看看这些模型卡在了哪里，以及近期的论文都引用和指出了旧论文中的哪些不足，这些是很有启发性的。历史上有许多编程语言是围绕着消息传递设计的，特别是那些专注于actor模型和组织计算单元的语言。</p>
+<p>本章我会描述actor模型的四个主要变体：经典actor模型、基于进程的actor模型、通信事件循环模型、以及活动对象模型。我会试着强调体现了这些模型的历史上和现代的语言，以及程序员需要注意的编程哲学和取舍，从而理解并最好的利用这些模型。</p>
+<p>尽管actor模型早在20世纪70年代就开始了，正如许多近期发表的论文和系统显示，它仍在发展，并被纳入到今天的编程语言中。有些健壮的工业级actor系统正被用于赋能大规模可伸缩分布式系统，例如Akka被用于服务PayPal的十亿级的事务，Erlang被用于为WhatsApp的上亿用户发送消息，而Orleans被用于服务Halo4的数百万玩家。围绕着监控、错误处理、actor生命周期管理，有许多不同方式去构建一个工业级的actor框架，后面会详述。</p>
+<p>对于我们介绍的actor模型，一个重点就在这个问题中：“为什么要传递消息，特别是为什么要用actor模型？”考虑到有那么多分布式编程模型，有人可能会问，为什么这个模型在最初提出时这么重要？为什么它促进了当今广泛使用的高级语言、系统和库？我们将在这一章看到，actor模型的一些最明显的优点包括了actor状态的隔离、可伸缩性、以及简化程序员对系统的推理难度。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/05/17/message-passing-and-the-actor-model/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/04/28/real-world-concurrency/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1372,804 +1752,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/17/redis-on-the-respberry-pi/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/17/redis-on-the-respberry-pi/" class="post-title-link" itemprop="url">[翻译] Redis on the Raspberry Pi: adventures in unaligned lands</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-03-17 15:05:18" itemprop="dateCreated datePublished" datetime="2018-03-17T15:05:18+08:00">2018-03-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 16:00:39" itemprop="dateModified" datetime="2020-11-11T16:00:39+08:00">2020-11-11</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><a href="http://antirez.com/news/111" target="_blank" rel="noopener">原文地址</a></p>
-<p>在售出1000万台设备，实际上是诸如传感器和显示器这样无数不同的应用和辅助设备后，可以说树莓派不仅仅是取得了成功，它还成为了一种程序员最喜爱的嵌入式实验平台。像是Pi zero这样的产品也在成为创造硬件产品的平台，且不会引入设计、构建、为车载设备写软件等方面的风险和开销。</p>
-<p>同样地，我也认同Redis是一个程序员乐于去冒险、实验、构建新事物的平台。而且，能用于嵌入式/物联网应用的设备，通常会有暂时或长期存储数据的需求，像是从传感器接收到的数据，需要在这台设备上运算的数据，或是要发往远程服务器的数据。Redis正在加入一种Stream数据类型，非常适合流式数据和时间序列存储，撰写本文时（2017年初）这个特性快要完成了，后续工作会在接下来几周内开始。Redis现存的数据结构，以及新增的Stream类型，以及它较小的内存使用，以及它即使在小型硬件（低功耗）上也能提供相当不错的性能，都让Redis看起来非常适合应用在树莓派，进而是其它小型ARM设备上。中间缺失的部分也很明显：在树莓派上把Redis跑起来。</p>
-<p>树莓派的一个很酷的特点就是，它的开发环境不像过去的嵌入式系统那样，它上面跑的就是正常的Linux，还包括各种Debian系的工具。简单地说在树莓派上适配Redis不算很困难。Linux程序移植到树莓派上最常见的问题就是性能或内存占用不匹配，但在Redis上这不是问题，因为它本身就被设计为：空实例只占用1MB内存，且查询请求会走内存，因此它足够快，也不会给闪存太高的压力，而且在需要持久化时，它只会用AOF（Append Only File）。但树莓派上用的是ARM处理器，意味着我们要小心处理未对齐的内存访问。</p>
-<p>本文会展示我为了让Redis能愉快地跑在树莓派上都做了什么，我会试着给出一个如何应对那些不能透明地处理非对齐内存访问的平台上（不像x86）的概述。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/03/17/redis-on-the-respberry-pi/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/15/cpp-object-model-pod/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/15/cpp-object-model-pod/" class="post-title-link" itemprop="url">C++对象模型（三）POD</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-03-15 18:37:59" itemprop="dateCreated datePublished" datetime="2018-03-15T18:37:59+08:00">2018-03-15</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-10-11 18:12:20" itemprop="dateModified" datetime="2020-10-11T18:12:20+08:00">2020-10-11</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>注：本节不讨论<code>union</code>。</p>
-<h1 id="Scalar-Type"><a href="#Scalar-Type" class="headerlink" title="Scalar Type"></a>Scalar Type</h1><p>第一个概念，Scalar Type，即标量类型。</p>
-<p>所谓标量，就是一个数字，而标量类型，就是可以表示为一个数字的类型。</p>
-<p>C++的标量类型为：</p>
-<ul>
-<li>各种整数/浮点类型，如<code>int8_t</code>、<code>uint32_t</code>、<code>char</code>、<code>float</code>等，可满足<code>std::is_arithmetic&lt;T&gt;</code>为true。</li>
-<li>枚举类型，可满足<code>std::is_enum&lt;T&gt;</code>为true。</li>
-<li>各种指针类型，包括<code>std::nullptr_t</code>，可满足<code>std::is_pointer&lt;T&gt;</code>或<code>std::is_member_pointer&lt;T&gt;</code>为true。</li>
-</ul>
-<p>以上类型都属于标量类型，都可满足<code>std::is_scalar&lt;T&gt;::value</code>为true。</p>
-<h1 id="Aggregate-Type"><a href="#Aggregate-Type" class="headerlink" title="Aggregate Type"></a>Aggregate Type</h1><p>第二个概念，Aggregate Type，即聚合类型。</p>
-<p>所谓聚合类型，就是可以使用<code>= {v1, v2, v3}</code>这样语法（注意不是C++11的<code>std::initializer_list</code>特性）进行初始化或赋值的类型，对应C的数组和struct。</p>
-<p>C++的聚合类型为：</p>
-<ul>
-<li>所有数组类型。</li>
-<li>满足以下条件的类（包括<code>class</code>、<code>struct</code>）：<ul>
-<li>所有非静态成员变量的访问权限都是<code>public</code>。</li>
-<li>没有用户自定义的构造函数（但允许使用<code>= default</code>来显式使用编译器合成的构造函数，或使用<code>= delete</code>来显式禁止某种构造函数）。</li>
-<li>没有基类（C++17后允许有<code>public</code>的非虚基类）。</li>
-<li>没有虚函数。</li>
-<li>成员变量没有默认初始化式（不在构造函数里那种）（C++11新增，但似乎C++14又去掉了此限制）。</li>
-</ul>
-</li>
-</ul>
-<p>根据上面的定义，聚合类型还有下面的几个特点：</p>
-<ul>
-<li>不要求其所有非静态成员变量均为聚合类型。</li>
-<li>对静态成员没有任何限制。</li>
-<li>只对构造函数有限制，对析构函数、赋值函数等无限制。</li>
-<li>非聚合类型的数组也是聚合类型。</li>
-</ul>
-<p>当我们写</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Type a[m] &#x3D; &#123;b0, b1, ..., bn-1&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>时：</p>
-<ul>
-<li>若m == n，则会发生b0到a[0]、b1到a[1]等等n次复制初始化。</li>
-<li>若m &lt; n，则报错。</li>
-<li>若m &gt; n，则a[0]-a[n-1]发生复制初始化，而a[n]-a[m-1]则发生默认初始化。</li>
-<li>若m为空，则a的长度会被设定为n，同样发生n次复制初始化。 </li>
-</ul>
-<p>对于下面的聚合类型</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    TypeA a;</span><br><span class="line">    TypeB b;</span><br><span class="line">    TypeC c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>当我们写</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">S s = &#123;a<span class="number">'</span>, b<span class="number">'</span>, c<span class="number">'</span>&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>时：</p>
-<ul>
-<li>若<code>{}</code>内元素数量与<code>S</code>中非静态成员变量数量相等，会按a’-&gt;a、b’-&gt;b、c’-&gt;c的方式进行复制初始化。</li>
-<li>若<code>{}</code>内元素数量更多，则报错。</li>
-<li>若<code>S</code>中非静态成员变量数量更多，则后面的成员发生默认初始化。</li>
-</ul>
-<p>在初始化时：</p>
-<ul>
-<li>若发生复制初始化，则会调用相应类型的复制构造函数或赋值函数。</li>
-<li>若列表中某项为表达式，则复制/赋值时允许发生隐式转换（C++11开始要求不能是narrow转换）。</li>
-<li>若列表中某项本身也是个<code>{}</code>列表，则要求对应的数组元素/非静态成员变量也是聚合类型，尝试递归聚合赋值。</li>
-<li>标量类型的默认初始化会将其初始化为0、0.0、false等。</li>
-<li>引用类型的默认初始化会报错。</li>
-</ul>
-<p>在对聚合类型（非数组）做列表赋值时，我们还可以指定成员的名字，如：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">A</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> x;</span><br><span class="line">    <span class="keyword">int</span> y;</span><br><span class="line">    <span class="keyword">int</span> z;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">A a = &#123;.x = <span class="number">1</span>, .z = <span class="number">2</span>&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>它有以下特点：</p>
-<ul>
-<li>列表中名字顺序必须符合成员顺序，即<code>{.z = 2, .x = 1}</code>是不行的。（注意，<a href="http://en.cppreference.com/w/c/language/struct_initialization" target="_blank" rel="noopener">C允许乱序，还允许其它多种初始化方式</a>，但C++不允许）</li>
-<li>列表中元素数量可以少于成员数量，未在列表中出现的成员发生默认初始化，即上例中<code>a.y</code>为0。</li>
-</ul>
-<h1 id="Trivial-Type"><a href="#Trivial-Type" class="headerlink" title="Trivial Type"></a>Trivial Type</h1><p>第三个概念，Trivial Type，即平凡类型。</p>
-<p>所谓平凡类型，可以认为是有bitwise语义的类型，即可以直接按字节复制的类型。C中的所有类型都是Trivial Type。</p>
-<p>Trivial Type有两个标准：</p>
-<ul>
-<li>能trivial静态构造，即要有一个trivial的默认构造函数。</li>
-<li>能trivial拷贝，即满足Trivial Copyable标准。</li>
-</ul>
-<p>Trivial Copyable类型即是满足<code>std::is_trivially_copyable&lt;T&gt;::value</code>为true的类型，它要求：</p>
-<ul>
-<li>所有复制构造、赋值函数要么是trivial的，要么是deleted。</li>
-<li>所有移动构造、赋值函数要么是trivial的，要么是deleted。</li>
-<li>至少有一个非deleted复制或移动的构造或赋值函数。</li>
-<li>析构函数为trivial，且非deleted。</li>
-</ul>
-<p>构造函数、析构函数、复制构造/赋值函数、移动构造/赋值函数的trivial是指：</p>
-<ul>
-<li>满足bitwise语义。</li>
-<li>要么是编译器隐式合成的版本。</li>
-<li>要么通过<code>= default</code>显式使用编译器的合成版本。</li>
-</ul>
-<p>以上条件也就意味着一个Trivial Type：</p>
-<ul>
-<li>不能有虚函数（会导致构造函数等失去bitwise语义）。</li>
-<li>不能有虚基类（同上）。</li>
-<li>如果有基类，基类也要是Trivial Type。</li>
-<li>不能有自定义的构造、析构、复制、移动函数。</li>
-<li>不能有非Trivial Type类型的非静态成员变量。</li>
-</ul>
-<p>标量类型、Trivial Type的数组也是Trivial Type。</p>
-<p>Trivial Type是用来区分那些可以像C一样通过<code>memset</code>、<code>memcpy</code>等函数直接构造和复制的类型，C++11中增加了<code>std::is_trivial</code>模板来判断一个类型是否是trivial的。</p>
-<p>注意，Trivial Type还有以下特点：</p>
-<ul>
-<li>不限制成员变量的访问限制，即<code>public</code>、<code>protected</code>、<code>private</code>都可以。</li>
-<li>只要求默认构造函数是trivial的，对其它构造函数没有要求。</li>
-</ul>
-<h1 id="Standard-Layout-Type"><a href="#Standard-Layout-Type" class="headerlink" title="Standard Layout Type"></a>Standard Layout Type</h1><p>第四个概念，Standard Layout Type，即标准布局类型。</p>
-<p>标准布局的目的是定义一种与C兼容的内存布局，满足标准布局的类型即为标准布局类型，Standard Layout Type。</p>
-<p>关于不同C++类型的内存布局，可以见上一篇文章<a href="/2018/03/11/cpp-object-model-struct/">C++对象模型（二）struct/class的内存布局</a>。</p>
-<p>C++的Standard Layout Type要求：</p>
-<ul>
-<li><p>所有非静态成员变量有着相同的访问权限。</p>
-</li>
-<li><p>没有虚函数或虚基类。</p>
-</li>
-<li><p>没有引用类型的非静态成员变量。</p>
-</li>
-<li><p>所有基类和非静态成员变量本身也是Standard Layout Type。</p>
-</li>
-<li><p>该类型与其所有基类中，最多只能有一个类型有非静态成员变量（其它类型都需要是空类型），即所有非静态成员变量都在一个类型中。</p>
-</li>
-<li><p>第一个非静态成员变量（包括继承自基类的成员）其类型不能与任一空基类相同（影响空基类优化）。</p>
-</li>
-<li><p>该类型的继承树中同一类型不能出现多次。</p>
-<p>  例子：</p>
-  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Q</span> &#123;</span>&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> Q &#123;&#125;；</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">T</span>:</span> Q &#123;&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">U</span>:</span> S, T &#123;&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>  <code>U</code>的继承树中<code>Q</code>出现了两次，则<code>Q</code>、<code>S</code>、<code>T</code>都是Standard Layout Type，但<code>U</code>不是。</p>
-</li>
-</ul>
-<p>相同访问权限的原因：标准只规定了同一个section内成员的顺序，未规定不同section之间的顺序，因此若非静态成员变量分布在不同section下，无法给出一个确定的布局。</p>
-<p>所有非静态成员变量都在一个类型中的原因：标准未规定基类子对象的位置，因此不同基类、或基类与子类的非静态成员变量间的顺序是未定义的。</p>
-<p>没有虚函数或虚基类的原因：虚函数和虚基类会影响类的内存布局，但标准未规定其实现方式，因此有虚函数或虚基类的类型无法给出一个确定的布局。</p>
-<p>第一个非静态成员变量不能与空基类类型相同的原因：标准规定同时存在的两个变量不能有相同地址，若应用空基类优化，则第一个非静态成员变量的地址与对象地址相同，也与所有空基类地址相同，若其中有相同类型，则导致该地址同时对应了多个变量。</p>
-<p>C++11新增了<code>std::is_standard_layout</code>来判断一个类型是不是Standard Layout Type。</p>
-<h2 id="标准布局"><a href="#标准布局" class="headerlink" title="标准布局"></a>标准布局</h2><p>C++的标准布局实际就是C中struct的布局，对于一个标准布局类的对象：</p>
-<ul>
-<li>其本身的地址与其所有基类子对象的地址相同，即基类子对象的地址无偏移。</li>
-<li>其各个非静态成员变量的位置按声明顺序从对象地址开始由低到高排列。</li>
-<li>其第一个非静态成员变量的地址与对象地址相同。</li>
-<li>其各个非静态成员变量的地址均满足对齐要求。</li>
-</ul>
-<h1 id="POD-Type"><a href="#POD-Type" class="headerlink" title="POD Type"></a>POD Type</h1><p>最后一个概念，POD Type，即Plain Old Data Type，即可导出，可跨语言使用的类型（通常也意味着与C二进制兼容）。</p>
-<p>一个POD类型为：</p>
-<ul>
-<li>标量类型。</li>
-<li>满足以下条件的自定义类型：<ul>
-<li>C++11之前：<ul>
-<li>聚合类型。</li>
-<li>没有非POD类型的非静态成员变量。</li>
-<li>没有引用类型的非静态成员变量。</li>
-<li>没有自定义的构造函数或析构函数。</li>
-</ul>
-</li>
-<li>C++11之后：<ul>
-<li>是平凡类。</li>
-<li>是标准布局类。</li>
-<li>没有非POD类型的非静态成员变量。</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>POD类型的数组。</li>
-</ul>
-<p>可以看到POD的标准在C++11前后发生了很大的变化。C++11里放宽了对POD的限制，且根据这些限制的目的，提出了平凡类和标准布局类这两个更清晰的概念。在C++20后POD这个概念本身都会被去掉，而是在不同场合直接使用平凡类、标准布局类等概念。</p>
-<p>一个类型可以只是平凡类或只是标准布局类：</p>
-<ul>
-<li>如果是平凡类，则意味着它可以直接通过<code>memcpy</code>、<code>memset</code>等函数来操作。</li>
-<li>如果是标准布局类，则意味着它的布局是确定的，可以与其它语言交互。</li>
-</ul>
-<p>可以用<code>is_pod</code>来判断一个类型是不是POD类型。</p>
-<h1 id="POD的用途"><a href="#POD的用途" class="headerlink" title="POD的用途"></a>POD的用途</h1><p>平凡类的用途：</p>
-<ul>
-<li>平凡类的对象可以与字节流之间安全转换，即：<ul>
-<li>若要将对象转为字节流，直接取其地址即可。</li>
-<li>若要将字节流转为对象，直接将该地址cast为对象指针即可。</li>
-<li>直接通过复制字节的方式复制对象。</li>
-</ul>
-</li>
-<li>安全的静态初始化。<ul>
-<li>C++11的<code>thread_local</code>变量可以是非平凡类型，但在某些编译器下会有比较大的性能开销。gcc扩展的<code>__thread</code>只能使用POD类型。</li>
-</ul>
-</li>
-</ul>
-<p>标准布局类的用途：</p>
-<ul>
-<li>跨进程、跨语言使用。</li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/11/cpp-object-model-struct/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/11/cpp-object-model-struct/" class="post-title-link" itemprop="url">C++对象模型（二）struct/class的内存布局</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-03-11 15:53:13" itemprop="dateCreated datePublished" datetime="2018-03-11T15:53:13+08:00">2018-03-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <ul>
-<li>运行环境：x86-64。</li>
-<li>编译器：gcc4.8.5。</li>
-<li>编译选项：-O2。</li>
-<li>语言标准：以c++98为主，兼顾c++11/14。</li>
-</ul>
-<h1 id="c-中的struct与c中的struct"><a href="#c-中的struct与c中的struct" class="headerlink" title="c++中的struct与c中的struct"></a>c++中的struct与c中的struct</h1><p>第一个问题：c++中的struct与c中的struct相同吗？</p>
-<p>答案是，有时相同，有时不同。</p>
-<h2 id="像c一样定义struct"><a href="#像c一样定义struct" class="headerlink" title="像c一样定义struct"></a>像c一样定义struct</h2><p>如果我们简单的按照c的方式定义一个struct，如c代码：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125; S;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S ss = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;;</span><br><span class="line">    S s = ss;</span><br><span class="line">    <span class="built_in">printf</span>(</span><br><span class="line">        <span class="string">"size:%d &amp;a-&amp;s:%d, &amp;b-&amp;s:%d &amp;c-&amp;s:%d\n"</span>,</span><br><span class="line">        <span class="keyword">sizeof</span>(s),</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.a - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.b - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.c - (<span class="keyword">char</span>*)&amp;s);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>和c++代码：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S ss = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;;</span><br><span class="line">    S s = ss;</span><br><span class="line">    <span class="built_in">printf</span>(</span><br><span class="line">        <span class="string">"size:%d &amp;a-&amp;s:%d, &amp;b-&amp;s:%d &amp;c-&amp;s:%d\n"</span>,</span><br><span class="line">        <span class="keyword">sizeof</span>(s),</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.a - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.b - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.c - (<span class="keyword">char</span>*)&amp;s);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>分别用gcc和g++编译上面两段代码，结果是：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">size:24 &amp;a-&amp;s:0, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br><span class="line"></span><br><span class="line">size:24 &amp;a-&amp;s:0, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br></pre></td></tr></table></figure>
-
-<p>完全一样对不对？再看下汇编指令：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">400440:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">400444:   41 b8 10 00 00 00       mov    $0x10,%r8d</span><br><span class="line">40044a:   b9 08 00 00 00          mov    $0x8,%ecx</span><br><span class="line">40044f:   31 d2                   xor    %edx,%edx</span><br><span class="line">400451:   be 18 00 00 00          mov    $0x18,%esi</span><br><span class="line">400456:   bf f0 05 40 00          mov    $0x4005f0,%edi</span><br><span class="line">40045b:   31 c0                   xor    %eax,%eax</span><br><span class="line">40045d:   e8 ae ff ff ff          callq  400410 &lt;printf@plt&gt;</span><br><span class="line">400462:   31 c0                   xor    %eax,%eax</span><br><span class="line">400464:   48 83 c4 08             add    $0x8,%rsp</span><br></pre></td></tr></table></figure>
-
-<p>和</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">400504:   41 b8 10 00 00 00       mov    $0x10,%r8d</span><br><span class="line">40050a:   b9 08 00 00 00          mov    $0x8,%ecx</span><br><span class="line">40050f:   31 d2                   xor    %edx,%edx</span><br><span class="line">400511:   be 18 00 00 00          mov    $0x18,%esi</span><br><span class="line">400516:   bf b0 06 40 00          mov    $0x4006b0,%edi</span><br><span class="line">40051b:   31 c0                   xor    %eax,%eax</span><br><span class="line">40051d:   e8 ae ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">400522:   31 c0                   xor    %eax,%eax</span><br><span class="line">400524:   48 83 c4 08             add    $0x8,%rsp</span><br></pre></td></tr></table></figure>
-
-<p>是不是也完全一样？当我们在c++里像c一样定义struct时，编译器会给我们一个与c的struct完全相同的结构。</p>
-<h2 id="为struct添加静态成员"><a href="#为struct添加静态成员" class="headerlink" title="为struct添加静态成员"></a>为struct添加静态成员</h2><p>我们为<code>S</code>添加一个静态成员变量与静态成员函数：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">int</span> d;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">Print</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"%d\n"</span>, d);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">int</span> S::d = <span class="number">0</span>;</span><br></pre></td></tr></table></figure>
-
-<p>仍然运行上面的<code>main</code>函数，结果就不贴了，我们会发现与c的struct仍然相同。这说明：</p>
-<ol>
-<li>静态成员变量不会影响struct布局。换句话说，静态成员变量不存在于对象内部。</li>
-<li>静态成员方法也不会影响struct布局，即也不存在于对象内部。</li>
-</ol>
-<h2 id="为struct添加非静态非虚成员函数"><a href="#为struct添加非静态非虚成员函数" class="headerlink" title="为struct添加非静态非虚成员函数"></a>为struct添加非静态非虚成员函数</h2><h3 id="为struct添加构造、析构、复制、移动函数"><a href="#为struct添加构造、析构、复制、移动函数" class="headerlink" title="为struct添加构造、析构、复制、移动函数"></a>为struct添加构造、析构、复制、移动函数</h3><p>假设我们向<code>S</code>中添加上述函数，上面的结论会有什么变化？</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line"></span><br><span class="line">    S(<span class="keyword">int8_t</span> x, <span class="keyword">int64_t</span> y, <span class="keyword">int32_t</span> z) &#123;</span><br><span class="line">        a = x;</span><br><span class="line">        b = y;</span><br><span class="line">        c = z;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ~S() &#123;</span><br><span class="line">        a = <span class="number">0</span>;</span><br><span class="line">        b = <span class="number">0</span>;</span><br><span class="line">        c = <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    S(<span class="keyword">const</span> S&amp; s) &#123;</span><br><span class="line">        a = s.a;</span><br><span class="line">        b = s.b;</span><br><span class="line">        c = s.c;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    S(S&amp;&amp; s) &#123;</span><br><span class="line">        a = s.a;</span><br><span class="line">        b = s.b;</span><br><span class="line">        c = s.c;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>运行结果没有任何变化，汇编指令也完全相同。这说明struct加上构造函数并没有改变它的布局，即：</p>
-<ul>
-<li>以上函数均不存在于对象内部。</li>
-<li>以上函数均未带来额外开销。</li>
-</ul>
-<p>但我们不能说这些函数对struct没有任何影响，后面会讲到，当我们添加了这些函数后：</p>
-<ul>
-<li>这个struct不再满足POD的定义，即不再有bitwise语义。</li>
-<li>如果上述函数未被定义为内联（inline）函数，则其会带来额外开销。</li>
-</ul>
-<h3 id="为struct添加普通非虚函数"><a href="#为struct添加普通非虚函数" class="headerlink" title="为struct添加普通非虚函数"></a>为struct添加普通非虚函数</h3><p>我们比较以下两种写法。写法一：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">(S* s)</span> </span>&#123;</span><br><span class="line">    s-&gt;a += <span class="number">1</span>;</span><br><span class="line">    s-&gt;b -= <span class="number">1</span>;</span><br><span class="line">    s-&gt;c *= <span class="number">2</span>;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"a:%d b:%ld c:%d\n"</span>, s-&gt;a, s-&gt;b, s-&gt;c);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>与写法二：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        a += <span class="number">1</span>;</span><br><span class="line">        b -= <span class="number">1</span>;</span><br><span class="line">        c *= <span class="number">2</span>;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"a:%d b:%ld c:%d\n"</span>, a, b, c);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>对应的<code>main</code>函数为：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S s = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;;</span><br><span class="line">    s.Func(); <span class="comment">// or Func(&amp;s);</span></span><br><span class="line">    <span class="built_in">printf</span>(</span><br><span class="line">        <span class="string">"size:%d &amp;a-&amp;s:%d, &amp;b-&amp;s:%d &amp;c-&amp;s:%d\n"</span>,</span><br><span class="line">        <span class="keyword">sizeof</span>(s),</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.a - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.b - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.c - (<span class="keyword">char</span>*)&amp;s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>写法一的结果：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">a:2 b:1 c:6</span><br><span class="line">size:24 &amp;a-&amp;s:0, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br><span class="line"></span><br><span class="line">  400500:   48 83 ec 28             sub    $0x28,%rsp</span><br><span class="line">  400504:   48 89 e7                mov    %rsp,%rdi</span><br><span class="line">  400507:   c6 04 24 01             movb   $0x1,(%rsp)</span><br><span class="line">  40050b:   48 c7 44 24 08 02 00    movq   $0x2,0x8(%rsp)</span><br><span class="line">  400512:   00 00</span><br><span class="line">  400514:   c7 44 24 10 03 00 00    movl   $0x3,0x10(%rsp)</span><br><span class="line">  40051b:   00</span><br><span class="line">  40051c:   e8 1f 01 00 00          callq  400640 &lt;_Z4FuncP1S&gt;</span><br><span class="line">  400521:   41 b8 10 00 00 00       mov    $0x10,%r8d</span><br><span class="line">  400527:   b9 08 00 00 00          mov    $0x8,%ecx</span><br><span class="line">  40052c:   31 d2                   xor    %edx,%edx</span><br><span class="line">  40052e:   be 18 00 00 00          mov    $0x18,%esi</span><br><span class="line">  400533:   bf 18 07 40 00          mov    $0x400718,%edi</span><br><span class="line">  400538:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40053a:   e8 91 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40053f:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400541:   48 83 c4 28             add    $0x28,%rsp</span><br></pre></td></tr></table></figure>
-
-<p>写法二的结果：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">a:2 b:1 c:6</span><br><span class="line">size:24 &amp;a-&amp;s:0, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br><span class="line"></span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   b9 06 00 00 00          mov    $0x6,%ecx</span><br><span class="line">  400509:   ba 01 00 00 00          mov    $0x1,%edx</span><br><span class="line">  40050e:   be 02 00 00 00          mov    $0x2,%esi</span><br><span class="line">  400513:   bf c0 06 40 00          mov    $0x4006c0,%edi</span><br><span class="line">  400518:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40051a:   e8 b1 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40051f:   41 b8 10 00 00 00       mov    $0x10,%r8d</span><br><span class="line">  400525:   b9 08 00 00 00          mov    $0x8,%ecx</span><br><span class="line">  40052a:   31 d2                   xor    %edx,%edx</span><br><span class="line">  40052c:   be 18 00 00 00          mov    $0x18,%esi</span><br><span class="line">  400531:   bf d8 06 40 00          mov    $0x4006d8,%edi</span><br><span class="line">  400536:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400538:   e8 93 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40053d:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40053f:   48 83 c4 08             add    $0x8,%rsp</span><br></pre></td></tr></table></figure>
-
-<p>对比两种写法的结果，我们发现：</p>
-<ul>
-<li>成员布局上，两者相同，即普通的非虚成员函数不存在于对象中，不会占用空间。</li>
-<li>汇编指令上，第一种写法调用了<code>Func(S*)</code>，而第二种写法完全看不到<code>S::Func</code>，而是直接调用了<code>printf</code>。</li>
-</ul>
-<p>上面的第二条发现，实际上就是inline的效果。c++标准规定了定义在类（无论是class还是struct）定义中的函数都默认带有inline效果，因此它被编译器直接展开到调用处了。</p>
-<p>如果我们给<code>Func(S*)</code>前面加上<code>inline</code>，我们会得到与写法二完全相同的汇编指令（不贴了）。因此结论就是：</p>
-<ul>
-<li>普通的非虚成员函数不会占用对象空间，也不会带来额外开销，与对应的非成员函数完全相同。</li>
-<li><code>Func(S*)</code>等效于<code>S::Func()</code>。</li>
-</ul>
-<p>针对上面的第二点，实际上<code>S::Func()</code>会被编译器变成一个非成员函数，类似为<code>S_Func(S* const this)</code>，而<code>S::Func() const</code>则对应<code>S_Func(const S* const this)</code>。</p>
-<h2 id="为struct添加虚成员函数"><a href="#为struct添加虚成员函数" class="headerlink" title="为struct添加虚成员函数"></a>为struct添加虚成员函数</h2><p>我们将<code>S::Func</code>改为一个虚函数：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">Func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        a += <span class="number">1</span>;</span><br><span class="line">        b -= <span class="number">1</span>;</span><br><span class="line">        c *= <span class="number">2</span>;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">"a:%d b:%ld c:%d\n"</span>, a, b, c);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>对应的<code>main</code>函数不变，直接运行会报错：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">struct.cpp: In function ‘int main()’:</span><br><span class="line">struct.cpp:18:19: error: in C++98 ‘s’ must be initialized by constructor, not by ‘&#123;...&#125;’</span><br><span class="line">     S s &#x3D; &#123;1, 2, 3&#125;;</span><br><span class="line">                   ^</span><br><span class="line">struct.cpp:18:19: error: could not convert ‘&#123;1, 2, 3&#125;’ from ‘&lt;brace-enclosed initializer list&gt;’ to ‘S’</span><br></pre></td></tr></table></figure>
-
-<p>似乎此时struct与c的struct已经不一样了。我们给它加上一个构造函数：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">S::S(<span class="keyword">int8_t</span> x, <span class="keyword">int64_t</span> y, <span class="keyword">int32_t</span> z) &#123;</span><br><span class="line">    a = x;</span><br><span class="line">    b = y;</span><br><span class="line">    c = z;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>就可以编译过了。先运行前面的<code>main</code>函数（构造那行要改），结果是：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:32 &amp;a-&amp;s:8, &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
-
-<p>我们发现：</p>
-<ul>
-<li>加入虚函数后，对象变大了，说明虚函数占用了一部分对象空间。</li>
-<li>对象变大了8字节（实际是虚表指针），且正好在对象的最前面，其它成员变量的位置依次向下8字节。</li>
-</ul>
-<p>这是第一个与c的struct布局不同的场景。我们知道虚函数是为了实现运行期多态的，那么就需要有信息来帮助程序在运行期根据对象的不同而选择不同的行为，这种信息就会带来运行期的额外开销。</p>
-<p>但调用虚函数真的就会有运行期开销吗？我们分别看一下直接通过对象来调用虚函数，与通过指针或引用调用虚函数的区别。</p>
-<p>我们添加三个Test函数，并在main函数中调用它：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Test1</span><span class="params">(S s)</span> </span>&#123;</span><br><span class="line">    s.Func();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Test2</span><span class="params">(S* s)</span> </span>&#123;</span><br><span class="line">    s-&gt;Func();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Test3</span><span class="params">(S&amp; s)</span> </span>&#123;</span><br><span class="line">    s.Func();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>对应的汇编指令为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">0000000000400710 &lt;_Z5Test11S&gt;:</span><br><span class="line">  400710:   0f b6 47 08             movzbl 0x8(%rdi),%eax</span><br><span class="line">  400714:   8d 70 01                lea    0x1(%rax),%esi</span><br><span class="line">  400717:   48 8b 47 10             mov    0x10(%rdi),%rax</span><br><span class="line">  40071b:   40 88 77 08             mov    %sil,0x8(%rdi)</span><br><span class="line">  40071f:   40 0f be f6             movsbl %sil,%esi</span><br><span class="line">  400723:   48 8d 50 ff             lea    -0x1(%rax),%rdx</span><br><span class="line">  400727:   8b 47 18                mov    0x18(%rdi),%eax</span><br><span class="line">  40072a:   48 89 57 10             mov    %rdx,0x10(%rdi)</span><br><span class="line">  40072e:   8d 0c 00                lea    (%rax,%rax,1),%ecx</span><br><span class="line">  400731:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400733:   89 4f 18                mov    %ecx,0x18(%rdi)</span><br><span class="line">  400736:   bf 20 08 40 00          mov    $0x400820,%edi</span><br><span class="line">  40073b:   e9 20 fe ff ff          jmpq   400560 &lt;printf@plt&gt;</span><br><span class="line"></span><br><span class="line">0000000000400740 &lt;_Z5Test2P1S&gt;:</span><br><span class="line">  400740:   48 8b 07                mov    (%rdi),%rax</span><br><span class="line">  400743:   48 8b 00                mov    (%rax),%rax</span><br><span class="line">  400746:   ff e0                   jmpq   *%rax</span><br><span class="line">  400748:   0f 1f 84 00 00 00 00    nopl   0x0(%rax,%rax,1)</span><br><span class="line">  40074f:   00</span><br><span class="line"></span><br><span class="line">0000000000400750 &lt;_Z5Test3R1S&gt;:</span><br><span class="line">  400750:   48 8b 07                mov    (%rdi),%rax</span><br><span class="line">  400753:   48 8b 00                mov    (%rax),%rax</span><br><span class="line">  400756:   ff e0                   jmpq   *%rax</span><br><span class="line">  400758:   0f 1f 84 00 00 00 00    nopl   0x0(%rax,%rax,1)</span><br><span class="line">  40075f:   00</span><br></pre></td></tr></table></figure>
-
-<p>我们发现：</p>
-<ul>
-<li><code>Test1</code>中<code>Func</code>被展开了，看不到直接的<code>Func</code>调用，这点与调用一个非虚函数的行为相同。</li>
-<li><code>Test2</code>中通过间接跳转（jmpq）调用了<code>Func</code>，方法是先取出<code>s</code>（%rdi）的前8字节到%rax，再从%rax取出前8字节放到%rax，这就是<code>Func</code>的地址，之后就是一次间接跳转。</li>
-<li><code>Test3</code>与<code>Test2</code>完全相同。</li>
-</ul>
-<p>结论：</p>
-<ul>
-<li>通过一个对象调用虚函数时，编译器没有采用运行期多态，而是直接像调用一个非虚函数一样，没有运行期开销。</li>
-<li>通过指针调用虚函数时，有运行期开销，即需要一次间接跳转，此时虚函数无法展开。</li>
-<li>引用与指针此处无区别，引用就是一种语法糖。</li>
-</ul>
-<h2 id="为struct添加一个非虚继承的基类"><a href="#为struct添加一个非虚继承的基类" class="headerlink" title="为struct添加一个非虚继承的基类"></a>为struct添加一个非虚继承的基类</h2><h3 id="为struct添加一个无虚函数的非虚继承基类"><a href="#为struct添加一个无虚函数的非虚继承基类" class="headerlink" title="为struct添加一个无虚函数的非虚继承基类"></a>为struct添加一个无虚函数的非虚继承基类</h3><p>我们修改一下<code>S</code>：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">int32_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>运行前面的<code>main</code>函数，结果为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:24 &amp;a-&amp;s:4, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br></pre></td></tr></table></figure>
-
-<p>此时<code>S</code>的布局可以认为是：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int32_t</span> ba;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>或</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    Base base;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>两者的区别在于，前者是基类的所有成员都可以被当作子类的成员，而后者是基类子对象就是子类的第一个成员。</p>
-<p>到底是哪种呢？当基类为：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">int32_t</span> ba;</span><br><span class="line">    <span class="keyword">int8_t</span> bb;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>时，如果按前者，<code>Base::bb</code>和<code>S::a</code>之间应该没有padding，即此时<code>S</code>的大小仍然是24；如果按后者，<code>Base</code>的alignment为8，此时<code>Base::bb</code>后面会有padding，<code>S</code>的大小应该是32。我们试一下，结果为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:32 &amp;a-&amp;s:8, &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
-
-<p>说明：基类子对象可以被当作子类对象的第一个成员，且保持自己的alignment和padding。</p>
-<h3 id="为struct添加第二个非虚基类"><a href="#为struct添加第二个非虚基类" class="headerlink" title="为struct添加第二个非虚基类"></a>为struct添加第二个非虚基类</h3><p>我们再加一个基类：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">int32_t</span> ba;</span><br><span class="line">    <span class="keyword">int8_t</span> bb;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base2</span> &#123;</span></span><br><span class="line">    <span class="keyword">int32_t</span> ca;</span><br><span class="line">    <span class="keyword">int8_t</span> cb;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> Base, <span class="keyword">public</span> Base2 &#123;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>根据上节的结论，我们可以认为<code>Base2</code>也是<code>S</code>的一个成员，且应排列在<code>Base</code>后面，<code>S</code>的大小应该是40。实验结果为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:40 &amp;a-&amp;s:16, &amp;b-&amp;s:24 &amp;c-&amp;s:32</span><br></pre></td></tr></table></figure>
-
-<p>证实了我们的猜测。</p>
-<h3 id="为struct添加空的基类"><a href="#为struct添加空的基类" class="headerlink" title="为struct添加空的基类"></a>为struct添加空的基类</h3><p>所谓空类型，指：</p>
-<ul>
-<li>没有任何非静态成员变量。</li>
-<li>没有任何虚函数。</li>
-<li>没有任何虚基类。</li>
-<li>其上没有基类，或只有空基类。</li>
-</ul>
-<p>当我们给<code>S</code>添加一个空类型的基类时，如：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="keyword">int64_t</span> b; <span class="comment">// 注意该场景中没有成员a</span></span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>根据之前的结论，<code>S</code>应该相当于：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    Base base;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;    </span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>我们知道，c++中任何类型的size都至少是1，这是为了避免不同变量对应相同的内存地址。那么<code>base</code>的size就是1，<code>S</code>的size就应该是24。实际上呢？</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:16 &amp;b-&amp;s:0 &amp;c-&amp;s:8</span><br></pre></td></tr></table></figure>
-
-<p>居然是16！这就是c++的空基类优化（Empty Base Optimization，EBO），当基类子对象为空时，其不必在子类对象中占据空间，且与子类对象共享相同的地址。这里是一个c的oop无法模拟的点。</p>
-<h2 id="为struct添加有虚函数的非虚继承基类"><a href="#为struct添加有虚函数的非虚继承基类" class="headerlink" title="为struct添加有虚函数的非虚继承基类"></a>为struct添加有虚函数的非虚继承基类</h2><h3 id="基类无成员变量"><a href="#基类无成员变量" class="headerlink" title="基类无成员变量"></a>基类无成员变量</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">virtual</span> ~Base() &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S s;</span><br><span class="line">    <span class="built_in">printf</span>(</span><br><span class="line">        <span class="string">"Base:%d S:%d &amp;base-&amp;s:%d &amp;a-&amp;s:%d &amp;b-&amp;s:%d &amp;c-&amp;s:%d\n"</span>,</span><br><span class="line">        <span class="keyword">sizeof</span>(Base),</span><br><span class="line">        <span class="keyword">sizeof</span>(S),</span><br><span class="line">        (<span class="keyword">char</span>*)<span class="keyword">static_cast</span>&lt;Base*&gt;(&amp;s) - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.a - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.b - (<span class="keyword">char</span>*)&amp;s,</span><br><span class="line">        (<span class="keyword">char</span>*)&amp;s.c - (<span class="keyword">char</span>*)&amp;s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>结果：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:8 S:32 &amp;base-&amp;s:0 &amp;a-&amp;s:8 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
-
-<p>结论：</p>
-<ul>
-<li>有虚函数的类型，其对象中需要有1个虚表指针来存放运行期信息，不再是空类型，作为基类也没办法应用EBO。</li>
-<li>子类对象中不会有2个虚表指针（基类子对象1个，子类对象1个），而是与基类共用1个虚表指针。</li>
-</ul>
-<h3 id="基类有成员变量"><a href="#基类有成员变量" class="headerlink" title="基类有成员变量"></a>基类有成员变量</h3><p>假设我们给基类添加一个成员变量：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">virtual</span> ~Base() &#123;&#125;</span><br><span class="line">    <span class="keyword">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>根据前文规则，<code>Base</code>大小为16，其alignment为8，<code>S</code>的大小就会是40，且<code>Base::bb</code>与<code>S::a</code>之间有padding。但运行结果却是：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:16 S:32 &amp;base-&amp;s:0 &amp;a-&amp;s:9 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
-
-<p>与我们的猜测不符，<code>Base::bb</code>与<code>S::a</code>之间没有padding。</p>
-<p>后面我们会说到c++有一种标准布局（Standard Layout），这种布局需要与c的struct布局兼容（外加空基类优化）。而当<code>Base</code>或<code>S</code>中加入虚函数后，它们就不再符合标准布局了，编译器就可以应用更紧凑的布局了。</p>
-<p>为什么标准布局需要与c的struct布局兼容？因为POD（Plain Old Data）类型首先需要是标准布局类型，而POD类型本身就是为了与c兼容而提出的概念。</p>
-<h2 id="为struct添加虚继承基类"><a href="#为struct添加虚继承基类" class="headerlink" title="为struct添加虚继承基类"></a>为struct添加虚继承基类</h2><p>注：大多数c++项目都禁止使用虚继承，因此下面的几个场景我们只给输出和大概的结论，不进行更多的探索和解释了。</p>
-<h3 id="基类为空类型"><a href="#基类为空类型" class="headerlink" title="基类为空类型"></a>基类为空类型</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>输出：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:1 S:32 &amp;base-&amp;s:0 &amp;a-&amp;s:8 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
-
-<p>结论：</p>
-<ul>
-<li>虚基类会在子类中占用额外空间（1个指针），位置在子类最前面，此时无法应用EBO。</li>
-</ul>
-<h3 id="基类为非空无虚函数类型"><a href="#基类为非空无虚函数类型" class="headerlink" title="基类为非空无虚函数类型"></a>基类为非空无虚函数类型</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>输出：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:1 S:32 &amp;base-&amp;s:28 &amp;a-&amp;s:8 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
-
-<p>结论：</p>
-<ul>
-<li>子类对象最前面仍然是1个指针。</li>
-<li>此时基类子对象位于子类最后。</li>
-</ul>
-<h3 id="基类为非空有虚函数类型"><a href="#基类为非空有虚函数类型" class="headerlink" title="基类为非空有虚函数类型"></a>基类为非空有虚函数类型</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">virtual</span> ~Base() &#123;&#125;</span><br><span class="line">    <span class="keyword">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>输出：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:16 S:48 &amp;base-&amp;s:32 &amp;a-&amp;s:8 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
-
-<p>结论：</p>
-<ul>
-<li>此时子类对象的前8字节不再是虚表指针，而是指向虚基类子对象的指针。</li>
-<li>基类子对象的前8字节是虚表指针，且其整体位于子类最后一个成员变量的后面。</li>
-</ul>
-<h3 id="无虚函数的菱形继承"><a href="#无虚函数的菱形继承" class="headerlink" title="无虚函数的菱形继承"></a>无虚函数的菱形继承</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">C</span>:</span> <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="keyword">int32_t</span> ca;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">D</span>:</span> <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="keyword">int32_t</span> da;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> C, <span class="keyword">public</span> D &#123;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>输出：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:1 C:16 D:16 S:48 &amp;Base-&amp;S:44 &amp;C-&amp;S:0 &amp;D-&amp;S:16 &amp;b-&amp;s:32 &amp;c-&amp;s:40</span><br></pre></td></tr></table></figure>
-
-<p>结论：</p>
-<ul>
-<li>此时<code>C</code>的子对象与<code>S</code>对象共享一个虚基类指针，而<code>D</code>则自己使用一个虚基类指针。</li>
-<li><code>C</code>与<code>D</code>依次位于<code>S</code>的前端，而<code>Base</code>依然在最后端。</li>
-<li>调用来自虚基类的虚函数时，相比非虚基类的虚函数，要多一次间接跳转：先通过虚基类指针找到虚表指针，再通过虚表指针找到对应函数地址。</li>
-</ul>
-<h3 id="有虚函数的菱形继承"><a href="#有虚函数的菱形继承" class="headerlink" title="有虚函数的菱形继承"></a>有虚函数的菱形继承</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Base</span> &#123;</span></span><br><span class="line">    <span class="keyword">virtual</span> ~Base() &#123;&#125;</span><br><span class="line">    <span class="keyword">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">C</span>:</span> <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="keyword">int32_t</span> ca;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">D</span>:</span> <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="keyword">int32_t</span> da;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span>:</span> <span class="keyword">public</span> C, <span class="keyword">public</span> D &#123;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>输出：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:16 C:32 D:32 S:64 &amp;Base-&amp;S:48 &amp;C-&amp;S:0 &amp;D-&amp;S:16 &amp;b-&amp;s:32 &amp;c-&amp;s:40</span><br></pre></td></tr></table></figure>
-
-<p>结论：</p>
-<ul>
-<li><code>C</code>和<code>D</code>依然位于<code>S</code>的前端，而<code>Base</code>位于后端。</li>
-<li><code>C</code>与<code>S</code>共享一个虚基类指针，<code>D</code>自己使用一个虚基类指针。</li>
-<li><code>C</code>与<code>D</code>与<code>S</code>与<code>Base</code>共享一个虚表指针。</li>
-</ul>
-<h1 id="struct与class"><a href="#struct与class" class="headerlink" title="struct与class"></a>struct与class</h1><p>第二个问题，c++中的struct和class有什么区别？</p>
-<p>答案是，除了默认访问权限不同（struct默认为public，而class默认为private）外，其它完全相同。</p>
-<p>上面的例子中，我们把每个struct都换成class，仍然能得到相同的结论。决定对象模型的不是用哪个关键字修饰它，而是它本身的性质，是否有基类，是否有虚函数，是否有虚基类。</p>
-<h2 id="然而struct不能用于修饰模板参数类型"><a href="#然而struct不能用于修饰模板参数类型" class="headerlink" title="然而struct不能用于修饰模板参数类型"></a>然而struct不能用于修饰模板参数类型</h2><p>但struct却不能用于下面这个场景：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="class"><span class="keyword">struct</span> <span class="title">X</span>&gt;</span></span><br><span class="line"><span class="class"><span class="title">void</span> <span class="title">PrintSize</span>() &#123;</span></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"%d\n"</span>, <span class="keyword">sizeof</span>(X));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>当我们编译时，报错信息为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">struct.cpp:19:18: error: ‘struct X’ is not a valid type for a template non-type parameter</span><br><span class="line"> template &lt;struct X&gt;</span><br><span class="line">                  ^</span><br></pre></td></tr></table></figure>
-
-<p>而当我们把struct改成class或typename后，就可以编译成功了。</p>
-<h1 id="struct的零额外开销"><a href="#struct的零额外开销" class="headerlink" title="struct的零额外开销"></a>struct的零额外开销</h1><p>众所周知，c++的一个核心理念就是保证某个功能对不使用它的用户零额外开销。我们从几方面看一下struct是如何实现零额外开销的。</p>
-<h2 id="使用栈上的struct成员"><a href="#使用栈上的struct成员" class="headerlink" title="使用栈上的struct成员"></a>使用栈上的struct成员</h2><p>下面两段代码：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">int64_t</span> Func(<span class="keyword">int8_t</span> x, <span class="keyword">int64_t</span> y, <span class="keyword">int32_t</span> z) &#123;</span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">    a = x;</span><br><span class="line">    b = y;</span><br><span class="line">    c = z;</span><br><span class="line">    <span class="keyword">return</span> a + b + c;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>和</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int8_t</span> a;</span><br><span class="line">    <span class="keyword">int64_t</span> b;</span><br><span class="line">    <span class="keyword">int32_t</span> c;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">int64_t</span> Func(<span class="keyword">int8_t</span> x, <span class="keyword">int64_t</span> y, <span class="keyword">int32_t</span> z) &#123;</span><br><span class="line">    S s;</span><br><span class="line">    s.a = x;</span><br><span class="line">    s.b = y;</span><br><span class="line">    s.c = z;</span><br><span class="line">    <span class="keyword">return</span> s.a + s.b + s.c;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>它们对应的汇编指令为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">00000000004005b0 &lt;_Z4Funcali&gt;:</span><br><span class="line">  4005b0:   48 0f be ff             movsbq %dil,%rdi</span><br><span class="line">  4005b4:   48 63 d2                movslq %edx,%rdx</span><br><span class="line">  4005b7:   48 01 fe                add    %rdi,%rsi</span><br><span class="line">  4005ba:   48 8d 04 16             lea    (%rsi,%rdx,1),%rax</span><br><span class="line">  4005be:   c3                      retq</span><br><span class="line">  4005bf:   90                      nop</span><br></pre></td></tr></table></figure>
-
-<p>和</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">00000000004005b0 &lt;_Z4Funcali&gt;:</span><br><span class="line">  4005b0:   48 0f be ff             movsbq %dil,%rdi</span><br><span class="line">  4005b4:   48 63 d2                movslq %edx,%rdx</span><br><span class="line">  4005b7:   48 01 fe                add    %rdi,%rsi</span><br><span class="line">  4005ba:   48 8d 04 16             lea    (%rsi,%rdx,1),%rax</span><br><span class="line">  4005be:   c3                      retq</span><br><span class="line">  4005bf:   90                      nop</span><br></pre></td></tr></table></figure>
-
-<p>完全相同，说明使用栈上的struct成员，与使用栈上变量完全相同，零额外开销。</p>
-<h2 id="传递小struct"><a href="#传递小struct" class="headerlink" title="传递小struct"></a>传递小struct</h2><p>下面两段代码：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">(<span class="keyword">int32_t</span> x, <span class="keyword">int32_t</span> y)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"x:%d y:%d\n"</span>, x, y);</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int32_t</span> x = <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">int32_t</span> y = <span class="number">2</span>;</span><br><span class="line">    Func(<span class="number">1</span>, <span class="number">2</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>与</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int32_t</span> x;</span><br><span class="line">    <span class="keyword">int32_t</span> y;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">Func</span><span class="params">(S s)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"x:%d y:%d\n"</span>, s.x, s.y);</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S s;</span><br><span class="line">    s.x = <span class="number">1</span>;</span><br><span class="line">    s.y = <span class="number">2</span>;</span><br><span class="line">    Func(s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>对应的汇编指令为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">0000000000400500 &lt;main&gt;:</span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   ba 02 00 00 00          mov    $0x2,%edx</span><br><span class="line">  400509:   be 01 00 00 00          mov    $0x1,%esi</span><br><span class="line">  40050e:   bf b0 06 40 00          mov    $0x4006b0,%edi</span><br><span class="line">  400513:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400515:   e8 b6 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40051a:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40051c:   48 83 c4 08             add    $0x8,%rsp</span><br><span class="line">  400520:   c3                      retq</span><br><span class="line">  400521:   0f 1f 00                nopl   (%rax)</span><br></pre></td></tr></table></figure>
-
-<p>和</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">0000000000400500 &lt;main&gt;:</span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   ba 02 00 00 00          mov    $0x2,%edx</span><br><span class="line">  400509:   be 01 00 00 00          mov    $0x1,%esi</span><br><span class="line">  40050e:   bf c0 06 40 00          mov    $0x4006c0,%edi</span><br><span class="line">  400513:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400515:   e8 b6 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40051a:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40051c:   48 83 c4 08             add    $0x8,%rsp</span><br><span class="line">  400520:   c3                      retq</span><br><span class="line">  400521:   0f 1f 00                nopl   (%rax)</span><br></pre></td></tr></table></figure>
-
-<p>注意此时两个<code>Func</code>函数都被inline掉了，因此我们可以直接对应<code>main</code>的汇编代码。可以看到它们完全相同，也符合上节的结论。</p>
-<p>当我们把inline关掉后，先看一下<code>main</code>（看参数是如何传递的）：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">0000000000400500 &lt;main&gt;:</span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   be 02 00 00 00          mov    $0x2,%esi</span><br><span class="line">  400509:   bf 01 00 00 00          mov    $0x1,%edi</span><br><span class="line">  40050e:   e8 fd 00 00 00          callq  400610 &lt;_Z4Funcii&gt;</span><br></pre></td></tr></table></figure>
-
-<p>和</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">0000000000400500 &lt;main&gt;:</span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   48 bf 01 00 00 00 02    movabs $0x200000001,%rdi</span><br><span class="line">  40050b:   00 00 00</span><br><span class="line">  40050e:   e8 fd 00 00 00          callq  400610 &lt;_Z4Func1S&gt;</span><br></pre></td></tr></table></figure>
-
-<p>可以看到直接传递一个struct反倒少了一条指令！原因是此时<code>S</code>为8个字节，刚好可以放入一个寄存器中，因此可以一条指令传递过去。而如果分成两个<code>int32_t</code>，则编译器必须用两个寄存器传递，多了一条指令。</p>
-<p>再对比一下<code>Func</code>的汇编代码：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">0000000000400610 &lt;_Z4Funcii&gt;:</span><br><span class="line">  400610:   89 f2                   mov    %esi,%edx</span><br><span class="line">  400612:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400614:   89 fe                   mov    %edi,%esi</span><br><span class="line">  400616:   bf b0 06 40 00          mov    $0x4006b0,%edi</span><br><span class="line">  40061b:   e9 b0 fe ff ff          jmpq   4004d0 &lt;printf@plt&gt;</span><br></pre></td></tr></table></figure>
-
-<p>和</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">0000000000400610 &lt;_Z4FuncS&gt;:</span><br><span class="line">  400610:   48 89 fa                mov    %rdi,%rdx</span><br><span class="line">  400613:   89 fe                   mov    %edi,%esi</span><br><span class="line">  400615:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400617:   48 c1 fa 20             sar    $0x20,%rdx</span><br><span class="line">  40061b:   bf c0 06 40 00          mov    $0x4006c0,%edi</span><br><span class="line">  400620:   e9 ab fe ff ff          jmpq   4004d0 &lt;printf@plt&gt;</span><br></pre></td></tr></table></figure>
-
-<p>可以看到传递<code>S</code>的版本多了一条<code>sar $0x20,%rdx</code>，这是因为我们用一个寄存器传递了两个值，但在调用<code>printf</code>时还是要把它们分开，因此这里需要先把低4字节放到另一个寄存器里，再把%rdx的内容右移32位，从而得到高4字节的值。</p>
-<p>把<code>main</code>和<code>Func</code>加起来，两个版本的汇编指令数量仍然完全相同，区别在于前者传递时多一次赋值，后者运算时多一次右移，可以认为开销相同。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/07/cpp-object-model-alignment/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/07/cpp-object-model-alignment/" class="post-title-link" itemprop="url">C++对象模型（一）Alignment</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-03-07 20:31:30" itemprop="dateCreated datePublished" datetime="2018-03-07T20:31:30+08:00">2018-03-07</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="word"><a href="#word" class="headerlink" title="word"></a>word</h1><p>第一个概念，word（字）。</p>
-<p>word是cpu领域的一个重要概念，它被定义为cpu使用数据的一个自然单位（natural unit），cpu的很多数据长度都与其相关，比如：</p>
-<ul>
-<li>通常cpu的大多数寄存器长度为一个word。</li>
-<li>通常cpu最大寻址空间为一个word（即指针大小通常是一个word）。</li>
-<li>总线宽度通常为一个word，即cpu单次读写内存的量通常最大为一个word。</li>
-<li>很多cpu每条指令的长度也为一个word。</li>
-</ul>
-<p>32位/64位cpu中的32位和64位就是指它的字长（word-length或word-size）为32位或64位。</p>
-<p>这里不详细介绍不同cpu的word的具体含义。我们说一下word对内存读写的影响：</p>
-<ul>
-<li>早期的cpu通常只能沿着一个word的边界读写数据，如果一次读/写操作的目标地址不是字长的整数倍，cpu会报错。</li>
-<li>现代的X86 cpu可以在任意地址读写数据，但如果目标地址不是字长的整数倍，底层会将这次操作按word分界分成多个读写操作，对性能有明显影响。</li>
-<li>X86-64 cpu可以在任意地址读写数据，且不会有明显的性能影响。</li>
-</ul>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/alignment.png" alt="alignment"></p>
-<p>上图的第一个例子，我们按alignment存放了1个int（4字节数据），cpu只需要一次内存操作就可以完成存取。而第二个例子中，cpu需要两次内存操作来完成int的存取。</p>
-<p>现代的cpu通常有多个字长概念（word、1/2word、1/4word等），针对不同的数据长度，可以有不同的字长。X86和X86-64对长度为1/2/4/8字节的数据，其字长也为1/2/4/8字节。</p>
-<h1 id="alignment和padding"><a href="#alignment和padding" class="headerlink" title="alignment和padding"></a>alignment和padding</h1><p>第二个概念，alignment。</p>
-<p>考虑到数据不按word边界存放可能引起的问题，编译器在排列变量时，会尽量将其按对应的字长来排列。这种行为就被称为对齐（alignment），而因为alignment导致的数据间产生未使用的空洞，则被称为填充（padding）。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">char</span> c;</span><br><span class="line">    <span class="keyword">int16_t</span> i16;</span><br><span class="line">    <span class="keyword">int32_t</span> i32;</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">"c:%ld i16:%ld i32:%ld i64:%ld\n"</span>, &amp;c, &amp;i16, &amp;i32, &amp;i64);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在我的环境下（X86-64，gcc4.8.5），输出为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">c:140730763468703 i16:140730763468700 i32:140730763468696 i64:140730763468688</span><br></pre></td></tr></table></figure>
-
-<p>可以看到<code>i16</code>与<code>c</code>之间有2字节的padding，<code>i32</code>与<code>i16</code>之间有2字节的padding，<code>i64</code>与<code>i32</code>之间有4字节的padding，实际上是这么排列的：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">char</span> c;</span><br><span class="line"><span class="keyword">char</span> padding0[<span class="number">2</span>];</span><br><span class="line"><span class="keyword">int16_t</span> i16;</span><br><span class="line"><span class="keyword">char</span> padding1[<span class="number">2</span>];</span><br><span class="line"><span class="keyword">int32_t</span> i32;</span><br><span class="line"><span class="keyword">char</span> padding2[<span class="number">4</span>];</span><br><span class="line"><span class="keyword">int64_t</span> i64;</span><br></pre></td></tr></table></figure>
-
-<h1 id="struct的alignment"><a href="#struct的alignment" class="headerlink" title="struct的alignment"></a>struct的alignment</h1><p>struct的alignment规则很简单：</p>
-<ul>
-<li>空struct的size与alignment均为1。</li>
-<li>非空的struct，其alignment为各成员的alignment的最大值。其最后一个成员后面若有需要，也要padding。</li>
-</ul>
-<p>注意第2条规则，会导致struct占用的空间比我们预期的更多，例子：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>它的自然大小为10B（1+8+1），但考虑到alignment的影响，真实大小却是24B（8+8+8）！</p>
-<p>因此<code>S</code>的真实布局为：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">char</span> padding0[<span class="number">7</span>]；</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">    <span class="keyword">char</span> padding1[<span class="number">7</span>];</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>而当<code>S</code>作为其它struct的成员时，它的size和alignment分别是24和8，会影响到上层struct的alignment。</p>
-<p>适当的重新排列<code>S</code>的成员，可以显著减小它的size：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>此时它的真实布局为：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">    <span class="keyword">char</span> padding[<span class="number">6</span>];</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p><code>S</code>的size减小到了16B。</p>
-<h1 id="与alignment有关的编译器扩展"><a href="#与alignment有关的编译器扩展" class="headerlink" title="与alignment有关的编译器扩展"></a>与alignment有关的编译器扩展</h1><p>这里只介绍gcc的相关扩展。</p>
-<p>gcc允许我们用<code>__attribute__</code>来修饰变量，其中用于改变alignment的有以下几种。</p>
-<p>注意：修改alignment可能会影响ABI兼容性和可移植性，通常不推荐。</p>
-<h2 id="aligned"><a href="#aligned" class="headerlink" title="aligned"></a>aligned</h2><p>语法1：<code>__attribute__ ((aligned (size_in_byte)))</code>，显式指定alignment。注意：指定比默认更小的alignment是无效的，会被编译器忽略。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">int</span> x __attribute__ ((aligned (<span class="number">16</span>))) = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> x[<span class="number">2</span>] __attribute__ ((aligned (<span class="number">8</span>)));</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">R</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c;</span><br><span class="line">&#125; __attribute__ ((aligned (<span class="number">8</span>)));</span><br></pre></td></tr></table></figure>
-
-<p>语法2：<code>__attribute__ ((aligned))</code>，让编译器选择可能的最大alignment，对64位环境而言通常是8。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">R</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c;</span><br><span class="line">&#125; __attribute__ ((aligned));</span><br></pre></td></tr></table></figure>
-
-<h2 id="packed"><a href="#packed" class="headerlink" title="packed"></a>packed</h2><p>语法：<code>__attribute__ ((packed))</code>，表示该变量或struct选择可能的最小alignment，对64位环境而言通常是1。</p>
-<p>下面这个struct，加上<code>packed</code>后其大小变为10，与其自然大小相等：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> c0;</span><br><span class="line">    <span class="keyword">int64_t</span> i64;</span><br><span class="line">    <span class="keyword">char</span> c1;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<h2 id="编译选项"><a href="#编译选项" class="headerlink" title="编译选项"></a>编译选项</h2><p>编译时如果加上<code>-fpack-struct</code>，则默认所有变量和struct都会按<code>packed</code>处理。</p>
-<p>如果加上<code>-Wpadded</code>，则编译器增加padding的地方会有warning。注意只包含struct场景。</p>
-<h1 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h1><ul>
-<li><a href="https://wr.informatik.uni-hamburg.de/_media/teaching/wintersemester_2013_2014/epc-14-haase-svenhendrik-alignmentinc-paper.pdf" target="_blank" rel="noopener">Alignment in C</a></li>
-<li><a href="https://en.wikipedia.org/wiki/Word_(computer_architecture)" target="_blank" rel="noopener">Wiki - Word</a></li>
-<li><a href="https://gcc.gnu.org/onlinedocs/gcc-3.2/gcc/Variable-Attributes.html" target="_blank" rel="noopener">Specifying Attributes of Variables</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2243,14 +1825,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">76</span>
+          <span class="site-state-item-count">80</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">55</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

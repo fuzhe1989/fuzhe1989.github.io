@@ -185,6 +185,330 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/" class="post-title-link" itemprop="url">[笔记] Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-17 22:06:38" itemprop="dateCreated datePublished" datetime="2020-11-17T22:06:38+08:00">2020-11-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:27:56" itemprop="dateModified" datetime="2020-11-21T23:27:56+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://research.google/pubs/pub42851/" target="_blank" rel="noopener">Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Mesa是一种面向Google Ads的特定模式数据的准实时数仓，而不是面向非常通用场景的离线数仓。Mesa的设计上偏向于高伸缩性和准实时响应，目标是保证简单query场景的高性能；相对地，Mesa不支持完整的ad-hoc查询（似乎也不支持SQL），可以支撑支持SQL的更上层系统（如MySQL、F1、Dremel）。</p>
+<p>Mesa依赖Google的Colossus、BigTable、MapReduce，数据被水平分片并复制到多个datacenter。Mesa会批量导入数据，每行数据都有version，使用MVCC，周期性提升可见的数据版本。为了保证跨datacenter的更新一致性，Mesa还使用了基于Paxos的同步协议。</p>
+<p>Mesa比较有特色的是它的聚合函数、数据版本管理、以及多datacenter同步。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/" class="post-title-link" itemprop="url">[笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-13 23:35:48" itemprop="dateCreated datePublished" datetime="2020-11-13T23:35:48+08:00">2020-11-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:28:31" itemprop="dateModified" datetime="2020-11-21T23:28:31+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://dl.acm.org/doi/abs/10.1145/3132747.3132765" target="_blank" rel="noopener">Pebblesdb: Building key-value stores using fragmented log-structured merge trees</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>PebblesDB在LevelDB（实际是HyperLevelDB）的基础上，借鉴了SkipList中的guard概念，提出了一种Fragmented Log-Structured Merge Trees（FLSM），将整个fileset分成了多层的，层内多个不重叠的区间，每个区间内可以有多个文件。这样compaction可以只在level i做，而不涉及level i+1，从而显著降低了写放大。代价是读的时候从level 1开始每层都可能引入多个文件（对比LevelDB每层一个），开销会变大。PebblesDB因此也引入了一些优化以降低读路径的延时。</p>
+<p>生产中有大量写多的workload，这些场景下PebblesDB的意义很大，且它的实践难度并不高，值得集成到现有系统中。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/dynamo-amazons-highly-available-key-value-store/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store/" class="post-title-link" itemprop="url">[笔记] Dynamo: amazon's highly available key-value store</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-11 17:49:12" itemprop="dateCreated datePublished" datetime="2020-11-11T17:49:12+08:00">2020-11-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:21:22" itemprop="dateModified" datetime="2020-11-21T23:21:22+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://dl.acm.org/doi/abs/10.1145/1323293.1294281" target="_blank" rel="noopener">Dynamo: amazon’s highly available key-value store</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Dynamo是一种去中心化的KV分布式存储系统。它的主要设计目标是：</p>
+<ul>
+<li>高可用性（always writable）。</li>
+<li>高可伸缩性。</li>
+<li>高性能（低延时）。</li>
+<li>面向异构机器。</li>
+</ul>
+<p>为此Dynamo在CAP中选择了AP，牺牲了一部分的一致性（最终一致）。针对潜在的数据修改的冲突，Dynamo将选择权交给了用户，读取会返回一个“vector clock”，由用户自己解决冲突。</p>
+<p>另外为了避免单点问题影响可用性，Dynamo选择了去中心化架构，所有节点都是相同地位的，通过一致性哈希决定数据分片，通过gossip协议在不同节点间同步节点列表和所管理的数据范围。</p>
+<p>Dynamo使用了quorum协议（即R+W&gt;N）来读写不同replica的数据。为了进一步提升集群发生错误时的可用性，Dynamo使用了“sloppy quorum”以允许少数派节点也可以临时写入数据，因此造成的数据冲突由上面提到的vector clock来解决。</p>
+<p>Dynamo与BigTable是同一个时期非常不同的两种技术选择，前者看重可用性，后者看重一致性，且有着更复杂的数据模型。目前来看，用户似乎通常不太喜欢自己来解决数据冲突，默认的“last write win”策略已经够好了。对于只在一个datacenter内的后继系统来说，Dynamo有点过于复杂了，中心节点可以极大简化系统设计。但对于跨datacenter的系统，quorum的价值一下子提高了很多。</p>
+<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/dynamo-02.jpg" alt="Summary of techniques used in Dynamo"></p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/11/dynamo-amazons-highly-available-key-value-store/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/building-a-database-on-s3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/11/building-a-database-on-s3/" class="post-title-link" itemprop="url">[笔记] Building a Database on S3</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-11 14:35:58" itemprop="dateCreated datePublished" datetime="2020-11-11T14:35:58+08:00">2020-11-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:22:29" itemprop="dateModified" datetime="2020-11-21T23:22:29+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://dl.acm.org/doi/abs/10.1145/1376616.1376645" target="_blank" rel="noopener">Building a Database on S3</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章讲的是如何实现自己的“云原生”数据库，以及探索S3是否适合作为DB的共享存储。</p>
+<p>S3的优点是安全、无需运维、按使用付费，缺点是访问延时高、使用廉价硬件可能会牺牲一致性（这里作者引用了Dynamo，不太确定Dynamo和S3的关系）、更新不保证顺序。</p>
+<p>本文的贡献：</p>
+<ul>
+<li>演示了如何在S3上实现需要被并发修改的小对象。</li>
+<li>演示了S3上如何实现B树。</li>
+<li>提出了可以演示如何用S3实现不同一致性级别的协议。</li>
+<li>使用TPC-W基准测试了不同一致性级别下使用S3的成本。</li>
+</ul>
+<p>本文的目的是在保证可用性和资源利用率的前提下，探索如何将DB的性质尽可能多地搬到云上。</p>
+<p>结论：显然只是一次实验，验证了使用S3作为共享存储的可行性，但实用性不高。如果换成EBS的话可能更好一些。它的PU queue有点像Bw-tree。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/11/building-a-database-on-s3/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/08/map-reduce-a-major-step-backwards/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -673,313 +997,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/" class="post-title-link" itemprop="url">[笔记] Improving MapReduce Performance in Heterogeneous Environments</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-09 23:13:07" itemprop="dateCreated datePublished" datetime="2020-10-09T23:13:07+08:00">2020-10-09</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-21 23:27:07" itemprop="dateModified" datetime="2020-11-21T23:27:07+08:00">2020-11-21</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://static.usenix.org/event/osdi08/tech/full_papers/zaharia/zaharia.pdf" target="_blank" rel="noopener">Improving MapReduce Performance in Heterogeneous Environments</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章讲的是如何优化Hadoop在异构环境下的任务调度性能。</p>
-<p>任务调度的关键在于如何让长尾任务尽快完成。MapReduce会在最后阶段冗余运行长尾任务，Google的数据显示这么做能提升44%的任务响应速度。</p>
-<p>Hadoop的调度策略是冗余运行最慢的任务，而这篇文章提出的LATE（Longest Approximate Time to End)策略则是找最可能最慢结束的任务。在异构环境下LATE可以让任务响应速度达到Hadoop原有策略的2倍。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/09/understanding-compression/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/09/understanding-compression/" class="post-title-link" itemprop="url">[笔记] 数据压缩入门（Understanding Compression）</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-09 11:21:22" itemprop="dateCreated datePublished" datetime="2020-10-09T11:21:22+08:00">2020-10-09</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 16:01:40" itemprop="dateModified" datetime="2020-11-11T16:01:40+08:00">2020-11-11</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p><a href="https://book.douban.com/subject/35034359/" target="_blank" rel="noopener">数据压缩入门</a></p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/09/understanding-compression/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/" class="post-title-link" itemprop="url">[笔记] Hive: a warehousing solution over a map-reduce framework</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-09-29 21:30:09" itemprop="dateCreated datePublished" datetime="2020-09-29T21:30:09+08:00">2020-09-29</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-21 23:27:48" itemprop="dateModified" datetime="2020-11-21T23:27:48+08:00">2020-11-21</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.303.2572&rep=rep1&type=pdf" target="_blank" rel="noopener">Hive: a warehousing solution over a map-reduce framework</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Hive在MapReduce模型上实现了支持类SQL查询的数据仓库，它的改进点主要为：</p>
-<ul>
-<li>自己维护了元数据，从而允许了其它的所有优化。</li>
-<li>数据在物理上切分为partition和bucket，避免了扫描全量数据。</li>
-<li>实现了各种operator，从而支持了大多数关系型操作。</li>
-</ul>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/" class="post-title-link" itemprop="url">[笔记] Map-reduce-merge: simplified relational data processing on large clusters</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-09-27 22:46:41" itemprop="dateCreated datePublished" datetime="2020-09-27T22:46:41+08:00">2020-09-27</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-21 23:27:16" itemprop="dateModified" datetime="2020-11-21T23:27:16+08:00">2020-11-21</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="http://www.cs.duke.edu/courses/cps399.28/current/papers/sigmod07-YangDasdanEtAl-map_reduce_merge.pdf" target="_blank" rel="noopener">Map-reduce-merge: simplified relational data processing on large clusters</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>这篇文章为MapReduce模型增加了一步Merge，增强了Join的能力。原理如图。</p>
-<p><img src="https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-01.jpg" alt=""></p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1053,14 +1070,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">76</span>
+          <span class="site-state-item-count">80</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">55</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

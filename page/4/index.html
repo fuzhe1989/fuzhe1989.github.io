@@ -185,6 +185,395 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/" class="post-title-link" itemprop="url">[笔记] Column-Stores vs. Row-Stores: How Different Are They Really?</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-31 12:29:30" itemprop="dateCreated datePublished" datetime="2020-08-31T12:29:30+08:00">2020-08-31</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:21:57" itemprop="dateModified" datetime="2020-11-21T23:21:57+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="http://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2017/2010/Papers/sigmod08-columstore-abadi.pdf" target="_blank" rel="noopener">Column-Stores vs. Row-Stores: How Different Are They Really?</a> </p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。</p>
+<p>本文针对的场景：星型的data warehouse，OLAP。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/" class="post-title-link" itemprop="url">[笔记] The Chubby lock service for loosely-coupled distributed systems</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-28 11:59:16" itemprop="dateCreated datePublished" datetime="2020-08-28T11:59:16+08:00">2020-08-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:28:50" itemprop="dateModified" datetime="2020-11-21T23:28:50+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://www.usenix.org/event/osdi06/tech/full_papers/burrows/burrows_html/" target="_blank" rel="noopener">The Chubby lock service for loosely-coupled distributed systems</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。</p>
+<p>论证过程：</p>
+<ol>
+<li>如何实现强一致：Paxos。</li>
+<li>实现为库还是外部服务：库是侵入式的，应用接入困难；外部服务能把应用与Chubby解耦开。</li>
+<li>提供什么样的接口：类UNIX文件系统，建议式锁，尽可能降低应用接入和开发者的使用难度。</li>
+<li>针对读远多于写的使用场景，如何降低server负载：尽可能地cache，为了降低开发者的理解难度，使用一致性cache而不是基于TTL的cache。</li>
+<li>如何提高可用性：粗粒度锁，client在session过期后有一个grace period。</li>
+<li>未来可以做哪些改进：使用proxy和partitioning进一步提升服务规模。</li>
+</ol>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/13/explore-the-world-0002/" class="post-title-link" itemprop="url">随便看看 0002</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-08-13 15:37:57 / 修改时间：15:37:18" itemprop="dateCreated datePublished" datetime="2020-08-13T15:37:57+08:00">2020-08-13</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a href="https://www.zhihu.com/question/406623513/answer/1338119623" target="_blank" rel="noopener">如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎</a></p>
+<blockquote>
+<p>从停机问题角度看待这个悖论，很有意思。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/410908068/answer/1379726440" target="_blank" rel="noopener">李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎</a></p>
+<blockquote>
+<p>李白的生平。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/58835500/answer/1374006629" target="_blank" rel="noopener">《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎</a></p>
+<blockquote>
+<p>而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读<a href="https://www.sohu.com/a/305206459_574698" target="_blank" rel="noopener">今天通知明天要，只能是假报告</a>。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/411958013/answer/1388346437" target="_blank" rel="noopener">31 省养老金已全部上调，你父母的退休工资比自己的在职工资高吗？ - 王海的回答 - 知乎</a></p>
+<blockquote>
+<p>现阶段养老基金投资实践中，负债端最大的问题就是资金短期化，委托规模低，资产负债不匹配这三点。</p>
+</blockquote>
+<p><a href="https://zhuanlan.zhihu.com/p/166552504" target="_blank" rel="noopener">揭阳食物中毒案中，为什么一碗河粉就能要人命？ - 厨房人类的文章 - 知乎</a></p>
+<blockquote>
+<p>河粉、米粉不能久放，木耳不能泡太长时间，在外面吃少点这些东西。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/409372180/answer/1384298523" target="_blank" rel="noopener">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 塔列朗的回答 - 知乎</a></p>
+<blockquote>
+<p>凡尔赛条约最大的失误，就是在侮辱德国的同时，没有伤害德国基本盘；讽刺的是，从事后看，凡尔赛合约在保留德国基本盘的同时，彻底摧毁了中欧及东南欧的强权，德国的战略态势相比于1914年反而还好了，中欧和东南欧没有了任何制衡力量。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/409372180/answer/1365283381" target="_blank" rel="noopener">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 路易-拿破仑的回答 - 知乎</a></p>
+<blockquote>
+<p>凡尔赛条约的一个典型特点是它在政治上非常宽松，另一个特点是在经济惩罚上非常严厉。在赔款以外，凡尔赛体系在民族自决这一原则上的“真双标”也是“屈辱”说的一个助推剂。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/357966552/answer/1021968782" target="_blank" rel="noopener">如何评价电影《1917》？ - 电影榨汁的回答 - 知乎</a></p>
+<blockquote>
+<p>《1917》中的行军路线、所属部队和战役历史。</p>
+</blockquote>
+<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a href="https://zhuanlan.zhihu.com/p/163236128" target="_blank" rel="noopener">浅谈OLAP系统核心技术点 - neoReMinD的文章 - 知乎</a></p>
+<blockquote>
+<p>不错的科普，参考文献很棒。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/312019918/answer/608965942" target="_blank" rel="noopener">作为 IT 行业的过来人，你有什么话想对后辈说的？ - 二律背反的回答 - 知乎</a></p>
+<blockquote>
+<p>世界上没有技术驱动型公司；IT领域最重要的是经验而不是你有多聪明；能大规模商用的技术，都不需要智商；要有分享精神；现代管理学的精髓，就是让每个人都变得可替代；程序员工作创造的价值，至少一半是通过文档体现出来才对。</p>
+<p>评论里对什么是技术驱动吵了起来。我的理解：做决定时，技术 or 市场，这条线该划在哪，无论什么公司，总会有一些决定偏向市场，程序员要接受这些决定，但这不妨碍我们尝试把线往技术那边推一推。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/411917655/answer/1385638325" target="_blank" rel="noopener">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 崔晨的回答 - 知乎</a></p>
+<p><a href="https://www.zhihu.com/question/411917655/answer/1388596024" target="_blank" rel="noopener">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 大宽宽的回答 - 知乎</a></p>
+<blockquote>
+<p>shell的历史包袱；奇怪的设计一定是有原因的。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/20405888/answer/15040566" target="_blank" rel="noopener">如何理解「面向对象编程的精髓在于将操作绑定在数据上」？ - 冯东的回答 - 知乎</a></p>
+<blockquote>
+<p>data structure over procedure。</p>
+</blockquote>
+<p><a href="https://zhuanlan.zhihu.com/p/166345772" target="_blank" rel="noopener">关于程序员的59条搞笑但却真实无比的编程语录 - 动力节点的文章 - 知乎</a></p>
+<blockquote>
+<p>很多条很有道理。</p>
+</blockquote>
+<p><a href="https://www.theverge.com/2018/7/16/17577654/amazon-prime-day-website-down-deals-service-disruption" target="_blank" rel="noopener">Amazon’s website crashed as soon as Prime Day began</a></p>
+<blockquote>
+<p>Amazon在2018年的一次崩溃。</p>
+</blockquote>
+<p><a href="https://www.zhihu.com/question/67858225/answer/1091344044" target="_blank" rel="noopener">如何看待sqlite作者放弃sqlite4的开发，说使用LSM Tree是一种失败？ - auxten的回答 - 知乎</a></p>
+<blockquote>
+<p>重点关注其中Dr. D. Richard Hipp关于测试的看法。</p>
+<p>100％MC / DC只是一个阈值，一个很高的阈值，一个易于测量且难以作弊的门槛。100％MC / DC 的主要好处之一并不是每个分支都经过测试，而是你必须编写如此多的测试，然后你就可以发现问题，并修复了许多你从未想过的问题。</p>
+</blockquote>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/c-store-a-column-oriented-dbms/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/13/c-store-a-column-oriented-dbms/" class="post-title-link" itemprop="url">[笔记] C-store: a column-oriented DBMS</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-13 12:12:32" itemprop="dateCreated datePublished" datetime="2020-08-13T12:12:32+08:00">2020-08-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:25:17" itemprop="dateModified" datetime="2020-11-21T23:25:17+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://dl.acm.org/doi/abs/10.1145/3226595.3226638" target="_blank" rel="noopener">C-store: a column-oriented DBMS</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文idea：面向ad-hoc读优化的分布式DBMS。</p>
+<p>论证过程：</p>
+<ol>
+<li>面向ad-hoc读优化需要：<ol>
+<li>列存，以提高压缩和扫描效率；</li>
+<li>数据直接存成多种排序形式，从而应对ad-hoc查询；</li>
+<li>只读事务避免加锁，需要读写分离以及snapshot isolation。</li>
+</ol>
+</li>
+<li>列存需要仔细地编码数据，因此需要区分不同情况编码。</li>
+<li>数据存成projection需要考虑：<ol>
+<li>不同replica可以用不同的projection，这样既满足了安全性，又有机会提高性能；</li>
+<li>anchor table物理上不存在，就需要通过storage key和join index组合多个projection来还原一行数据；</li>
+</ol>
+</li>
+<li>读写分离要考虑：<ol>
+<li>分成WS和RS，这样两者可以用不同的存储结构，分别在写和读上达到最优；</li>
+<li>任意时间的MVCC开销太大，可以把时间分成epoch，一段一段推进；</li>
+<li>需要有一个将WS合并进RS的操作。</li>
+</ol>
+</li>
+<li>考虑到C-Store的主要场景是写特别少读特别多，可以：<ol>
+<li>不压缩WS中的数据；</li>
+<li>使用简化的2PC而不需要考虑吞吐问题。</li>
+</ol>
+</li>
+</ol>
+<p>感想：</p>
+<ol>
+<li>学术界的paper画风和工业界的确实不太一样，到处都是idea，但细推敲又觉得缺点什么。</li>
+<li>列存的核心问题就是编码。</li>
+<li>不同replica用不同projection确实是非常棒的idea，但这样要求DB和FS必须耦合在一起，很多情况下不现实。</li>
+<li>关于读写分离的几个idea很棒，MVCC是可以不用那么细粒度的。</li>
+</ol>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/13/c-store-a-column-oriented-dbms/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -733,386 +1122,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2019/04/07/three-optimization-tips-for-cpp/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2019/04/07/three-optimization-tips-for-cpp/" class="post-title-link" itemprop="url">[笔记] Three Optimization Tips for C++</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2019-04-07 19:29:29" itemprop="dateCreated datePublished" datetime="2019-04-07T19:29:29+08:00">2019-04-07</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-21 23:29:13" itemprop="dateModified" datetime="2020-11-21T23:29:13+08:00">2020-11-21</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://www.facebook.com/notes/facebook-engineering/three-optimization-tips-for-c/10151361643253920/" target="_blank" rel="noopener">Three Optimization Tips for C++</a></p>
-</blockquote>
-<p>建议：</p>
-<ul>
-<li>Prefer static linking and position-dependent code (as opposed to PIC, position-independent code).</li>
-<li>Prefer 64-bit code and 32-bit data.</li>
-<li>Prefer array indexing to pointers (this one seems to reverse every ten years).</li>
-<li>Prefer regular memory access patterns.</li>
-<li>Minimize control flow.</li>
-<li>Avoid data dependencies.</li>
-</ul>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2019/04/07/three-optimization-tips-for-cpp/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/07/22/cpp-use-mixin-to-get-better-performance/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/07/22/cpp-use-mixin-to-get-better-performance/" class="post-title-link" itemprop="url">C++：使用mixin获得比继承+组合更好的性能</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-07-22 17:00:52" itemprop="dateCreated datePublished" datetime="2018-07-22T17:00:52+08:00">2018-07-22</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-10-11 18:12:22" itemprop="dateModified" datetime="2020-10-11T18:12:22+08:00">2020-10-11</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>注：本文所使用编译器均为gcc4.1.2，即只能使用C++98标准。</p>
-<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Node</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> mRow;</span><br><span class="line">    <span class="keyword">int</span> mCol;</span><br><span class="line">    <span class="keyword">int</span> mValue;</span><br><span class="line"></span><br><span class="line">    Node(<span class="keyword">int</span> row, <span class="keyword">int</span> col, <span class="keyword">int</span> value)</span><br><span class="line">        : mRow(row), mCol(col), mValue(value)</span><br><span class="line">    &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Iterator</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~Iterator() &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Node <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="keyword">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>我们有一个接口类<code>Iterator</code>，它有三个方法，可以返回<code>Node</code>类型的值。现在我们要用这个接口来遍历一个矩阵。</p>
-<p>矩阵的类型是<code>vector&lt;vector&lt;int&gt;&gt;</code>，我们有几种不同的遍历需求：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>这个方法返回一个最原始的<code>Iterator</code>，只是单纯遍历数据。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>在<code>RawIterator</code>基础上，只返回奇数。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>在<code>OddIterator</code>基础上，遍历过程中，在每行末尾加上<code>appendix</code>中的元素。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>在<code>AppendPerRowIterator</code>基础上，返回的每个<code>Node</code>的value都乘2。</p>
-<h2 id="测试程序"><a href="#测试程序" class="headerlink" title="测试程序"></a>测试程序</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    srand(time(<span class="literal">NULL</span>));</span><br><span class="line">    <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt; matrix;</span><br><span class="line">    <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; appendix;</span><br><span class="line">    PrepareMatrix(matrix, <span class="number">1000</span>, <span class="number">10000</span>);</span><br><span class="line">    PrepareAppendix(appendix, <span class="number">3</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int64_t</span> t0 = Measure(NewRawIterator(matrix));</span><br><span class="line">    <span class="keyword">int64_t</span> t1 = Measure(NewOddIterator(matrix));</span><br><span class="line">    <span class="keyword">int64_t</span> t2 = Measure(NewAppendPerRowIterator(matrix, appendix));</span><br><span class="line">    <span class="keyword">int64_t</span> t3 = Measure(NewDoubleIterator(matrix, appendix));</span><br><span class="line"></span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; <span class="string">"Raw:"</span> &lt;&lt; t0 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Odd:"</span> &lt;&lt; t1 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Append:"</span> &lt;&lt; t2 &lt;&lt; <span class="built_in">endl</span></span><br><span class="line">         &lt;&lt; <span class="string">"Double:"</span> &lt;&lt; t3 &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>我们会在一个1000*10000的矩阵上测试各个<code>Iterator</code>。</p>
-<h2 id="基于继承-组合的实现"><a href="#基于继承-组合的实现" class="headerlink" title="基于继承+组合的实现"></a>基于继承+组合的实现</h2><p>上面的需求看起来很适合用继承+组合来实现：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RawIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">OddIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AppendPerRowIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    AppendPerRowIterator(Iterator* iter, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix);</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">DoubleIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">DoubleIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>我们用了4个派生自<code>Iterator</code>的新类型来实现不同的需求，除了<code>RawIterator</code>外，其它3种类型都是在组合了已有的<code>Iterator</code>基础上实现新功能，因此可以任意顺序组合。</p>
-<p>几个New函数的实现：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> RawIterator(matrix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    Iterator* rawIter = NewRawIterator(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> OddIterator(rawIter);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* oddIter = NewOddIterator(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> AppendPerRowIterator(oddIter, appendix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* appendIter = NewAppendPerRowIterator(matrix, appendix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> DoubleIterator(appendIter);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>测试结果为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:164311</span><br><span class="line">Odd:316020</span><br><span class="line">Append:436596</span><br><span class="line">Double:458733</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，每增加一层功能，调用延时就明显上涨了一截。有没有其它性能更好的方案了呢？</p>
-<h2 id="mixin"><a href="#mixin" class="headerlink" title="mixin"></a>mixin</h2><p>mixin是给一组基础类，每个都建模了一个抽象概念，且能直接组合成一个新的类，像乐高一样，满足需求。如果你新增了基础类，只要它是和其它基础类正交的，就可以扩展到这个组合类里。</p>
-<p>C++中的一种mixin方法是结合模板和继承，通过模板参数来组合基础类（见<a href="/2018/04/21/mixin/">通过mixin组合功能</a>）。</p>
-<p>在上面这个例子中，<code>RawIterator</code>是一个基础类，可以单独使用，而<code>OddIterator</code>、<code>AppendIterator</code>和<code>DoubleIterator</code>则是用来提供新的功能的，是mixin类，我们可以将这三个类型实现为模板类，以<code>OddIterator</code>为例：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    OddIterator(?)</span><br><span class="line">        : T(?) &#123;</span><br><span class="line">        MoveUntilOdd();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">Node <span class="title">GetValue</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::GetValue();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="keyword">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::IsValid();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        T::MoveNext();</span><br><span class="line">        MoveUntilOdd();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">MoveUntilOdd</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">while</span> (T::IsValid() &amp;&amp; T::GetValue().mValue % <span class="number">2</span> == <span class="number">0</span>) &#123;</span><br><span class="line">            T::MoveNext();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，新的<code>OddIterator</code>是通过继承自<code>T</code>来给<code>T</code>增加功能的，这有什么好处？摘取上文中的一段：</p>
-<blockquote>
-<p>不需要堆分配。<br>没有运行期检查null。<br>不需要显式管理生命期。<br>没有多余的虚函数定义及其调用。<br>编译器有机会做更多优化。</p>
-</blockquote>
-<p>似乎一切都很美好，除了代码有些怪异外。但我们还有一个问题没有解决：怎么构造<code>T</code>？</p>
-<h2 id="一种mixin的通用构造方法"><a href="#一种mixin的通用构造方法" class="headerlink" title="一种mixin的通用构造方法"></a>一种mixin的通用构造方法</h2><p>这是一个很大很复杂的课题，这里我只提出一种似乎可行的方式（至少本文的例子是没问题的）。</p>
-<p>我们要求每个mixin类型，及需要与这个mixin类型组合的基础类型内部，都定义一个Context类型，且有一个只有一个Context类型参数的构造函数。例子：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">RawIterator</span>:</span> <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; mMatrix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span></span></span><br><span class="line">            : mMatrix(matrix) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="keyword">const</span> Context&amp; context)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">OddIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; base)</span></span></span><br><span class="line">            : mBase(base) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    OddIterator(<span class="keyword">const</span> Context&amp; c)</span><br><span class="line">        : T(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">AppendPerRowIterator</span>:</span> <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">Context</span> &#123;</span></span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line">        <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; mAppendix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="keyword">const</span> <span class="keyword">typename</span> T::Context&amp; base, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span></span></span><br><span class="line">            : mBase(base), mAppendix(appendix) &#123;&#125;</span><br><span class="line">    &#125;;</span><br><span class="line">    AppendPerRowIterator(<span class="keyword">const</span> Context&amp; c)</span><br><span class="line">       : T(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br></pre></td></tr></table></figure>
-
-<p>通过这种方式，我们可以在不知道<code>T</code>的具体类型（也就不知道它到底有什么样的构造函数）的情况下，构造出组合类型。从而也获得了任意组合这些mixin顺序的能力。</p>
-<p>在C++11后，我们可以通过变长参数和继承构造函数的方式提供更优雅的mixin的通用构造方案，这是另外的话题，这里不展开了。</p>
-<p>在使用了上面的方法来构造mixin后，几个New函数的实现为：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> RawIterator(c);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> OddIter(c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    AppendIter::<span class="function">Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> AppendIter(c2);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt; &gt;&amp; matrix, <span class="keyword">const</span> <span class="built_in">vector</span>&lt;<span class="keyword">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line">    <span class="keyword">typedef</span> DoubleIterator&lt;AppendIter&gt; DoubleIter;</span><br><span class="line"></span><br><span class="line">    RawIterator::<span class="function">Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    OddIter::<span class="function">Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    AppendIter::<span class="function">Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    DoubleIter::<span class="function">Context <span class="title">c3</span><span class="params">(c2)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> DoubleIter(c3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>看起来还是很笨拙，但至少我们成功地把它们构造出来了。</p>
-<h2 id="mixin的性能"><a href="#mixin的性能" class="headerlink" title="mixin的性能"></a>mixin的性能</h2><p>重新编译，运行，基于mixin的结果为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:165505</span><br><span class="line">Odd:164377</span><br><span class="line">Append:187320</span><br><span class="line">Double:191260</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，在Raw结果不变的情况下（这是当然的），其它三种场景mixin方案的延时分别比继承+组合减少了48%、57%和58%，调用链越长，mixin方案的优势越大。</p>
-<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>本文提出了用mixin来解决功能组合的方案，且使用了Context类型来解决构造问题，相比常见的继承+组合的方案，mixin方案有着非常明显的性能优势。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/07/22/cpp-inline-member-function-in-cpp-file/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/07/22/cpp-inline-member-function-in-cpp-file/" class="post-title-link" itemprop="url">C++：在实现文件中内联小的成员函数</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-07-22 16:53:22" itemprop="dateCreated datePublished" datetime="2018-07-22T16:53:22+08:00">2018-07-22</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2019-12-28 12:45:41" itemprop="dateModified" datetime="2019-12-28T12:45:41+08:00">2019-12-28</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>注：本文所使用编译器均为gcc4.1.2。</p>
-<p>例子：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// file.h</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifndef</span> XXX_FILE_H</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> XXX_FILE_H</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">File</span> &#123;</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">File</span><span class="params">(<span class="keyword">int</span> content)</span></span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">int</span> <span class="title">GetContent</span><span class="params">()</span></span>;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="function"><span class="keyword">bool</span> <span class="title">IsLoaded</span><span class="params">()</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">void</span> <span class="title">Load</span><span class="params">()</span></span>;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">bool</span> mIsLoaded;</span><br><span class="line">    <span class="keyword">int</span> mContent;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br></pre></td></tr></table></figure>
-
-<p>首先我们在file.h中定义了一个类型<code>File</code>。为了保持头文件简洁，我们这里只声明了各个成员函数，而将定义都放到实现文件中：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// file.cpp</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"file.h"</span></span></span><br><span class="line"></span><br><span class="line">File::File(<span class="keyword">int</span> content)</span><br><span class="line">  : mIsLoaded(<span class="literal">false</span>),</span><br><span class="line">    mContent(content) &#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">int</span> File::GetContent() &#123;</span><br><span class="line">    <span class="keyword">if</span> (!IsLoaded()) &#123;</span><br><span class="line">        Load();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> mContent;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">bool</span> File::IsLoaded() &#123;</span><br><span class="line">    <span class="keyword">return</span> mIsLoaded;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">void</span> File::Load() &#123;</span><br><span class="line">    mIsLoaded = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>接下来，我们在main.cpp中使用这个类：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// main.cpp</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"file.h"</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;iostream&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> <span class="built_in">std</span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="function">File <span class="title">f</span><span class="params">(<span class="number">5</span>)</span></span>;</span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; f.GetContent() &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在这个很简单的例子中，我们要关注的是：对于简短的成员函数，将其实现放到.cpp中，而不是直接定义在类定义体中（也就是放到.h中<code>class File</code>内部），会不会损害性能？</p>
-<p>我们用<code>-O2</code>编译，再看一下其汇编指令：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">0000000000400840 &lt;_ZN4File10GetContentEv&gt;:</span><br><span class="line">  400840:   53                      push   %rbx</span><br><span class="line">  400841:   48 89 fb                mov    %rdi,%rbx</span><br><span class="line">  400844:   e8 d7 ff ff ff          callq  400820 &lt;_ZN4File8IsLoadedEv&gt;</span><br><span class="line">  400849:   84 c0                   test   %al,%al</span><br><span class="line">  40084b:   75 08                   jne    400855 &lt;_ZN4File10GetContentEv+0x15&gt;</span><br><span class="line">  40084d:   48 89 df                mov    %rbx,%rdi</span><br><span class="line">  400850:   e8 db ff ff ff          callq  400830 &lt;_ZN4File4LoadEv&gt;</span><br><span class="line">  400855:   8b 43 04                mov    0x4(%rbx),%eax</span><br><span class="line">  400858:   5b                      pop    %rbx</span><br><span class="line">  400859:   c3                      retq</span><br><span class="line">  40085a:   90                      nop</span><br><span class="line">  40085b:   90                      nop</span><br><span class="line">  40085c:   90                      nop</span><br><span class="line">  40085d:   90                      nop</span><br><span class="line">  40085e:   90                      nop</span><br><span class="line">  40085f:   90                      nop</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，<code>GetContent</code>里确实调用了<code>IsLoaded</code>和<code>Load</code>。</p>
-<p>我们知道，如果把<code>IsLoaded</code>和<code>Load</code>的定义放到类定义体内，这样的函数是默认内联的，<code>GetContent</code>中就不会真的去调用这两个函数。但现在，我们为了简洁，把它们的实现移到了.cpp中，导致了它们没有被内联，确实损害了性能。</p>
-<p>怎么既把小函数定义放到.cpp中，又能让它们在<code>GetContent</code>中内联呢？</p>
-<p>我们先把<code>IsLoaded</code>和<code>Load</code>的实现放到<code>GetContent</code>前面：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">bool</span> File::IsLoaded() &#123;</span><br><span class="line">    <span class="keyword">return</span> mIsLoaded;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">void</span> File::Load() &#123;</span><br><span class="line">    mIsLoaded = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">int</span> File::GetContent() &#123;</span><br><span class="line">    <span class="keyword">if</span> (!IsLoaded()) &#123;</span><br><span class="line">        Load();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> mContent;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这次编译的结果没有变，<code>IsLoaded</code>和<code>Load</code>没有内联。</p>
-<p>我们再在两个函数的定义前面加上<code>inline</code>：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">inline</span> <span class="keyword">bool</span> File::IsLoaded() &#123;</span><br><span class="line">    <span class="keyword">return</span> mIsLoaded;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">inline</span> <span class="keyword">void</span> File::Load() &#123;</span><br><span class="line">    mIsLoaded = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">int</span> File::GetContent() &#123;</span><br><span class="line">    <span class="keyword">if</span> (!IsLoaded()) &#123;</span><br><span class="line">        Load();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> mContent;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这回编译结果变成了：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">0000000000400820 &lt;_ZN4File10GetContentEv&gt;:</span><br><span class="line">  400820:   80 3f 00                cmpb   $0x0,(%rdi)</span><br><span class="line">  400823:   75 03                   jne    400828 &lt;_ZN4File10GetContentEv+0x8&gt;</span><br><span class="line">  400825:   c6 07 01                movb   $0x1,(%rdi)</span><br><span class="line">  400828:   8b 47 04                mov    0x4(%rdi),%eax</span><br><span class="line">  40082b:   c3                      retq</span><br><span class="line">  40082c:   90                      nop</span><br><span class="line">  40082d:   90                      nop</span><br><span class="line">  40082e:   90                      nop</span><br><span class="line">  40082f:   90                      nop</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，<code>inline</code>起作用了，<code>GetContent</code>里面的函数调用都被抹平了。</p>
-<p>假如把<code>IsLoaded</code>和<code>Load</code>的实现加上<code>inline</code>，但放到<code>GetContet</code>后面，<code>inline</code>还会生效吗：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">int</span> File::GetContent() &#123;</span><br><span class="line">    <span class="keyword">if</span> (!IsLoaded()) &#123;</span><br><span class="line">        Load();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> mContent;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">inline</span> <span class="keyword">bool</span> File::IsLoaded() &#123;</span><br><span class="line">    <span class="keyword">return</span> mIsLoaded;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">inline</span> <span class="keyword">void</span> File::Load() &#123;</span><br><span class="line">    mIsLoaded = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>编译结果为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">0000000000400820 &lt;_ZN4File10GetContentEv&gt;:</span><br><span class="line">  400820:   80 3f 00                cmpb   $0x0,(%rdi)</span><br><span class="line">  400823:   75 03                   jne    400828 &lt;_ZN4File10GetContentEv+0x8&gt;</span><br><span class="line">  400825:   c6 07 01                movb   $0x1,(%rdi)</span><br><span class="line">  400828:   8b 47 04                mov    0x4(%rdi),%eax</span><br><span class="line">  40082b:   c3                      retq</span><br><span class="line">  40082c:   90                      nop</span><br><span class="line">  40082d:   90                      nop</span><br><span class="line">  40082e:   90                      nop</span><br><span class="line">  40082f:   90                      nop</span><br></pre></td></tr></table></figure>
-
-<p>可以看到，即使我们把待<code>inline</code>的成员函数的实现放到调用处后面，这种<code>inline</code>仍然是生效的。</p>
-<p>结论：我们可以在成员函数的定义前显式加上<code>inline</code>，这样同文件的调用处就可以内联这个成员函数，去除多余的跳转，提升性能，且在同一个.cpp文件中待内联的函数与调用处的顺序不会影响内联的效果。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/05/17/message-passing-and-the-actor-model/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/05/17/message-passing-and-the-actor-model/" class="post-title-link" itemprop="url">[翻译]消息传递与actor模型</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-05-17 23:35:06" itemprop="dateCreated datePublished" datetime="2018-05-17T23:35:06+08:00">2018-05-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-11 15:59:37" itemprop="dateModified" datetime="2020-11-11T15:59:37+08:00">2020-11-11</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>原文：<a href="http://dist-prog-book.com/chapter/3/message-passing.html" target="_blank" rel="noopener">Message Passing and the Actor Model</a></p>
-<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>自有分布式计算以来，人们就已经讨论过消息传递编程模型了，因此消息传递可以用于表示许多事情。Wikipedia上消息传递的宽泛定义包括了远程过程调用（RPC）和消息传递接口（MPI）等。另外，实践中的消息传递系统也受到了像是pi-calculus和CSP这些流行的进程演算（process-calculus）的启发。例如，Go的channel就是基于pi-calculus中消息通道作为一等公民的思想，而Clojure中的core.async库则是基于CSP。但今天人们谈起消息传递时，通常是指actor模型。作为一种通用的消息传递编程模型，它开端于20世纪70年代，并在今天用于构建大规模可伸缩系统。</p>
-<p>在消息传递编程模型领域，重要的不仅是考虑目前的研究现状，还包括历史上最初的关于消息传递和actor模型的论文，它们是更近期的论文描述的编程模型的源头。看看这些模型卡在了哪里，以及近期的论文都引用和指出了旧论文中的哪些不足，这些是很有启发性的。历史上有许多编程语言是围绕着消息传递设计的，特别是那些专注于actor模型和组织计算单元的语言。</p>
-<p>本章我会描述actor模型的四个主要变体：经典actor模型、基于进程的actor模型、通信事件循环模型、以及活动对象模型。我会试着强调体现了这些模型的历史上和现代的语言，以及程序员需要注意的编程哲学和取舍，从而理解并最好的利用这些模型。</p>
-<p>尽管actor模型早在20世纪70年代就开始了，正如许多近期发表的论文和系统显示，它仍在发展，并被纳入到今天的编程语言中。有些健壮的工业级actor系统正被用于赋能大规模可伸缩分布式系统，例如Akka被用于服务PayPal的十亿级的事务，Erlang被用于为WhatsApp的上亿用户发送消息，而Orleans被用于服务Halo4的数百万玩家。围绕着监控、错误处理、actor生命周期管理，有许多不同方式去构建一个工业级的actor框架，后面会详述。</p>
-<p>对于我们介绍的actor模型，一个重点就在这个问题中：“为什么要传递消息，特别是为什么要用actor模型？”考虑到有那么多分布式编程模型，有人可能会问，为什么这个模型在最初提出时这么重要？为什么它促进了当今广泛使用的高级语言、系统和库？我们将在这一章看到，actor模型的一些最明显的优点包括了actor状态的隔离、可伸缩性、以及简化程序员对系统的推理难度。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/05/17/message-passing-and-the-actor-model/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1186,14 +1195,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">76</span>
+          <span class="site-state-item-count">80</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">55</span>
+        <span class="site-state-item-count">58</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
