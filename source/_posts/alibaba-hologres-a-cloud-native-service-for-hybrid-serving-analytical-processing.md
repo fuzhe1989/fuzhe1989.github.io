@@ -116,7 +116,7 @@ delete map是一个Row Tablet，其中key是shard file id，value是一个bitmap
 
 在写Column Tablet时，insert很正常；delete会对所有包含这行的shard file写一笔（也解释了上段话）；update被实现为一次insert加一次delete。
 
-> Column Tablet的实现保证了一行只会存在于一个文件中，这样扫描就可以非常简单，而不用担心两个文件的数据有重叠。这种设计下level应该不需要太多，文件数多一点也没关系（考虑有bloom filter，点查的开销不会大）。
+> Column Tablet的实现保证了一行只会存在于一个文件中，这样扫描就可以非常简单，而不用担心两个文件的数据有重叠。
 
 ### Hierarchical Cache
 
