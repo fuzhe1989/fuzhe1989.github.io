@@ -26,3 +26,21 @@ F1的设计选择导致了常规读写延时上升，因此F1使用了以下技�
 - 重度使用batch、并行、异步读，并通过新的ORM来体现这些特点。
 
 ## Basic Architecture
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/f1-01.jpg)
+
+为了降低延时，F1 client和load balancer会优先选择离得最近的F1 server。
+
+F1 server通常与对应的Spanner部署在相同datacenter中。但F1 server也可以访问其它datacenter的Spanner。Spanner的数据在CFS（Colossus File System）上，CFS是单datacenter的，因此Spanner不会访问其它datacenter的CFS。
+
+F1 server通常是无状态的，除了client要执行悲观事务，此时F1 server会持有锁，client需要在事务期间保证与对应的F1 server的连接。
+
+F1集群还会有slave pool来执行复杂的分布式query，这些机器由F1 master负责管理。
+
+F1也支持将大规模的数据处理offload给MapReduce来执行，MapReduce会直接与Spanner通信获取数据，不需要再走一次F1。
+
+因为Spanner的同步replication，一次commit的延时通常在50ms-150ms。
+
+### Spanner
+
+
