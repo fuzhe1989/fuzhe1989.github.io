@@ -72,3 +72,87 @@ F1并不强制这种层级结构，平坦结构也是可以的。对于Ads而言
 ### Protocol Buffers
 
 F1支持数据格式为Protocol Buffers（保存为一个blob），且经常在每行父表数据对应的子表数据不多时，将子表替换为父表中的一个repeated字段，从而避免了多张表的管理开销与潜在的join开销。此外使用repeated字段常常要比用子表语义上更自然。
+
+表可以将所有列分为几组，经常一起访问的在一起，不太修改的和经常修改的分开，不同列设置不同的读写权限，也可以并发写。使用更少的列能显著提升Spanner的性能，后者每列都有不少的开销（为什么？）。
+
+### Indexing
+
+F1的index被单独保存为Spanner中的表，primary key是index自己的key加上主表的primary key。
+
+F1中index分成了local和global两种。local index的key的前缀必须是root row的primary key。它类似于子表，也和root row保存在一个Spanner的directory。因此更新local index只需要增加少量开销。
+
+global index是单独保存的，主表和global index的修改会涉及2PC，因此开销比较大。global index经常会有规模问题，主表的一次修改可能涉及很多index row的修改，导致2PC参与者数量非常多。因此F1中global index用得并不多，且写入时建议将事务拆小，避免2PC参与者过多。
+
+## Schema Changes
+
+F1中所有schema change都是非阻塞的，非常有挑战性：
+- F1的分布式规模非常大，一次schema change影响的节点特别多。
+- 每个F1 server会在本地内存中缓存一份schema，难以原子修改所有缓存的schema。
+- 过程中的query和事务不能停。
+- schema change过程不能影响系统可用性和延时。
+
+因此F1使用了异步schema change，在一段时间内逐步应用到所有F1 server上，隐含着两台F1 server可能同时使用不同的schema服务请求。
+
+此时可能出现一种不兼容情况：A机器看到了主表增加一个索引，它在处理一个insert时同时向主表和索引表写了一行数据；随后的delete这行的请求发给了B机器，它没看到主表增加了索引，只删除了主表的数据，导致主表和索引表数据不一致。
+
+为了避免这种不兼容情况出现，F1实现了以下schema change算法：
+1. 限制所有F1 server同时最多只能有两套schema。每个server使用lease来管理schema，lease过期后就不能再使用对应的schema。
+1. 将一次schema change分为若干步，每步前后都保证兼容。比如前面的例子中，F1先增加索引I，但限制它只能删除不能添加。随后再将I升级为可以执行全部写操作。之后启动一个MapRedcue任务回填历史数据。最后令I可以服务读。
+
+## Transaction
+
+每个F1事务由若干次读和一次可选的写组成，这次写会自动提交整个事务。F1基于Spanner的事务实现了三种事务：
+1. Snapshot事务，使用固定的timestamp执行只读事务。如前面所述，通常Spanner的global safe timestamp会落后5-10秒。用户也可以自己选择timestamp，但太新的时间有被阻塞的风险。
+1. 悲观事务，直接映射为Spanner的事务。悲观事务会使用一种有状态的协议，负责处理请求的F1 server会持有锁。
+1. 乐观事务，它包含一个可以任意长的只读阶段（不持有锁）和一个非常短的写阶段（Spanner事务）。F1在读请求返回的每行数据中都隐含了这行上次修改时间，在最后的写阶段用于校验是否有冲突。
+
+F1 client默认使用悲观事务。但乐观事务有以下好处：
+- 可以容忍行为不端的client：读阶段不持有锁，写阶段持续时间短。
+- 支持长时间的事务，比如等待用户交互响应，或单步调试。
+- server端可以重试。
+- server端可以failover，所有状态都在client端，可以用户无感知地切换到另一台server处理。
+- 可以做speculative write，即先记录感兴趣的数据的timestamp，再用这些timestamp做一次尝试的写。
+
+乐观事务也有一些缺陷：
+- 有幻写，因为乐观事务是一种snapshot isolation，只能防已经有的数据被修改，不能防止新的数据插入。
+- 高冲突时吞吐低。
+
+### Flexible Locking Granularity
+
+F1默认的锁粒度是行级别，每行中有一个默认的lock列来控制这行的所有列。但用户也可以自己指定锁粒度，如一行有多个lock列来增加并发度。用户也可以使用父表的lock列控制子表的列，从而有意降低并发度。这种方式可以避免子表的幻写。
+
+## Change History
+
+F1的首要设计目标就包含了自动记录change history。每个F1事务都会创建一个或多个ChangeBatch对象，其中包含了primary key和修改前后的数据。这些ChangeBatch对象会被写进单独的ChangeHistory表，作为被修改的root表的子表。如果一个事务修改了多个root行（甚至多张root表）下面的数据，每个root row都对应一个ChangeBatch，其中还会包含指向这个事务中其它行的指针，用来恢复完整的事务。
+
+ChangeHistory表本身是可以用SQL查询的，且它与对应root表保存在一起的特性也使得记录history并不会增加Spanner写的参与者。
+
+ChangeHistory支持pub-sub，可以用来实现change data capture（CDC），比如client可以用它来实现snapshot一致性的cache。
+
+## Client Design
+
+### Simplified ORM
+
+F1实现了一套新的ORM系统，不使用任何join，不会隐式遍历记录。所有object的加载都是显式的，所有暴露的API都是异步的。这种设计依赖了F1 schema的两个特点：
+- F1的一个DB中通常表会比其它RDBMS更少，client通常直接读出Protocol Buffers的数据。
+- 层级结构使得读取一个object的所有children不需要join，只需要一次range query。
+
+新的ORM系统写起来比之前的ORM系统要复杂一些，但更容易避免反模式，支持的规模更大，且因为避免了join，读取延时更稳定，不会因为涉及大型join而导致延时抖动得非常厉害。它的最小延时要比MySQL高，但平均延时差不多，延时长尾控制得比较好，只是平均延时的几倍而已。
+
+## SQL Interface
+
+F1的query处理有以下关键性质：
+- 既支持低延时的集中执行模式，又支持高并发的分布式模式。
+- 所有数据都是远程读取的，重度使用batch以缓解网络延时。
+- 所有输入数据和内部数据都可以任意分区，不太需要保证顺序。
+- query过程中会经历许多基于hash的重分区步骤。
+- 每个算子都是流式处理数据，并会尽快将输出发送给下游，最大化query过程中的流水线。
+- 层级结构的表有着最优的访问模式。
+- query的结果可以并行消费。
+- 对结构化数据类型（Protocol Buffers）有着良好的支持。
+- Spanner的snapshot一致性模式提供了全局一致的结果。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/f1-03.jpg)
+
+### Central and Distributed Queries
+
