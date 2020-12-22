@@ -1,3 +1,13 @@
+---
+title:      "[笔记] F1: A distributed SQL database that scales"
+date:       2020-12-22 15:59:20
+tags:
+    - 笔记
+    - OLTP
+    - Google
+    - RDBMS
+---
+
 > 原文：[F1: A distributed SQL database that scales](https://research.google/pubs/pub41344/)
 
 ## TL;DR
@@ -152,7 +162,84 @@ F1的query处理有以下关键性质：
 - 对结构化数据类型（Protocol Buffers）有着良好的支持。
 - Spanner的snapshot一致性模式提供了全局一致的结果。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/f1-03.jpg)
-
 ### Central and Distributed Queries
 
+F1有两种执行query的模式：
+- 集中式模式会在一台F1 server上执行OLTP风格的短query。
+- 分布式模式会在多台slave worker上执行，总是使用snapshot事务。
+
+query优化器会启发式确定用哪种模式处理请求。
+
+### Distributed Query Example
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/f1-03.jpg)
+
+对应的query：
+
+```sql
+SELECT agcr.CampaignId, click.Region, cr.Language, SUM(click.Clicks)
+FROM AdClick click
+  JOIN AdGroupCreative agcr
+    USING (AdGroupId, CreativeId)
+  JOIN Creative cr
+    USING (CustomerId, CreativeId)
+WHERE click.Date = '2013-03-23'
+GROUP BY agcr.CampaignId, click.Region, cr.Language
+```
+
+### Remote Data
+
+F1相比传统的RDBMS的一个区别在于它自己不存数据，所有数据都在Spanner上，因此请求处理的网络延时很高，而传统RDBMS主要是磁盘延时。这两者有着本质区别：网络延时可以通过batch或pipeline来缓解；磁盘延时通常是单点硬件资源争抢导致的，很难通过扩容来获得线性提升。Spanner的数据是存在CFS上的，本身就是很分散的，因此F1可以通过尽量并行化来获得接近线性的提升。
+
+batch的一个例子发生在lookup join时，F1会聚合相同的lookup key，直到聚合的数据达到了50MB或者100K个不同的key时再开始lookup。lookup的结果会立即流式返回回来。
+
+F1中的算子都被设计为流式处理，一有数据就输出，但这样就很难做保序等操作。尤其是这些算子自己处理也是高度并行化的，即使输入有序，并行之后也不再有序了，这样能保证最大的并行度，从而提高吞吐，降低延时。
+
+### Distributed Execution Overview
+
+一个完整的query plan包含若干个plan part，每个plan part表示一组执行相同subplan的worker。这些plan part组成DAG，数据从叶子节点一直流向唯一的根节点。根节点本身是接受请求的F1 server，也是整个query执行的coordinator，它负解析query、分发subplan、执行最终的聚合、排序、过滤。
+
+很多分布式DB会将多份有序数据按相同方式分片，可以下推很多算子给各个分片，省掉shuffle。但F1自己不管理数据，因此很难做这样的优化，尤其是这种优化还需要多次重排序。最终F1选择了只支持hash partition。近期的网络技术的发展也使得这种全hash partition变得实际了，几百台F1 server可以同时全速互相连接。它的缺点是F1的规模会受到交换机的资源限制，但目前还没遇到。
+
+使用hash partition允许F1实现高效的分布式hash join和聚合算子。worker在处理hash join时，如果数据量比较大，可以将一部分hash table写到磁盘中，但不需要做checkpoint。
+
+### Hierarchical Table Joins
+
+F1的层级结构数据允许用一个请求就执行完下面的join：
+
+```sql
+SELECT *
+FROM Customer JOIN
+     Campaign USING (CustomerId)
+```
+
+Spanner会交替返回父表与子表数据：
+
+```
+Customer(3)
+  Campaign(3,5)
+  Campaign(3,6)
+Customer(4)
+  Campaign(4,2)
+  Campaign(4,4)
+```
+
+读取过程中F1会使用一种类似于merge join的cluster join策略，它只需要每张表缓存一行数据，一个请求可以处理任意多张表，只要这些表沿着一条路径下降（同级只能有一张表，否则需要缓存不确定数量的行）。
+
+当F1在join父表与多张同级子表时，它会先用cluster join完成父表与其中一张子表的join，再用其它join策略完成剩余部分。像lookup join之类的策略可以控制batch大小，避免结果集太大需要写到磁盘中。
+
+### Partitioned Consumers
+
+为了避免coordinator本身成为数据输出的瓶颈，F1允许多个client使用一组endpoint消费同一个query的结果（比如MapRecuce）。但因为F1的流式处理，其中一个client慢了会拖慢其它client。一种未实现的优化策略是使用基于磁盘的buffer来解耦。
+
+### Queries with Protocol Buffers
+
+这篇文章发表时F1还不支持解析一个PB对象的部分字段。
+
+## Deployment
+
+略
+
+## Latency And Throughput
+
+F1的读延时为5-10ms，commit延时为50-150ms。
