@@ -185,6 +185,75 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/22/f1-a-distributed-sql-database-that-scales/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/12/22/f1-a-distributed-sql-database-that-scales/" class="post-title-link" itemprop="url">[笔记] F1: A distributed SQL database that scales</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-12-22 15:59:20 / 修改时间：15:59:31" itemprop="dateCreated datePublished" datetime="2020-12-22T15:59:20+08:00">2020-12-22</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://research.google/pubs/pub41344/" target="_blank" rel="noopener">F1: A distributed SQL database that scales</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>F1是Google用于替换分库分表的MySQL的RDBMS系统。它在<a href="/2020/12/14/spanner-googles-globally-distributed-database/">Spanner</a>之上建立了一套关系模型，拥有Spanner的跨datacenter的同步replication能力。F1还开发了新的ORM模型，从而将同步geo-replication导致的延时隐藏了起来，保证了E2E延时在替换后没有上升。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/12/22/f1-a-distributed-sql-database-that-scales/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/14/spanner-googles-globally-distributed-database/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -694,7 +763,7 @@
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-12-09 13:53:04" itemprop="dateModified" datetime="2020-12-09T13:53:04+08:00">2020-12-09</time>
+                <time title="修改时间：2020-12-20 23:19:01" itemprop="dateModified" datetime="2020-12-20T23:19:01+08:00">2020-12-20</time>
               </span>
 
           
@@ -715,7 +784,7 @@
 <p>Hologres的主要特点：</p>
 <ul>
 <li>计算存储分离。</li>
-<li>兼容PostgreSQL（SQL解析层是不是基于PSQL改造的？）。</li>
+<li>兼容PostgreSQL。</li>
 <li>同时支持行列两种存储形式，从而支持高性能的写入、点查、扫描。</li>
 <li>高效的高并发实现。</li>
 <li>TableGroup，支持表之间colocate。</li>
@@ -771,10 +840,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-11-24 16:12:02 / 修改时间：16:12:03" itemprop="dateCreated datePublished" datetime="2020-11-24T16:12:02+08:00">2020-11-24</time>
+              <time title="创建时间：2020-11-24 16:12:02" itemprop="dateCreated datePublished" datetime="2020-11-24T16:12:02+08:00">2020-11-24</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-12-21 22:00:37" itemprop="dateModified" datetime="2020-12-21T22:00:37+08:00">2020-12-21</time>
+              </span>
 
           
 
@@ -805,7 +880,7 @@
 </ul>
 <p>这篇文章中有些细节看得不是很明白，以下内容部分来自脑补。</p>
 <p>总体感觉ADB的性能确实好。缺点是可能成本会比较高，索引的构建过程的计算开销与所有列的索引对应的存储开销都挺高的。存储开销可以通过更好的编码和压缩来控制，但会导致计算开销更高，这样base compaction时间会更长，常规路径的数据可见性会受到一些影响。</p>
-<p>如果将compaction分成更多级别，一步步提高优化等级，优点是数据可见性比较好，缺点是第一次compaction时如果还是要为每列都建索引，则优化不够的话存储开销大，或者读开销也会大。而通常query都会更倾向于读近期的数据，相当于大多数query都只享受到了低优化等级。</p>
+<p>如果将compaction分成更多级别，一步步提高优化等级，优点是数据可见性比较好，缺点是第一次compaction时如果还是要为每列都建索引，则优化不够的话存储开销大，或者读开销也会大。而通常query都会更倾向于读近期的数据，相当于大多数query都只享受到了低优化等级。</p>
 <p>本质上数据可见性与优化就是矛盾的，没有万能药，只能靠工程上的tradeoff。</p>
           <!--noindex-->
             <div class="post-button">
@@ -899,87 +974,11 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/21/f1-query-declarative-querying-at-scale/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/11/21/f1-query-declarative-querying-at-scale/" class="post-title-link" itemprop="url">[笔记] F1 query: declarative querying at scale</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2020-11-21 13:49:45 / 修改时间：23:20:42" itemprop="dateCreated datePublished" datetime="2020-11-21T13:49:45+08:00">2020-11-21</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://dl.acm.org/doi/abs/10.14778/3229863.3229871" target="_blank" rel="noopener">F1 query: declarative querying at scale</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>F1 query是一种federated query processing平台，它的特点是：</p>
-<ol>
-<li>计算存储分离。</li>
-<li>支持不同的存储引擎，如BigTable、Spanner、Mesa等，因此称为federated query processing。</li>
-<li>使用三种不同的模式处理不同规模的query：单节点模式处理短的实时query；分布式模式处理中等query；远程模式使用MapReduce处理大型query。</li>
-<li>使用启发式的query optimizer。</li>
-</ol>
-<p>这里面最有价值的部分就是它如何融合不同的数据源与处理模式。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/11/21/f1-query-declarative-querying-at-scale/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/9/">9</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1048,14 +1047,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">80</span>
+          <span class="site-state-item-count">81</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">58</span>
+        <span class="site-state-item-count">59</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
