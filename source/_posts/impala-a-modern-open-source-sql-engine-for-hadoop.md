@@ -1,8 +1,20 @@
+---
+title:      "[笔记] Impala: A Modern, Open-Source SQL Engine for Hadoop"
+date:       2020-12-23 11:52:41
+tags:
+    - 笔记
+    - OLAP
+    - Codegen
+---
+
 > 原文：[Impala: A Modern, Open-Source SQL Engine for Hadoop](https://2013.berlinbuzzwords.de/sites/2013.berlinbuzzwords.de/files/slides/Impala%20tech%20talk.pdf)
 
 ## TL;DR
 
-TODO
+Impala是建立在Hadoop生态之上的MPP query engine，它有以下特点：
+- MPP，所有节点都可以参与query执行。
+- 代码生成。
+- 基于pub-sub的元数据同步。
 
 <!--more-->
 
@@ -84,5 +96,42 @@ query生成过程分为query解析、语义分析、生成plan、优化几个阶
 - top-n
 - 分析求值
 
-这一阶段需要尽可能下推谓词、基于等价类做谓词推断、裁剪partition、设置limit/offset、执行projection、执行一些基于cost的优化（如排序合并分析窗口函数、重排列join）。开销预测是基于table/partition的基数与每列的不同值数量，目前还没有统计直方图。Impala使用了启发式方法，避免常规的在整个join空间内枚举和计算。
+这一阶段需要尽可能下推谓词、基于等价类做谓词推断、裁剪partition、设置limit/offset、执行projection、执行一些基于cost的优化（如排序合并分析窗口函数、重排列join）。开销预测是基于table/partition的基数与每列的不同值数量（使用HyperLogLog），目前还没有统计直方图。Impala使用了启发式方法，避免在整个join空间内枚举和计算。
 
+第二阶段会将单节点plan作为输入，生成分布式执行plan，原则是最小化数据移动，最大化扫描的数据局部度。向plan的节点中间插入exchange节点以使plan分布化，插入非exchange节点（如部分聚合节点）以最小化数据移动。这阶段所有join的策略都会被确定下来，目前支持broadcast和partitioned join（两边都hash分区）。
+
+所有聚合都会先在各个节点上预聚合，跟着一个最终的聚合。sort和top-n也使用类似的策略。
+
+最后plan树会在exchange处切分为若干个fragment，作为backend的执行单位。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/impala-02.jpg)
+
+## Backend
+
+Impala的backend是C++写的（frontend是Java），使用了代码生成（codegen）。它的执行方式是传统的Volcano风格，但每次`GetNext()`会返回一批record，而不是一个。除了sort等要hold数据的操作，其它操作都是完全流水线化的，最小化内存占用。在内存中处理期间，数据是按行组织的（提前组装）。
+
+在需要的时候，算子也可以把过多的数据暂存到磁盘上。Impala在hash join的时候会把内存中的hash table分为若干个partition，当内存吃紧的时候会把一些partition暂存到磁盘上。
+
+在构建hash table过程中，Impala也会生成bloom filter，这样能避免探测表传输太多数据。
+
+### Runtime Code Generation
+
+Impala使用了LLVM来编译生成有JIT的代码，在一些典型场景中性能提升能达到5倍以上。代码生成的好处是可以去掉那些考虑到通用性的分支、虚函数、变量、循环、各种指针等，在编译过程中可以充分inline。Impala会对那些运行在内层循环中的函数使用codegen，比如将数据解析为内存格式的函数会per record调用，对它使用codegen是收益非常大的。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/impala-03.jpg)
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/impala-04.jpg)
+
+### I/O Management
+
+Impala会使用HDFS的short-circuit本地读取技术，绕过datanode的协议，直接读本地盘，从而充分利用磁盘带宽。HDFS的cache也帮助Impala减少了磁盘和cpu消耗。
+
+为了能匹配不同盘的能力，Impala会为每块HDD配一个线程，每块SSD配8个线程。
+
+### Storage Formats
+
+Impala推荐使用Parquet作为文件格式（细节略，参见[Dremel笔记](/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets)）。
+
+## Resource/Workload Management
+
+略
