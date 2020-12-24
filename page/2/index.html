@@ -185,6 +185,97 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/" class="post-title-link" itemprop="url">[笔记] AnalyticDB: Real-time OLAP Database System at Alibaba Cloud</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-24 16:12:02" itemprop="dateCreated datePublished" datetime="2020-11-24T16:12:02+08:00">2020-11-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-12-21 22:00:37" itemprop="dateModified" datetime="2020-12-21T22:00:37+08:00">2020-12-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://dl.acm.org/doi/abs/10.14778/3352063.3352124" target="_blank" rel="noopener">AnalyticDB: Real-time OLAP Database System at Alibaba Cloud</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>AnalyticDB（以下简称ADB）是一种支持复杂ad-hoc查询的实时分析系统。</p>
+<p>ADB的主要特点：</p>
+<ul>
+<li>读写节点分离，之间通过pangu异步交换数据，或通过RPC同步交换数据。优点是可以避免相互影响，缺点是高数据可见性就会有一定的性能损失。</li>
+<li>索引功能强大：<ul>
+<li>全量数据中所有列都有索引，增量数据也有简单的索引。</li>
+<li>运行期可以基于选择率跳过部分索引，不会因过度使用索引而导致性能下降。</li>
+<li>索引类型丰富，string、int、JSON、向量等类型的列都可以建索引，还可以创建全文搜索索引。</li>
+</ul>
+</li>
+<li>仔细设计过的列存格式。</li>
+<li>使用MapReduce做全量数据的compaction。</li>
+</ul>
+<p>这篇文章中有些细节看得不是很明白，以下内容部分来自脑补。</p>
+<p>总体感觉ADB的性能确实好。缺点是可能成本会比较高，索引的构建过程的计算开销与所有列的索引对应的存储开销都挺高的。存储开销可以通过更好的编码和压缩来控制，但会导致计算开销更高，这样base compaction时间会更长，常规路径的数据可见性会受到一些影响。</p>
+<p>如果将compaction分成更多级别，一步步提高优化等级，优点是数据可见性比较好，缺点是第一次compaction时如果还是要为每列都建索引，则优化不够的话存储开销大，或者读开销也会大。而通常query都会更倾向于读近期的数据，相当于大多数query都只享受到了低优化等级。</p>
+<p>本质上数据可见性与优化就是矛盾的，没有万能药，只能靠工程上的tradeoff。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/21/druid-a-real-time-analytical-data-store/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -894,91 +985,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/" class="post-title-link" itemprop="url">[笔记] The End of an Architectural Era (It's Time for a Complete Rewrite)</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-14 16:56:10" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-11-21 23:28:55" itemprop="dateModified" datetime="2020-11-21T23:28:55+08:00">2020-11-21</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://hstore.cs.brown.edu/papers/hstore-endofera.pdf" target="_blank" rel="noopener">The End of an Architectural Era (It’s Time for a Complete Rewrite)</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文针对新硬件带来的新的趋势，提出了一种全新的OLTP DBMS，H-Store，可以大幅度提高传统的DBMS的性能。</p>
-<p>传统的DBMS主要还是沿用System R的架构：</p>
-<ul>
-<li>面向磁盘的存储和索引结构。</li>
-<li>多线程。</li>
-<li>基于锁的并发控制。</li>
-<li>基于log的恢复机制。</li>
-</ul>
-<p>本文观点是在这套架构上小修小补已经不够了，我们需要全新的设计。</p>
-<p>尤其是传统RDBMS想用一套系统满足全部需求的想法已经过时了。</p>
-<p>H-Store针对OLTP场景，打破了上面这种架构，主要是充分利用大内存和多节点，结合对OLTP场景的若干假设，省掉log和lock相关的很多机制，从而大幅度提升了性能。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1052,7 +1058,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">82</span>
+          <span class="site-state-item-count">83</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

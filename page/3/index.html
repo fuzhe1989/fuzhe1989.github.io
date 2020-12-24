@@ -185,6 +185,91 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/" class="post-title-link" itemprop="url">[笔记] The End of an Architectural Era (It's Time for a Complete Rewrite)</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-10-14 16:56:10" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-11-21 23:28:55" itemprop="dateModified" datetime="2020-11-21T23:28:55+08:00">2020-11-21</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a href="https://hstore.cs.brown.edu/papers/hstore-endofera.pdf" target="_blank" rel="noopener">The End of an Architectural Era (It’s Time for a Complete Rewrite)</a></p>
+</blockquote>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文针对新硬件带来的新的趋势，提出了一种全新的OLTP DBMS，H-Store，可以大幅度提高传统的DBMS的性能。</p>
+<p>传统的DBMS主要还是沿用System R的架构：</p>
+<ul>
+<li>面向磁盘的存储和索引结构。</li>
+<li>多线程。</li>
+<li>基于锁的并发控制。</li>
+<li>基于log的恢复机制。</li>
+</ul>
+<p>本文观点是在这套架构上小修小补已经不够了，我们需要全新的设计。</p>
+<p>尤其是传统RDBMS想用一套系统满足全部需求的想法已经过时了。</p>
+<p>H-Store针对OLTP场景，打破了上面这种架构，主要是充分利用大内存和多节点，结合对OLTP场景的若干假设，省掉log和lock相关的很多机制，从而大幅度提升了性能。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -890,93 +975,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/" class="post-title-link" itemprop="url">[笔记] A comparison of approaches to large-scale data analysis</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-09-17 21:40:22" itemprop="dateCreated datePublished" datetime="2020-09-17T21:40:22+08:00">2020-09-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-12-20 23:19:01" itemprop="dateModified" datetime="2020-12-20T23:19:01+08:00">2020-12-20</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a href="https://people.eecs.berkeley.edu/~kubitron/cs262/handouts/papers/p165-pavlo.pdf" target="_blank" rel="noopener">A comparison of approaches to large-scale data analysis</a></p>
-</blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>本文的背景是随着MapReduce的兴起，越来越多的人抛弃了传统的DBMS，直接使用MapReduce来做数据分析。本文对比了MapReduce（Hadoop）、Vertica（列存的并行DBMS）、DBMS-X（某个商用的行存的并行DBMS）的性能，指出并行RDBMS仍然有它的优势，不会被MapReduce取代。</p>
-<p>并行DBMS的优势：</p>
-<ul>
-<li>速度远快于MapReduce（热数据、有组织、强大的优化器）。</li>
-<li>更少的代码（SQL的表达能力优势）。</li>
-</ul>
-<p>劣势：</p>
-<ul>
-<li>冷数据的加载时间长。</li>
-<li>容错能力弱（任意子query失败都会导致 整个query失败）。</li>
-<li>灵活性差，难以处理非关系型数据。</li>
-</ul>
-<p>但本文指出，并行DBMS可以用更少的节点完成同样的任务，因此它不一定需要MapReduce那么强的容错能力。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1050,7 +1048,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">82</span>
+          <span class="site-state-item-count">83</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
