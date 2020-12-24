@@ -1,3 +1,14 @@
+---
+title:      "[笔记] Kudu: Storage for fast analytics on fast data"
+date:       2020-12-24 23:11:31
+tags:
+    - 笔记
+    - HTAP
+    - Columnar
+    - Codegen
+    - 开源系统
+---
+
 > 原文：[Kudu: Storage for fast analytics on fast data](https://kudu.apache.org/kudu.pdf)
 
 ## TL;DR
