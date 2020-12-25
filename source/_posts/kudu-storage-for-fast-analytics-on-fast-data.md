@@ -13,6 +13,14 @@ tags:
 
 ## TL;DR
 
+Kudu是一种同时支持高效的随机读写与扫描的存储系统，是用来弥补Hadoop生态中HDFS与HBase的gap的。它的特点是：
+- 自己用Raft实现了多副本（没有用HDFS）。
+- 精巧的列存设计。
+- 两种一致性级别，有可选的commit wait来实现外部一致的snapshot ioslation。
+- codegen。
+
+Kudu应该也属于HTAP系统（或者更接近于HSAP），它的列存设计很棒。但这种使用Raft实现的多副本shard-nothing架构，计算和存储是耦合的，会给后面的扩展带来很多麻烦（比如怎么支持erasure coding）。
+
 <!--more-->
 
 ## Introduction
