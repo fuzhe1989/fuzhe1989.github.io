@@ -162,3 +162,30 @@ Snowflake被设计为允许系统中同时存在多种版本的服务，这主�
 ### Semi-Structured and Schema-Less Data
 
 Snowflake支持三种半结构化数据：VARIANT、ARRAY、OBJECT。VARIANT可以是任何原生SQL类型（DATE、VARCHAR等），OBJECT类似于JavaScript中的object。这三种类型本质都是VARIANT，有着相同的内部形式：自描述的紧凑的二进制，支持快速kv查询、高效的类型测试、比较、hash。
+
+VARIANT允许用户使用一种ETL（Extract-Load-Transform）风格来处理数据，而不是传统的ETL（Extract-Transform-Load）（个人理解是可以保留原始格式，为未来的使用保留更多可能性，类似于数据湖的用法）。
+
+另外Snowflake可以在任何SQL语句中做转换，而不需要单独的转换步骤。
+
+#### Post-relational Operations
+
+Snowflake能高效处理OBJECT和ARRAY的子对象提取，因为子对象是单独存放的，父对象中只是一个指针，因此提取过程中不需要拷贝。
+
+#### Columnar Storage and Processing
+
+Snowflake在收集统计信息之后，如果发现VARIANT中有某条路径经常被访问，这一列就会被单独使用类似原生类型的压缩列存格式保存，甚至会生成物化的聚合值用来剪枝。这种优化是在各个文件中单独做的，每个文件会有bloom filter来判断某个路径是否单独保存，这样只有做了这个优化的文件才会下推算子，而其它文件则回退到未优化的处理路径上。
+
+#### Optimistic Conversion
+
+半结构化数据的一个问题是没有类型信息，需要在读的时候做类型转换，对性能有影响，也缺少剪枝需要的元数据。
+
+Snowflake可以在写的时候自动推断类型信息，做写时类型转换，避免上述问题。原始列也会被一同保留下来，这样在读的时候如果发现自动推断的类型不对，还可以回退。
+
+#### Performance
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/snowflake-04.jpg)
+
+图中可以看出schema-less的存储和处理只有10%的额外开销（除了Q9和Q17因为bug）。
+
+### Time Travel and Cloning
+
