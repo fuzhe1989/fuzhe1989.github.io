@@ -108,4 +108,57 @@ Snowflake自己实现了一个全新的列存、向量化、基于push的执行�
 
 所有用户发起的query都会先经过云服务层，在这里做完早期处理：解析、对象解析、访问控制、plan优化。
 
-Snowflake的query优化器基于典型的Cascades风格，采用了自上而下、基于cost的优化。
+Snowflake的query优化器基于典型的Cascades风格，采用了自上而下、基于cost的优化。所有优化需要的统计信息都是在数据加载和更新时维护的。因为Snowflake不支持索引，优化器要搜索的空间比其它系统要小，再加上很多决策会被推迟到运行期（如join的数据分布类型），搜索空间就更小了。这种设计减少了优化器生成错误决策的机会，增加了稳健性，只是损失了一点峰值性能。
+
+优化完成后plan会发给所有参与的节点。在query执行过程中，云服务层会持续追踪query的状态，一方面收集性能指标，一方面检测节点错误。
+
+#### Concurrency Control
+
+并发控制完全由云服务层来实现。Snowflake提供了snapshot isolation的ACID事务。因为S3的文件只能整个重写，Snowflake每笔写都会生成新的文件（Snowflake没有undo/redo log），并通过元数据的MVCC来实现数据本身的MVCC。
+
+#### Pruning
+
+传统的DBMS是通过索引来跳过不需要的数据的，但在Snowflake这样的系统中，索引会带来以下问题：
+- 索引会带来大量随机读，与Snowflake的远端存储和压缩格式有冲突。
+- 维护索引显著增加了存储空间和数据加载时间。
+- 用户需要显式创建索引，这与Snowflake的纯粹服务的宗旨不符——增加了用户的使用难度。
+
+Snowflake使用了另一种近期很流行的方案，使用min/max剪枝。这种方案很好地契合了Snowflake的设计原则：不依赖用户输入；伸缩性好；易于维护。这种方案在顺序大块数据时效果很好，对数据载入、query优化、query执行的影响也非常小。
+
+Snowflake对半结构化的列也会生成min/max。
+
+除了静态剪枝，Snowflake还会运行期动态剪枝。例如在hash join时，Snowflake会在构建端统计join key的分布，再传到探测端用来过滤数据，甚至有机会跳过整个文件。
+
+## Feature Highlights
+
+### Pure Software-as-a-Service Experience
+
+用户可以通过web页面访问和管理Snowflake。
+
+### Continuous Availability
+
+#### Fault Resilience
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/snowflake-02.jpg)
+
+S3本身是多AZ的，保证了99.99%的可用性和99.999999999%（9个9）的可靠性。Snowflake的元数据本身也是多副本、多AZ的。云服务层的其它stateless的服务也是跨AZ的，保证了一个节点到一个zone宕机都不会造成严重后果。
+
+相对地，出于性能原因，VW不是跨AZ的。如果query过程中有节点出错，整个query会无感知地重试。如果节点没有马上恢复，Snowflake还有一个备用节点池。
+
+如果整个zone宕机，用户需要在别的zone再创建一个VW。
+
+#### Online Upgrade
+
+Snowflake被设计为允许系统中同时存在多种版本的服务，这主要得益于所有服务都相当于stateless的，且所有状态都维护在一个事务性的KV store中，通过一个感知元数据版本和schema演化的映射层来访问。每次元数据schema版本变化都会保证向后兼容。
+
+在软件升级时，Snowflake会保留旧服务的同时部署新服务，用户请求按账号迁移到新服务上，但已经进行中的query会在旧服务上完成。一旦所有用户都迁移完了，旧服务就会停止下线。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/snowflake-03.jpg)
+
+所有版本的云服务层都会共享相同的元数据。更进一步，不同版本的VW可以共享相同的节点和上面的cache，这样升级后cache仍然保持有效，不会有任何性能损失。
+
+写这篇文章时Snowflake每周会升级一次所有服务。
+
+### Semi-Structured and Schema-Less Data
+
+Snowflake支持三种半结构化数据：VARIANT、ARRAY、OBJECT。VARIANT可以是任何原生SQL类型（DATE、VARCHAR等），OBJECT类似于JavaScript中的object。这三种类型本质都是VARIANT，有着相同的内部形式：自描述的紧凑的二进制，支持快速kv查询、高效的类型测试、比较、hash。
