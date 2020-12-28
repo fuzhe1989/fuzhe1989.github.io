@@ -1,3 +1,13 @@
+---
+title:      "[笔记] The snowflake elastic data warehouse"
+date:       2020-12-28 22:44:12
+tags:
+    - 笔记
+    - Data Warehouse
+    - Columnar
+    - Cloud
+---
+
 > 原文：[The snowflake elastic data warehouse](https://dl.acm.org/doi/abs/10.1145/2882903.2903741)
 
 ## TL;DR
@@ -189,3 +199,92 @@ Snowflake可以在写的时候自动推断类型信息，做写时类型转换�
 
 ### Time Travel and Cloning
 
+文件不可变，加上元数据的MVCC，使得Snowflake可以实现时间漫游：
+
+```sql
+SELECT * FROM my_table AT(TIMESTAMP =>
+    ’Mon, 01 May 2015 16:20:00 -0700’::timestamp);
+SELECT * FROM my_table AT(OFFSET => -60*5); -- 5 min ago
+SELECT * FROM my_table BEFORE(STATEMENT =>
+    ’8e5d0ca9-005e-44e6-b858-a8f5b37c5726’);
+```
+
+可以在同一个query中访问同一张表的不同版本：
+
+```sql
+SELECT new.key, new.value, old.value FROM my_table new
+JOIN my_table AT(OFFSET => -86400) old -- 1 day ago
+ON new.key = old.key WHERE new.value <> old.value;
+```
+
+还可以使用`UNDROP`命令恢复表、schema、甚至整个DB：
+
+```sql
+DROP DATABASE important_db; -- whoops!
+UNDROP DATABASE important_db;
+```
+
+Snowflake还支持高效的clone操作，两张表共享底下的文件，而不需要物理拷贝。clone也可以用来做snapshot：
+
+```sql
+CREATE DATABASE recovered_db CLONE important_db BEFORE(
+    STATEMENT => ’8e5d0ca9-005e-44e6-b858-a8f5b37c5726’);
+```
+
+### Security
+
+Snowflake中，数据会在两个地方加密，一个是client发送前，一个是写入本地盘或S3前。
+
+#### Key Hierarchy
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/snowflake-05.jpg)
+
+Snowflake中有4层key：root key、account key、table key、file key。每层key的保护范围都会包括下面的child key。
+
+#### Key Life Cycle
+
+每个key的生命期有四阶段：
+1. 生效前的创建阶段。
+1. 生效阶段，用来加解密数据。
+1. 失效阶段，key不再使用。
+1. 销毁阶段。
+
+一个key只有在没有文件使用它之后才会从阶段2变到阶段3。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/snowflake-06.jpg)
+
+Snowflake使用了key rotation来限制加密阶段key的使用，rekeying来限制解密阶段key的使用。
+
+key rotation会定期（如一个月）创建新的key，之后旧的key只用来解密，不用来加密。
+
+rekeying是定期用新key重新加密旧数据的过程。当一个key已经被淘汰一段时间（如一年）之后，仍然用它来解密的文件就需要重新加密。
+
+同样的操作也发生在root key与account key、account key与table key之间，它们的rekeying只需要重新加密child key，不需要重新加密文件。
+
+table key与file key的关系与这些都不同。file key不是直接由table key管理的，而是用table key与file name组合来的，因此一旦table key变化了，所有file key都跟着变化，文件也都需要重新加密。这种开销换来的是不再创建、管理、销毁file key了，否则Snowflake的文件数量是十亿量级，需要管理的file key将达到GB级别。
+
+## Related Work
+
+**vs Redshift**：Redshift使用了经典的shared-nothing架构，导致了因计算资源而扩缩容时需要搬数据。而Snowflake的计算完全独立于存储。另外Snowflake不需要用户来调优、整理数据、手动收集统计信息、淘汰失效数据。尽管Redshift也可以将JSON等半结构化数据导入为VARCHAR，Snowflake可以对半结构化数据做优化和列存。
+
+**vs BigQuery**：BigQuery的SQL方言与ANSI SQL有一些本质区别。另外BigQuery只支持追加写，必须要有schema。相比之下Snowflake支持完整的DML与ACID的事务，且不需要为半结构化数据准备schema。
+
+**vs Azure SQL DW**：尽管Azure SQL DW可以以data warehouse unit为单位扩容计算资源，但并发度是受限的。Snowflake则没有这种限制。且Azure SQL DW没有内建的对半结构化数据的支持。
+
+## Lessons Learnd and Outlook
+
+2012年，在Snowflake刚创建时，整个数据库世界都在关注SQL on Hadoop，短短时间出现了超过一打的新系统。在那个时候，决定要走一条不同的路，构建一个云上的“经典”数据仓库，看起来是个逆潮流的冒险决定。3年的开发之后，我们确信这个决定是对的。Hadoop没有替代关系型数据库，而是成为了后者的补充。人们仍然需要一个关系型数据库，但要更高效、更灵活、更适合云平台。
+
+Snowflake满足了我们的期望：一个构建在云上的系统能为它的用户和作者提供什么。多集群加上共享存储架构的弹性改变了用户对待数据处理任务的方式。SaaS模型不仅简化了用户尝试和适应系统的过程，也戏剧性地帮助了我们开发和测试。生产环境单版本和在线升级允许我们比传统的开发模型更快地发布新版本、做改进、修复问题。
+
+我们曾经希望半结构化扩展能证明是有用的，但仍然震惊于它被接受的速度。我们发现了一个非常流行的模型，那就是很多用户会用Hadoop做两件事：保存JSON数据、将JSON转换为能载入关系型数据库的格式。通过提供能保存和处理半结构化数据的系统——并提供强大的SQL支持——我们发现Snowflake不仅可以取代传统的数据库，还可以取代Hadoop。
+
+当然过程不会一帆风顺。尽管整个团队加起来有超过100年的数据库开发经验，我们仍然犯了一些可以避免的错误，包括一些关系操作的早期实现过度简化了，没有早点在引擎中支持所有数据类型，对资源管理的关注不够早，推迟了日期与时间函数上的工作等。同样地，我们在避免调优参数上的持续关注也带来了一系统工程上的挑战，最终变成了许多令人激动的技术方案。作为结果，今天的Snowflake只有一个调优参数：用户想要（以及愿意花钱买）多少性能。
+
+尽管Snowflake的性能已经很有竞争力了（尤其是考虑到它还不需要调优），我们仍然有很多已知的优化清官没有时间做。但有些令人意外的是，Snowflake的核心性能几乎没有给用户带来过困扰。原因是通过VW提供的弹性计算可以提供用户偶尔需要的性能提升。这允许我们将注意力转移到系统的其它开发上。
+
+我们的最大的技术挑战与SasS和多租户有关。构建一个可以支持数百个用户并发访问的元数据层，这是很有挑战、很复杂的任务。这是永无止境的战斗：处理多种类型的宕机、网络问题，并提供服务。安全一直是一个很大的主题：保护系统和用户数据免于外部攻击。想要维护一个活跃的、有数百个节点、每天处理数百万个query的系统，且令人满意，需要有能将开发、运维、支持高度整合起来的方案。
+
+Snowflake的用户一直在抛出越来越大、越来越复杂的问题，也在影响着系统的演进。我们目前正在致力于提供额外的元数据架构和数据重组任务——尽量减少用户交互——来提升数据访问性能。我们持续改进和扩展着标准SQL和半结构化数据的核心query处理功能。我们计划进一步改进倾斜处理和负载均衡策略，随着用户workload的规模增大，这两方面愈发重要。我们也在努力简化用户的workload管理，使系统更有弹性；与外部系统集成，包括高频的数据加载。
+
+Snowflake未来最大的挑战是向完全自服务模型的转变，到那时候不需要我们介入，用户自己就可以注册与体验系统。它会带来很多安全、性能、支持上的挑战。我们很期待这一天。
