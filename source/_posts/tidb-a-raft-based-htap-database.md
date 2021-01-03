@@ -143,4 +143,72 @@ learner在收到log之后会以FIFO方式将行存的数据重放为列存数据
 
 #### Columnar Delta Tree
 
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-05.png)
 
+TiFlash的数据分为两部分，base数据是列存的，按key-range分为若干个chunk。列存格式类似于Parquet，区别在于它的row group的meta是单独保存为一个文件，另外压缩格式上目前只支持LZ4。
+
+delta数据则是按写入顺序保存的（用作WAL），也会持久化到磁盘上和compaction。delta数据之上有一个B+树索引用来加速查找（compaction时如何更新索引？）。
+
+当读最新数据时要合并所有delta和对应的base数据，读放大系数很高，因此要定期将delta和base合并到一起。
+
+整个DeltaTree与LSM的性能对比：
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-06.png)
+
+DeltaTree的用时只有LSM（Tiered Compaction）的一半，主要归功于它的读放大会比较小（相当于只有L0和L1），缺点是写放大比较大，但可以接受。
+
+## HTAP Engines
+
+在TiKV和TiFlash之上是计算层TiDB，它支持基于rule和cost的优化器、index、计算下推，使用Percolator风格的2PC来实现分布式事务，还实现了TiSpark作为Spark的connector。
+
+### Transactional Processing
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-07.png)
+
+TiDB同时支持乐观锁和悲观锁，其中乐观锁参考了[Percolator](/2020/12/21/large-scale-incremental-processing-using-distributed-transactions-and-notifications)。
+
+TiDB支持snapshot-isolation（SI）和repeatable-read（RR）两种语义。悲观锁使用RR语义，在加锁时会申请一个for_update_ts的时间戳，加锁失败可以只重试加锁，而不用回滚重试整个事务，且用for_update_ts来读数据。用户也可以指定悲观事务中使用read-committed（RC）语义，这样能减少冲突，但隔离性会下降。
+
+PD生成时间戳的方式类似于HLC，各个节点会批量申请时间戳，目前单机房内不是瓶颈（但geo的话延时会太高）。
+
+### Analytical Processing
+
+#### Query Optimization in SQL Engine
+
+TiDB的优化过程分为两阶段：先用RBO生成逻辑plan，再用CBO生成物理plan。
+
+TiDB支持异步构建和移除索引。索引也保存在TiKV中。有唯一key的index编码为：
+
+```
+Key: {table{tableID}_index{indexID}_indexedColValue}
+Value: {rowID}
+```
+
+没有唯一key的index编码为：
+
+```
+Key: {table{tableID}_index{indexID}_indexedColValue_rowID}
+Value: {null}
+```
+
+在生成物理plan时，TiDB会使用[skyline pruning算法](https://github.com/pingcap/tidb/blob/master/docs/design/2019-01-25-skyline-pruning.md)裁剪掉不用需要的index。如果有多个index分别匹配不同的条件，TiDB会合并这些部分结果。
+
+执行时存储层通过coprocessor来执行某个叶子子树。
+
+#### TiSpark
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-08.png)
+
+TiSpark相比于普通的connector有两方面区别：
+1. 可以同时读取多个region。
+1. 可以并发读取index。
+
+### Isolation and Coordination
+
+TiDB中有三种读取数据的路径：扫描TiKV、扫描索引、扫描TiFlash。这三种路径有着不同的开销和key order。TiKV和TiFlash都是按primary key排序，索引则可以有多种排序。三种路径的开销如下：
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-09.png) 
+
+其中S<sub>tuple/col/index</sub>代表平均大小，N<sub>tuple/reg</sub>代表记录数或region数。f<sub>scan</sub>代表扫描的I/O开销，f<sub>seek</sub>代表seek的I/O开销。
+
+考虑`select T.*, S.a from T join S on T.b=S.b where T.a between 1 and 100`，其中T和S在a列有索引，则优化器会选择使用T的索引和S的列存。
