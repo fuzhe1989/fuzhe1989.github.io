@@ -1,6 +1,29 @@
+---
+title:      "[笔记] TiDB: a Raft-based HTAP database"
+date:       2021-01-03 20:38:05
+tags:
+    - 笔记
+    - HTAP
+    - Columnar
+    - 2PC
+    - Raft
+    - 开源系统
+---
+
 > 原文：[TiDB: a Raft-based HTAP database](https://dl.acm.org/doi/abs/10.14778/3415478.3415535)
 
 ## TL;DR
+
+TiDB是一个HTAP系统，目标是同时服务TP和AP服务，且能保证隔离性和数据新鲜度。它的架构受到了Spanner和F1的影响：计算层类似于F1，无状态；存储层类似于Spanner，支持分布式事务。
+
+它的存储层分为了行存的TiKV和列存的TiFlash，其中TiKV各个replica之间通过Raft保持一致，TiFlash则作为Raft的learner保证看到最新的数据。相比[Kudu](/2020/12/24/kudu-storage-for-fast-analytics-on-fast-data)，TiDB物理上分离了TP和AP，隔离性更好；相比[F1-Lightning](/2020/11/30/f1-lightning-htap-as-a-service)的基于CDC的replay，TiDB的新鲜度更好。
+
+一些看法：
+- TiKV底下使用了RocksDB，但LSM的compaction会导致性能不稳定，在高并发的TP场景可能会有问题，如何解决？
+- TiFlash是绑在TiKV上的：
+    - 数据一定要先进TiKV再进TiFlash，对于没有强事务需求的场景而言有些浪费，是否能提供更低开销的ingestion？
+    - 列存和行存的key order是一样的，是否能有列存格式的索引？
+- 与Kudu等系统类似，TiKV的Raft与多副本是绑定的，对支持erasure coding有阻碍，对上云也有阻碍（使用云存储）。
 
 <!--more-->
 

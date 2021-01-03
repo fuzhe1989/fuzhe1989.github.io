@@ -87,7 +87,7 @@ Kudu支持将表水平切分为若干个partition，它的特点是支持用户�
 
 ### Replication
 
-Kudu没有使用HDFS，而是自己管理数据。每个tablet可以有多个replica，之间通过Raft协议保持一致。所有写请求都会发给leader，leader有本地的lock manager，使用MVCC来解决并发冲突。默认情况下Raft的心跳间隔是500ms，选举timeout是1.5s。
+Kudu没有使用HDFS，而是自己管理数据。每个tablet可以有多个replica，之间通过Raft协议保持一致。所有写请求都会发给leader，leader有本地的lock manager，使用MVCC来解决并发冲突。默认情况下Raft的心跳间隔是500ms，选举timeout是1.5s。
 
 Kudu对Raft实现了以下小的优化：
 - 选举过程中采用指数退避重试。
