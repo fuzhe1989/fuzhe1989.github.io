@@ -233,6 +233,26 @@ bit-vector解压慢是因为它要把并发读多个bit-string再合并起来。
 
 RLE（run length很短时）和字典的聚合方法一表现不太好，但列存仍然体现出了对行存的优势：一次可以聚合多个值，聚合次数更少了。因此相比于常规压缩的拿CPU换I/O，直接在压缩数据上操作同时节省了I/O和CPU，意味着即使在I/O更快CPU更慢的机器上，压缩加上直接在压缩数据上操作仍然有用。
 
+### Higher column cardinalities
+
+下图是更高cardinality时的性能对比。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-08.png)
+
+图a的run length为1，图b的run length为14。NS与bit-vector性能太差，图中没显示。注意到cardinality特别大时，hash table已经超过cache大小了，造成了性能的陡降。
+
+注意到RLE和LZ这样依赖于数据局部性的算法在run length为1时表现很差，但run length大一点就有很好的表现。字典则在局部性不好时也有着良好的表现。
+
+下图是几项测试的总结。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-09.png)
+
+可以看出对于RLE和LZ来说，run length是比cardinality更好的指示器。
+
+### Generated vs. TPC-H Data
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-10.png)
+
 ## References
 
 1. [G.Graefe and L.Shapiro. Data compression and database performance. In ACM/IEEE-CS Symp. On Applied Computing pages 22 -27, April 1991.][1]
