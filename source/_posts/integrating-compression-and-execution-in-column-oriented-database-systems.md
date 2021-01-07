@@ -1,4 +1,6 @@
 > 原文：[Integrating Compression and Execution in Column-Oriented Database Systems](https://dl.acm.org/doi/abs/10.1145/1142473.1142548)
+>
+> 可以与The design and implementation of modern column-oriented database systems对照阅读。
 
 ## TL;DR
 
@@ -108,6 +110,128 @@ Bit-vector encoding的定义参考[Wikipedia](https://en.wikipedia.org/wiki/Bitm
 LZ编码可以参考[Wikipedia](https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Welch)和[之前的博客](/2020/10/09/understanding-compression)。它有非常多的变种，是使用最广泛的通用压缩算法。
 
 作者选择了[LZ算法的一个可以任意使用的版本](http://www.lzop.org)，针对解压速度有优化。
+
+## Compressed Query Execution
+
+### Query Executor Architecture
+
+直接在压缩数据上操作可以带来非常明显的性能提升，但如果因此而需要让算子知道具体的压缩类型，就太耦合了，因此作者引入了两个类作为中间层。
+
+第一个类称为compression block，是压缩数据的一种封装。它提供了以下API供算子使用：
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-01.png)
+
+有两种方法遍历解压过的数据：调用`getNext()`会返回一个解压过的值和对应的位置；调用`asArray()`会返回整个buffer解压过的数组指针。
+
+三个Block Information API都是可以不解压就得到的。重点说下bit-vector encoding，每个compression block只对应一个特定值，因此`isPosContig`返回false，`getSize`返回1的数量，`getStartValue`返回值本身，`getEndPosition`返回最后一个1的位置。
+
+第二个类是一个新的scan算子，叫DataSource。它作为query plan和存储层之间的接口，知道压缩过的page保存在哪，有哪些索引可用。scan时它会将压缩的page读上来，转换为compression block。对于像LZ这样的重量级算法，DataSource会在读page时直接解压。
+
+有些谓词可以直接下推给DataSource，比如下推equal，且数据是bit-vector编码的，就可以直接返回bit-string。而如果下推equal给字典编码的数据，DataSource会将谓词值转换为字典值再做比较（不用解压数据）。其它时候谓词可以在数据刚从磁盘中读出来时就求值，总之尽可能避免解压。
+
+### Compression-Aware Optimizations
+
+考虑一个nested loops join的例子。C-Store中，如果数据已经被组装为tuple了，join就和正常的row-store一样了。但如果数据仍然是列存格式的，join的输出会是两边的position list：
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-02.png)
+
+考虑到各种压缩算法，可能伪代码会写成这样：
+
+```
+NLJoin(Predicate q, Column c1, Column c2)
+    IF c1 IS NOT COMPRESSED AND c2 IS NOT COMPRESSED
+        FOR EACH VALUE valc1 WITH POSITION i IN c1 DO
+            FOR EACH VALUE valc2 WITH POSITION j IN c2 DO
+                IF q(valc1, valc2) THEN OUTPUT-LEFT: (i), OUTPUT-RIGHT: (j)
+            END
+        END
+    IF c1 IS NOT COMPRESSED AND c2 IS RLE COMPRESSED
+        FOR EACH VALUE valc1 WITH POSITION i IN c1 DO
+            FOR EACH TRIPLE t WITH VAL v, STARTPOS j AND RUNLEN k IN c2
+                IF q(valc1, v) THEN:
+                    OUTPUT-LEFT: t,
+                    OUTPUT-RIGHT: (j ... j+k-1)
+            END
+        END
+     IF c1 IS NOT COMPRESSED AND c2 IS BIT-VECTOR COMPRESSED
+        FOR EACH VALUE valc1 WITH POSITION i IN c1 DO
+            FOR EACH VALUE valc2 WITH BITSTRING b IN c2 DO
+                // ASSUME THAT THERE ARE num '1's IN b
+                IF q(valc1, valc2) THEN OUTPUT
+                    OUTPUT-LEFT: NEW RLE TRIPLE (NULL, i, num)
+                    OUTPUT-RIGHT: b
+            END
+        END
+    ETC. ETC. FOR EVERY POSSIBLE COMBINATION OF ENCODING TYPES
+```
+
+可以看出为了充分利用不同压缩算法的特点，上面这段代码变得非常繁琐，如果有N种压缩算法，需要写N<sup>2</sup>种情况。
+
+为了避免这种代码爆炸的情况出现，作者总结了几种压缩算法的特点，提炼为前面的三个Properties API，其中`isPosContig()`表示这个compression block中的值是否是这列数据中连续的一段。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-03.png)
+
+注意上面的表格只对应本文使用的几种实现的特点。
+
+算子可以在无法操作压缩数据时退化到调用`getNext()`和`asArray()`来操作解压过的值。我们可以把`SELECT  c1, COUNT(*) FROM t GROUP BY c1`实现为下面的伪代码：
+
+```
+COUNT(COLUMN c1)
+    b = GET NEXT COMPRESSED BLOCK FROM c1
+    WHILE b IS NOT NULL
+        IF b.IsOneValue()
+            x = FETCH CURRENT COUNT FOR b.GetStartValue()
+            x = x + b.GetSize()
+        ELSE
+            a = b.AsArray()
+            FOR EACH ELEMENT i IN a
+                x = FETCH CURRENT COUNT FOR i
+                x = x + 1
+        b = GET NEXT COMPRESSED BLOCK FROM c1
+```
+
+这段代码中RLE和bit-vector会走同一条路径，从而降低了代码的复杂度。
+
+下图给了更多join和聚合如何使用这几个API的例子。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-04.png)
+
+## Experimental Results
+
+### Eager Decompression
+
+这一项测试的是数据读出来就立刻解压。query很简单：`SELECT SUM(C) FROM TABLE GROUP BY C`。C列生成了1亿个32位整数。这组测试中C的NDA在2-40之间，模拟一种低cardinality的场景，理论上会比较适合bit-vector。下图是几种压缩算法在不同情况下的压缩后体积。配合这个projection前两列的NDA，我们控制数据的sorted run length为50（图左）和1000（图右），其中C列连续的run length为sorted run length除以它的NDA。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-05.png)
+
+一些结论：
+- 字典和LZ有着最高的压缩率。字典在低cardinality时表现要比LZ好一点。
+- RLE在run length比较大（低cardinality）时表现良好。
+- bit-vector的压缩率与NDA呈线性关系。一旦NDA大于32，bit-vector还不如不压缩。
+
+下图是性能对比。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-06.png)
+
+可以看出压缩后体积小不意味着性能好。比如bit-vector体积只有未压缩的一半，但它要比未压缩慢一个数量级（35~120秒，图里没显示）。这也说明解压严重影响了性能，体积小带来的I/O延时优势完全被解压速度淹没了。
+
+bit-vector解压慢是因为它要把并发读多个bit-string再合并起来。RLE和NS比字典和LZ慢是因为它们的解压代码中有比较多的分支，无法充分利用CPU的流水线（[[5]]有相同结论）。
+
+### Operation Directly on Compressed Data
+
+这项测试与上一项的区别在于可以直接在压缩数据上操作。LZ和NS没办法操作，因此它们的性能直接取自上个测试（或忽略）。字典编码有两种直接操作压缩数据的方式，第一种一次取一个编码，局部做group-by得到次数，再将编码替换为真实值乘以次数，得到sum。例如2映射为000，4映射为001，8映射为002。当操作`001, 001, 000, 001, 002, 002`时，先聚合为`001: 3, 000: 1, 002:２`，再替换得到结果`12, 2, 16`。
+
+第二种直接用多个编码值的字典项聚合，然后将所有包含特定值的字典项的聚合值加起来，再乘以真实值。第一种方式适用于所有聚合情况，第二种方式只适用于group-by自身。
+
+下图a和b是性能对比。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-07.png)
+
+可以看到在sorted run为1000时，RLE相比上一项的性能平均提升了3.3倍，bit-vector则是10.3倍，字典则分别是3.94倍（group-by自身）和1.1倍（group-by非自身）。
+
+图c是在有外界CPU竞争下，测试用时相比图a和b的增加。这里的主要因素是CPU cycle的竞争，而不是cache的竞争。
+
+RLE（run length很短时）和字典的聚合方法一表现不太好，但列存仍然体现出了对行存的优势：一次可以聚合多个值，聚合次数更少了。因此相比于常规压缩的拿CPU换I/O，直接在压缩数据上操作同时节省了I/O和CPU，意味着即使在I/O更快CPU更慢的机器上，压缩加上直接在压缩数据上操作仍然有用。
 
 ## References
 
