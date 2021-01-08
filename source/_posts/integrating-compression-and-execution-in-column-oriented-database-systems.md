@@ -1,8 +1,20 @@
+---
+title:      "[笔记] Integrating Compression and Execution in Column-Oriented Database Systems"
+date:       2021-01-08 08:41:03
+tags:
+    - 笔记
+    - Columnar
+    - 探索研究
+    - Compression
+---
+
 > 原文：[Integrating Compression and Execution in Column-Oriented Database Systems](https://dl.acm.org/doi/abs/10.1145/1142473.1142548)
 >
 > 可以与The design and implementation of modern column-oriented database systems对照阅读。
 
 ## TL;DR
+
+一篇略老（2006年）的paper，但很重要。
 
 数据库中压缩算法的使用是非常影响性能的。这方面列存要比行存更有优势：每列排列在一起天然就适合压缩，而行存中相同列的值是被其它列隔开的。
 
@@ -200,7 +212,7 @@ COUNT(COLUMN c1)
 
 ### Eager Decompression
 
-这一项测试的是数据读出来就立刻解压。query很简单：`SELECT SUM(C) FROM TABLE GROUP BY C`。C列生成了1亿个32位整数。这组测试中C的NDA在2-40之间，模拟一种低cardinality的场景，理论上会比较适合bit-vector。下图是几种压缩算法在不同情况下的压缩后体积。配合这个projection前两列的NDA，我们控制数据的sorted run length为50（图左）和1000（图右），其中C列连续的run length为sorted run length除以它的NDA。
+这项测试的是数据读出来就立刻解压。query很简单：`SELECT SUM(C) FROM TABLE GROUP BY C`。C列生成了1亿个32位整数。这组测试中C的NDA在2-40之间，模拟一种低cardinality的场景，理论上会比较适合bit-vector。下图是几种压缩算法在不同情况下的压缩后体积。配合这个projection前两列的NDA，我们控制数据的sorted run length为50（图左）和1000（图右），其中C列连续的run length为sorted run length除以它的NDA。
 
 ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-05.png)
 
@@ -252,6 +264,49 @@ RLE（run length很短时）和字典的聚合方法一表现不太好，但列�
 ### Generated vs. TPC-H Data
 
 ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-10.png)
+
+### Other Query Types
+
+这项测试关心一列的压缩是如何影响另一列的访问的。query为：`SELECT COL1, COUNT(*) FROM TABLE WHERE PREDICATE(COL2) GROUP BY COL1`。
+
+C-Store中会使用position filter来处理这种query，有谓词的列会通过DataSource算子得到一个表示position的bit-string，所有这些bit-string在与/或之后再交给上层算子来取出想要的值。
+
+第一个试验使用TPC-H数据，COL2是quantity列（`quantity == 1`），使用RLE压缩。COL1列可以是suppkey、shipdata、linenumber、returnflag列。使用的projection是按COL1、COL2排序的，因此COL1使用RLE压缩（对有序数据友好）。下图a是结果。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-11.png)
+
+bit-vector这么快是因为它保存的已经是position list了。而且COL1是RLE编码，与bit-string的与操作可以很高效。
+
+第二个试验的query是一样的，但两列的角色交换了下，现在COL1有谓词（仍然是RLE），COL2用来聚合。结果见图b。这个试验中bit-vector表现就不太好了，前面已经提到过它的解压是比较慢的。但在run length很长时，开始出现整个page都是0或1的情况，允许bit-vector做一些优化，表现又变好了。
+
+图a和b的对比说明列该如何编码不光要看数据本身，还要看query类型。一个可能的优化是将相同列以相同顺序但不同压缩方式保存多份。
+
+下一个query是：
+
+```sql
+SELECT S.COL3, COUNT(*)
+FROM P1 AS L, P2 AS S
+WHERE PREDICATE(S.COL2) AND PREDICATE(L.COL1)
+            AND L.COL2 = S.COL1
+GROUP BY S.COL3
+```
+
+这里假设P1是事实表，P2是维度表，projection按S.COL2和L.COL1排序（C-Store会优先按有谓词的列排序projection），因此都使用RLE编码。L.COL2是二级排序列，用来试验不同压缩方式。结果如下：
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-12.png)
+
+## Conclusion
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-13.png)
+
+上图总结了用于选择编码的决策树。
+
+其中“exhibits good locality”意思是这列要么已排序，要么与已排序的列有关系，要么数据本身有重复pattern。“likely to be used in a position contiguous manner”意思是这列需要与其它列并行读，因此不能乱序。
+
+除了如何使用压缩算法外，以下几点也很关键：
+- 数据库的schema设计需要感知压缩子系统。数据局部性很重要。
+- 如果能直接在压缩数据上操作的话，就值得牺牲一些压缩率，将重量级压缩算法替换为轻量级压缩算法。
+- 优化器在估计cost时需要意识到压缩算法的影响。
 
 ## References
 
