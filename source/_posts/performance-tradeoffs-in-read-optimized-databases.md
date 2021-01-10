@@ -35,3 +35,5 @@ tags:
 前面说的列存的I/O次数更多的问题，可以通过prefetch来解决，文章中尝试了prefetch 48个I/O单元（每个128KB），明显提升了性能。有了prefetch后，列存相当于在用并发I/O，从而将seek延时掩盖住了。
 
 最后的结论是大部分场景中仔细优化过的列存要比仔细优化过的行存性能更好，行存只有在记录非常小（小于20B）、CPU是瓶颈（cpdb小）的场景中有优势。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/perf-read-optimized-01.png)
