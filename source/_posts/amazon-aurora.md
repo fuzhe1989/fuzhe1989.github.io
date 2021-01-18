@@ -16,6 +16,8 @@ Amazon Aurora目前有两篇文章：
 
 其中第一篇内容比较多，重点讲架构与实现；第二篇重点讲的是细节，比如一致性、优化、恢复过程、成员变更。
 
+[Deep Dive on Amazon Aurora](https://www.percona.com/live/e18/sites/default/files/slides/Deep%20Dive%20on%20Amazon%20Aurora%20-%20FileId%20-%20160328.pdf)这个slide还介绍了很多paper中没提到的特性，比如cache在DB进程之外、锁优化、索引构建优化等。
+
 <!--more-->
 
 ## 背景
@@ -179,4 +181,3 @@ Aurora中每个PG的6个Segment是不对等的，分为3个完整的大Segment�
 修复一个小Segment的过程与前面一样，但修复一个大Segment就有点复杂了，因为它可能是唯一有完整数据的大Segment（注意4/6的quorum中可能有3份是小Segment）。但回顾Aurora的口号：“THE LOG IS THE DATABASE”，只要有足够的log，仍然可以修复这样的大Segment。
 
 可以看到quorum协议有着足够的灵活性，可以用来实现非对等的成员。
-
