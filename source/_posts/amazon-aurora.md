@@ -23,10 +23,10 @@ Amazon Aurora目前有两篇文章：
 ## 背景
 
 在Aurora之前，云数据库有两个思路：
-1. RDS，单机的MySQL/PostgreSQL几乎原封不动地移到VM上运行，底下是云存储（EBS），我们称这种为shared-disk，属于计算存储分离的架构。
+1. RDS，单机的MySQL/PostgreSQL几乎原封不动地移到VM上运行，底下是云存储（EBS），我们称这种为shared-disk，属于计算存储分离的架构。扩展计算节点需要分库分表。
 1. Spanner，将数据水平切分为若干个shard，由多个节点服务，相互不共享数据，涉及到不同节点的事务需要使用两阶段提交（2PC），我们称这种为shared-nothing。
 
-> 两种思路的优缺点可以参考[可否对比一下 TiDB 与 AWS Aurora ？ - 朱元的回答](https://www.zhihu.com/question/56669587/answer/552118039)。
+> [可否对比一下 TiDB 与 AWS Aurora ？ - 朱元的回答](https://www.zhihu.com/question/56669587/answer/552118039)
 
 shared-disk的优点是最大限度保证兼容（MySQL/PostgreSQL），通常只需要动存储层，不需要改上面的query解析、plan生成等，另外不涉及分布式事务，性能比较稳定；缺点就是规模上不去。
 
