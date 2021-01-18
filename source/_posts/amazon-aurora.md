@@ -1,3 +1,15 @@
+---
+title:      "[笔记] Amazon Aurora SIGMOD'17 '18"
+date:       2021-01-10 23:16:30
+tags:
+    - 笔记
+    - Amazon
+    - OLTP
+    - Aurora
+    - Shared-disk
+    - Quorum
+---
+
 Amazon Aurora目前有两篇文章：
 - 2017年的[Amazon aurora: Design considerations for high throughput cloud-native relational databases](https://dl.acm.org/doi/abs/10.45/3035918.3056101)。
 - 2018年的[Amazon aurora: On avoiding distributed consensus for i/os, commits, and membership changes](https://dl.acm.org/doi/abs/10.1145/3183713.3196937)。
@@ -47,9 +59,17 @@ Aurora默认会部署到三个AZ中，可以有一个可写的主实例与多个
 
 采用这种配置的目的是能在1个AZ整个挂掉的情况下继续服务写，在1个AZ加1份存储挂掉的情况下继续服务读。
 
+> 情况一：不考虑机房整体失效的情况下，如果只有一个副本损坏，由于写请求至少写入4个副本，4-1=3，那么读请求仍然可以读到3个相同的副本，因此读写请求仍然可以成功。
+>
+> 情况二：假设一个机房整体失败了，**Aurora设计的巧妙之处就在于，它会把读写的Quorum模式改为“总共4副本、写入最少3副本、读出最少2副本”这种模式，即4/3/2模式。**
+>
+> 情况三：假设失败的机房又恢复了，那么系统再把它的Quorum模式改回“总共6副本、写入最少4副本、读出最少3副本”模式，即6/4/3模式，然后开始慢慢的修复数据。
+>
+> 综上所述，**Aurora最美妙的设计在于通过变换Quorum模式来解决单个机房长期失败的问题。**
+>
 > [请问Aurora系统为什么必须要6份copy来支持“AZ+1”failures？ - 江枫的回答](https://www.zhihu.com/question/435302730/answer/1634390470)
 
-## 存储层
+### 存储层
 
 Aurora最大的创新就是将复杂的page管理放到了存储层。
 
@@ -57,7 +77,11 @@ Aurora最大的创新就是将复杂的page管理放到了存储层。
 
 DB将redolog写进存储层的UPDATE QUEUE之后就返回了，之后存储层内部完成log补齐（quorum协议会导致每个Segment的log不全，相同PG的不同Segment之间会通过gossip协议交换log record）、page管理（应用log、多版本管理、垃圾回收）、备份到S3等操作。
 
-## 一致性保证
+存储层每个节点有本地的SSD盘，同时数据定期会备份到S3上（没有使用EBS）。
+
+## 实现
+
+### 一致性保证
 
 Aurora的一致性保证的前提是单写多读（实际支持多写，但论文中没提，似乎多写也不保证全局唯一顺序，这里不讨论），由唯一的写实例来控制存储的整体推进，从而在quorum协议（通常被认为只能保证最终一致性）基础上实现了DB需要的各种一致性。整个过程中PG的各个副本（Segment）之间不会有任何的信息同步，保证了低开销。
 
@@ -105,6 +129,40 @@ Aurora中DB初始化与故障恢复走相同流程：
 
 在PG都恢复之后，DB自己可以慢慢做undo，不影响服务。
 
+第二篇paper中称这种复杂的恢复流程是一种tradeoff，用这种复杂度换取了正常流程的简单、低开销：“The time we save in the normal forward processing of commits using local transient state must be paid back by re-establishing consistency upon crash recovery”。
+
 ### 读取
 
+Aurora的DB只需要写redolog，不需要写data page，因此也不需要刷脏页（dirty page），但仍然需要决定如何将脏页从buffer pool中踢掉。Aurora需要保证client永远能看到最新的页。定义页的LSN就是它的最后一笔写的LSN，如果page LSN > VDL，说明此时page要比存储更新，就不能踢掉。只有page LSN <= VDL的页才可以踢掉（第一篇paper这里写反了），后面如果需要读的话再从存储层load上来。
+
+Aurora的读需要固定在某个CPL上以保证read view一致，默认是读请求到达时的VDL。注意DB是有存储层各PG的全部信息的，它可以选择一个足够新的Segment来服务这次读，避免使用read quorum。
+
+DB也会追踪目前所有活跃的读事务（包括只读replica在处理的读事务）在各个PG上的最小的LSN，记为Protection Group Minimum Read Point LSN（PGMRPL），PGMRPL会发送给各个Segment，Segment可以把低于它的log record与过期的data page都清理掉。
+
+与正常的MySQL类似，读出来的页可能比想要的版本更新，需要本地应用undo record。因此本地的undo record也必须在PGMRPL提升之后才能清理掉。
+
+### 只读replica
+
+Aurora中每个DB最多可以有15个只读replica，它们与主实例共享存储层，理论上可以定期从各个Segment上拉取数据来保持与主实例同步。但为了降低主实例与只读实例的可见延时，主实例在写存储层的同时也会把log流发送给只读实例。注意log流中也包含了VDL的提升与主实例上的事务状态变化，这样只读实例可以正确地维护活跃事务列表。
+
+只读实例会将主实例发过来的log record应用到自己buffer pool中的page上，规则是：
+1. 如果log record修改的page不在buffer pool中，直接丢掉。
+1. 只应用那些不大于VDL的log record，这些数据可能在failover后截断掉，不能被client看到。
+1. 相同MTR的log record要原子应用到page上。
+
+主实例到只读实例的replication是异步的，只会增加主实例的网络流量，不会对延时有明显的影响。如果主实例挂了，会有一个只读实例升级为主实例，此时它只需要走一遍恢复流程重建内存状态。
+
+### 成员变更
+
+这里指PG的Segment变更。
+
+quorum协议的成员变更通常是比较复杂的，比如I/O要停，变更过程中不能有failover等。Aurora使用了quorum set的概念，将一次成员变更分成至少两次操作，每次都会提升membership epoch，从而解决了上面这两个问题。
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/aurora-06.png)
+
+假设我们要将ABCDEF变更为ABCDEG，第一步是将write quorum变为`4/6 of ABCDEF AND 4/6 of ABCDEG`，read quorum则是`3/6 of ABCDEF OR 3/6 of ABCDEG`。此时如果F恢复了，我们可以再将成员列表变回ABCDEF。如果F一直没有恢复，当G追上其它成员后，做第二步变更，将成员列表改为ABCDEG。
+
+如果过程中E也挂了，需要替换为H，则write quorum变为`4/6 of ABCDEF AND 4/6 of ABCDEG AND 4/6 of ABCDFH AND 4/6 of ABCDGH`（不会更复杂了，4/6的quorum只允许同时最多挂2份）。整个过程中I/O是不需要停的。
+
+当整个AZ挂掉时，quorum需要从6/4/3退化为4/3/2，也是通过上面的机制实现的。
 

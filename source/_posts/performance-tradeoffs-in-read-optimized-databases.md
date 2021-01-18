@@ -8,8 +8,7 @@ tags:
     - Compression
 ---
 
-
-> 原文：[Performance Tradeoffs in Read-Optimized Databases]()
+> 原文：[Performance Tradeoffs in Read-Optimized Databases](http://nms.csail.mit.edu/~stavros/pubs/vldb2006.pdf)
 
 ## TL;DR
 
