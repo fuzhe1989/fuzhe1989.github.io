@@ -168,3 +168,13 @@ quorum协议的成员变更通常是比较复杂的，比如I/O要停，变更�
 
 当整个AZ挂掉时，quorum需要从6/4/3退化为4/3/2，也是通过上面的机制实现的。
 
+### 降低存储成本
+
+Aurora中每个PG的6个Segment是不对等的，分为3个完整的大Segment（包含log与data）与3个log-only的小Segment。因为log通常远小于data，这样整体存储成本更接近于3份拷贝，而不是6份。
+
+这种设计同时也影响了读写的quorum。write quorum是4/6的任意Segment，**或**3/3的大Segment，而read quorum则是3/6的任意Segment，**且**1/3的大Segment（注意read quorum不用于常规读请求）。
+
+修复一个小Segment的过程与前面一样，但修复一个大Segment就有点复杂了，因为它可能是唯一有完整数据的大Segment（注意4/6的quorum中可能有3份是小Segment）。但回顾Aurora的口号：“THE LOG IS THE DATABASE”，只要有足够的log，仍然可以修复这样的大Segment。
+
+可以看到quorum协议有着足够的灵活性，可以用来实现非对等的成员。
+
