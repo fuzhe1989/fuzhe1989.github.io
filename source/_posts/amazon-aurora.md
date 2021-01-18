@@ -14,7 +14,7 @@ Amazon Aurora目前有两篇文章：
 - 2017年的[Amazon aurora: Design considerations for high throughput cloud-native relational databases](https://dl.acm.org/doi/abs/10.45/3035918.3056101)。
 - 2018年的[Amazon aurora: On avoiding distributed consensus for i/os, commits, and membership changes](https://dl.acm.org/doi/abs/10.1145/3183713.3196937)。
 
-其中第一篇内容比较多，重点讲架构；第二篇重点讲的是实现细节。
+其中第一篇内容比较多，重点讲架构与实现；第二篇重点讲的是细节，比如一致性、优化、恢复过程、成员变更。
 
 ## 背景
 
