@@ -44,15 +44,15 @@
   };
 </script>
 
-  <meta name="description" content="原文：Kudu: Storage for fast analytics on fast data  TL;DR">
+  <meta name="description" content="原文：Kudu: Storage for fast analytics on fast data  TL;DRKudu是一种同时支持高效的随机读写与扫描的存储系统，是用来弥补Hadoop生态中HDFS与HBase的gap的。它的特点是：  自己用Raft实现了多副本（没有用HDFS）。 精巧的列存设计。 两种一致性级别，有可选的commit wait来实现外部一致的snapshot ioslat">
 <meta property="og:type" content="article">
 <meta property="og:title" content="[笔记] Kudu: Storage for fast analytics on fast data">
 <meta property="og:url" content="http://fuzhe1989.github.io/2020/12/24/kudu-storage-for-fast-analytics-on-fast-data/index.html">
 <meta property="og:site_name" content="Fu Zhe&#39;s Blog">
-<meta property="og:description" content="原文：Kudu: Storage for fast analytics on fast data  TL;DR">
+<meta property="og:description" content="原文：Kudu: Storage for fast analytics on fast data  TL;DRKudu是一种同时支持高效的随机读写与扫描的存储系统，是用来弥补Hadoop生态中HDFS与HBase的gap的。它的特点是：  自己用Raft实现了多副本（没有用HDFS）。 精巧的列存设计。 两种一致性级别，有可选的commit wait来实现外部一致的snapshot ioslat">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2020-12-24T15:11:31.000Z">
-<meta property="article:modified_time" content="2020-12-24T15:11:41.049Z">
+<meta property="article:modified_time" content="2021-03-12T11:23:27.314Z">
 <meta property="article:author" content="Fu Zhe">
 <meta property="article:tag" content="笔记">
 <meta property="article:tag" content="Columnar">
@@ -214,10 +214,16 @@
                 <i class="fa fa-calendar-o"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2020-12-24 23:11:31 / 修改时间：23:11:41" itemprop="dateCreated datePublished" datetime="2020-12-24T23:11:31+08:00">2020-12-24</time>
+              <time title="创建时间：2020-12-24 23:11:31" itemprop="dateCreated datePublished" datetime="2020-12-24T23:11:31+08:00">2020-12-24</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-03-12 19:23:27" itemprop="dateModified" datetime="2021-03-12T19:23:27+08:00">2021-03-12</time>
+              </span>
 
           
 
@@ -233,7 +239,15 @@
         <blockquote>
 <p>原文：<a href="https://kudu.apache.org/kudu.pdf" target="_blank" rel="noopener">Kudu: Storage for fast analytics on fast data</a></p>
 </blockquote>
-<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><a id="more"></a>
+<h2 id="TL-DR"><a href="#TL-DR" class="headerlink" title="TL;DR"></a>TL;DR</h2><p>Kudu是一种同时支持高效的随机读写与扫描的存储系统，是用来弥补Hadoop生态中HDFS与HBase的gap的。它的特点是：</p>
+<ul>
+<li>自己用Raft实现了多副本（没有用HDFS）。</li>
+<li>精巧的列存设计。</li>
+<li>两种一致性级别，有可选的commit wait来实现外部一致的snapshot ioslation。</li>
+<li>codegen。</li>
+</ul>
+<p>Kudu应该也属于HTAP系统（或者更接近于HSAP），它的列存设计很棒。但这种使用Raft实现的多副本shard-nothing架构，计算和存储是耦合的，会给后面的扩展带来很多麻烦（比如怎么支持erasure coding）。</p>
+<a id="more"></a>
 
 <h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>很多Hadoop的用户会使用HDFS上的Parquet或Avro文件做OLAP，使用HBase做OLTP，但没办法结合起来。前者顺序写很厉害，但不支持实时更新，后者随机写很厉害，但分析性能差。一种折衷的方案是数据和修改流式写入HBase，再定期导出为HDFS上的Parquet文件。但这样的架构会有以下问题：</p>
 <ul>
@@ -262,7 +276,7 @@
 <p>读的时候用户可以指定一个timestamp进行snapshot读。</p>
 <h2 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h2><h3 id="Cluster-roles"><a href="#Cluster-roles" class="headerlink" title="Cluster roles"></a>Cluster roles</h3><p>Kudu有单master负责维护元数据，若干个tablet server服务用户数据。master支持replication。</p>
 <h3 id="Partitioning"><a href="#Partitioning" class="headerlink" title="Partitioning"></a>Partitioning</h3><p>Kudu支持将表水平切分为若干个partition，它的特点是支持用户设置一个partition schema，类似一个函数，将primary key转为二进制的partition key。这样除了key-range和hash两种分区策略外，用户还可以自己实现更复杂的策略。</p>
-<h3 id="Replication"><a href="#Replication" class="headerlink" title="Replication"></a>Replication</h3><p>Kudu没有使用HDFS，而是自己管理数据。每个tablet可以有多个replica，之间通过Raft协议保持一致。所有写请求都会发给leader，leader有本地的lock manager，使用MVCC来解决并发冲突。默认情况下Raft的心跳间隔是500ms，选举timeout是1.5s。</p>
+<h3 id="Replication"><a href="#Replication" class="headerlink" title="Replication"></a>Replication</h3><p>Kudu没有使用HDFS，而是自己管理数据。每个tablet可以有多个replica，之间通过Raft协议保持一致。所有写请求都会发给leader，leader有本地的lock manager，使用MVCC来解决并发冲突。默认情况下Raft的心跳间隔是500ms，选举timeout是1.5s。</p>
 <p>Kudu对Raft实现了以下小的优化：</p>
 <ul>
 <li>选举过程中采用指数退避重试。</li>
@@ -351,7 +365,10 @@
     <a href="/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/" rel="prev" title="[笔记] Impala: A Modern, Open-Source SQL Engine for Hadoop">
       <i class="fa fa-chevron-left"></i> [笔记] Impala: A Modern, Open-Source SQL Engine for Hadoop
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2020/12/28/the-snowflake-elastic-data-warehouse/" rel="next" title="[笔记] The snowflake elastic data warehouse">
+      [笔记] The snowflake elastic data warehouse <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -440,14 +457,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">83</span>
+          <span class="site-state-item-count">91</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">60</span>
+        <span class="site-state-item-count">65</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -472,7 +489,7 @@
 <div class="copyright">
   
   &copy; 
-  <span itemprop="copyrightYear">2020</span>
+  <span itemprop="copyrightYear">2021</span>
   <span class="with-love">
     <i class="fa fa-user"></i>
   </span>
