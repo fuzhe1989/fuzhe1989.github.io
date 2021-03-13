@@ -75,6 +75,6 @@ HARBOR的优化版本的2PC中coordinator仍然有一次同步写，而在对3PC
 
 （如果backup没有参与这次事务呢？这套机制似乎不允许coordinator并发处理请求。）
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/integrated-approach-03.png)
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/integrated-approach-02.png)
 
 benchmark就略过了。
