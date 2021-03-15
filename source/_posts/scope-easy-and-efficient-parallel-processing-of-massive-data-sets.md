@@ -122,5 +122,3 @@ int StringOccurs(string str, string ptrn)
 其中`#CS`和`#ENDCS`中间可以直接嵌入C#代码。
 
 用户还可以自己定制PROCESS、REDUCE、COMBINE三类算子，从而实现类似于[MapReduceMerge](2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/)的操作。
-
-
