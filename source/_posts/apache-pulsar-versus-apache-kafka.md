@@ -4,7 +4,7 @@ date: 2020-07-30 23:06:42
 tags:
     - Pulsar
     - Kafka
-    - BigData
+    - Queue
 ---
 
 只有33页的新书，可以从[MemSQL](https://www.memsql.com/resources/ebook-oreilly-pulsar-vs-kafka)上下载到。

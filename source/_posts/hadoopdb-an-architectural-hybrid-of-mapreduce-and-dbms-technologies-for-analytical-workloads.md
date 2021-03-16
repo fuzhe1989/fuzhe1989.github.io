@@ -3,7 +3,7 @@ title:      "[笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Te
 date:       2020-09-21 16:08:09
 tags:
     - 笔记
-    - BatchProcessing
+    - BigData
     - MapReduce
     - Database
 ---

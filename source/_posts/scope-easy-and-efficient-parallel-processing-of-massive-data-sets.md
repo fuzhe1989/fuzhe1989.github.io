@@ -3,7 +3,7 @@ title:      "[笔记] SCOPE: Easy and Efficient Parallel Processing of Massive D
 date:       2020-10-11 18:18:37
 tags:
     - 笔记
-    - BatchProcessing
+    - BigData
 ---
 
 > 原文：[SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets](http://www.vldb.org/pvldb/vol1/1454166.pdf)

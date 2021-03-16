@@ -4,7 +4,7 @@ date:       2020-10-16 20:00:43
 tags:
     - 笔记
     - MapReduce
-    - BatchProcessing
+    - BigData
     - Google
 ---
 

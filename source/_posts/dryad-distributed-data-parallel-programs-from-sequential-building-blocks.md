@@ -3,7 +3,7 @@ title:      "[笔记] Dryad: Distributed Data-Parallel Programs from Sequential 
 date:       2020-10-11 15:25:21
 tags:
     - 笔记
-    - BatchProcessing
+    - BigData
     - Microsoft
 ---
 

@@ -1,22 +1,22 @@
 ---
 title:      "[笔记] Pig Latin: A Not-So-Foreign Language for Data Processing"
-date:       2020-10-11 18:18:37
+date:       2021-03-16 12:29:41
 tags:
     - 笔记
-    - BatchProcessing
+    - BigData
 ---
 
 > 原文：[Pig Latin: A Not-So-Foreign Language for Data Processing](https://dl.acm.org/doi/abs/10.1145/1376616.1376726)
 
 ## TL;DR
 
+Pig Latin又是一个瞄准了MapReduce表达能力弱点的类SQL语言，它声称“集合了体现SQL精神的高阶查询与类MapReduce的过程式程序”。
+
 > 关于Pig Latin的逸事：[大数据那些事(7)：腾飞的拉丁猪](https://mp.weixin.qq.com/s/1OwY353VTfVrPfY2bxhGhA)
 
 <!--more-->
 
 ## Introduction
-
-Pig Latin又是一个瞄准了MapReduce表达能力弱点的类SQL语言，它声称“集合了体现SQL精神的高阶查询与类MapReduce的过程式程序”。
 
 下面的SQL：
 
@@ -91,7 +91,7 @@ expanded_queries的类型也是bag。
 real_queries = FILTER queries BY userId neq 'bot';
 ```
 
-`COGROUP`会将不同set的数据按各自的key做colocation，与`JOIN`的区别在于它不会有一个product效果，如以下两个bag：
+`COGROUP`会将不同set的数据按各自的group key做切分，再分别合并，与`JOIN`的区别在于它不会有一个product效果，如以下两个bag：
 
 ```
 results: (queryString, url, position)
@@ -106,3 +106,40 @@ grouped_data = COGROUP results BY queryString,
 ```
 
 ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/pig-latin-05.png)
+
+`COGROUP`是Pig Latin与SQL之间的关键差异，前者会保留嵌套结构，而后者则产生平铺的relation。对大数据处理而言，前者更易于做二次处理。
+
+`GROUP`是`COGROUP`在只有一个data set时的特例。
+
+`JOIN`则是`COGROUP`后再进一步做cross-product+flatten，算是语法糖。
+
+此外Pig Latin支持的命令还包括：
+- `UNION`。
+- `CORSS`：多个bag的corss-product。
+- `DISTINCT`。
+
+Pig Latin还支持`FOREACH`中嵌套子查询（只支持`FILTER`、`ORDER`、`DISTINCT`）：
+
+```
+grouped_revenue = GROUP revenue BY queryString;
+query_revenue = FOREACH grouped_revenue {
+    top_slot = FILTER revenue BY adSlot eq 'top';
+    GENERATE queryString, SUM(top_slot.amount), SUM(revenue.amount);
+}
+```
+
+最终输出结果的命令是`STORE`：
+
+```
+STORE query_revenues INTO 'myoutput' USING myStore();
+```
+
+## Implementation
+
+Pig Latin下面的运行时称为Pig。Pig支持多种执行引擎，默认Hadoop，此时整个plan会被编译为若干个MapReduce job：
+
+![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/pig-latin-06.png)
+
+（细节不说了，和[MapReduceMerge](2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/)、[FlumeJava](/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines)等都差不多）
+
+Pig Latin中bag会被延迟物化，甚至在求`COUNT`、`SUM`、`AVG`以及一些分布函数时，bag不会真的被物化出来。Pig Latin也会做两阶段聚合来减少聚合开销。
