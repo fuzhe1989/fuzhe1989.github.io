@@ -3,7 +3,9 @@ title:      "[笔记] Consensus on Transaction Commit"
 date:       2021-03-16 19:51:30
 tags:
     - 笔记
-    - BigData
+    - Paxos
+    - 2PC
+    - Consensus
 ---
 
 > 原文：[Consensus on Transaction Commit](https://dl.acm.org/doi/abs/10.1145/1132863.1132867)
