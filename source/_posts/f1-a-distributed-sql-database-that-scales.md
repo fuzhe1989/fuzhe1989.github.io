@@ -37,7 +37,7 @@ F1的设计选择导致了常规读写延时上升，因此F1使用了以下技�
 
 ## Basic Architecture
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/f1-01.jpg)
+![](/images/2020-12/f1-01.jpg)
 
 为了降低延时，F1 client和load balancer会优先选择离得最近的F1 server。
 
@@ -67,7 +67,7 @@ Spanner提供了一个global safe timestamp，并保证不会有正在执行的�
 
 逻辑上F1的表schema可以组织为树型结构。物理上F1会将子表与父表的行交织在一起，要求子表有一个foreign key是父表primary key的前缀（类似于Megastore）。比如Customer表的primary key是`(CustomerId)`，它的一个子表Campaign的primary key是`(CustomerId, CampaignId)`，再下层子表AdGroup的primary key是`(CustomerId, CampaignId, AdGroupId)`。root表的行称为root row，所有从属于某个root row的子表的行都与root row存储在Spanner的一个directory中。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/f1-02.jpg)
+![](/images/2020-12/f1-02.jpg)
 
 这种层级结构的好处：
 - 将读某个root前缀下多个entity的操作由多次point query转为了一次range query。
@@ -172,7 +172,7 @@ query优化器会启发式确定用哪种模式处理请求。
 
 ### Distributed Query Example
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/f1-03.jpg)
+![](/images/2020-12/f1-03.jpg)
 
 对应的query：
 

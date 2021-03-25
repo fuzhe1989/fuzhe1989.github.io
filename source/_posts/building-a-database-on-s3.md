@@ -35,7 +35,7 @@ Simple Queueing System（SQS）是一种不保证顺序的队列服务，每个c
 
 ## 架构
 
-![Shared-disk Architecture](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/build-s3-01.png)
+![Shared-disk Architecture](/images/2020-11/build-s3-01.png)
 
 这套架构假设client的数量可能达到百万这个量级。为了保证任何client挂掉都不会阻塞其它client，client不会去拿阻塞的锁，且都是无状态的。
 
@@ -80,7 +80,7 @@ log record分为insert、delete、update三种，都要保证是幂等的：
 
 ### Basic协议
 
-![Shared-disk Architecture](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/build-s3-02.png)
+![Shared-disk Architecture](/images/2020-11/build-s3-02.png)
 
 在Basic协议中，B树的每个叶子节点对应一个PU queue，里面是对这个page的所有update，另外B树本身还有一个PU queue，里面是所有insert和delete。
 

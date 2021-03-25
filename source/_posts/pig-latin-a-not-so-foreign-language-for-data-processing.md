@@ -53,14 +53,14 @@ Pig Latin支持以下四种数据类型：
 - tuple：一组可以类型不同的值（还可以嵌套），`('alice', 'lakers')`。
 - bag：一组可以重复的tuple，不要求所有tuple有相同的field和元素数量。
 
-    ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/pig-latin-02.png)
+    ![](/images/2021-03/pig-latin-02.png)
 - map：一组key-value对，其中key必须是atom，value可以是任意类型。
 
-    ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/pig-latin-03.png)
+    ![](/images/2021-03/pig-latin-03.png)
 
 下表是Pig Latin的表达式类型。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/pig-latin-01.png)
+![](/images/2021-03/pig-latin-01.png)
 
 Pig Latin中通过`LOAD`来导入数据：
 
@@ -83,7 +83,7 @@ expanded_queries的类型也是bag。
 
 可以用`FLATTEN`来平铺嵌套类型（看起来像`CROSS JOIN`）：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/pig-latin-04.png)
+![](/images/2021-03/pig-latin-04.png)
 
 `FILTER`：
 
@@ -105,7 +105,7 @@ grouped_data = COGROUP results BY queryString,
                        revenue BY queryString;
 ```
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/pig-latin-05.png)
+![](/images/2021-03/pig-latin-05.png)
 
 `COGROUP`是Pig Latin与SQL之间的关键差异，前者会保留嵌套结构，而后者则产生平铺的relation。对大数据处理而言，前者更易于做二次处理。
 
@@ -138,7 +138,7 @@ STORE query_revenues INTO 'myoutput' USING myStore();
 
 Pig Latin下面的运行时称为Pig。Pig支持多种执行引擎，默认Hadoop，此时整个plan会被编译为若干个MapReduce job：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/pig-latin-06.png)
+![](/images/2021-03/pig-latin-06.png)
 
 （细节不说了，和[MapReduceMerge](2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/)、[FlumeJava](/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines)等都差不多）
 

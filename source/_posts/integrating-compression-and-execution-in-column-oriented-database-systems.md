@@ -131,7 +131,7 @@ LZ编码可以参考[Wikipedia](https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv
 
 第一个类称为compression block，是压缩数据的一种封装。它提供了以下API供算子使用：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-01.png)
+![](/images/2021-01/integrating-compression-01.png)
 
 有两种方法遍历解压过的数据：调用`getNext()`会返回一个解压过的值和对应的位置；调用`asArray()`会返回整个buffer解压过的数组指针。
 
@@ -145,7 +145,7 @@ LZ编码可以参考[Wikipedia](https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv
 
 考虑一个nested loops join的例子。C-Store中，如果数据已经被组装为tuple了，join就和正常的row-store一样了。但如果数据仍然是列存格式的，join的输出会是两边的position list：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-02.png)
+![](/images/2021-01/integrating-compression-02.png)
 
 考虑到各种压缩算法，可能伪代码会写成这样：
 
@@ -181,7 +181,7 @@ NLJoin(Predicate q, Column c1, Column c2)
 
 为了避免这种代码爆炸的情况出现，作者总结了几种压缩算法的特点，提炼为前面的三个Properties API，其中`isPosContig()`表示这个compression block中的值是否是这列数据中连续的一段。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-03.png)
+![](/images/2021-01/integrating-compression-03.png)
 
 注意上面的表格只对应本文使用的几种实现的特点。
 
@@ -206,7 +206,7 @@ COUNT(COLUMN c1)
 
 下图给了更多join和聚合如何使用这几个API的例子。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-04.png)
+![](/images/2021-01/integrating-compression-04.png)
 
 ## Experimental Results
 
@@ -214,7 +214,7 @@ COUNT(COLUMN c1)
 
 这项测试的是数据读出来就立刻解压。query很简单：`SELECT SUM(C) FROM TABLE GROUP BY C`。C列生成了1亿个32位整数。这组测试中C的NDA在2-40之间，模拟一种低cardinality的场景，理论上会比较适合bit-vector。下图是几种压缩算法在不同情况下的压缩后体积。配合这个projection前两列的NDA，我们控制数据的sorted run length为50（图左）和1000（图右），其中C列连续的run length为sorted run length除以它的NDA。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-05.png)
+![](/images/2021-01/integrating-compression-05.png)
 
 一些结论：
 - 字典和LZ有着最高的压缩率。字典在低cardinality时表现要比LZ好一点。
@@ -223,7 +223,7 @@ COUNT(COLUMN c1)
 
 下图是性能对比。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-06.png)
+![](/images/2021-01/integrating-compression-06.png)
 
 可以看出压缩后体积小不意味着性能好。比如bit-vector体积只有未压缩的一半，但它要比未压缩慢一个数量级（35~120秒，图里没显示）。这也说明解压严重影响了性能，体积小带来的I/O延时优势完全被解压速度淹没了。
 
@@ -237,7 +237,7 @@ bit-vector解压慢是因为它要把并发读多个bit-string再合并起来。
 
 下图a和b是性能对比。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-07.png)
+![](/images/2021-01/integrating-compression-07.png)
 
 可以看到在sorted run为1000时，RLE相比上一项的性能平均提升了3.3倍，bit-vector则是10.3倍，字典则分别是3.94倍（group-by自身）和1.1倍（group-by非自身）。
 
@@ -249,7 +249,7 @@ RLE（run length很短时）和字典的聚合方法一表现不太好，但列�
 
 下图是更高cardinality时的性能对比。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-08.png)
+![](/images/2021-01/integrating-compression-08.png)
 
 图a的run length为1，图b的run length为14。NS与bit-vector性能太差，图中没显示。注意到cardinality特别大时，hash table已经超过cache大小了，造成了性能的陡降。
 
@@ -257,13 +257,13 @@ RLE（run length很短时）和字典的聚合方法一表现不太好，但列�
 
 下图是几项测试的总结。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-09.png)
+![](/images/2021-01/integrating-compression-09.png)
 
 可以看出对于RLE和LZ来说，run length是比cardinality更好的指示器。
 
 ### Generated vs. TPC-H Data
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-10.png)
+![](/images/2021-01/integrating-compression-10.png)
 
 ### Other Query Types
 
@@ -273,7 +273,7 @@ C-Store中会使用position filter来处理这种query，有谓词的列会通�
 
 第一个试验使用TPC-H数据，COL2是quantity列（`quantity == 1`），使用RLE压缩。COL1列可以是suppkey、shipdata、linenumber、returnflag列。使用的projection是按COL1、COL2排序的，因此COL1使用RLE压缩（对有序数据友好）。下图a是结果。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-11.png)
+![](/images/2021-01/integrating-compression-11.png)
 
 bit-vector这么快是因为它保存的已经是position list了。而且COL1是RLE编码，与bit-string的与操作可以很高效。
 
@@ -293,11 +293,11 @@ GROUP BY S.COL3
 
 这里假设P1是事实表，P2是维度表，projection按S.COL2和L.COL1排序（C-Store会优先按有谓词的列排序projection），因此都使用RLE编码。L.COL2是二级排序列，用来试验不同压缩方式。结果如下：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-12.png)
+![](/images/2021-01/integrating-compression-12.png)
 
 ## Conclusion
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/integrating-compression-13.png)
+![](/images/2021-01/integrating-compression-13.png)
 
 上图总结了用于选择编码的决策树。
 

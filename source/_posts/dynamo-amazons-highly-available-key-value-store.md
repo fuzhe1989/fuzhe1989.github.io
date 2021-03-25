@@ -27,13 +27,13 @@ Dynamo使用了quorum协议（即R+W>N）来读写不同replica的数据。为�
 
 Dynamo与BigTable是同一个时期非常不同的两种技术选择，前者看重可用性，后者看重一致性，且有着更复杂的数据模型。目前来看，用户似乎通常不太喜欢自己来解决数据冲突，默认的“last write win”策略已经够好了。对于只在一个datacenter内的后继系统来说，Dynamo有点过于复杂了，中心节点可以极大简化系统设计。但对于跨datacenter的系统，quorum的价值一下子提高了很多。
 
-![Summary of techniques used in Dynamo](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/dynamo-02.jpg)
+![Summary of techniques used in Dynamo](/images/2020-11/dynamo-02.jpg)
 
 <!--more-->
 
 ## Partitioning and Replication
 
-![Partitioning](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/dynamo-01.jpg)
+![Partitioning](/images/2020-11/dynamo-01.jpg)
 
 Dynamo使用一致性哈希，每个物理节点根据自己的处理能力（面向异构）使用多个虚拟节点。每个key range的N个replica由它对应的节点和前面的N-1的节点负责，其中它对应的节点称为coordinator，正常情况下负责处理这个key range的读写请求和replication。
 
@@ -45,7 +45,7 @@ Dynamo使用Merkle树来组织数据，这种数据结构的优点是每层都�
 
 ### Ensuring Uniform Load distribution
 
-![Partitioning Strategies](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/dynamo-04.jpg)
+![Partitioning Strategies](/images/2020-11/dynamo-04.jpg)
 
 以下三种partition策略：
 1. 每个节点在整个哈希空间中随机选择T个token。
@@ -66,7 +66,7 @@ Dynamo的目标应用需要保证always writable，因此Dynamo允许在网络�
 
 Dynamo选择将这些写入历史记录下来，构成vector clock，由用户解决。
 
-![Version Clock](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/dynamo-03.jpg)
+![Version Clock](/images/2020-11/dynamo-03.jpg)
 
 一个vector clock由一组`(node, counter)`组成，记录了它在某个node的最后一笔写入的counter（node级别单调增），这样如果vector A在每个node上的counter都小于等于vector B，则称B包含A。两个互不包含的vector可以merge到一起，由用户决定最终值是什么。
 

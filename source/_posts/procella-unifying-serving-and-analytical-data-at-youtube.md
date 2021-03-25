@@ -47,7 +47,7 @@ Procella基于了多种Google的infrastructure，这些系统的特性也影响�
 - 存储用Colossus，文件写完后不可变，远程访问延时高。
 - 计算用Borg，运行大量小task比少量大task更有助于提高总的利用率（调度容易）；failover概率大，外加没有本地存储，更有理由拆小task了；单个task的性能难以预测。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/procella-01.jpg)
+![](/images/2020-12/procella-01.jpg)
 
 ### Data
 
@@ -103,11 +103,11 @@ Procella一开始使用Capacitor作为列存格式，但这种格式不适合于
 
 以下是Capacitor与Artus的比较。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/procella-02.jpg)
+![](/images/2020-12/procella-02.jpg)
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/procella-04.jpg)
+![](/images/2020-12/procella-04.jpg)
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/procella-03.jpg)
+![](/images/2020-12/procella-03.jpg)
 
 ### Evaluation Engine
 
@@ -120,9 +120,9 @@ Procella一开始使用Capacitor作为列存格式，但这种格式不适合于
 
 以下是Superluminal和开源的Supersonic运行TPC-H的对比：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/procella-05.jpg)
+![](/images/2020-12/procella-05.jpg)
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/procella-06.jpg)
+![](/images/2020-12/procella-06.jpg)
 
 ### Partitioning & Indexing
 
@@ -130,7 +130,7 @@ Procella支持多级的分区和聚类。通常fact table是按date分区，再�
 
 MDS的内存中的元数据也使用了多种压缩算法，用有限的内存装下海量的元数据。MDS的裁剪对Procella的性能影响巨大，因此保证MDS的大多数操作只走内存是非常重要的。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/procella-07.jpg)
+![](/images/2020-12/procella-07.jpg)
 
 DS在处理query时会使用bloom filter、min/max、倒排索引等文件元数据来最小化磁盘访问，这些元数据会异步缓存在LRU cache中。
 

@@ -63,7 +63,7 @@ HARBOR中未提交的transaction不会落盘或生成timestamp，worker会在内
 
 HARBOR的K-safety机制下，worker不需要这两次同步写，原因是它可以通过识别特殊值来跳过未提交的修改（从而不需要PREPARE或ABORT），并通过historical query获得其它节点的已提交修改（从而不需要COMMIT）。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/integrated-approach-01.png)
+![](/images/2021-03/integrated-approach-01.png)
 
 HARBOR的优化版本的2PC中coordinator仍然有一次同步写，而在对3PC进行改进后，HARBOR可以省掉所有同步写，移除所有需要落盘的log，从而进一步提升事务性能。
 
@@ -75,6 +75,6 @@ HARBOR的优化版本的2PC中coordinator仍然有一次同步写，而在对3PC
 
 （如果backup没有参与这次事务呢？这套机制似乎不允许coordinator并发处理请求。）
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/integrated-approach-02.png)
+![](/images/2021-03/integrated-approach-02.png)
 
 benchmark就略过了。

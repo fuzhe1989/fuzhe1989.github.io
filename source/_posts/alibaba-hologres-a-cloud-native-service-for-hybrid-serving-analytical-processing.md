@@ -29,7 +29,7 @@ Hologres的主要特点：
 
 ## HSAP
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/hologres-01.jpg)
+![](/images/2020-11/hologres-01.jpg)
 
 HSAP要服务的典型场景同时需要实时和离线的写入和分析。
 
@@ -44,7 +44,7 @@ HSAP要服务的典型场景同时需要实时和离线的写入和分析。
 
 ## 架构
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/hologres-02.jpg)
+![](/images/2020-11/hologres-02.jpg)
 
 Hologres中FE负责接收请求并解析，coordinator负责执行，每个worker会管理若干个tablet并处理它们的请求。worker里面EC pool是Execution Context运行的地方，而HOS Scheduler负责调度这些EC。
 
@@ -68,7 +68,7 @@ table group的好处是单个shard内多张表可以原子写，equi join不需�
 
 每个TGS有一个WAL，其下每个tablet有自己的memory table和若干个sst，采用leveled compaction。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/hologres-03.jpg)
+![](/images/2020-11/hologres-03.jpg)
 
 Hologres中一个请求可以只写一个TGS，也可以写多个TGS，两者都保证是原子的。
 
@@ -96,7 +96,7 @@ Hologres的一致性等级是read-your-writes，每个client保证能看到自�
 
 ### Row and Column Tablet
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/hologres-04.jpg)
+![](/images/2020-11/hologres-04.jpg)
 
 Row Tablet与LevelDB等差不多，区别在于它的memory table没有用SkipList，而是用了Masstree，后者对cache更友好，高并发读时性能更高。
 
@@ -124,7 +124,7 @@ Hologres中有三级cache：本地的SSD Cache、Block Cache、Row Cache。其�
 
 ## Query处理
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/hologres-05.jpg)
+![](/images/2020-11/hologres-05.jpg)
 
 Hologres的FE节点会将Query转换为DAG，再将DAG按shuffle边界切为多个fragment。fragment有三种，read、write、query，其中query fragment表示非读非写的算子（迷惑）。每个fragment随后被并行化为多个fragment instance。
 

@@ -41,7 +41,7 @@ TiDB的idea就来自这里，它使用了Raft来同步replica，其中AP replica
 
 ## Raft-based HTAP
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-01.png)
+![](/images/2021-01/tidb-01.png)
 
 从high level来看，数据保存在若干个Raft group中，其中每个leader和follower的数据是行存的，用来服务TP请求，learner数据是列存的，用来服务AP请求。query优化器会考虑两种引擎来生成query plan。
 
@@ -52,7 +52,7 @@ TiDB的idea就来自这里，它使用了Raft来同步replica，其中AP replica
 
 ## Architecture
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-02.png)
+![](/images/2021-01/tidb-02.png)
 
 TiDB支持MySQL协议，分为三层：分布式存储层、Placement Driver（PD）、计算层。
 
@@ -73,7 +73,7 @@ PD负责管理region，同时也是timestamp oracle，生成全局单调增的ti
 
 ## Multi-Raft Storage
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-03.png)
+![](/images/2021-01/tidb-03.png)
 
 TiKV的多个region可能会对应TiFlash的一个partition，从而提高扫描的效率。
 
@@ -154,7 +154,7 @@ learner在收到log之后会以FIFO方式将行存的数据重放为列存数据
 
 （如何保证rollback对应的prewritten log一定在buffer中呢？）
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-04.png)
+![](/images/2021-01/tidb-04.png)
 
 转换生成的列存数据会写到DeltaTree中。
 
@@ -166,7 +166,7 @@ learner在收到log之后会以FIFO方式将行存的数据重放为列存数据
 
 #### Columnar Delta Tree
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-05.png)
+![](/images/2021-01/tidb-05.png)
 
 TiFlash的数据分为两部分，base数据是列存的，按key-range分为若干个chunk。列存格式类似于Parquet，区别在于它的row group的meta是单独保存为一个文件，另外压缩格式上目前只支持LZ4。
 
@@ -176,7 +176,7 @@ delta数据则是按写入顺序保存的（用作WAL），也会持久化到磁
 
 整个DeltaTree与LSM的性能对比：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-06.png)
+![](/images/2021-01/tidb-06.png)
 
 DeltaTree的用时只有LSM（Tiered Compaction）的一半，主要归功于它的读放大会比较小（相当于只有L0和L1），缺点是写放大比较大，但可以接受。
 
@@ -186,7 +186,7 @@ DeltaTree的用时只有LSM（Tiered Compaction）的一半，主要归功于它
 
 ### Transactional Processing
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-07.png)
+![](/images/2021-01/tidb-07.png)
 
 TiDB同时支持乐观锁和悲观锁，其中乐观锁参考了[Percolator](/2020/12/21/large-scale-incremental-processing-using-distributed-transactions-and-notifications)。
 
@@ -220,7 +220,7 @@ Value: {null}
 
 #### TiSpark
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-08.png)
+![](/images/2021-01/tidb-08.png)
 
 TiSpark相比于普通的connector有两方面区别：
 1. 可以同时读取多个region。
@@ -230,7 +230,7 @@ TiSpark相比于普通的connector有两方面区别：
 
 TiDB中有三种读取数据的路径：扫描TiKV、扫描索引、扫描TiFlash。这三种路径有着不同的开销和key order。TiKV和TiFlash都是按primary key排序，索引则可以有多种排序。三种路径的开销如下：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/tidb-09.png) 
+![](/images/2021-01/tidb-09.png) 
 
 其中S<sub>tuple/col/index</sub>代表平均大小，N<sub>tuple/reg</sub>代表记录数或region数。f<sub>scan</sub>代表扫描的I/O开销，f<sub>seek</sub>代表seek的I/O开销。
 

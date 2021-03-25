@@ -25,7 +25,7 @@ Dryad属于是底层框架，用户真正用到的还是上面的框架，类似
 
 Dryad有一个JobManager负责调度，每台机器上有一个daemon负责起进程和监控，还有name server可以查询机器和机器的位置。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/dryad-01.jpg)
+![](/images/2010-10/dryad-01.jpg)
 
 Dryad底下也有一个类似于GFS的共享存储，顶点间默认用它来通信，但也可以使用TCP Pipe和in-memory FIFO。
 
@@ -38,7 +38,7 @@ Dryad可以处理以下对DAG的修改：
 - 组合两个DAG以增加边。
 - 合并两个DAG。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/dryad-02.jpg)
+![](/images/2010-10/dryad-02.jpg)
 
 ## 执行
 
@@ -54,8 +54,8 @@ Dryad只负责顶点间纯字节流的通信，具体的序列化和反序列化
 
 大多数数据中心的网络都是两层结构，机器直连rack的交换机，rack的交换机再连主交换机。Dryad可以根据网络拓扑，在原有的DAG中插入中间层进行部分聚合。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/dryad-03.jpg)
+![](/images/2010-10/dryad-03.jpg)
 
 也可以复制更多的中间顶点以提高整体的并行度。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/dryad-04.jpg)
+![](/images/2010-10/dryad-04.jpg)

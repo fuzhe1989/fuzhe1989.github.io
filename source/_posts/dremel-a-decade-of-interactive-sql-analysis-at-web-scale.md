@@ -75,7 +75,7 @@ shuffle是query执行性能的瓶颈之一。Dremel一开始参照MapReduce的�
 
 2012年Dremel实现了基于Colossus的shuffle，2014年又扩展到了[支持全内存query执行的shuffle架构](https://cloud.google.com/blog/products/gcp/in-memory-query-execution-in-google-bigquery)。新架构中混合使用了内存和磁盘。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/dremel-01.png)
+![](/images/2020-12/dremel-01.png)
 
 新架构的效果：
 - shuffle的延时减少了一个数量级。
@@ -147,9 +147,9 @@ Dremel的这种弹性、多租户、按需的服务，现在被称为Serverless�
 - 旧paper的执行模型如图3，是一种固定的树型结构。之后Dremel演进到了图4的DAG结构，更加灵活，也能支持更大的规模。
 - Dremel会在运行期收集统计信息，用于动态修改执行plan，比如用哪种join（broadcast还是hash）。这要归功于新的shuffle和集中式调度。在broadcast和hash的例子中，Dremel会先选择hash join，同时shuffle两侧，但如果其中一侧结束得很快，size小于broadcast的阈值，Dremel会取消另一侧的shuffle，转而执行broadcast join。
 
-![旧的执行模型](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/dremel-02.png)
+![旧的执行模型](/images/2020-12/dremel-02.png)
 
-![新的执行模型](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/dremel-03.png)
+![新的执行模型](/images/2020-12/dremel-03.png)
 
 ## 针对嵌套数据的列存
 
@@ -165,7 +165,7 @@ Arrow的做法类似于ORC，但它记录了重复字段的offset，这样有助
 
 下图是Dremel用Google内部的数据集做的统计，如果将RL/DL换成ORC的方案，这些数据集平均大小能减少13%。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/dremel-04.png)
+![](/images/2020-12/dremel-04.png)
 
 但RL/DL在读的时候有一定优势：不需要读祖先。而使用ORC的方案就要读祖先，会多一些I/O。
 
@@ -181,19 +181,19 @@ Capacitor使用了以下技术来高效过滤数据：
 - skip索引。经观察，Dremel/BigQuery中使用的filter的选择性通常都非常强（见图9），需要有快速跳过一片记录的能力。Capacitor在写的时候会把每列的数据分为多个segment，再分别压缩。在扫描时可以直接排除掉不需要的segment，不需要解压缩。
 - 谓词重排序。重排序filter中谓词的最优算法是已知的（[link](https://dl.acm.org/doi/pdf/10.1145/359581.359600)），需要的输入是每个谓词的选择率和开销。Capacitor会使用多种启发式方法，根据是否使用字典、cardinality、NULL的密度、表达式的复杂度来决定如何排序。例如，考虑`p(x) AND q(y)`，其中x没有字典，cardinality很大，而y有字典，cardinality很小，那么最好先求值`q(y)`，即使它表达式更复杂。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/dremel-05.png)
+![](/images/2020-12/dremel-05.png)
 
 ### 行重排序
 
 通常分析引擎中行序都不太重要，因此Capacitor可以自由重新排列行以达到更好的RLE效果，如图10。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/dremel-06.png)
+![](/images/2020-12/dremel-06.png)
 
 但这里最优解是个NP完全问题。而且不是每列效果都一样——长字符串上短的RLE长度也要比短的INTEGER上很长的RLE效果更好。最后我们还要考虑到不同列的使用场景不同：有些列常被用在SELECT中，而另一些列常被用在WHERE中。Capacitor使用了一种基于抽样和启发式规则的近似模型。
 
 实践中行重排序的效果好得惊人。下图中一共有40个数据集，重排序行之后体积平均减少了17%，有些达到了40%，最好的达到了75%。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/dremel-07.png)
+![](/images/2020-12/dremel-07.png)
 
 ### 更复杂的schema
 
@@ -226,5 +226,5 @@ Dremel使用了以下优化从而在不违反上述设计原则的同时使延�
 - 用户可以预留一些资源只用于处理延时敏感的任务。这些资源在空闲时也可以给别人用，但Dremel保证了在需要时会立即将资源还给预留用户使用。
 - 自适应调整query规模。Dremel可以根据query的特点来调整DAG，如`COUNT`和`SUM`只需要最多两层，而top-k则可以增加一层预聚合。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/dremel-08.png)
+![](/images/2020-12/dremel-08.png)
 

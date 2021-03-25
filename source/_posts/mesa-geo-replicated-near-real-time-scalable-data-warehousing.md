@@ -39,7 +39,7 @@ Mesa中数据按表组织，每张表的schema分为两部分，keyspace和value
 
 每张表也可以有若干个索引，每个索引的key column是主表key column的一个排列。
 
-![Table Schema](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/mesa-01.jpg)
+![Table Schema](/images/2020-11/mesa-01.jpg)
 
 上面例子中，表A的key column有Date、PublisherId、Country，value column有Clicks和Cost。表B没有PublisherId列，但有AdvertiserId列。两张表的value column的聚合函数都是SUM。
 
@@ -53,7 +53,7 @@ Mesa接受批量写入，每次写入时会带上版本号V（从0开始单调�
 
 在对前面表A、B、C进行更新时，可以分别对表A和B更新（不同的行），表C会自动更新，也可以一次更新同时包含AdvertiserId和PublisherId，这样表A和B也会一起更新，但开销比较大（为什么？）。
 
-![Table Update](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/mesa-02.jpg)
+![Table Update](/images/2020-11/mesa-02.jpg)
 
 一次更新可能会涉及多张表和view，在结束之前这些数据都不可见，保证了查询的原子性。
 
@@ -68,7 +68,7 @@ Mesa会定期提升base，删掉老的base和无用的delta version、singleton 
 
 Mesa的delta是分多层的，越近的delta的区间越小。
 
-![Delta management](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/mesa-03.jpg)
+![Delta management](/images/2020-11/mesa-03.jpg)
 
 ### Physical Data and Index Formats
 
@@ -86,7 +86,7 @@ Mesa用BigTable保存元数据，用Colossus保存数据文件。
 
 单个datacenter内Mesa实例分成了controller和worker。controller负责管理任务和维护元数据，包括每张表的待更新version与数据文件、delta compaction policy、每种操作类型最近涉及的entry等。
 
-![Controller Worker](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/mesa-04.jpg)
+![Controller Worker](/images/2020-11/mesa-04.jpg)
 
 controller是按表做shard的，本身是无状态的，启动时会从BigTable中读出所有元数据，之后会订阅表的创建、删除操作，表的元数据本身只有controller能修改。
 
@@ -101,11 +101,11 @@ Mesa同时服务于在线和离线业务，因此需要通过优先级来做隔�
 
 每个query server在启动时会将它能服务的表注册到global locator service上，之后client会用这类信息来选择query server。
 
-![Query Processing](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/mesa-05.jpg)
+![Query Processing](/images/2020-11/mesa-05.jpg)
 
 ### 多datacenter部署
 
-![Update Processing](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/mesa-06.jpg)
+![Update Processing](/images/2020-11/mesa-06.jpg)
 
 Mesa有全局的committer和version DB，前者是部署在多个datacenter的无状态的server，后者是基于Paxos的跨datacenter的datastore。
 

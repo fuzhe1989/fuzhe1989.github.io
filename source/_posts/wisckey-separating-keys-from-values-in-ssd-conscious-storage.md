@@ -43,7 +43,7 @@ LSM的成功在于，它充分利用了SATA磁盘顺序IO性能远超随机IO的
 
 ### 2.1 LSM
 
-![wisckey_lsm.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-01.png)
+![wisckey_lsm.png](/images/2020-11/wisc-key-01.png)
 
 可以看到LSM中一个kv对要经历5次写：
 
@@ -77,7 +77,7 @@ LevelDB插入时先写logfile，再写进memtable；memtable满了之后变成im
 
 一项测试中可以看到实际系统中的读写放大系数：
 
-![wisckey_wr_amplification.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-02.png)
+![wisckey_wr_amplification.png](/images/2020-11/wisc-key-02.png)
 
 必须要说明的是，LSM的这种设计是为了在SATA磁盘上获得更好的性能。SATA磁盘的一组典型数据是寻址10ms，吞吐100MB/s，而顺序读下一个Block的数据可能只要10us，与寻址相比延时是1:1000，因此只要LSM的写放大系数不超过1000，就能获得比B树更好的性能。而B树的读放大也不低，比如读1KB的数据，B树可能要读6个4KB的Block，那么读放大系数是24，没有完全拉开和LSM的差距。
 
@@ -85,7 +85,7 @@ LevelDB插入时先写logfile，再写进memtable；memtable满了之后变成im
 
 SSD上仍然不推荐随机写，因为SSD的整块擦除再写以及代价高昂的回收机制，当SSD上预留的Block用光时，它的写性能会急剧下降。LSM的最大化顺序写的特性很适合SSD。
 
-![wisckey_ssd_performance.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-03.png)
+![wisckey_ssd_performance.png](/images/2020-11/wisc-key-03.png)
 
 但与SATA非常不同的是，SSD的随机读性能非常好，且支持高并发。
 
@@ -119,7 +119,7 @@ WiscKey受到了这么一个小发现的启示：我们要排序的只是Key，V
 
 WiscKey中与Key放在一起的只是Value的位置，Value本身存放在其它地方。
 
-![wisckey_ssd_layout.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-04.png)
+![wisckey_ssd_layout.png](/images/2020-11/wisc-key-04.png)
 
 常见的使用场景下，WiscKey中的LSM要比LevelDB小得多。这样就大大降低了写的放大系数。Key为16B，Value为1KB的场景，假设Key的放大系数是10（LSM带来的），Value的放大系数是1，那么WiscKey的整体放大系数是(10 × 16 + 1024) / (16 + 1024) = 1.14。
 
@@ -145,7 +145,7 @@ LSM都是通过compaction来回收无效数据的。WiscKey中Value不参与comp
 
 WiscKey的做法是每次写入Value时也写入对应的Key。
 
-![wisckey_log_layout.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-05.png)
+![wisckey_log_layout.png](/images/2020-11/wisc-key-05.png)
 
 上图中的head总是指向ValueLog的尾部，新数据写到这里。而tail会随着GC的进行向后移动。所有有效数据都在tail~head区间中，每次GC都从tail开始，也只有GC线程可以修改tail。
 
@@ -178,7 +178,7 @@ WiscKey不会每笔写入都调用一次ValueLog的write，这样效率太低。
 
 缺点是在crash丢的数据会多一些，这点与LevelDB类似。
 
-![wisckey_write_unit_size.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-06.png)
+![wisckey_write_unit_size.png](/images/2020-11/wisc-key-06.png)
 
 #### 3.4.2 优化LSM的log
 
@@ -221,31 +221,31 @@ WiscKey为RangeQuery准备了一个32个线程的背景线程池来随机读Valu
 
 第一轮：顺序插入100GB的数据。第二轮：uniform随机写。注意第一轮顺序写不会导致LevelDB和WiscKey做compaction。
 
-![wisckey_load_perf_seq.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-07.png)
+![wisckey_load_perf_seq.png](/images/2020-11/wisc-key-07.png)
 
 即使在256KB场景中，LevelDB的写入吞吐仍然距离磁盘的带宽上限很远。
 
-![wisckey_load_perf_ldb_dist.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-08.png)
+![wisckey_load_perf_ldb_dist.png](/images/2020-11/wisc-key-08.png)
 
 可以看到小Value时LevelDB的延时主要花在写log上，而大Value时延时主要花在等待写memtable上。
 
-![wisckey_load_perf_rand.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-09.png)
+![wisckey_load_perf_rand.png](/images/2020-11/wisc-key-09.png)
 
 LevelDB的吞吐如此之低，原因在于compaction占了太多资源，造成了太大的写放大。WiscKey的compaction则只占了很少的资源。
 
 下图是不同ValueSize下LevelDB的写放大系数。
 
-![wisckey_load_perf_write_amp.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-10.png)
+![wisckey_load_perf_write_amp.png](/images/2020-11/wisc-key-10.png)
 
 #### 4.1.2 Query
 
 第一轮：在100GB随机生成的DB上做100000次随机查找。第二轮：在100GB随机生成的DB上做4GB的范围查找。
 
-![wisckey_query_perf_rand.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-11.png)
+![wisckey_query_perf_rand.png](/images/2020-11/wisc-key-11.png)
 
 LevelDB的低吞吐原因是读放大和compaction资源占用多。
 
-![wisckey_query_perf_range.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-12.png)
+![wisckey_query_perf_range.png](/images/2020-11/wisc-key-12.png)
 
 ValueSize超过4KB后，LevelDB生成的SSTable文件变多，吞吐变差。此时WiscKey吞吐是LevelDB的8.4倍。而在ValueSize为64B时，受限于SSD的随机读能力，LevelDB的吞吐是WiscKey的12倍。如果换一块支持更高并发的盘，这里的性能差距会变小一些。
 
@@ -255,7 +255,7 @@ ValueSize超过4KB后，LevelDB生成的SSTable文件变多，吞吐变差。此
 
 测试内容：1. 随机生成DB；2. 删掉一定比例的kv；3. 随机插入数据同时后台做GC。作者固定Key+Value为4KB，但第二步删除的kv的比例从25%-100%不等。
 
-![wisckey_gc_perf.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-13.png)
+![wisckey_gc_perf.png](/images/2020-11/wisc-key-13.png)
 
 100%删除时，GC扫过的都是无效的Value，也就不会写数据，因此只降低了10%的吞吐。后面的场景GC都会把有效的Value再写进ValueLog，因此降低了35%的吞。
 
@@ -277,7 +277,7 @@ WiscKey可以通过加快LSM中`head`记录的持久化频率来降低恢复时�
 
 下图是LevelDB和WiscKey在载入一个100GB的随机写入的数据集后的DB大小。
 
-![wisckey_space_amp_perf.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-14.png)
+![wisckey_space_amp_perf.png](/images/2020-11/wisc-key-14.png)
 
 LevelDB多出来的空间主要是在加载结束时还没来得及回收掉的无效kv对。WiscKey多出来的空间包括了无效的数据、元数据（LSM中的Value索引，ValueLog中的Key)。在GC后无效数据就没有了，而元数据又非常少，因此整个DB的大小非常接近原始数据大小。
 
@@ -285,7 +285,7 @@ KV存储没办法兼顾写放大、读放大、空间放大，只能从中做取
 
 #### 4.1.6 CPU使用率
 
-![wisckey_cpu_usage.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-15.png)
+![wisckey_cpu_usage.png](/images/2020-11/wisc-key-15.png)
 
 可以看到除了顺序写入之外，LevelDB的CPU使用率都要比WiscKey低。
 
@@ -297,6 +297,6 @@ LevelDB不是一个面向高并发的DB，因此CPU不是瓶颈，这点RocksDB�
 
 ### 4.2 YCSB测试
 
-![wisckey_ycsb.png](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/wisc-key-16.png)
+![wisckey_ycsb.png](/images/2020-11/wisc-key-16.png)
 
 （直接上图，结论不说了）

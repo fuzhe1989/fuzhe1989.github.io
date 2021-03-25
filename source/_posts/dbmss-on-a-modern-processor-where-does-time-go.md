@@ -25,7 +25,7 @@ tags:
 
 ## 现代CPU执行模型
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-01.png)
+![](/images/2021-03/where-does-time-go-01.png)
 
 上图是简略的PⅡ执行过程：
 - FETCH/DECODE模块将用户指令翻译为微码并放到池子里；
@@ -39,7 +39,7 @@ tags:
 
 以上方法会使得一些步骤的时间有重叠，因此处理时间T<sub>Q</sub> = T<sub>C</sub> + T<sub>M</sub> + T<sub>B</sub> + T<sub>R</sub> - T<sub>OVL</sub>，其中T<sub>C</sub>是纯计算时间，T<sub>M</sub>是内存引起的停顿时间，T<sub>B</sub>是分支预测失败引起的停顿时间，T<sub>R</sub>是资源不可用引起的停顿时间，T<sub>OVL</sub>是各步骤的重叠时间。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-02.png)
+![](/images/2021-03/where-does-time-go-02.png)
 
 上表是更细的分解，其中LxD代表数据cache，LxI代表指令cache，DTLB代表数据TLB，ITLB代表指令TLB。
 
@@ -90,15 +90,15 @@ WHERE R.a2 = S.a1
 - DBMS：四个匿名的商业数据库A/B/C/D。
 - 测试工具：Intel提供的emon，可以测量多达74种事件。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-03.png)
+![](/images/2021-03/where-does-time-go-03.png)
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-04.png)
+![](/images/2021-03/where-does-time-go-04.png)
 
 ## 结果
 
 ### 执行时间分解
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-05.png)
+![](/images/2021-03/where-does-time-go-05.png)
 
 A的Q2结果无效，因为它执行时不走索引。
 
@@ -106,7 +106,7 @@ A的Q2结果无效，因为它执行时不走索引。
 
 ### 内存停顿
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-06.png)
+![](/images/2021-03/where-does-time-go-06.png)
 
 将内存停顿时间分解后，我们发现，L1D miss的影响非常小，且因为测试中没有去掉L1D miss被重叠的部分，它的实际影响要更小。进一步的分析发现DBMS访问内部结构的次数远多于访问用户数据，L1D足够装下这部分数据，因此L1D miss主要是在访问冷的用户数据，不是瓶颈。
 
@@ -124,14 +124,14 @@ L1I也造成了巨大的影响，如前面所述，指令的cache miss会导致C
 
 ### 分支预测失败
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-07.png)
+![](/images/2021-03/where-does-time-go-07.png)
 
 1. 分支预测失败率与记录大小或选择率基本无关。
 1. 更大的Branch Target Buffer（BTB）可以提升OLTP场景的分支预测成功率。
 
 ### 资源停顿
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-08.png)
+![](/images/2021-03/where-does-time-go-08.png)
 
 资源不可用是因为：
 1. 指令相互依赖，指令并行度低；
@@ -141,9 +141,9 @@ X86下机器指令会被翻译为微指令再执行，因此编译器没有简�
 
 ### TPC-D与TPC-C
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-09.png)
+![](/images/2021-03/where-does-time-go-09.png)
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/where-does-time-go-10.png)
+![](/images/2021-03/where-does-time-go-10.png)
 
 TPC-D的停顿主要由L1I引起，这方面的优化能很大程度上提升复杂query的性能。
 

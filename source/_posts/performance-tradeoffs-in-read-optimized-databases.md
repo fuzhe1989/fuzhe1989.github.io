@@ -35,4 +35,4 @@ tags:
 
 最后的结论是大部分场景中仔细优化过的列存要比仔细优化过的行存性能更好，行存只有在记录非常小（小于20B）、CPU是瓶颈（cpdb小）的场景中有优势。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/perf-read-optimized-01.png)
+![](/images/2021-01/perf-read-optimized-01.png)

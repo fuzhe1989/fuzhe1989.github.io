@@ -40,7 +40,7 @@ HTAP现在已经不那么新颖了，但F1 Lightning的切入点很独特，也�
 
 F1 Lightning整个系统分为三部分：OLTP系统作为source of truth，并暴露CDC接口；F1 Query作为分析引擎；Lightning来维护用于分析的replica。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-lightning-01.jpg)
+![](/images/2020-11/f1-lightning-01.jpg)
 
 通常OLTP系统都是面向写入和点查询优化的，采用行式存储，不适用于分析。因此一些团队会自己写pipeline定期将F1数据转换为列存文件（如ColumnIO）再由F1 Query分析。这种方案的问题：
 - 整个开发流程散布在不同系统中，且有大量冗余存储（可能一个团队自己存一份）。
@@ -95,7 +95,7 @@ delta merging包含两种操作：merging和collapsing。merging将同一行的�
 
 整个过程采用向量化执行。首先Lightning会列举出可能的delta，然后进行多路归并。归并时每个source会一次出一个block的数据，每轮先确定哪个范围的数据可以进行collapsing。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-lightning-02.jpg)
+![](/images/2020-11/f1-lightning-02.jpg)
 
 上面这个例子中，当前轮Lightning只能collapse小于K2的数据（因为K2还没有到头）。K2对应的数据要等到下轮处理。
 
@@ -103,7 +103,7 @@ delta merging包含两种操作：merging和collapsing。merging将同一行的�
 
 Lightning中数据有两种schema，一种是逻辑schema，来自OLTP系统中的schema，支持PB和GoogleSQL结构体等复杂类型。对于每种逻辑schema，Lightning还会生成一种或多种物理schema，只支持基本类型。Lightning中的文件接口只按物理schema进行操作。两种schema的转换发生在数据写入文件和读出文件时。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-lightning-03.jpg)
+![](/images/2020-11/f1-lightning-03.jpg)
 
 Lightning可以使用不同的物理schema来保存相同逻辑schema的数据，这样可以试验新schema，或者同时保存多种物理schema以平衡不同需求下的开销，或者磁盘与内存中使用不同的物理schema。
 
@@ -146,7 +146,7 @@ Index server会根据BigTable的改动修改index partition，也负责生成ind
 
 目前Lightning只能处理有限的几种materialized view，比如简单的聚合。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-lightning-04.jpg)
+![](/images/2020-11/f1-lightning-04.jpg)
 
 Lightning支持动态重分区，基本上只需要修改元数据，不需要搬数据，因此不影响在线请求。
 

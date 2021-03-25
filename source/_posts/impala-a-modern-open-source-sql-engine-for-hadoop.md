@@ -59,7 +59,7 @@ Statestore服务（statestored）是Impala的元数据pub-sub服务，负责将�
 
 Catalog服务（catalogd）负责管理Impala的元数据，数据的修改会通过statestore传播出去。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/impala-01.jpg)
+![](/images/2020-12/impala-01.jpg)
 
 ### State distribution
 
@@ -105,7 +105,7 @@ query生成过程分为query解析、语义分析、生成plan、优化几个阶
 
 最后plan树会在exchange处切分为若干个fragment，作为backend的执行单位。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/impala-02.jpg)
+![](/images/2020-12/impala-02.jpg)
 
 ## Backend
 
@@ -119,9 +119,9 @@ Impala的backend是C++写的（frontend是Java），使用了代码生成（code
 
 Impala使用了LLVM来编译生成有JIT的代码，在一些典型场景中性能提升能达到5倍以上。代码生成的好处是可以去掉那些考虑到通用性的分支、虚函数、变量、循环、各种指针等，在编译过程中可以充分inline。Impala会对那些运行在内层循环中的函数使用codegen，比如将数据解析为内存格式的函数会per record调用，对它使用codegen是收益非常大的。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/impala-03.jpg)
+![](/images/2020-12/impala-03.jpg)
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/impala-04.jpg)
+![](/images/2020-12/impala-04.jpg)
 
 ### I/O Management
 

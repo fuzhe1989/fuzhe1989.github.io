@@ -145,7 +145,7 @@ private:
 
 Persistent Map的实现也是基于路径复制的。算法导论上有这么一道习题，清晰的体现了它的实现思路：
 
-![Persistent Map](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-01.png)
+![Persistent Map](/images/2020-11/persistent-data-structure-01.png)
 
 当我们插入或删除一个节点时，路径上的每个节点都需要被复制一次，因此这样的操作的开销是O(lgn)的。
 
@@ -199,7 +199,7 @@ Node* Delete(Node* root, const T& val) {
 
 Persistent Vector的基本思想与Persistent Map非常接近：你把Persistent Vector想象成以下标为Key的Map即可：
 
-![Basic Persistent Vector](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-02.png)
+![Basic Persistent Vector](/images/2020-11/persistent-data-structure-02.png)
 
 图中就是一个这样的Map，它有如下特点：
 
@@ -229,7 +229,7 @@ const T& Get(Node* root, int32_t index) {
 
 那么，假如Persistent Vector直接持有Tail节点呢？这样当它未满时，PushBack只要复制两个节点：Tail节点和Vector本身。当Tail节点已满时，我们才需要真正做一次PushBack。对于32个子节点的Persistent Vector来说，有31/32的PushBack是真正的O(1)操作，其它1/32的PushBack才需要O(lgn)。
 
-![Tail](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/persistent-data-structure-03.png)
+![Tail](/images/2020-11/persistent-data-structure-03.png)
 
 新的查找也很简单。为了配合查找，我们要记录下Tail节点的offset：
 

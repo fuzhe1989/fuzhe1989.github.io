@@ -54,13 +54,13 @@ Spanner的部署单位称为universe，目前只有三个：test/playground，de
 
 每个universe分为若干个zone，这些zone是实际部署的单位，也是数据replication可指定的单位。每个datacenter可以有1个或多个zone。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/spanner-01.jpg)
+![](/images/2020-12/spanner-01.jpg)
 
 上图可以看到Spanner有两层master。universemaster和placement drive是全局唯一的，前者负责监控各个zone的情况，后者负责跨zone的数据自动迁移。每个zone还有zone master，负责zone内部的数据分发；location proxy被client用于查找数据所在的spanserver。
 
 ### Spanserver Software Stack
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/spanner-02.jpg)
+![](/images/2020-12/spanner-02.jpg)
 
 Spanner的数据类似于BigTable，也有timestamp，但区别在于Spanner自己会赋timestamp，而不是由用户指定。
 
@@ -80,7 +80,7 @@ Spanner的数据类似于BigTable，也有timestamp，但区别在于Spanner自�
 
 ### Directories and Placement
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/spanner-03.jpg)
+![](/images/2020-12/spanner-03.jpg)
 
 Spanner的数据分为了若干个directory，每个directory对应一段key range。directory也是数据分布的单位，每个directory内的数据有着相同的replication配置。数据在PG间移动实际是在移动directory（后面提到directory可能进一步分成若干个fragment，fragment才是移动的单位）。移动directory不会阻塞client操作。
 
@@ -101,13 +101,13 @@ Spanner的数据模型只是半关系型的原因在于它需要primary key有�
 
 Spanner支持类似于Megastore的嵌入表结构，如下图。子表可以用`INTERLEAVE IN`声明自己与root表是交替存储的。`ON DELETE CASCADE`意思是root表中删一行也会删掉子表的对应行。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/spanner-04.jpg)
+![](/images/2020-12/spanner-04.jpg)
 
 ## TrueTime
 
 Spanner最黑科技的功能就是TrueTime。TrueTime与正常的timestamp的区别在于它的格式为`[earliest, latest]`，是一个范围。两个TrueTime只有在时间范围完全不重叠时才能比较大小。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/spanner-05.jpg)
+![](/images/2020-12/spanner-05.jpg)
 
 Spanner通过GPS和原子钟两个时钟源来获取时间。每个datacenter都有time master，其中多数会有GPS接收器，另一些会有原子钟（paper里强调原子钟没那么贵:)）。综合两种time master就可以得到一个时间点和误差范围，通常是1ms-7ms，其中0-6ms来自原子钟的漂移，1ms来自机器到time master的延时。但一些偶发的故障也会导致误差变大。
 
@@ -117,7 +117,7 @@ Spanner提供了Snapshot Isolation，用时间t去读DB，能读到所有早于t
 
 ### Timestamp Management
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/spanner-06.jpg)
+![](/images/2020-12/spanner-06.jpg)
 
 Spanner提供了三种读写操作：
 - read-write transaction。
@@ -146,7 +146,7 @@ Spanner还要保证如下外部一致性：如果事务T2的开始晚于T1的提
 
 具体证明如下：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/spanner-07.jpg)
+![](/images/2020-12/spanner-07.jpg)
 
 其中e<sup>start</sup>是事务开始事件、e<sup>commit</sup>是事件提交事件、e<sup>server</sup>是事务到达coordinator事件。
 

@@ -89,7 +89,7 @@ bool UpdateDocument(Document doc) {
 }
 ```
 
-![Example usage of the Percolator API](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-12/percolator-01.png)
+![Example usage of the Percolator API](/images/2020-12/percolator-01.png)
 
 Percolator的`Get()`会检测要读的cell的lock列的`[0, startTS]`有没有数据，如果有，说明当前snapshot有未提交的事务，**可能**修改当前snapshot的状态。为了保证SI，`Get()`需要退避重试，等待当前snapshot状态确定了（没有未提交事务）才能读出数据。如果当前没有冲突，`Get()`会根据write列在当前snapshot的最后一次提交版本，返回data列对应的数据。
 

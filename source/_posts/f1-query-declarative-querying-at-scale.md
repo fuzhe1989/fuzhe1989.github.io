@@ -36,7 +36,7 @@ F1 Query的目标是成为一种[one-size-fits-all](/2020/08/06/one-size-fits-al
 
 ## Overview
 
-![Overview](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-01.png)
+![Overview](/images/2020-11/f1-query-01.png)
 
 F1 Master负责监控和管理F1 Server，F1 Server负责接收和处理请求。当请求涉及的数据量较大时，F1 Server会将任务转交给若干个F1 Worker，自身变成coordinator。
 
@@ -44,7 +44,7 @@ F1 Server和Worker都是无状态的。
 
 F1 Server在解析请求过程中会把它涉及的数据源提取出来，如果其中有任意数据源不在当前datacenter，且有其它F1 Server位于更靠近数据源的datacenter，当前Server会将最适合的Server集合返回给client。即使在高速网络下，选择更近的datacenter仍然能对延时产生巨大影响。
 
-![Query Execution](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-02.png)
+![Query Execution](/images/2020-11/f1-query-02.png)
 
 数据量较小时，接收请求的F1 Server直接处理掉这个请求，称为集中模式；中等数据量时，接收请求的F1 Server作为coordinator，协调若干个F1 Worker处理请求，称为分布模式；批处理模式下F1 Server会启动一个远端的MapReduce任务，并将执行情况保存在一个单独的仓库中。
 
@@ -77,7 +77,7 @@ F1 Query支持SQL 2011标准，加上Google针对嵌套类型（Protobuf）的�
 
 集中模式下F1 Server会使用单线程执行，以pull模式每次拉8KB数据。
 
-![Central Query Execution](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-03.png)
+![Central Query Execution](/images/2020-11/f1-query-03.png)
 
 执行计划的叶子节点通常是Scan，不同的数据源支持不同的Scan，有的只支持全表扫，有的支持index查询。有些数据源支持下推一些简单的非主键的filter。所有数据源都支持直接在源端解析pb。
 
@@ -91,7 +91,7 @@ F1 Query支持多种join，如：
 
 如果数据源较大，F1 Server会将整个查询计划分为若干个fragment，每个fragment交给一组F1 Worker线程执行。每个F1 Worker是多线程的，因此同一个Worker可能同时处理同一个query的不同部分。
 
-![Fragment in Distributed Query Execution](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-04.png)
+![Fragment in Distributed Query Execution](/images/2020-11/f1-query-04.png)
 
 优化器以自底向上的方向计算fragment的边界（哪些算子属于同一个fragment）。每个算子有自己的分片规则（如按某个field hash），如果相邻算子的分片规则相兼容，就会被分到同一个fragment中，否则会在它们中间插入一个exchange算子，将它们分到不同的fragment中。
 
@@ -103,7 +103,7 @@ F1 Query支持多种join，如：
 
 有些算子会跨fragment执行，如lookup join与它的左input在一个fragment中，而hash join通常有多个fragment，每个有多个分片。
 
-![Distributed Query Execution](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-05.png)
+![Distributed Query Execution](/images/2020-11/f1-query-05.png)
 
 aggregation通常需要先分片做预聚合，再汇总到一个Node上做最终的聚合。
 
@@ -134,7 +134,7 @@ F1 Query的算子通常尽可能地在内存中做流计算，而不是checkpoin
 
 一次query中，每个fragment都可能映射为一个MapReduce任务，输出会被写到Colossus上，提供足够的容错性。F1 Query借鉴了[FlumeJava](/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/)的MSCR优化，多个算子可以聚合到一个mapper或reducer中。针对`map-reduce-reduce`类型的任务，F1 Query会插入一个占位的mapper，变成`map-reduce-map<identify>-reduce`。未来可以使用像Google Cloud Dataflow这样的系统来处理`map-reduce-reduce`任务（用Spark或Flink都可以）。
 
-![Mapping a Physical Plan to a BatchMode MapReducePlan](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-06.png)
+![Mapping a Physical Plan to a BatchMode MapReducePlan](/images/2020-11/f1-query-06.png)
 
 交互模式下整个query是以pipeline的形式进行的，上下游算子是并行执行的。批处理模式下要所有上游算子的输出都持久化到Colossus上，下游MR才能启动。但不依赖的MR任务可以同时执行。
 
@@ -142,7 +142,7 @@ F1 Query的算子通常尽可能地在内存中做流计算，而不是checkpoin
 
 其它用于追踪MR任务的上层框架如图：
 
-![Batch Mode Service](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-07.png)
+![Batch Mode Service](/images/2020-11/f1-query-07.png)
 
 ## 优化器
 
@@ -150,7 +150,7 @@ F1 Query中所有查询计划的优化都会应用到三种模式中。
 
 F1 Query的优化器设计上借鉴了Cascades风格，且与Spark的Catalyst planner共享一些设计原则（两个团队在早期设计阶段有交流）。优化器先将SQL解析为AST，再将AST转换为关系代数计划。这阶段F1 Query会启发式应用一系列规则，直到满足某种条件，从而产生最优化的查询计划。
 
-![Optimizer](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-08.png)
+![Optimizer](/images/2020-11/f1-query-08.png)
 
 值得注意的是F1 Query的优化是以启发式规则为主的，辅助以基于静态统计信息的规则（如果存在的话）（可能是因为数据源不支持统计信息）。
 
@@ -194,7 +194,7 @@ CREATE TABLE FUNCTION EventsFromPastDays(
         INTERVAL num_days DAY);
 ```
 
-![Remote TVF](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/f1-query-09.png)
+![Remote TVF](/images/2020-11/f1-query-09.png)
 
 ## 高级特性
 

@@ -24,11 +24,11 @@ tags:
 
 ## Architecture Outline
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/paxos-made-live-01.png)
+![](/images/2021-03/paxos-made-live-01.png)
 
 在Chubby的架构中，Paxos用来构建最底层的log，有意地与上层的DB分离，这样log层可以给其它系统复用。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/paxos-made-live-02.png)
+![](/images/2021-03/paxos-made-live-02.png)
 
 log层的API如上图。一旦一个值submit了，client在各个replica上设置的callback会被触发，并得知submit的值。
 

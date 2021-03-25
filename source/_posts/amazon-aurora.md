@@ -36,7 +36,7 @@ Aurora仍然是顺着RDS的shard-disk的思路演进。它要解决的最大问�
 
 ### 写放大
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/aurora-01.png)
+![](/images/2021-01/aurora-01.png)
 
 如上图，一个MySQL进程会产生如下写流量：
 1. redolog
@@ -51,7 +51,7 @@ Aurora仍然是顺着RDS的shard-disk的思路演进。它要解决的最大问�
 
 ## 架构
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/aurora-02.png)
+![](/images/2021-01/aurora-02.png)
 
 Aurora默认会部署到三个AZ中，可以有一个可写的主实例与多个只读实例。
 
@@ -77,7 +77,7 @@ Aurora默认会部署到三个AZ中，可以有一个可写的主实例与多个
 
 Aurora最大的创新就是将复杂的page管理放到了存储层。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/aurora-03.png)
+![](/images/2021-01/aurora-03.png)
 
 DB将redolog写进存储层的UPDATE QUEUE之后就返回了，之后存储层内部完成log补齐（quorum协议会导致每个Segment的log不全，相同PG的不同Segment之间会通过gossip协议交换log record）、page管理（应用log、多版本管理、垃圾回收）、备份到S3等操作。
 
@@ -99,7 +99,7 @@ DB可以根据每个Segment的SCL生成Protection Group Complete LSN（PGCL，�
 
 下图说明了PGCL和VCL的区别。PG1只保存奇数LSN，PG2只保存偶数LSN，则PGCL1为103，PGCL2为104，VCL为104。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/aurora-04.png)
+![](/images/2021-01/aurora-04.png)
 
 每个DB事务在存储引擎这里可能会分为若干个mini-transaction（MTR），如页面的分裂合并等，每个MTR可能包含多个log record，在恢复时要保证MTR的完整性。因此Aurora会标记每个MTR的最后一条log为Consistency Point LSN（CPL），在恢复数据时只能恢复到VCL之前最大的一个CPL，称为Volume Durable LSN（VDL）。
 
@@ -122,7 +122,7 @@ Aurora的DB在执行写操作时是全异步I/O，在将log record发给对应�
 
 可以看到client的commit在超前于VDL时是不返回的，因此Aurora可以在failover时将大于VDL（不完整）的所有log都截断掉而不影响一致性。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/aurora-05.png)
+![](/images/2021-01/aurora-05.png)
 
 Aurora中DB初始化与故障恢复走相同流程：
 - DB确认可连接的PG达到read quorum。
@@ -164,7 +164,7 @@ Aurora中每个DB最多可以有15个只读实例，它们与主实例共享存�
 
 quorum协议的成员变更通常是比较复杂的，比如I/O要停，变更过程中不能有failover等。Aurora使用了quorum set的概念，将一次成员变更分成至少两次操作，每次都会提升membership epoch，从而解决了上面这两个问题。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-01/aurora-06.png)
+![](/images/2021-01/aurora-06.png)
 
 假设我们要将ABCDEF变更为ABCDEG，第一步是将write quorum变为`4/6 of ABCDEF AND 4/6 of ABCDEG`，read quorum则是`3/6 of ABCDEF OR 3/6 of ABCDEG`。此时如果F恢复了，我们可以再将成员列表变回ABCDEF。如果F一直没有恢复，当G追上其它成员后，做第二步变更，将成员列表改为ABCDEG。
 

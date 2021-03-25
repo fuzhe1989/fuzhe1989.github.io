@@ -27,13 +27,13 @@ LevelDB和RocksDB是最常见的LSM存储引擎，它们的特点是：
 
 这个过程中，一个key的整个生命期（从第0层到最高层），可能要经历多次重写，称为写放大。
 
-![Write Amplification](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/pebblesdb-01.jpg)
+![Write Amplification](/images/2020-11/pebblesdb-01.jpg)
 
 图中可以看到LevelDB和RocksDB有着非常高的写放大系数。而FLSM在这方面有着非常好的表现。
 
 传统的Leveled Compaction如此之大的写放大是因为它要时刻保证每层的严格有序。
 
-![Leveled Compaction](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/pebblesdb-02.jpg)
+![Leveled Compaction](/images/2020-11/pebblesdb-02.jpg)
 
 写放大一方面会占用磁盘带宽，另一方面会导致compaction不及时而影响正常的写请求处理。
 
@@ -47,7 +47,7 @@ RocksDB中的Universal Compaction（或称Tiered Compaction）的思路是第i�
 
 为了保证文件从第i层移入第i+1层时既不需要与第i+1层的文件做compaction，又不破坏区间性质，FLSM借鉴了SkipList中的guard，使用guard来划分区间，保证第i层的guard也会是第i+1层的guard。
 
-![FLSM Guard](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/pebblesdb-03.jpg)
+![FLSM Guard](/images/2020-11/pebblesdb-03.jpg)
 
 与SkipList类似，FLSM中guard也是在插入时随机选取，一个key是第i+1层开始的guard的概率是第i层的概率的B倍。
 
@@ -69,7 +69,7 @@ FLSM的缺点与Tiered Compaction类似，局部的无序也会带来读放大�
 
 ## 性能评估
 
-![Micro-benchmarks](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/pebblesdb-04.jpg)
+![Micro-benchmarks](/images/2020-11/pebblesdb-04.jpg)
 
 - 写放大：PebblesDB有明显优势。
 - 单线程：
@@ -89,9 +89,9 @@ FLSM的缺点与Tiered Compaction类似，局部的无序也会带来读放大�
 
 YCSB测试的结论也差不多。
 
-![YCSB](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/pebblesdb-05.jpg)
+![YCSB](/images/2020-11/pebblesdb-05.jpg)
 
 值得一提的是，PebblesDB的index block常驻内存，因此它的内存使用要高于LevelDB和RocksDB：
 
-![Memory](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/pebblesdb-06.jpg)
+![Memory](/images/2020-11/pebblesdb-06.jpg)
 

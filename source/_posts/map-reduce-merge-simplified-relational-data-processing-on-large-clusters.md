@@ -12,7 +12,7 @@ tags:
 
 这篇文章为MapReduce模型增加了一步Merge，增强了Join的能力。原理如图。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-01.jpg)
+![](/images/2010-09/map-reduce-merge-01.jpg)
 
 <!--more-->
 
@@ -21,16 +21,16 @@ tags:
 merge动作会在所有reducer结束后启动。MapReduceMerge允许定制以下行为：
 - Partition Selector。它的输入是左右两个数据源的reducer编号列表，输出是这个merger处理哪些reducer。
 
-    ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-02.jpg)
+    ![](/images/2010-09/map-reduce-merge-02.jpg)
 - Processor。它是在左右数据集上执行merge，可以用来实现hash-join等。它与Merger互斥。
 - Merger。它是逐条执行merge，输入是左右各一条记录，输出是join后的结果。
 
-    ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-03.jpg)
+    ![](/images/2010-09/map-reduce-merge-03.jpg)
 - Iterator。它可以定义在迭代过程中左右数据集上的iterator如何前进，从而实现不同的join。
     
-    ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-04.jpg)
-    ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-05.jpg)
-    ![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/map-reduce-merge-06.jpg)
+    ![](/images/2010-09/map-reduce-merge-04.jpg)
+    ![](/images/2010-09/map-reduce-merge-05.jpg)
+    ![](/images/2010-09/map-reduce-merge-06.jpg)
 
 ## Map-Reduce-Merge实现关系运算
 

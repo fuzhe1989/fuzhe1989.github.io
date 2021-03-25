@@ -45,7 +45,7 @@ Paxos Commit算法使用Paxos弥补了2PC在容错性上的软肋，而进一步
 
 事务处理过程中RM的状态变化如图：
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/consensus-commit-01.png)
+![](/images/2021-03/consensus-commit-01.png)
 
 两个safety要求：
 - Stability：RM一旦到达committed或aborted状态就不再改变。
@@ -77,7 +77,7 @@ RM在状态转换中的每一步都只能执行以下两种操作：
 
 2PC算法引入了transaction manager（TM）来协调整个事务的运行。TM有init、preparing、committed、aborted状态，RM的状态不变。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/consensus-commit-02.png)
+![](/images/2021-03/consensus-commit-02.png)
 
 任意RM到达prepared状态后，它会发送prepared消息给TM，TM随后向其它所有RM发送prepare消息。当收集到所有RM的prepared后，TM可以到达committed状态，并向所有其它进程发送commit。收到的RM就可以到达committed状态。
 
@@ -148,7 +148,7 @@ Paxos Commit中为每个RM分别运行一个Paxos实例，决定对应RM是进�
 
 如果有RM出错（如超时），leader会回退到发送p1a消息以确定当前状态。如果在p2a阶段leader发现它处于Free状态，说明没有RM做出决定，它就会走到abort分支。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/consensus-commit-03.png)
+![](/images/2021-03/consensus-commit-03.png)
 
 ### Cost
 
@@ -171,13 +171,13 @@ Paxos Commit中为每个RM分别运行一个Paxos实例，决定对应RM是进�
 
 ## Paxos vs. Two-Phase Commit
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/consensus-commit-04.png)
+![](/images/2021-03/consensus-commit-04.png)
 
 在有5个RM，F为1（3副本）的系统中，2PC需要12次通信，默认的Paxos Commit需要17次，Fast PC需要20次。当N非常大时，三种算法分别需要3N、4N、5N次通信。
 
 假设F为0，此时只有一个acceptor，且不可失败（RM仍然可以失败）。令acceptor与leader在相同节点上，此时2PC、Paxos Commit与Fast PC就相同了。因此2PC就是Paxos Commit在F为0时的特例。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2021-03/consensus-commit-05.png)
+![](/images/2021-03/consensus-commit-05.png)
 
 [1]: https://dl.acm.org/doi/abs/10.1145/3149.214121
 [2]: http://www.sigmod.org/publications/dblp/db/books/dbtext/bernstein87.html

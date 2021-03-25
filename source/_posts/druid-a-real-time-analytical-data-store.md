@@ -23,11 +23,11 @@ Druid比较有价值的点是它的lambda架构、列存、倒排索引、良好
 
 Druid服务的典型时序场景，数据模式如下图：
 
-![Sample Data](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/druid-01.jpg)
+![Sample Data](/images/2020-11/druid-01.jpg)
 
 一个Druid集群包含多种角色，如下图：
 
-![Overview](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/druid-02.jpg)
+![Overview](/images/2020-11/druid-02.jpg)
 
 ### 实时节点（Real-time Nodes）
 
@@ -35,15 +35,15 @@ Druid服务的典型时序场景，数据模式如下图：
 
 实时节点针对新写的数据有一个内存中的行格式index，定期会转换为列存格式写进本地磁盘中，再load上来，从而避免JVM堆溢出。所有磁盘文件都是不可变的。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/druid-03.jpg)
+![](/images/2020-11/druid-03.jpg)
 
 每隔一段时间实时节点会有背景任务将所有本地文件compact成一个大文件，称为segment，这个segment会包含当前节点一个时间段内的所有数据。之后实时节点会将segment上传到存储引擎。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/druid-04.jpg)
+![](/images/2020-11/druid-04.jpg)
 
 一开始实时节点在ZK上记录它服务13:00-14:00的数据。在到达14:00后，它会声明自己同时还服务于14:00-15:00的数据，再等一会前一小时的晚到数据，不立即持久化。等到持久化完egment并上传成功后，实时节点会在ZK上将13:00-14:00从自己的服务范围去掉。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/druid-05.jpg)
+![](/images/2020-11/druid-05.jpg)
 
 实时节点的上游可能是像Kafka这样的系统，实时节点会在每次写磁盘文件时把从Kafka中读到的offset记录下来。不同的实时节点可能会对应相同的Kafka流，相当于创建了数据备份；也可以一个实时节点对应一个Kafka分片，这样能最大化处理能力。
 
@@ -53,7 +53,7 @@ Druid服务的典型时序场景，数据模式如下图：
 
 类似于实时节点，Zookeeper也服务于所有历史节点。载入和丢弃segment的请求就是通过ZK发送的，里面会包含这个segment的位置和解压、处理方式。每个历史节点有一个本地的cache进程。历史节点在载入segment前，会先看cache中有没有segment。引入本地cache允许历史节点快速更新和重启，而不需要担心预热。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/druid-06.jpg)
+![](/images/2020-11/druid-06.jpg)
 
 因为只服务不可变的数据，历史节点可以做无阻塞的一致性读、并发scan和聚合。
 
@@ -65,7 +65,7 @@ Druid可以将历史节点分为多层，每层单独配置性能和容错等参
 
 路由节点本地维护了一个LRU cache存放segment信息，这样处理请求的时候路由节点只需要去ZK中读那些未命中的segment就可以了。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/druid-07.jpg)
+![](/images/2020-11/druid-07.jpg)
 
 实时节点的数据无法缓存，因此请求总是会被发给实时节点。
 
@@ -105,7 +105,7 @@ Druid中数据是按列存储的，根据每列的类型选择不同的压缩方
 
 Druid会使用bitmap为string列创建倒排索引。如Table 1中的"Justin Bieber"对应`[1, 1, 0, 0]`，而"Ke$ha"则对应`[0, 0, 1, 1]`。bitmap经常会使用RLE进一步编码。Druid中使用了Concise算法。下图是Concise算法对于整数数组的压缩效果。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/druid-08.jpg)
+![](/images/2020-11/druid-08.jpg)
 
 有意思的是图中排序只换来了很小的收益。
 

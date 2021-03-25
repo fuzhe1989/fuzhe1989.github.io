@@ -65,13 +65,13 @@ SUBPARTITION OPTIONS (available_partition_num = 12);
 
 ## 架构
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-01.jpg)
+![](/images/2020-11/adb-01.jpg)
 
 ADB的构架底座是标准的阿里云飞天三件套，即Fuxi用于调度，Pangu用于分布式存储，Nuwa用于分布式锁（图里没有，猜测后面出现的ZK实际指的是Nuwa）。在其上是ADB的三类节点：coordinators、write nodes、read nodes。其中读写节点是物理分离的。
 
 ADB中数据是以page（column block）为单位流动的，整个处理过程是pipeline的。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-02.jpg)
+![](/images/2020-11/adb-02.jpg)
 
 ### 写节点
 
@@ -83,7 +83,7 @@ ADB中数据是以page（column block）为单位流动的，整个处理过程�
 
 每个读节点会被coordinator按哈希值分配若干个partition（疑问1：哪个coordinator，是每个DB有自己的coordinator，还是所有读节点也有一个leader？疑问2：普通哈希还是一致性哈希？有coordinator的话可能更像是普通哈希，那如何解决节点加入离开的扰动？）
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-03.jpg)
+![](/images/2020-11/adb-03.jpg)
 
 这种分配方式避免了equi join时的数据重分布（ADB表示超过80%）。
 
@@ -95,7 +95,7 @@ ADB中数据是以page（column block）为单位流动的，整个处理过程�
 
 为了不影响读延时，ADB中写节点可以主动将数据推给对应的读节点。如果读节点拉数据失败，它可以直接从pangu上读取log file并应用到本地cache上。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-04.jpg)
+![](/images/2020-11/adb-04.jpg)
 
 ### 集群管理
 
@@ -105,11 +105,11 @@ ADB中数据是以page（column block）为单位流动的，整个处理过程�
 
 ADB中数据文件分为若干个row group（每3万行），每个row group内每列数据是一个data block，这样兼顾了列存的扫描效率与行存的点查效率。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-05.jpg)
+![](/images/2020-11/adb-05.jpg)
 
 复杂类型（如JSON和向量）的每个值可能很长，ADB采用了另一种方式。每个复杂类型列的数据会单独写进一个文件，里面分为若干个32KB的FBlock，这样data block中只需要记FBlock的索引和行范围，就把变长数据转为定长了。一行可能特别大，可能跨FBlock。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-06.jpg)
+![](/images/2020-11/adb-06.jpg)
 
 数据文件的元数据也被保存为了单独的文件，且默认缓存在内存中，如Figure 6。
 
@@ -117,23 +117,23 @@ ADB中数据文件分为若干个row group（每3万行），每个row group内�
 
 读节点会为增量数据生成简单的sorted index，即按数据值排序的row_id数组（目测row_id是每个分区自己产生的自增ID）。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-11.jpg)
+![](/images/2020-11/adb-11.jpg)
 
 每个data block有3万行，每个row_id占2B（short），则每个sorted index block占60KB。sorted index block会和增量数据一起写进读节点的cache，而不进pangu。
 
 另外读节点还会维护一个bitmap，记录哪些row_id被删除了。这个bitmap是分段copy on write的，因此读不需要加锁。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-07.jpg)
+![](/images/2020-11/adb-07.jpg)
 
 在做全量compaction时，当前的增量数据会被freeze，与全量数据一起由MapReduce任务转换为新的全量数据。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-08.jpg)
+![](/images/2020-11/adb-08.jpg)
 
 ## 索引管理
 
 ADB中所有索引都是局部索引。每列都有倒排索引，索引值为row_id数组。每个索引单独保存为一个文件。在查询的时候从存储层出去的就只是row_id了。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-09.jpg)
+![](/images/2020-11/adb-09.jpg)
 
 为了避免过度使用索引导致的性能损失，ADB会在查询时按每个索引的选择率从低到高排序，依次执行。如果应用了某个索引后，整个节点的选择率已经低过阈值了，后面的索引就会被跳过，直接根据当前已经拿到的row_id的原始值进行过滤。
 
@@ -165,13 +165,13 @@ ADB中的优化策略分为CBO（基于开销）和RBO（基于规则）。规�
 
 ADB引入了STARs框架来做谓词下推，它可以把存储引擎的能力抽象为一种关系代数能处理的概念，从而可以将计算层和存储层的开销统一起来做下推优化。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-12.jpg)
+![](/images/2020-11/adb-12.jpg)
 
 在下推join时，前文介绍了ADB将相同哈希值的partition分配给同一个读节点，这样equi join就不需要传输数据了。对于不满足这一条件的join，ADB会从存储层获取到两张表的大小，以决定最高效的传输方式。
 
 如果参与join的列大多数都是partition列且有索引，那么ADB会将hash join转为LeftDeepTree形状的lookup join。ADB还会将很多算子下推到索引中，如`count`等。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-13.jpg)
+![](/images/2020-11/adb-13.jpg)
 
 ### 实时采样
 
@@ -189,7 +189,7 @@ ADB使用了ANTLR ASM来做代码生成，不同机器可以生成不同的代�
 
 （只是一些摘要）
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-11/adb-13.jpg)
+![](/images/2020-11/adb-13.jpg)
 
 ADB和Greenplum的索引构建对比。ADB时间更长，但存储空间更小，且不影响在线请求。
 

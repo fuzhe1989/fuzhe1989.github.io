@@ -62,7 +62,7 @@ Megastore中每个数据分片称为一个entity group，entity group内支持1P
 
 Megastore的数据存储在Bigtable上，同一分片的数据对应在Bigtable的连续的行上。用户可以参与指定数据的存储方式。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-01.jpg)
+![](/images/2020-10/megastore-01.jpg)
 
 ## A Tour of Megastore
 
@@ -121,7 +121,7 @@ CREATE GLOBAL INDEX PhotosByTag
 
 索引可以内联到更上层主表中，此时索引项相当于上层主表entity的一个repeated property。如将PhotosByTime定义为内联到User的索引，这样每个User对应若干项PhotosByTime。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-02.jpg)
+![](/images/2020-10/megastore-02.jpg)
 
 每个entity group的metadata和log也会保存到entity root对应的Bigtable表的一行中，这样可以原子更新。
 
@@ -157,11 +157,11 @@ Megastore的Paxos不依赖于某个master，任意replica都可以服务读写�
 
 应用写本地Bigtable不需要走replication server。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-03.jpg)
+![](/images/2020-10/megastore-03.jpg)
 
 replication log中每个log entry对应Bigtable中的一个cell，Megastore允许某个replica的log中间有空洞，这样刚failover的replica可以尽快参与到投票中。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-04.jpg)
+![](/images/2020-10/megastore-04.jpg)
 
 在做current read时，至少有一个replica的readable version要追上committed version，称为catch up。完整过程：
 - 读本地的coordinator判断当前entity group是否足够新。
@@ -172,7 +172,7 @@ replication log中每个log entry对应Bigtable中的一个cell，Megastore允�
 - 如果选择的是本地replica，且完成了catch up，则向coordinator发送一个请求来判断entity group是否健康。应用不需要等待这个请求返回，如果失败了后续的读请求还会自动重试。
 - 读数据。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/2020-10/megastore-05.jpg)
+![](/images/2020-10/megastore-05.jpg)
 
 写流程：
 1. 询问leader是否接受当前log entry作为0号proposal，如果是，直接跳到步骤3。
