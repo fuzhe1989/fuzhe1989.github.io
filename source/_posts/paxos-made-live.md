@@ -10,12 +10,6 @@ tags:
 
 > 原文：[Paxos Made Live - An Engineering Perspective](https://dl.acm.org/doi/abs/10.1145/1281100.1281103)
 
-## TL;DR
-
-<!--more-->
-
-## Introduction
-
 [Chubby](/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems)的第一个版本基于一个第三方可容错的商业数据库（下文称为3DB），它的replication有很多bug，并没有基于任何已有证明的算法，也无法证明其正确性。最终Chubby将3DB替换为了基于Paxos的实现。
 
 作者在实现Paxos的过程中，发现这个工作并不trivial：
@@ -25,6 +19,8 @@ tags:
 - 真实系统很少能有精确的spec，甚至在实现过程中还会修改spec，就需要实现本身具有可塑性，也许就会有实现“误解”了spec导致的错误。
 
 这篇文章就在讲作者将Paxos从理论搬到实际的过程中的一些挑战。
+
+<!--more-->
 
 ## Architecture Outline
 
