@@ -53,7 +53,7 @@ OUTPUT s3 TO “qcount.result";
 
 ## 架构
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/scope-01.jpg)
+![](/images/2010-10/scope-01.jpg)
 
 SCOPE是建立在Cosmos分布式执行平台之上的（参考[Dryad](/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/)）。
 

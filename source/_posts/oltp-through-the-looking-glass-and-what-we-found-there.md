@@ -26,7 +26,7 @@ tags:
 - latching，指具体的各种mutex。将事务处理改成单线程就可以去掉很多mutex。
 - buffer management，指page和cache管理。
 
-![TPC-C New Order场景指令数分布](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f1.jpg)
+![TPC-C New Order场景指令数分布](/images/2010-09/oltp_f1.jpg)
 
 
 ## Single Threading in OLTP Systems
@@ -77,13 +77,13 @@ tags:
 
 ## Performance Study
 
-![Payment场景指令数分布](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f5.jpg)
+![Payment场景指令数分布](/images/2010-09/oltp_f5.jpg)
 
-![New Order场景指令数分布](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f6.jpg)
+![New Order场景指令数分布](/images/2010-09/oltp_f6.jpg)
 
-![New Order场景指令数详细分布](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f7.jpg)
+![New Order场景指令数详细分布](/images/2010-09/oltp_f7.jpg)
 
-![New Order场景指令数与周期数对比](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/oltp_f8.jpg)
+![New Order场景指令数与周期数对比](/images/2010-09/oltp_f8.jpg)
 
 两个观察：
 1. 单个部分的优化效果并不明显，最明显的也不过30%。

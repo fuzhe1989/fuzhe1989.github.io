@@ -63,7 +63,7 @@ top()：
 
 `combineValues`是另一种形式的`parallelDo`，因此也可以一起合并掉。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-01.jpg)
+![](/images/2010-10/flumejava-01.jpg)
 
 ### MapShuffleCombineReduce（MSCR）
 
@@ -71,7 +71,7 @@ top()：
 
 一个MSCR有M个输入（每个对应一种map操作）和R个输出（每个可以包含shuffle、combine、reduce阶段）。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-02.jpg)
+![](/images/2010-10/flumejava-02.jpg)
 
 注意shuffle发生在`groupByKey`之前。
 
@@ -81,7 +81,7 @@ top()：
 
 多个相关的`groupByKey`可以合并为一个MSCR，这些`groupByKey`上游的`parallelDo`合并进MSCR，对应一个输入，每个`groupByKey`对应一个输出。如果MSCR的某个输出只被`comineValues`或`parallelDo`消费，这个操作也可以合并进来（`parallelDo`也可以合并进下个MSCR的输入）。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-03.jpg)
+![](/images/2010-10/flumejava-03.jpg)
 
 最后孤立的`parallelDo`会被转换为平凡的MSCR，这样最终执行计划只剩下MSCR、`fatten`、`operate`。
 
@@ -94,7 +94,7 @@ top()：
 1. 合并`parallelDo`。
 1. 合并与转换MSCR。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/flumejava-04.jpg)
+![](/images/2010-10/flumejava-04.jpg)
 
 ### 限制
 

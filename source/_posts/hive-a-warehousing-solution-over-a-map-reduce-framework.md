@@ -34,7 +34,7 @@ Hive支持基本类型以及array和map。
 
 Hive使用HiveQL，支持`load`和`insert`，不支持`update`和`delete`。HiveQL支持一次select出来的结果给后续多个语句使用。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/hive-01.jpg)
+![](/images/2010-09/hive-01.jpg)
 
 ## Architecture
 
@@ -62,4 +62,4 @@ Hive的compile流程：
     - 在map阶段而不是reduce阶段执行join。
 - Physical Plan Generator将logic plan转换为physical plan。它先基于分隔operator（repartition和union all）将logic plan分为若干部分，再将每部分转为map或reduce任务。
 
-![](https://fuzhe-pics.oss-cn-beijing.aliyuncs.com/hive-02.jpg)
+![](/images/2010-09/hive-02.jpg)
