@@ -1,6 +1,6 @@
 ---
 title:      "[笔记] Paxos Made Live - An Engineering Perspective"
-date:       2021-03-16 19:51:30
+date:       2021-03-25 15:38:11
 tags:
     - 笔记
     - Paxos
@@ -145,4 +145,13 @@ Chubby实现了一种MultiOp，可以在条件满足时原子执行若干个操�
 作者遇到的非预期的错误：
 - 新的Chubby的线程数是旧Chubby的10倍，但上线后没有能处理更多请求，worker线程还会阻塞其它关键线程。在回滚过程中，因为文档不清晰，SRE的操作不正确，丢失了15小时的数据。
 - 几个月后再次尝试升级Chubby时，因为没有清理掉上次升级留下的文件，升级又失败了，还因为使用了一个旧的snapshot，丢失了30分钟的数据。
-- 
+- 接下来作者发现了replica在失去master身份又成为master后，之前的操作没有失败，与预期不符。之后引入了epoch number。
+- 之后又通过runtime check发现了某个replica的checksum与其它replica不一致。
+- 从旧Chubby到新的基于Paxos的Chubby的迁移脚本多次失败，其中一次的原因是软件包配置不对。
+- Linux2.4内核的fsync有bug，会将其它文件的数据也刷下去，执行时间可能很长。workaround是让大文件的flush更频繁（每个chunk flush一次），牺牲大文件的写性能来保证log的写性能。
+
+## Summary and Open Problems
+
+- Paxos算法与真实系统之间有着巨大的gap，工程师需要对协议做许多微小的扩展，而这导致了真实系统总是基于一个未经证明的协议。
+- 社区还没有工具能让实现一个容错算法变得容易。
+- 社区在test方面的关注不够。
