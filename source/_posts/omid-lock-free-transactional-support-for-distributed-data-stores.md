@@ -9,6 +9,11 @@ tags:
 ---
 
 > 原文：[Omid: Lock-free transactional support for distributed data stores](https://ieeexplore.ieee.org/abstract/document/6816691/)
+>
+> Omid三部曲：
+> 1. Omid: Lock-free transactional support for distributed data stores
+> 2. [Omid, Reloaded: Scalable and Highly-Available Transaction Processing](/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing)
+> 3. Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics
 
 Omid的目标是为支持MVCC的分布式KV增加乐观事务（2PC）功能，实现snapshot isolation。
 
@@ -109,6 +114,8 @@ Percolator的做法是将commit_ts再写回到数据存储中（图4），但这
 由此我们得到了优化后的Omid事务全过程：
 
 ![](/images/2021-04/omid-14-08.png)
+
+（从2017年的paper可以看到SO还需要维护一个WAL，但这篇没有提）
 
 [1]: https://ieeexplore.ieee.org/abstract/document/6816691/ 
 [2]: https://dl.acm.org/doi/abs/10.1145/568271.223787

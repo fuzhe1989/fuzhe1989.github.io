@@ -8,7 +8,7 @@ Hi，我是付哲，目前居住在杭州，是PingCAP的工程师。
 
 我曾在以下公司工作过：
 - Google Ads，开发一个内部的数据平台。
-- 阿里云的[Tablestore](https://cn.aliyun.com/product/ots)工作，负责NoSQL引擎的性能优化与代码库维护。
+- 阿里云的[Tablestore](https://cn.aliyun.com/product/ots)，负责NoSQL引擎的性能优化与代码库维护。
 
 我的本科和硕士都就读于哈尔滨工业大学，专业是微电子学与固体电子学。
 
