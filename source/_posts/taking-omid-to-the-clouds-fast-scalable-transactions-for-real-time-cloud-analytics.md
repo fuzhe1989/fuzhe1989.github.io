@@ -21,7 +21,11 @@ tags:
 - Omid Low Latency（Omid LL），将Omid中写CT的工作由TM转交给client，从而分散了负载，降低了延时。
 - Omid Fast Path（Omid FP），处理单key事务时绕开TM，从而达到原生HBase操作的延时（代价是隔离级别从snapshot isolation（SI）降低到了generalized snapshot isolation（GSI）[[1]]）。
 
-（接下来再改进就要考虑分散冲突检测了）
+Omid再改进就要考虑分散冲突检测了。
+
+Omid LL中TM有两个角色，一个是TSO，通常不会是瓶颈；另一个是全局冲突检测。我们知道Omid中冲突检测是per bucket进行的，每个bucket独立判断。假如bucket足够小，小到只有一个key，就相当于每个key独立判断一下冲不冲突。此时TM的必要性就不存在了，client可以直接与data server通信判断。
+
+此时Omid就变成了Percolator的变种，即将commit meta放到了单独的commit table中，而不是与数据在一起。
 
 <!--more-->
 
