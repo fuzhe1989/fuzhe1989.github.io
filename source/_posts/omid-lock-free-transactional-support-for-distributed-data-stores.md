@@ -13,7 +13,7 @@ tags:
 > Omid三部曲：
 > 1. Omid: Lock-free transactional support for distributed data stores
 > 2. [Omid, Reloaded: Scalable and Highly-Available Transaction Processing](/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing)
-> 3. Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics
+> 3. [Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics](/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics)
 
 Omid的目标是为支持MVCC的分布式KV增加乐观事务（2PC）功能，实现snapshot isolation。
 

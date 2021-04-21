@@ -13,7 +13,7 @@ tags:
 > Omid三部曲：
 > 1. [Omid: Lock-free transactional support for distributed data stores](/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores)
 > 2. Omid, Reloaded: Scalable and Highly-Available Transaction Processing
-> 3. Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics
+> 3. [Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics](/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics)
 
 这是Omid的第二篇（2017年），相比2014年的初版，它在规模和可用性上做了增强。
 
