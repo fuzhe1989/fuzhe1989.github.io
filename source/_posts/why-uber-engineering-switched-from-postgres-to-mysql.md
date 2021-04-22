@@ -21,6 +21,8 @@ Uber之前一直用Postgres作为DBMS（最终版本是9.2），后来遇到了�
 1. 依赖于OS的page cache，自身只维护非常小的内部cache。
 1. 多进程（per-connection）而不是多线程。
 
+这里面引起问题最多的就是物理replication协议。后续PG增加了pglogical，但文章中表示pglogical还没有合入主线，只能是辅助使用。
+
 ## 严重问题
 
 **写放大**
