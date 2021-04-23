@@ -8,7 +8,7 @@ tags:
 
 > 原文：[One Size Fits All? - Part 2: Benchmarking Results](http://static.cs.brown.edu/people/jduggan/research/osfa.pdf)
 
-## TL;DR
+**TL;DR**
 
 > 2005年的前文：[‘One Size Fits All’: An Idea Whose Time Has Come and Gone](/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone)
 

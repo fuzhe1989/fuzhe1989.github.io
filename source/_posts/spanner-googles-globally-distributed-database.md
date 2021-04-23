@@ -11,7 +11,7 @@ tags:
 
 > 原文：[Spanner: Google's Globally-Distributed Database](https://dl.acm.org/doi/abs/10.1145/2491245)
 
-## TL;DR
+**TL;DR**
 
 Spanner是划时代的OLTP系统，它的创新点是：
 1. 用TrueTime实现了广域的物理timestamp，这样不引入全局唯一的TSO就提供了基于2PC的分布式事务与Snapshot Isolation。

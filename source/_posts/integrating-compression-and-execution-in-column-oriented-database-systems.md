@@ -12,7 +12,7 @@ tags:
 >
 > 可以与The design and implementation of modern column-oriented database systems对照阅读。
 
-## TL;DR
+**TL;DR**
 
 一篇略老（2006年）的paper，但很重要。
 

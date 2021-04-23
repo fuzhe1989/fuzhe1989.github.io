@@ -11,7 +11,7 @@ tags:
 
 > 原文：[Large-scale incremental processing using distributed transactions and notifications](https://www.usenix.org/event/osdi10/tech/full_papers/Peng.pdf)
 
-## TL;DR
+**TL;DR**
 
 Percolator是Google用于构建增量web索引的数据系统。它的价值在于提出了一种基于NoSQL（BigTable）的两阶段提交（2PC）实现。
 

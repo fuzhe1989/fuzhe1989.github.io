@@ -10,7 +10,7 @@ tags:
 
 > 原文：[Performance Tradeoffs in Read-Optimized Databases](http://nms.csail.mit.edu/~stavros/pubs/vldb2006.pdf)
 
-## TL;DR
+**TL;DR**
 
 > 有点旧，有些结论可能不适合现在的列存数据库了。
 

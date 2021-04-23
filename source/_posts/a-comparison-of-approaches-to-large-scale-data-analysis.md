@@ -10,7 +10,7 @@ tags:
 
 > 原文：[A comparison of approaches to large-scale data analysis](https://people.eecs.berkeley.edu/~kubitron/cs262/handouts/papers/p165-pavlo.pdf)
 
-## TL;DR
+**TL;DR**
 
 本文的背景是随着MapReduce的兴起，越来越多的人抛弃了传统的DBMS，直接使用MapReduce来做数据分析。本文对比了MapReduce（Hadoop）、Vertica（列存的并行DBMS）、DBMS-X（某个商用的行存的并行DBMS）的性能，指出并行RDBMS仍然有它的优势，不会被MapReduce取代。
 

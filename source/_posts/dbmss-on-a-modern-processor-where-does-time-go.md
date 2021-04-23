@@ -10,7 +10,7 @@ tags:
 
 > 原文：[DBMSs On A Modern Processor: Where Does Time Go?](https://infoscience.epfl.ch/record/133194/files/vldb99_dbms_eval.pdf)
 
-## TL;DR
+**TL;DR**
 
 我们都知道数据库开销的大头是I/O，但在现代机器架构下，CPU与内存的交互成本也不容忽视。这篇文章比较了四种商用数据库在三种典型场景下的性能分解，得出结论：
 1. 一半的执行时间实际是在停顿（stall）。

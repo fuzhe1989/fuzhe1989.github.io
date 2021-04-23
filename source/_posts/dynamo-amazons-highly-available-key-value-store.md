@@ -11,7 +11,7 @@ tags:
 
 > 原文：[Dynamo: amazon's highly available key-value store](https://dl.acm.org/doi/abs/10.1145/1323293.1294281)
 
-## TL;DR
+**TL;DR**
 
 Dynamo是一种去中心化的KV分布式存储系统。它的主要设计目标是：
 - 高可用性（always writable）。

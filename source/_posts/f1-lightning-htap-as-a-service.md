@@ -12,7 +12,7 @@ tags:
 
 > 原文：[F1 Lightning: HTAP as a Service](https://dl.acm.org/doi/abs/10.14778/3415478.3415553)
 
-## TL;DR
+**TL;DR**
 
 F1 Lightning是一种提供HTAP服务的系统，本身并不是一个完整的HTAP系统。它的切入点是为已有的OLTP（F1、Spanner）用户提供列式存储，供其它的OLAP系统（[F1 Query](/2020/11/21/f1-query-declarative-querying-at-scale)）使用。这样用户不需要迁移转换已有的数据就能享受到更快捷的分析能力。
 

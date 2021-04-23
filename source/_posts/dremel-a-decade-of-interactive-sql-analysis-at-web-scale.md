@@ -11,7 +11,7 @@ tags:
 
 > 原文：[Dremel: a decade of interactive SQL analysis at web scale](https://dl.acm.org/doi/abs/10.14778/3415478.3415568)
 
-## TL;DR
+**TL;DR**
 
 这篇文章主要讲Dremel的核心思想和架构原则（参考[2010年的paper](/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets)），包括这些年Dremel的演进（作为BigQuery的后端），以及这些思想在同领域的其它系统中的异同。
 

@@ -10,7 +10,7 @@ tags:
 
 > 原文：[FlumeJava: Easy, Efficient Data-Parallel Pipelines](https://research.google/pubs/pub35650.pdf)
 
-## TL;DR
+**TL;DR**
 
 FlumeJava是基于MapReduce的计算框架。它的特点：
 - 提供了表达能力很强的Java库。

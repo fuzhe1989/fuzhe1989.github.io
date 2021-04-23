@@ -8,7 +8,7 @@ tags:
 
 > 原文：[Improving MapReduce Performance in Heterogeneous Environments](https://static.usenix.org/event/osdi08/tech/full_papers/zaharia/zaharia.pdf)
 
-## TL;DR
+**TL;DR**
 
 这篇文章讲的是如何优化Hadoop在异构环境下的任务调度性能。
 

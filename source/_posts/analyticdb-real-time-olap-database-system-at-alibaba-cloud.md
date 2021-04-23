@@ -9,7 +9,7 @@ tags:
 
 > 原文：[AnalyticDB: Real-time OLAP Database System at Alibaba Cloud](https://dl.acm.org/doi/abs/10.14778/3352063.3352124)
 
-## TL;DR
+**TL;DR**
 
 AnalyticDB（以下简称ADB）是一种支持复杂ad-hoc查询的实时分析系统。
 

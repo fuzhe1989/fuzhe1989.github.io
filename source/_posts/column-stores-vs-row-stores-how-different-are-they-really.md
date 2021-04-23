@@ -10,7 +10,7 @@ tags:
 
 > 原文：[Column-Stores vs. Row-Stores: How Different Are They Really?](http://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2017/2010/Papers/sigmod08-columstore-abadi.pdf) 
 
-## TL;DR
+**TL;DR**
 
 本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。
 

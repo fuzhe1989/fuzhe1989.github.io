@@ -10,7 +10,7 @@ tags:
 
 > 原文：[HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads](https://people.eecs.berkeley.edu/~kubitron/courses/cs262a-F19/handouts/papers/vldb09-861.pdf)
 
-## TL;DR
+**TL;DR**
 
 这篇文章在尝试结合MapReduce（Hadoop）与DBMS（PostgreSQL），取MapReduce的伸缩性与容错性、DBMS的性能。
 

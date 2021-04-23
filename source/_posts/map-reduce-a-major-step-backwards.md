@@ -9,7 +9,7 @@ tags:
 
 > 原文：[MapReduce: A Major step backwards](https://pdfs.semanticscholar.org/08d1/2e771d811bcd0d4bc81fa3993563efbaeadb.pdf)
 
-## TL;DR
+**TL;DR**
 
 这篇文章是两位大佬（DeWitt和Stonebraker）对“MapReduce可以革掉传统的并行RDBMS的命”的论点的回击。
 

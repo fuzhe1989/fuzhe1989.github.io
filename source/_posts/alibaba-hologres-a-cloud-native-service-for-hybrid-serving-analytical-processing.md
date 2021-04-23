@@ -11,7 +11,7 @@ tags:
 
 > 原文：[Alibaba Hologres: A Cloud-Native Service for Hybrid Serving/Analytical Processing](https://dl.acm.org/doi/abs/10.14778/3415478.3415550)
 
-## TL;DR
+**TL;DR**
 
 Hologres是一种融合了NoSQL的写和OLAP的读的系统，它自称为HSAP，即Hybrid Srerving and Analytical Processing，目标是针对那些同时有着大量在线写入和实时分析需求的场景。
 

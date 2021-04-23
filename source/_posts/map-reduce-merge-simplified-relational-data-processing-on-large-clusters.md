@@ -8,7 +8,7 @@ tags:
 
 > 原文：[Map-reduce-merge: simplified relational data processing on large clusters](http://www.cs.duke.edu/courses/cps399.28/current/papers/sigmod07-YangDasdanEtAl-map_reduce_merge.pdf)
 
-## TL;DR
+**TL;DR**
 
 这篇文章为MapReduce模型增加了一步Merge，增强了Join的能力。原理如图。
 

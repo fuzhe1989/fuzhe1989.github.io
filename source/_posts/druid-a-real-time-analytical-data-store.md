@@ -11,7 +11,7 @@ tags:
 
 > 原文：[Druid: A real-time analytical data store](https://dl.acm.org/doi/abs/10.1145/2588555.2595631)
 
-## TL;DR
+**TL;DR**
 
 Druid是一种实时分析系统，它主要面向时序数据的复杂分析。Druid使用了lambda架构，使用实时节点来服务新数据，历史节点来服务历史数据，从而同时保证了查询效率、空间效率、数据可见性。Druid是存储计算分离架构，支持多种存储引擎，如HDFS、AWS S3等。
 

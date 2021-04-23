@@ -9,7 +9,7 @@ tags:
 
 > 原文：[Pebblesdb: Building key-value stores using fragmented log-structured merge trees](https://dl.acm.org/doi/abs/10.1145/3132747.3132765)
 
-## TL;DR
+**TL;DR**
 
 PebblesDB在LevelDB（实际是HyperLevelDB）的基础上，借鉴了SkipList中的guard概念，提出了一种Fragmented Log-Structured Merge Trees（FLSM），将整个fileset分成了多层的，层内多个不重叠的区间，每个区间内可以有多个文件。这样compaction可以只在level i做，而不涉及level i+1，从而显著降低了写放大。代价是读的时候从level 1开始每层都可能引入多个文件（对比LevelDB每层一个），开销会变大。PebblesDB因此也引入了一些优化以降低读路径的延时。
 

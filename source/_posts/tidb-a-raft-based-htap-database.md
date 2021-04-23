@@ -12,7 +12,7 @@ tags:
 
 > 原文：[TiDB: a Raft-based HTAP database](https://dl.acm.org/doi/abs/10.14778/3415478.3415535)
 
-## TL;DR
+**TL;DR**
 
 TiDB是一个HTAP系统，目标是同时服务TP和AP服务，且能保证隔离性和数据新鲜度。它的架构受到了Spanner和F1的影响：计算层类似于F1，无状态；存储层类似于Spanner，支持分布式事务。
 

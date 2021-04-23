@@ -9,7 +9,7 @@ tags:
 
 > 原文：[Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing](https://research.google/pubs/pub42851/)
 
-## TL;DR
+**TL;DR**
 
 Mesa是一种面向Google Ads的特定模式数据的准实时数仓，而不是面向非常通用场景的离线数仓。Mesa的设计上偏向于高伸缩性和准实时响应，目标是保证简单query场景的高性能；相对地，Mesa不支持完整的ad-hoc查询（似乎也不支持SQL），可以支撑支持SQL的更上层系统（如MySQL、F1、Dremel）。
 

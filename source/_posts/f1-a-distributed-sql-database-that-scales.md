@@ -10,7 +10,7 @@ tags:
 
 > 原文：[F1: A distributed SQL database that scales](https://research.google/pubs/pub41344/)
 
-## TL;DR
+**TL;DR**
 
 F1是Google用于替换分库分表的MySQL的RDBMS系统。它在[Spanner](/2020/12/14/spanner-googles-globally-distributed-database/)之上建立了一套关系模型，拥有Spanner的跨datacenter的同步replication能力。F1还开发了新的ORM模型，从而将同步geo-replication导致的延时隐藏了起来，保证了E2E延时在替换后没有上升。
 

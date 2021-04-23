@@ -9,7 +9,7 @@ tags:
 
 > 原文：[C-store: a column-oriented DBMS](https://dl.acm.org/doi/abs/10.1145/3226595.3226638)
 
-## TL;DR
+**TL;DR**
 
 本文idea：面向ad-hoc读优化的分布式DBMS。
 

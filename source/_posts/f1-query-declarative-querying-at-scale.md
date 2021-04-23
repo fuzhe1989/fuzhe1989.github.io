@@ -9,7 +9,7 @@ tags:
 
 > 原文：[F1 query: declarative querying at scale](https://dl.acm.org/doi/abs/10.14778/3229863.3229871)
 
-## TL;DR
+**TL;DR**
 
 F1 query是一种federated query processing平台，它的特点是：
 1. 计算存储分离。

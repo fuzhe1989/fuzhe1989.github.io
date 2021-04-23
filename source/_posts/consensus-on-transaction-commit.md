@@ -10,7 +10,7 @@ tags:
 
 > 原文：[Consensus on Transaction Commit](https://dl.acm.org/doi/abs/10.1145/1132863.1132867)
 
-## TL;DR
+**TL;DR**
 
 这篇文章是Jim Gray和Leslie Lamport两位图灵奖大佬的合作产物，是数据库与系统两个领域在consensus方面的结合。
 

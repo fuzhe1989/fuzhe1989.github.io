@@ -9,7 +9,7 @@ tags:
 
 > 原文：[Building a Database on S3](https://dl.acm.org/doi/abs/10.1145/1376616.1376645)
 
-## TL;DR
+**TL;DR**
 
 这篇文章讲的是如何实现自己的“云原生”数据库，以及探索S3是否适合作为DB的共享存储。
 

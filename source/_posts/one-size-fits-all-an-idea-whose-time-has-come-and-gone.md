@@ -8,7 +8,7 @@ tags:
 
 > 原文：[Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.68.9136&rep=rep1&type=pdf)
 
-## TL;DR
+**TL;DR**
 
 本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。
 

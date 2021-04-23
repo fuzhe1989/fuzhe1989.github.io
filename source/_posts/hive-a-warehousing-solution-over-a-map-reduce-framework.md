@@ -12,7 +12,7 @@ tags:
 
 > 原文：[Hive: a warehousing solution over a map-reduce framework](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.303.2572&rep=rep1&type=pdf)
 
-## TL;DR
+**TL;DR**
 
 Hive在MapReduce模型上实现了支持类SQL查询的数据仓库，它的改进点主要为：
 - 自己维护了元数据，从而允许了其它的所有优化。

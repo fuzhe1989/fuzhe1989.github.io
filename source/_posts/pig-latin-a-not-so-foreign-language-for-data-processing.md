@@ -8,7 +8,7 @@ tags:
 
 > 原文：[Pig Latin: A Not-So-Foreign Language for Data Processing](https://dl.acm.org/doi/abs/10.1145/1376616.1376726)
 
-## TL;DR
+**TL;DR**
 
 Pig Latin又是一个瞄准了MapReduce表达能力弱点的类SQL语言，它声称“集合了体现SQL精神的高阶查询与类MapReduce的过程式程序”。
 

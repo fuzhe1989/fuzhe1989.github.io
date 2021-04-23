@@ -9,7 +9,7 @@ tags:
 
 > 原文：[Dryad: Distributed Data-Parallel Programs from Sequential Building Blocks](https://cse.buffalo.edu/~stevko/courses/cse704/fall10/papers/eurosys07.pdf)
 
-## TL;DR
+**TL;DR**
 
 Dryad是一个分布式批处理框架，相比MapReduce，它的特点是：
 - 支持多种operator组成的DAG，且支持组合多个DAG。

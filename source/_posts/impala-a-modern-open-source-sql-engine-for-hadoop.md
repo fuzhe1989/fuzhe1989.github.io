@@ -10,7 +10,7 @@ tags:
 
 > 原文：[Impala: A Modern, Open-Source SQL Engine for Hadoop](https://2013.berlinbuzzwords.de/sites/2013.berlinbuzzwords.de/files/slides/Impala%20tech%20talk.pdf)
 
-## TL;DR
+**TL;DR**
 
 Impala是建立在Hadoop生态之上的MPP query engine，它有以下特点：
 - MPP，所有节点都可以参与query执行。

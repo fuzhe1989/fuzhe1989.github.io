@@ -10,7 +10,7 @@ tags:
 
 > 原文：[The snowflake elastic data warehouse](https://dl.acm.org/doi/abs/10.1145/2882903.2903741)
 
-## TL;DR
+**TL;DR**
 
 Snowflake是一个**云原生**的数据仓库。它的价值在于：
 1. 展示了云平台与分布式系统的差别，如何利用好云上的基础设施。

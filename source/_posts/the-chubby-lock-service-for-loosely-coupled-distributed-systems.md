@@ -10,7 +10,7 @@ tags:
 
 > 原文：[The Chubby lock service for loosely-coupled distributed systems](https://www.usenix.org/event/osdi06/tech/full_papers/burrows/burrows_html/)
 
-## TL;DR
+**TL;DR**
 
 本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。
 

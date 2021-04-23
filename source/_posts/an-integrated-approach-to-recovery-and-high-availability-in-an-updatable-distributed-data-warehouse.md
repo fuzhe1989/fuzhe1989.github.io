@@ -9,7 +9,7 @@ tags:
 
 > 原文：[An Integrated Approach to Recovery and High Availability in an Updatable, Distributed Data Warehouse](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.481.3000&rep=rep1&type=pdf)
 
-## TL;DR
+**TL;DR**
 
 这篇文章介绍了HARBOR，一种针对高可用数仓的新的恢复与高可用机制。相比传统的基于ARIES的系统，HARBOR不依赖log，而是利用冗余replica，在恢复时query其它replica来恢复数据。
 

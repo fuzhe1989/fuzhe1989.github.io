@@ -10,7 +10,7 @@ tags:
 
 > 原文：[Dremel: interactive analysis of web-scale datasets](https://research.google/pubs/pub36632.pdf)
 
-## TL;DR
+**TL;DR**
 
 这篇文章讲了两方面：
 - 支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的[Parquet](https://parquet.apache.org/)）。

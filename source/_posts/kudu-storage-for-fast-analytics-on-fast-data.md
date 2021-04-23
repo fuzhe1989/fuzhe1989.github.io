@@ -11,7 +11,7 @@ tags:
 
 > 原文：[Kudu: Storage for fast analytics on fast data](https://kudu.apache.org/kudu.pdf)
 
-## TL;DR
+**TL;DR**
 
 Kudu是一种同时支持高效的随机读写与扫描的存储系统，是用来弥补Hadoop生态中HDFS与HBase的gap的。它的特点是：
 - 自己用Raft实现了多副本（没有用HDFS）。

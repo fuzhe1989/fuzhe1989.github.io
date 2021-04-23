@@ -10,7 +10,7 @@ tags:
 
 > 原文：[The End of an Architectural Era (It's Time for a Complete Rewrite)](https://hstore.cs.brown.edu/papers/hstore-endofera.pdf)
 
-## TL;DR
+**TL;DR**
 
 本文针对新硬件带来的新的趋势，提出了一种全新的OLTP DBMS，H-Store，可以大幅度提高传统的DBMS的性能。
 

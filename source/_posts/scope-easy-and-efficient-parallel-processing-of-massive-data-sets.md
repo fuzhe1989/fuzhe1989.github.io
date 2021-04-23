@@ -8,7 +8,7 @@ tags:
 
 > 原文：[SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets](http://www.vldb.org/pvldb/vol1/1454166.pdf)
 
-## TL;DR
+**TL;DR**
 
 SCOPE是一种分布式批处理语言，将类SQL的脚本编译为可以运行在Cosmos平台上的分布式作业。
 

@@ -11,7 +11,7 @@ tags:
 
 > 原文：[Megastore: Providing scalable, highly available storage for interactive services](https://research.google/pubs/pub36971.pdf)
 
-## TL;DR
+**TL;DR**
 
 Megastore结合了NoSQL的扩展性和RDBMS的便利性，支持局部的ACID、多datacenter间的无缝failover。
 
