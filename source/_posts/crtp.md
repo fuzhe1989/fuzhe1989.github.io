@@ -265,7 +265,7 @@ public:
 template <typename Derived>
 class Shape_CRTP : public Shape {
 public:
-    virtual Shape* Clone() const {
+    Shape* Clone() const override {
         return new Derived(static_cast<Derived const&>(*this));
     }
 };
