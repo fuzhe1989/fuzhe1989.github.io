@@ -1,6 +1,6 @@
 ---
 title:      "[笔记] Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency"
-date:       2021-04-28 22:48:13
+date:       2021-05-02 23:18:12
 tags:
     - 笔记
     - Storage
@@ -85,3 +85,67 @@ seal过程中SM会与每个replica EN通信，并使用可用的EN中**最小的
 
 client在读多副本的extent时可以设置一个deadline，这样一旦当前EN无法在deadline之前读到数据，client还有机会读另一个EN。而在读erasure coded数据时，client也可以设置deadline，超过deadline后向所有fragment发送读请求，并使用最先返回的N个fragment重新计算缺少的数据。
 
+WAS还实现了自己的I/O调度器，如果某个spindle（这个怎么翻译？）已经调度的I/O请求预计超过100ms，或有单个I/O已经排队超过200ms，调度器就不再向这个spindle发送新的I/O请求。这样牺牲了一些延时，但达到了更好的公平性。
+
+为了进一步加速I/O，EN会使用单独的一块盘（HDD或SSD）作为journal drive，写入这台EN的数据会同时append到journal drive上，以及正常写extent，哪笔写先完成都可以返回。写入journal drive的数据还会缓存在内存中，直到数据写extent成功（阿里云的pangu使用了类似的方案）。journal drive方案的优点：
+- 将大量随机写转换为了顺序写。除了写journal drive天然是顺序的，这种设计还使得写extent时可以使用更倾向batch的I/O调度策略，进一步提高了磁盘带宽的利用率。
+- 关键路径上读写请求分离，前者读数据盘（或cache），后者写journal drive。
+
+使用了journal drive可以极大降低I/O的延时波动率（对在线业务意义重大）。
+
+（Partition层的设计类似于BigTable，略过部分信息）
+
+Partition层数据保存在了不同的Object Table（OT）中，每个OT分为若干个RangePartition。OT包括：
+- Account Table
+- Blob Table
+- Entity Table
+- Message Table
+- Schema Table
+- Partition Map Table
+
+Partition层的架构：
+- Partition Manager（PM）：类似于BigTable的Master，管理所有RangePartition。
+- Partition Server（PS）：类似于BigTable的Tablet Server，加载RangePartition，处理请求。
+- Lock Service：类似于Chubby。
+
+![](/images/2021-05/was-04.png)
+
+![](/images/2021-05/was-05.png)
+
+Blob Table有个类似于后面Wisckey[[1]]的优化，就是大块数据进commit log，但不进入row data（不进cache、不参与常规compaction等），相反row data中只记录数据的位置（extent+offset），并且在checkpoint的时候直接用commit log的extent拼装成data stream。
+
+RangePartition的分裂（Split）过程：
+- PM向PS发请求，要求将B分裂为C和D。
+- PS生成B的checkpoint，然后B停止服务（此时是不是可以不停读）。
+- PS使用B的所有stream的extent组装成C和D的stream。
+- C和D开始服务（client还不知道C和D，此时应该不会有请求发过来）。
+- PS告知PM分裂结果，PM更新Partition Map Table，之后将其中一个新Partition移到另一台PS上（分散压力）。
+
+合并（Merge）过程类似：
+- PM将C和D移动到相同PS上，之后告知PS将C和D合并为E。
+- PS生成C和D的checkpoint，之后C和D停止服务。
+- PS使用C和D的stream的extent组装为E的stream，每个stream中C的extent在D之前。
+- PS生成E的metadata stream，其中包括了新的stream的名字、key range、C和D的commit log的start和end位置、新的data stream的root index。（这里commit log的meta管理有点复杂，如果连续分裂怎么办？Tablestore是先停止服务再生成checkpoint，就不需要分别记录C和D的log meta，但停止服务时间会比较长；WAS这种方案停止服务时间短，但meta管理复杂）
+- E开始服务。
+- PS告知PM合并结果。
+
+最后是一些经验教训的总结：
+- 计算存储分离。好处是弹性、隔离性，但对网络架构有要求，需要网络拓扑更平坦、点对点的双向带宽更高等。
+- Range vs Hash。WAS使用Range的一个原因是它更容易实现性能上的隔离（天然具有局部性），另外客户如果需要hash，总是可以基于Range自己实现，而反过来则不然。
+- 流控（Throttling）与隔离（Isolation）。WAS使用了SimpleHold算法[[2]]来记录请求最多的N个AccountName和PartitionName。当需要流控时，PS会使用这个信息来选择性拒绝请求，大概原则是请求越多，被拒绝概率越大（保护小用户）。而WAS会汇总整个系统的信息来判断哪些account有问题（异常访问），如果LoadBalance解决不了就更高层面上控制这种用户的流量。
+- 自动负载均衡（LoadBalancing）：WAS一开始使用单维度“load”（延时*请求速率）来均衡，但无法应对复杂场景。现在的均衡算法是每N秒收集所有Partition的信息，然后基于每个维度排序，找出需要分裂的Partition。之后PM再将PS按各维度排序，找出负载过重的PS，将其中一部分Partition移到相对空闲的PS上（整体思路与Tablestore的LoadBalance差不多，更系统化一些，但Tablestore的LoadBalance策略更多，更灵活）。
+- 每个Partition使用自己的log file。这点与BigTable的整个Tablet Server共享log file区别比较大。单独log file在load/unload上更快，且隔离性更好，而共享log file更节省I/O（综合来看单独log file更好一些，尤其是随着存储性能的提升、计算存储分离架构的流行，共享log file的优势越来越小，劣势越来越大了）。
+- Journal drive。它的意义是降低I/O波动。BigTable使用了另一种方案，用2个log来规避长I/O，但导致了更多的网络流量与更高的管理成本。
+- Append-only。（与log as database理念差不多）
+- End-to-end checksum。
+- Upgrade。重点是在每一层将节点分为若干个upgrade domain，再使用rolling upgrade来控制upgrade的影响。
+- 基于相同Stack的多种数据抽象。就是指Blob、Table、Queue（其实还应该有Block）。
+- 使用预定义的Object Table，而不允许应用定义自己的Table。意义在于更容易维护（真的有意义吗）。
+- 限制每个Bucket大小为100TB。这个是教训，WAS计划增大单个storage stamp。
+- CAP。WAS认为自己在实践层面上同时实现了C和A（高可用、强一致），具体策略上是通过切换新extent来规避掉不可访问的节点（实践上有意义，但也不能说是同时实现了C和A）。另外[[3]]表示使用chain replication就可以同时实现高可用和强一致。
+- 高性能的debug log。这点很重要。
+- 压力点测试。WAS可以单独测试多个预定义的压力点（如checkpoint、split、merge、gc等）。（除此之外现在还需要考虑chaos test）。
+
+[1]: /2017/05/19/wisckey-separating-keys-from-values-in-ssd-conscious-storage
+[2]: https://dl.acm.org/doi/abs/10.1145/633025.633056
+[3]: https://static.usenix.org/events/osdi04/tech/full_papers/renesse/renesse.pdf
