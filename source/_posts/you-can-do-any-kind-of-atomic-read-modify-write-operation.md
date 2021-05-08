@@ -3,7 +3,7 @@ title:      "翻译：You Can Do Any Kind of Atomic Read-Modify-Write Operation"
 date:       2015-05-06 14:31:05
 tags:
     - C++
-    - atomic
+    - Atomic
     - 翻译
 ---
 

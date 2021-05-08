@@ -8,7 +8,6 @@ tags:
     - Google
 ---
 
-
 > 原文：[Large-scale incremental processing using distributed transactions and notifications](https://www.usenix.org/event/osdi10/tech/full_papers/Peng.pdf)
 
 **TL;DR**

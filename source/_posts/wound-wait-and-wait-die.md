@@ -68,3 +68,5 @@ Wait-die 中新事务试图获取老事务持有的锁会导致自身被 abort�
 1. [有哪些分布式数据库可以提供交互式事务？ - 陈广胜的回答 - 知乎](https://www.zhihu.com/question/344517681/answer/815329816)
 1. [What is the difference between wait-die and wound-wait algorithms - Stackoverflow](https://stackoverflow.com/q/32794142)
 1. [Comparing the wait-die and wound-wait schemes](http://www.mathcs.emory.edu/~cheung/Courses/554/Syllabus/8-recv+serial/deadlock-compare.html)
+
+[1]: https://www.zhihu.com/question/344517681/answer/815329816
