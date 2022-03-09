@@ -85,7 +85,7 @@ Pulsar中partition是可选的，可以不用partition而支持多个consumer。
 ## Performance
 
 [GigaOm的一份报告](https://oreil.ly/vGoPy)显示：
-- Pulsar的吞吐是Kafka的150%。
+- Pulsar的吞吐上限比Kafka高出150%。
 - Pulsar的延时比Kafka低40%，且一致性等级更高。
 - 得益于更好的伸缩性，Pulsar在不同的message大小和partition数量下有着一致的结果。
 
