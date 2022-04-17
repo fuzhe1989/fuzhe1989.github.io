@@ -1,5 +1,5 @@
 ---
-title:      "极简介绍 TiFlash 执行器线程模型"
+title:      "TiFlash 执行器线程模型"
 date:       2022-04-17 23:45:38
 tags:
 ---
