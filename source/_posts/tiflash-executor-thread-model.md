@@ -52,7 +52,7 @@ Exchange 算子是由 receiver 端主动建立连接，之后 sender 端会源�
 
 ![图2](/images/2022-04/tiflash-executor-thread-model-01.png)
 
-TiFlash 使用了类似于 volcano 的 push 模型，执行流是由一个个 IBlockInputStream（下文简称 InputStream）组成的，可以认为它们就是 TiFlash 的算子。每个 InputStream） 支持以下基本接口：
+TiFlash 使用了类似于 volcano 的 pull 模型，执行流是由一个个 IBlockInputStream（下文简称 InputStream）组成的，可以认为它们就是 TiFlash 的算子。每个 InputStream） 支持以下基本接口：
 - readPrefix：类似于 open。
 - read：类似于 next。
 - readSuffix：类似于 close。
