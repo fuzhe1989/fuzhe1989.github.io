@@ -14,7 +14,7 @@ tags:
 
 长话短说。TiKV 的架构如下：
 
-![](/images/2022-04/build-cloud-native-kv-engine-based-on-a-dfs-01.png)
+![](/images/2022-05/build-cloud-native-kv-engine-based-on-a-dfs-01.png)
 
 每个节点都维护一个本地的 kv store，节点间通过 raft 协议保证多副本的一致性。如果将 TiKV 直接搬上 AWS，每个 TiKV node 底下需要挂载一块盘当作本地存储。截止到 TiDB 6.0，Cloud TiKV 仍然挂载的是 EBS。
 
@@ -51,7 +51,7 @@ S3 可以解决前面说的几个问题：
 
 S3 的种种不足，提示着我们，它需要一层 cache。翻出经典的 [Computer Memory Hierarchy](https://en.wikipedia.org/wiki/Memory_hierarchy)：
 
-![](/images/2022-04/build-cloud-native-kv-engine-based-on-a-dfs-02.png)
+![](/images/2022-05/build-cloud-native-kv-engine-based-on-a-dfs-02.png)
 
 对于 S3 这种 remote storage，最适合的 cache 就是 local storage。恰好这种定位能够解决本地 SSD 容量有限的问题（cache 不需要保存全量数据）。
 
