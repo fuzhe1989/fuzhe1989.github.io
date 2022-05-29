@@ -24,6 +24,8 @@ tags:
 1. 资源浪费。TiKV 的每个副本会独立进行 compaction。我们知道 lsmt engine 中 compaction 通常是非常消耗计算资源的。当使用可靠存储介质时，我们完成可以只让写节点（比如 leader）compaction 一次，而让生成的文件被多个读节点（比如 follower）反复使用。
 
 > TiKV 的存储实际可以分为 WAL 与 Data 两部分，两者对存储介质的需求差别较大，且通常前者成本远低于后者。本文主要探讨 Data 的管理，可以假设 WAL 仍然以多副本的形式保存在 EBS 上。
+>
+> 免责声明：本文只是以 TiKV 为例，以下内容不保证符合 TiKV 实现。
 
 ## 为什么不直接用本地 SSD
 
