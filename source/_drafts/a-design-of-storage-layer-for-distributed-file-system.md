@@ -110,34 +110,35 @@ workload 特点：
 
 每个 replica 上读取某个 chunk 时，**不需要**加任何锁：并发读写时读不保证原子性。
 
-### 容错流程
+### replica 状态管理
 
-#### 基本原则
-
-1. primary 在遇到 secondary 失败时会尽量重试。如果重试仍不成功则将结果返回给 client。**但 primary 本身不会直接 offline secondary**。
+1. primary 在遇到 secondary 失败时会尽量重试。如果重试仍不成功则将结果返回给 client。
 1. primary 写入时会跳过 offline 的 secondary，但不会跳过 online 的 secondary（即使上轮写入失败）。
-1. offline 的 secondary 可以通过 sync 重新回到 online。sync 过程中 primary 会暂停写入。
-1. meta server 会将 chunk_info 的变更通知给 primary。
-1. 只有 management node 可以
+1. offline 的 secondary 可以通过 sync 重新回到 online。
+1. offline replica 的顺序是先修改 meta，再通知 primary；online replica 的顺序则相反，primary 先确认 secondary 已经 sync 完成，再修改 meta。
+1. management node 会在某个 storage server 心跳断开足够长时间之后将它对应的所有 replica 置为 offline。
+1. storage server 在重新建立心跳之后需要确认自身 replica 状态，移除不在 meta 中的 replica，并与 primary 通信完成被标记为 offline 的 replica 的 online。
+1. 为了提高可用性，client 可以主动发起 offline 某个 replica 的操作。
+1. meta server 在 offline replica 时，可以根据配置决定要不要增加 replica。
+1. 增加 replica 的过程为：
+    1. meta 中增加一个 offline 的 replica。
+    1. meta server 通知对应 storage server 增加 replica。
+        1. 考虑到这次通知可能会失败，为了保证 storage server 后续能意识到这个新 replica，我们可以让 storage server 每隔一段时间拉取 meta 中自身对应的 chunk list。
+    1. storage server 走正常的 recovery 流程同步 replica。
+1. 同步 replica 的过程：
+    1. secondary 与 primary 通信，这次 rpc 也会带上每个 subrange 的 commit version。
+    1. primary 停写，对比每个 subrange 的 commit version，将不一致的 subrange 发送给 secondary。
+    1. secondary 写成功，回复 response。
+    1. primary 通知 meta server 修改 secondary 状态为 online。
+    1. primary 恢复写入。
+    1. 存在一种情况，相同的 commit version 对应的数据不同。这是因为修改 chunk_file 与持久化 commit version 不是原子操作。但此时 client 一定没有收到写成功，因此不同 replica 的状态不一致是可以接受的。
+1. 如果 primary 本身被标记为 offline，meta server 会立即从 online 的 secondary replica 中随机挑一个升级为 primary。我们的写入流程保证了这个 replica 一定拥有所有被 client 确认写成功的数据。
+1. 如果有 client 在访问被标记为 offline 的 replica（使用了过期的缓存），且此时另外的 client 有写入，则前一个 client 可能读到过期的数据。可以考虑不保证多个 client 并发读写的一致性。
 
-1. 每个 replica 会重试本地的写入。
-1. primary 会重试 secondary 的写失败（主要是 timeout）。
-1. management node 发现 storage server 心跳断开后，如果超过指定时间 storage server 仍未恢复，则通知 meta server 将这个 storage server 对应的所有 replica 设置为 offline。
-1. meta server 在 offline replica 时，可以根据配置决定要不要增加 replica。replica 状态的修改也会同步给 primary，primary 不再尝试写 offline 的 secondary。
+## Q & A
 
-storage server 在重新建立心跳后，需要先确认自身所有 replica 状态。对于已经 offline 的 replica，再从对应的 primary 同步数据。整个同步期间 primary 会暂停写入以简化状态管理。chunk 同步时，每个 subrange 可以通过 commit version 来判断自身是否过期，从而减小需要同步的数据量。
+### 为什么不考虑 chunk 分 shard
 
-> 存在一种情况，不同 replica 上相同的 commit version 对应的数据不同。这是因为修改 chunk_file 与持久化 commit version 不是原子操作。但此时 client 一定没有收到写成功，因此不同 replica 的状态不一致是可以接受的。
+假设我们将系统分为若干个 shard，每个 shard 有 primary 和 secondary，管理多个 chunk，看起来能降低 metadata 的管理压力。
 
-新增 replica 也会走 recovery 流程，即先 offline，同步好之后再切换到 online。
-
-在 offline replica 之前，对应 chunk 的写操作均会失败。此时如果 client 可以容忍短时间降级写，则可以自行 offline replica。
-
-如果 primary 本身被标记为 offline，meta server 会立即从 online 的 secondary replica 中随机挑一个升级为 primary。我们的写入流程保证了这个 replica 一定拥有所有被 client 确认写成功的数据。
-
-存在一种情况：client a 写操作失败，标记 replica r1 为 offline，之后继续写数据；r1 所在的 storage server 心跳未断；client b 读 r1，未意识到 r1 已经 offline。此时 client b 可能无法读到 client a 的后续写入。
-
-此时我们可以：
-1. 强制只读 primary。
-1. secondary 每次读都与 primary 通信，确认自己没有被 offline。
-1. 不保证多个 client 并发读写的一致性。
+但考虑到一致性，这会使得写入的单位也变成了 shard，限制了整个系统的写吞吐。
