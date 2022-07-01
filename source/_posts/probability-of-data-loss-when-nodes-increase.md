@@ -101,6 +101,6 @@ P = 0.00001，K = 5000
 1. 只考虑存储空间与数据可靠性的话，Chain replication 相比 Quorum（Paxos/Raft）更适合用于数据平面。
 1. 在集群节点数量增加时，需要考虑是否有必要增加副本数量。
 
-上述结论与数据分布无关，如 Copyset 等策略相当于降低了 P<sub>n</sub>，正交于具体的共识算法。
+上述结论与数据分布无关，如 Copyset 等策略相当于降低了 P<sub>ss</sub>，正交于具体的共识算法。
 
 > 安利一个网站：https://www.desmos.com/calculator
