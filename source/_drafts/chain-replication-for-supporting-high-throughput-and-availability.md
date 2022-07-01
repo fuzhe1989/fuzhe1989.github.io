@@ -73,3 +73,4 @@ CR 将出错情况分为了三种：
 - https://medium.com/coinmonks/chain-replication-how-to-build-an-effective-kv-storage-part-1-2-b0ce10d5afc3
 - https://medium.com/swlh/replication-and-linearizability-in-distributed-systems-cd9036ea7b40
 - http://nil.lcs.mit.edu/6.824/2020/papers/craq-faq.txt
+- https://engineering.fb.com/2022/05/04/data-infrastructure/delta/
