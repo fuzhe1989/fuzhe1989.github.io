@@ -33,8 +33,8 @@ public:
         bool await_suspend(std::coroutine_handle<> awaiting_coroutine) noexcept {
             const void * const setState = &m_event;
             m_awaiting_coroutine = awaiting_coroutine;
-            void * old_value = m_event.m_state.load(std::memory_order_acquire);
             do {
+                void * old_value = m_event.m_state.load(std::memory_order_acquire);
                 if (old_value == setState)
                     return false;
                 m_next = static_cast<awaiter *>(old_value);
