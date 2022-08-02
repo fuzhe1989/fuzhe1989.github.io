@@ -14,3 +14,65 @@
         1. dynamic priority?
         1. caching unit?
     1. compression?
+
+## Goal
+
+For many distributed systems (include but not limited to OLTP and OLAP systems), such a storage abstraction could be very helpful:
+1. Unified namespace across multiple nodes.
+2. Leverage different cloud native storage mediums to balance between cost and performance.
+3. Automaticaly swap data in/out between different storage tiers. That is, a fast (but expensive) medium could be treated as a cache layer of a slow (but cheap) medium.
+4. Lifetime guarantee for files maybe shared between different nodes.
+5. Provide different abstractions for WAL (which is mutable, append-only) and File (which is immutable for a given identity).
+
+## Use case
+
+Suppose we have a distributed key-value system called XKV. It has a typical distributed architecture based on Raft and local state machine (RocksDB).
+
+We want to migrate XKV from purely local disk + Raft to our brand new storage system so that:
+1. Reduce our storage cost since S3 is much cheaper than local disk on EC2 or EBS.
+2. Save lots of cpu usage from less compaction: now only one writer (the leader node or remote compaction service) needs to compact data.
+3. Largely improve the scaling speed since all data is stored at S3 and no need to move them during shard changing: data can be lazily loaded later.
+4. Capable to serve read requests on all replicas.
+
+The new design:
+1. As before, the leader forwards data to followers and write data to WAL. (TODO: only leader write or all write?)
+2. As before, The leader and followers only write memory file when applying data.
+3. **Changed**. The leader will flush data to files, upload and register them.
+4. **Changed**. The leader will forward manifest changes through Raft log to followers.
+5. **Changed**. The follower will never flush data. It will only discard useless data when receiving manifest changes.
+6. As before, the follower needs to ensure itself fresh enough when serving read requests.
+7. **Changed**. When reading a file, it could be fully or partly missing at the local disk. However our storage system will automatically fetch necessary data fragment from S3 and evict cold data if need.
+8. **Changed**. When the leader wants to gc some obsolete files, it has to wait unitl all followers acknowledge this. This could be tricky so a built-in support for data sharing (e.g. maintain a ref-count in metadata and inc ref when register file, dec ref when each replica acknowledge) could be very helpful.
+
+## Details
+
+### Global namespace
+
+Question: why we need a global namespace? By using S3 as the fact of persistent storage, we already have the ability to share data across different nodes and shards, only the metadata needs to be sent from one node to another.
+
+Pros if there's no global namespace:
+- Do not need a global metadata service.
+- (TBC)
+
+Cons:
+- Share data across shards could be tricky.
+- Lack of centralized 
+
+### Metadata
+
+Unified namespace means we need a centralized metadata service. It should provide strong consistency and high availablity, e.g. built upon Paxos/Raft.
+
+> **Proposal**: build a centralized metadata service upon a strong consistent and highly avaiable system.
+
+> **TBD**: do we need a global namespace or a per-shard namespace is enough?
+
+### File abstraction
+
+The file abstraction is not complex. The only writer writes data locally, uploads data to persistent storage e.g. S3, then register file in metadata service. The question is, do we need to differentiate a logical file and a physical file?
+
+Logical files are what users could see. Physical files are what we upload to S3. A trivial way is to keep them identical. The cons is that, file granularity is too coarse for caching: thinking about a file larger than the local disk capacity. So the caching unit should be less than a file. It could be chunk, page, or whatever. Then why not let a physical file represent a chunk? That's good, but maybe not good enough. Chunk may not be the best caching or operating unit.
+
+> **TBD**: how do we organize file?
+
+### WAL abstraction
+
