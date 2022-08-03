@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing  TL;DR Mesa是一种面向Google Ads的特定模式数据的准实时数仓，而不是面向非常通用场景的离线数仓。Mesa的设计上偏向于高伸缩性和准实时响应，目标是保证简单query场景的高性能；相对地，Mesa不支持完整的ad-hoc查询（似乎也不支持SQL），">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing  TL;DR Mesa是一种面向Google Ads的特定模式数据的准实时数仓，而不是面向非常通用场景的离线数仓。Mesa的设计上偏向于高伸缩性和准实时响应，目标是保证简单query场景的高性能；相对地，Mesa不支持完整的ad-hoc查询（似乎也不支持SQL），">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/mesa-01.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/mesa-02.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/mesa-03.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/mesa-04.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/mesa-05.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/mesa-06.jpg">
+<meta property="article:published_time" content="2020-11-17T14:06:38.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.657Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLAP">
+<meta property="article:tag" content="Google">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-11/mesa-01.jpg">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-17 22:06:38" itemprop="dateCreated datePublished" datetime="2020-11-17T22:06:38+08:00">2020-11-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub42851/">Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Mesa是一种面向Google Ads的特定模式数据的准实时数仓，而不是面向非常通用场景的离线数仓。Mesa的设计上偏向于高伸缩性和准实时响应，目标是保证简单query场景的高性能；相对地，Mesa不支持完整的ad-hoc查询（似乎也不支持SQL），可以支撑支持SQL的更上层系统（如MySQL、F1、Dremel）。</p>
+<p>Mesa依赖Google的Colossus、BigTable、MapReduce，数据被水平分片并复制到多个datacenter。Mesa会批量导入数据，每行数据都有version，使用MVCC，周期性提升可见的数据版本。为了保证跨datacenter的更新一致性，Mesa还使用了基于Paxos的同步协议。</p>
+<p>Mesa比较有特色的是它的聚合函数、数据版本管理、以及多datacenter同步。</p>
+<span id="more"></span>
+
+<h2 id="设计目标"><a href="#设计目标" class="headerlink" title="设计目标"></a>设计目标</h2><ul>
+<li>原子更新，更新完之前不被查询到。</li>
+<li>一致性和正确性，需要提供强一致性和跨datacenter的可重复读。</li>
+<li>可用性，不能有单点问题，能承受单个datacenter或region挂掉。</li>
+<li>准实时更新，能每秒更新百万量级的行，并提供分钟级的跨datacenter和view的可见性。</li>
+<li>查询性能，能服务需要低延时的在线业务，以及需要高吞吐的离线业务，点查的P99延时要在百ms这个量级，且每天的读吞吐能达到千亿行量级。</li>
+<li>伸缩性，系统要能跟得上数据和查询规模的增长，要能支持千亿量级的行、PB量级的数据，并在数据大幅度增长时还保持更新和查询性能稳定。</li>
+<li>在线变更数据schema和元数据，且不影响正常的读写请求。</li>
+</ul>
+<h2 id="存储层"><a href="#存储层" class="headerlink" title="存储层"></a>存储层</h2><h3 id="Data-Model"><a href="#Data-Model" class="headerlink" title="Data Model"></a>Data Model</h3><p>Mesa中数据按表组织，每张表的schema分为两部分，keyspace和valuespace，分别可以包含多列，但角色不同：keyspace唯一确定一行，key列都可以作为predicate；每个value列各自关联一个聚合函数F，查询时通过F来获得这列的聚合值，不作为predicate。</p>
+<p>聚合函数需要能满足结合率，通常也满足交换率（但不要求）。</p>
+<p>每张表也可以有若干个索引，每个索引的key column是主表key column的一个排列。</p>
+<p><img src="/images/2020-11/mesa-01.jpg" alt="Table Schema"></p>
+<p>上面例子中，表A的key column有Date、PublisherId、Country，value column有Clicks和Cost。表B没有PublisherId列，但有AdvertiserId列。两张表的value column的聚合函数都是SUM。</p>
+<p>表C实际是表B的一个materialized view：<code>SELECT SUM(Clicks), SUM(Cost) GROUP BY AdvertiserId, Country</code>。Mesa要求MV的聚合函数要与主表相同，因此也是SUM。</p>
+<h3 id="Updates-and-Queries"><a href="#Updates-and-Queries" class="headerlink" title="Updates and Queries"></a>Updates and Queries</h3><p>Mesa接受批量写入，每次写入时会带上版本号V（从0开始单调增）。</p>
+<p>查询包含一个predicate P和最大版本n，Mesa会将所有匹配P的行的0到n版本的value聚合起来返回。Mesa支持的其它更复杂的查询也都是基于此实现的。</p>
+<p>在对前面表A、B、C进行更新时，可以分别对表A和B更新（不同的行），表C会自动更新，也可以一次更新同时包含AdvertiserId和PublisherId，这样表A和B也会一起更新，但开销比较大（为什么？）。</p>
+<p><img src="/images/2020-11/mesa-02.jpg" alt="Table Update"></p>
+<p>一次更新可能会涉及多张表和view，在结束之前这些数据都不可见，保证了查询的原子性。</p>
+<h3 id="Versioned-Data-Management"><a href="#Versioned-Data-Management" class="headerlink" title="Versioned Data Management"></a>Versioned Data Management</h3><p>为了提高版本聚合的性能，Mesa将所有版本的数据进行了预处理，分为base、delta和singleton delta：</p>
+<ul>
+<li>base表示查询中能指定的最早的version。Mesa不可能永久保存所有version，因此它会定期将0-base的所有version聚合成一个值，比如一天之前的数据。</li>
+<li>delta指一个区间<code>[V1, V2]</code>的聚合值。<code>[V1, V2]</code>和<code>[V2+1, V3]</code>可以合并为<code>[V1, V3]</code>。Mesa会在base之后维护若干个delta version，用于加速聚合。</li>
+<li>singleton指某个具体version，或<code>[V1, V1]</code>，它与delta version表示的范围是一样的。</li>
+</ul>
+<p>Mesa会定期提升base，删掉老的base和无用的delta version、singleton delta。</p>
+<p>Mesa的delta是分多层的，越近的delta的区间越小。</p>
+<p><img src="/images/2020-11/mesa-03.jpg" alt="Delta management"></p>
+<h3 id="Physical-Data-and-Index-Formats"><a href="#Physical-Data-and-Index-Formats" class="headerlink" title="Physical Data and Index Formats"></a>Physical Data and Index Formats</h3><p>Mesa中文件都是immutable的，这样文件格式的设计就简化了很多，首先考虑空间效率，其次是支持快速seek和聚合。每表Mesa表都有一个或多个索引。</p>
+<p>数据文件中的行都是排好序的，切分为多个row block，每个单独按列存格式编码和压缩，压缩时优先考虑压缩率和解压速度，压缩速度可以慢一些。</p>
+<p>每个数据文件都对应一个block index文件。</p>
+<h2 id="系统架构"><a href="#系统架构" class="headerlink" title="系统架构"></a>系统架构</h2><h3 id="单datacenter实例"><a href="#单datacenter实例" class="headerlink" title="单datacenter实例"></a>单datacenter实例</h3><p>Mesa用BigTable保存元数据，用Colossus保存数据文件。</p>
+<p>单个datacenter内Mesa实例分成了controller和worker。controller负责管理任务和维护元数据，包括每张表的待更新version与数据文件、delta compaction policy、每种操作类型最近涉及的entry等。</p>
+<p><img src="/images/2020-11/mesa-04.jpg" alt="Controller Worker"></p>
+<p>controller是按表做shard的，本身是无状态的，启动时会从BigTable中读出所有元数据，之后会订阅表的创建、删除操作，表的元数据本身只有controller能修改。</p>
+<p>controller对于不同的操作都有单独的队列，交给不同的worker执行。单instance内部的操作如更新和delta compaction，controller自己就能发起；跨instance的操作会由外界模块向controller发送RPC触发。</p>
+<p>每个worker会周期性从controller那里拉任务，拉到的任务会有一个lease，保证了慢worker不会永久占用任务。controller只会接受指定的worker传回的结果，保证了安全性。</p>
+<p>Mesa同时服务于在线和离线业务，因此需要通过优先级来做隔离和资源分配。一个Mesa实例中的query server分为多组，每组可以服务的表都是相同的。分组的目的：</p>
+<ol>
+<li>分批次升级而不影响在线服务。</li>
+<li>可以将相同表的请求路由到同一组，允许预读和缓存Colossus上的数据。</li>
+<li>方便不同组之间做load balance。</li>
+</ol>
+<p>每个query server在启动时会将它能服务的表注册到global locator service上，之后client会用这类信息来选择query server。</p>
+<p><img src="/images/2020-11/mesa-05.jpg" alt="Query Processing"></p>
+<h3 id="多datacenter部署"><a href="#多datacenter部署" class="headerlink" title="多datacenter部署"></a>多datacenter部署</h3><p><img src="/images/2020-11/mesa-06.jpg" alt="Update Processing"></p>
+<p>Mesa有全局的committer和version DB，前者是部署在多个datacenter的无状态的server，后者是基于Paxos的跨datacenter的datastore。</p>
+<p>上游服务会定期将数据批量导入Colossus，再通知committer。committer为数据赋上version，再将这次更新相关的元数据写入version DB。</p>
+<p>各个datacenter的controller会订阅version DB的修改，发现这次更新后会创建任务交给worker执行，执行完毕后将结果（success）写回version DB。</p>
+<p>committer会周期性检查每次更新的执行完整性，等到所有controller都执行成功后，再修改version DB中的committed version，这次修改才可见。</p>
+<p>这种异步提升version的方式不需要任何锁的参与，能保证跨表和view的修改在所有datacenter同步可见，但代价是数据可见性的延时较大。</p>
+<p>新datacenter加入的时候类似于分布式系统中的新节点加入，先p2p加载已有数据，再应用过去一段时间的新修改。在追上之前，新datacenter不会影响committer提升committed version。</p>
+<h2 id="Enhancements"><a href="#Enhancements" class="headerlink" title="Enhancements"></a>Enhancements</h2><h3 id="Query-Server-Performance-Optimizations"><a href="#Query-Server-Performance-Optimizations" class="headerlink" title="Query Server Performance Optimizations"></a>Query Server Performance Optimizations</h3><p>query server会根据查询的key range来过滤完全不相关的delta，比如基于时间的过滤效果会非常好。</p>
+<p>在寻找匹配的row时，Mesa会在第一列超出P的范围后seek到下一个值，从而避免scan（Tablestore也做了类似的优化，难点在于如何评估当前key的数据量，需要统计信息辅助）。</p>
+<p>为了避免大query超时，Mesa可能会返回部分结果，并带有resume key。</p>
+<h3 id="Parallelizing-Worker-Operation"><a href="#Parallelizing-Worker-Operation" class="headerlink" title="Parallelizing Worker Operation"></a>Parallelizing Worker Operation</h3><p>Mesa的worker可能会做涉及到超大数据量的任务（如compaction等），此时Mesa会使用MapReduce来调度worker。为了更均匀地切分数据，Mesa在写数据时会抽样row key，与数据一起写进文件。后面读的时候就可以先将所有抽样信息读上来，分片好之后再交给各个worker执行。</p>
+<p>（具体计算分裂点的算法略，看起来与Tablestore的类似）</p>
+<h3 id="Schema-Changes-in-Mesa"><a href="#Schema-Changes-in-Mesa" class="headerlink" title="Schema Changes in Mesa"></a>Schema Changes in Mesa</h3><p>Mesa运用两种技术实现了在线schema变更：一种适用于所有情况的、简单但开销高的方法，一种覆盖多种重要且通用的场景的优化方法。</p>
+<p>简单方法：</p>
+<ol>
+<li>钉住某个version，使用新schema存一份表数据。</li>
+<li>在新数据上应用这个version后面的修改。</li>
+<li>原子更新query使用的schema（基于BigTable的原子更新）。</li>
+</ol>
+<p>复杂方法是记录下新schema和对应的version，但不变更持久化的数据，而是在query路径上转换。新数据直接采用新schema，老数据等到下一轮base compaction时变更。</p>
+<h3 id="Mitigating-Data-Corruption-Problems"><a href="#Mitigating-Data-Corruption-Problems" class="headerlink" title="Mitigating Data Corruption Problems"></a>Mitigating Data Corruption Problems</h3><p>在Mesa这个量级下，只在文件里记录checksum已经不足以保证数据安全了。Mesa使用了在线和离线两种方式检查数据。</p>
+<p>各个实例在修改和查询时都会做在线检查。修改的时候会检查行序、key range、聚合值是否正确。</p>
+<p>每隔一段时间Mesa还会做全局的离线检查，在所有实例间比较checksum。另外Mesa还会做另一种轻量的全局检查，只检查最近的committed version对应的数据的聚合值是否一致。这项检查只需要读元数据，因此开销比前面的全局离线检查要低很多。</p>
+<p>Mesa还定期备份，即使所有实例都坏了，还可以恢复备份数据。</p>
+<h2 id="Experiences-amp-Lesson-Learned"><a href="#Experiences-amp-Lesson-Learned" class="headerlink" title="Experiences &amp; Lesson Learned"></a>Experiences &amp; Lesson Learned</h2><p>只记录两点：</p>
+<ol>
+<li>激进地预读Colossus上的数据以缓解将数据从本地磁盘迁到Colossus带来的性能降级。</li>
+<li>基于像Colossus和BigTable这样的现成的系统开发，帮助作者专注于Mesa自身的架构。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLAP/" rel="tag"># OLAP</a>
+              <a href="/tags/Google/" rel="tag"># Google</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/" rel="prev" title="[笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees">
+      <i class="fa fa-chevron-left"></i> [笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/11/21/f1-query-declarative-querying-at-scale/" rel="next" title="[笔记] F1 query: declarative querying at scale">
+      [笔记] F1 query: declarative querying at scale <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%BE%E8%AE%A1%E7%9B%AE%E6%A0%87"><span class="nav-number">1.</span> <span class="nav-text">设计目标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E5%B1%82"><span class="nav-number">2.</span> <span class="nav-text">存储层</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Data-Model"><span class="nav-number">2.1.</span> <span class="nav-text">Data Model</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Updates-and-Queries"><span class="nav-number">2.2.</span> <span class="nav-text">Updates and Queries</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Versioned-Data-Management"><span class="nav-number">2.3.</span> <span class="nav-text">Versioned Data Management</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Physical-Data-and-Index-Formats"><span class="nav-number">2.4.</span> <span class="nav-text">Physical Data and Index Formats</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84"><span class="nav-number">3.</span> <span class="nav-text">系统架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95datacenter%E5%AE%9E%E4%BE%8B"><span class="nav-number">3.1.</span> <span class="nav-text">单datacenter实例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9Adatacenter%E9%83%A8%E7%BD%B2"><span class="nav-number">3.2.</span> <span class="nav-text">多datacenter部署</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Enhancements"><span class="nav-number">4.</span> <span class="nav-text">Enhancements</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Query-Server-Performance-Optimizations"><span class="nav-number">4.1.</span> <span class="nav-text">Query Server Performance Optimizations</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Parallelizing-Worker-Operation"><span class="nav-number">4.2.</span> <span class="nav-text">Parallelizing Worker Operation</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Schema-Changes-in-Mesa"><span class="nav-number">4.3.</span> <span class="nav-text">Schema Changes in Mesa</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Mitigating-Data-Corruption-Problems"><span class="nav-number">4.4.</span> <span class="nav-text">Mitigating Data Corruption Problems</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Experiences-amp-Lesson-Learned"><span class="nav-number">5.</span> <span class="nav-text">Experiences &amp; Lesson Learned</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

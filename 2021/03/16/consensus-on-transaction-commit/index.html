@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Consensus on Transaction Commit  TL;DR 这篇文章是Jim Gray和Leslie Lamport两位图灵奖大佬的合作产物，是数据库与系统两个领域在consensus方面的结合。 Paxos Commit算法使用Paxos弥补了2PC在容错性上的软肋，而进一步的Fast Paxos Commit算法则减少了一轮commit的延时跳数，代价是增加了总的通信">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Consensus on Transaction Commit">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/03/16/consensus-on-transaction-commit/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Consensus on Transaction Commit  TL;DR 这篇文章是Jim Gray和Leslie Lamport两位图灵奖大佬的合作产物，是数据库与系统两个领域在consensus方面的结合。 Paxos Commit算法使用Paxos弥补了2PC在容错性上的软肋，而进一步的Fast Paxos Commit算法则减少了一轮commit的延时跳数，代价是增加了总的通信">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/consensus-commit-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/consensus-commit-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/consensus-commit-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/consensus-commit-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/consensus-commit-05.png">
+<meta property="article:published_time" content="2021-03-16T11:51:30.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.651Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="2PC">
+<meta property="article:tag" content="Paxos">
+<meta property="article:tag" content="Consensus">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-03/consensus-commit-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/03/16/consensus-on-transaction-commit/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Consensus on Transaction Commit | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/16/consensus-on-transaction-commit/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Consensus on Transaction Commit
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-16 19:51:30" itemprop="dateCreated datePublished" datetime="2021-03-16T19:51:30+08:00">2021-03-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1132863.1132867">Consensus on Transaction Commit</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章是Jim Gray和Leslie Lamport两位图灵奖大佬的合作产物，是数据库与系统两个领域在consensus方面的结合。</p>
+<p>Paxos Commit算法使用Paxos弥补了2PC在容错性上的软肋，而进一步的Fast Paxos Commit算法则减少了一轮commit的延时跳数，代价是增加了总的通信次数。</p>
+<p>文章另外还论证了经典的2PC就是Paxos Commit的一种特例。</p>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>本文介绍了一种Paxos consensus commit算法，结合了传统的2PC与Paxos。</p>
+<p>文章假设：</p>
+<ul>
+<li>整个算法由若干进程执行，这些进程之间通过消息传递来通信。</li>
+<li>每个进程运行在网络中的一个节点上，每个节点上可以有多个进程。</li>
+<li>节点间的通信延迟不可忽略，同节点进程间的通信延迟可以忽略。</li>
+<li>消息可能丢失或重复，但不会发生无法察觉的损坏（不考虑拜占廷问题）。</li>
+<li>失败节点上的进程只会停止运行，而不会执行错误的操作，且节点状态不会丢失。</li>
+</ul>
+<p>一个consensus算法通常需要满足两种正确性相关的性质：safety和liveness。safety性质描述了什么可能发生（allowed），而liveness性质描述了什么一定会发生（must）。</p>
+<p>Paxos consensus是异步的，即它的safety不依赖于进程要及时处理，或通信延时要有上界。而它的进度（progress）则依赖于进程处理的及时性和通信延时。</p>
+<p>假如一个节点上的进程能够在一个已知的时间内完成消息处理，我们称它为nonfaulty节点。当且仅当一个网络中所有节点都是nonfaulty的，且所有消息通信的延时也有上界时，这个网络也是nonfaulty的。</p>
+<h2 id="Transaction-Commit"><a href="#Transaction-Commit" class="headerlink" title="Transaction Commit"></a>Transaction Commit</h2><p>分布式系统中处理事务的进程称为resource manager（RM）。每个RM可以自行决定事务中与自己有关的部分要commit还是abort，而整个事务想要commit则必须所有参与的RM都同意commit。整个transaction commit的关键就在于所有RM要对事务是commit还是abort达成共识。</p>
+<p>本节假设每个事务涉及的RM是预先确定的。</p>
+<p>事务处理过程中RM的状态变化如图：</p>
+<p><img src="/images/2021-03/consensus-commit-01.png"></p>
+<p>两个safety要求：</p>
+<ul>
+<li>Stability：RM一旦到达committed或aborted状态就不再改变。</li>
+<li>Consistency：所有RM的终态相同，不可能一个RM到达committed而另一个到达aborted状态。</li>
+</ul>
+<p>另外还有两个要求：</p>
+<ul>
+<li>任意RM到达committed状态的前提是所有RM都已经经历过prepared状态了：prepared阶段用来确定是否所有RM一致同意commit。</li>
+<li>RM可以直接从working状态到达aborted状态：任意RM可以提前abort。</li>
+</ul>
+<p>上述算法的问题在于当RM可能失败（如宕机）或因通信错误而无法连接时，不存在non-trivial的方法让所有RM达成共识。FLP理论[<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3149.214121">1</a>]也暗示了一个确定性的、完全异步的算法无法在允许哪怕单节点失败时满足上述stability和consistency性质。</p>
+<p>考虑到liveness后，transaction commit协议需要有以下两个性质：</p>
+<ul>
+<li>Non-triviality。如果在commit过程中网络是nonfaulty的，则：<ul>
+<li>如果所有RM到达prepared状态，它们也会到达committed状态。</li>
+<li>如果任意RM到达aborted状态，所有RM会到达aborted状态。</li>
+</ul>
+</li>
+<li>Non-blocking。只要存在某个时刻，有足够多的网络节点已经处于nonfaulty状态足够长时间了，这些节点上的RM就可以都到达committed或aborted状态。</li>
+</ul>
+<p>作者进一步明确了transaction commit算法允许的操作。算法的初始断言是所有RM都处于working状态，另外有两个状态断言：</p>
+<ul>
+<li>canCommit：当且仅当所有RM处于prepared或committed状态时为TRUE。</li>
+<li>notCommitted：当且仅当没有RM处于committed状态时为TRUE。</li>
+</ul>
+<p>RM在状态转换中的每一步都只能执行以下两种操作：</p>
+<ul>
+<li>Prepare：RM状态从working到prepared。</li>
+<li>Decide：如果RM处于prepared状态，且canCommit，则它可以转变为committed状态；如果RM是working或prepared状态，且notCommitted，则它可以转变为aborted状态。</li>
+</ul>
+<h2 id="Two-Phase-Commit"><a href="#Two-Phase-Commit" class="headerlink" title="Two-Phase Commit"></a>Two-Phase Commit</h2><h3 id="Protocol"><a href="#Protocol" class="headerlink" title="Protocol"></a>Protocol</h3><p>2PC算法引入了transaction manager（TM）来协调整个事务的运行。TM有init、preparing、committed、aborted状态，RM的状态不变。</p>
+<p><img src="/images/2021-03/consensus-commit-02.png"></p>
+<p>任意RM到达prepared状态后，它会发送prepared消息给TM，TM随后向其它所有RM发送prepare消息。当收集到所有RM的prepared后，TM可以到达committed状态，并向所有其它进程发送commit。收到的RM就可以到达committed状态。</p>
+<p>这个过程中TM的prepare消息是可选的，RM也可以自发进入prepared状态（如超时触发），这也是很多2PC的变种用来节省通信次数的方法。</p>
+<p>当有RM自发从working变成aborted状态（如超时触发），如果TM不是committed状态，它也会进入aborted状态，随后向其它RM发送abort。</p>
+<h3 id="Cost"><a href="#Cost" class="headerlink" title="Cost"></a>Cost</h3><p>一个transaction commit算法的关键效率指标就是它在正常路径（transaction到达commited）下的开销。假设有N个RM，则正常路径下2PC会发送如下消息：</p>
+<ul>
+<li>触发2PC的RM发送prepared给TM（1次）。</li>
+<li>TM发送prepare给其它RM（N-1次）。</li>
+<li>其它RM发送prepared给TM（N-1次）。</li>
+<li>TM发送commit给所有RM（N次）。</li>
+</ul>
+<p>总开销为3N-1次消息。假设TM与其中某个RM在一个节点上，则消息数减少为3N-3。</p>
+<p>如果令RM自发到达prepared状态，则可以省掉N-1次TM到RM的prepare消息，总消息数为2N，但此时要么引入额外的通信延时，要么对实时性有假设。</p>
+<p>另外2PC还有3次落盘的写延时：初始RM的prepare写、其它RM的prepare写、TM作出commit决定的写。如果令所有RM都并发prepare，前2种写延时可以合并，总延时变为2次写。</p>
+<h3 id="Problem"><a href="#Problem" class="headerlink" title="Problem"></a>Problem</h3><p>2PC中的任意RM失败（包括TM没有及时收到prepared）意味着整个事务abort，但如果TM失败了，整个流程会阻塞到TM恢复。尤其是如果所有RM都发送完prepared之后TM失败了，它们没办法知道事务是成功还是失败了，也就没办法做决定。</p>
+<p>non-blocking commit协议要求单个进程失败不会阻止其它进程决定事务状态。很多这样的协议都是在2PC上打补丁，引入备TM。但据作者所知其中没有算法能给出清晰的正确性证明，如[<a target="_blank" rel="noopener" href="http://www.sigmod.org/publications/dblp/db/books/dbtext/bernstein87.html">2</a>]就无法解释当一个进程收到两个自称为TM的进程的消息时该如何处理。</p>
+<h2 id="Paxos-Commit"><a href="#Paxos-Commit" class="headerlink" title="Paxos Commit"></a>Paxos Commit</h2><h3 id="Paxos"><a href="#Paxos" class="headerlink" title="Paxos"></a>Paxos</h3><p>Paxos算法是在解决若干个进程的共识问题。这些进程称为acceptor，它们要达成的共识是选择一个值。每个acceptor位于不同节点上。最基本的safety要求是只能选出一个值。为了排除无意义的解法，这个值必须是client提议过的值。liveness需求的断言是，如果有足够多的acceptor构成了足够长时间的nonfaulty网络，就一定能选出一个值。可以证明，如果没有严格的同步假设的话，为了能在最多F个acceptor失败时选出一个值，需要至少2F+1个acceptor（多数性）。</p>
+<p>Paxos算法要求先选出leader，所有请求由leader处理，当前leader失败后会选出新的leader。Paxos需要有唯一leader来保证liveness，但可以在没有leader或多个leader下保证safety。</p>
+<p>Paxos中每个proposal对应一个id，每个id从属于唯一的leader（不同leader产生的id不会重复）。</p>
+<p>下面是Paxos的完整流程（假设有一个预设的leader）：</p>
+<ul>
+<li><p>phase 1a。leader选择一个大于所有已知id的新id bal，并将带有bal的p1a消息发给所有其它acceptor。</p>
+</li>
+<li><p>phase 1b。当acceptor收到id为bal的p1a消息时，如果它还没有对大于等于bal的任何其它消息做操作，它就会回复一个p1b消息，其中包含：</p>
+<ul>
+<li>它收到p1a消息中的最大id。</li>
+<li>它已经回复的p2b消息中的最大id（如果有的话）。</li>
+</ul>
+</li>
+<li><p>phase 2a。当leader收到bal的p1b回复达到多数，有两种可能：</p>
+<ul>
+<li>Free：目前还未产生任何值。</li>
+<li>Forced：已经产生了一个值v。</li>
+</ul>
+<p>  Free下leader可以提议任意值（通常是第一个client提议的值）。Forced则要求leader必须提议v。接下来leader需要将带有bal和它选择的值v的p2a消息发给其它acceptor。</p>
+</li>
+<li><p>phase 2b。当acceptor收到带有bal和v的p2a消息时，如果它还没收到过id大于bal的p1a或p2a消息，它会accept当前消息，并回复带有bal和v的p2b消息。</p>
+</li>
+<li><p>phase 3。当leader收到的bal和v的p2b回复达到多数，v就是这次Paxos的结果，leader可以将带有bal和v的p3消息发给所有参与者（包括client和acceptor）。</p>
+</li>
+</ul>
+<p>在快速路径上（failure-free），leader在收到client的提议后，可以直接向其它acceptor发送id为0的p2a消息。如果回复p2b的acceptor达到多数，leader可以接着发送p3消息，整个流程结束。选择id为0是确认其它acceptor不会收到过其它leader的消息。</p>
+<p>如果快速路径没成功，leader需要走完整流程，从p1a开始。</p>
+<p>Paxos有两种优化思路。在快速路径上leader一开始可以只向F个acceptor发送p2a消息（如果收集不到足够的p2b回复再补发其它p2a消息）。另一个思路是acceptor广播p2b消息，这样可以省掉p3消息的延时，但增加了消息次数。</p>
+<h3 id="Paxos-Commit-1"><a href="#Paxos-Commit-1" class="headerlink" title="Paxos Commit"></a>Paxos Commit</h3><p>如果将2PC中的TM做出committed&#x2F;aborted决策这一步替换为一轮Paxos，就能解决2PC的容错问题。但此时TM仍然需要先得知所有RM都prepared，至少需要一轮消息延时。而本文提出的Paxos Commit算法则消除了这次延时。</p>
+<p>Paxos Commit中为每个RM分别运行一个Paxos实例，决定对应RM是进入prepared还是aborted状态。所有这些Paxos实例共享一个leader和2F+1个acceptor，且假设RM知道acceptor列表。</p>
+<p>每个RM会在自己的Paxos实例中发送id为0值为prepared或aborted的p2a消息来宣布它的决定。</p>
+<p>每轮Paxos Commit通常是开始于某个RM决定prepare并向leader发送BeginCommit。leader随后发送prepare给所有RM，每个RM再在自己的Paxos实例中决定prepared还是aborted，而acceptor再将p2b回复给leader。对于每个Paxos实例，当leader收集到F+1个p2b回复后它就知道对应RM已经决定好了。当且仅当所有RM都回复了prepared，leader就可以选择commit。</p>
+<p>为了提高效率，acceptor可以将它的多个p2b消息合并为一个发送，leader也可以将它对每个RM的多个实例的p3消息合并为一个。</p>
+<p>如果有RM出错（如超时），leader会回退到发送p1a消息以确定当前状态。如果在p2a阶段leader发现它处于Free状态，说明没有RM做出决定，它就会走到abort分支。</p>
+<p><img src="/images/2021-03/consensus-commit-03.png"></p>
+<h3 id="Cost-1"><a href="#Cost-1" class="headerlink" title="Cost"></a>Cost</h3><p>假设有N个RM，2F+1个acceptor，且p2a消息只发给F+1个acceptor。正常路径下Paxos Commit包含以下消息：</p>
+<ul>
+<li>第一个RM发送BeginCommit给leader（1次）。</li>
+<li>leder发送prepare给其它RM（N-1次）。</li>
+<li>每个RM发送它的p2a消息给F+1个acceptor（N(F+1)次）。</li>
+<li>每个acceptor将各个实例的p2b消息合并发送给leader（F次）。</li>
+<li>leader发送合并的p3消息给各个RM（N次）。</li>
+</ul>
+<p>总次数为(N+1)(F+3)-2。</p>
+<p>如果leader本身也是acceptor，且第一个RM的BeginCommit跟着它发给leader（也是acceptor）的p2a消息一起，则总次数减少为(N+1)(F+3)-4。如果每个acceptor与RM在相同节点上，且第一个RM与leader在一个节点上，则BeginCommit和F次p2a消息可以忽略，总次数减少为N(F+3)-3。</p>
+<p>如果acceptor将p2b发送给所有RM，则延时少一跳，变成4跳，但总通信次数增加为N(2F+3)。如果加上前面这些优化，总次数减少为(N-1)(2F+3)。</p>
+<p>现在Paxos Commit需要4跳延时，但其中有2跳是为了将prepare发送给所有RM。如果允许RM自发进入prepared状态，则延时只剩2跳。此时算法已达到最优，因为[<a target="_blank" rel="noopener" href="https://www.sciencedirect.com/science/article/pii/S0196677403001652">3</a>]已经证明了任何容错的共识算法至少需要2跳才能选出一个值。</p>
+<p>在Paxos Commit中RM仍然需要一次写盘，每个acceptor也需要一次写盘（所有实例合并写），因此总计需要N+F+1次写盘。</p>
+<h2 id="Paxos-vs-Two-Phase-Commit"><a href="#Paxos-vs-Two-Phase-Commit" class="headerlink" title="Paxos vs. Two-Phase Commit"></a>Paxos vs. Two-Phase Commit</h2><p><img src="/images/2021-03/consensus-commit-04.png"></p>
+<p>在有5个RM，F为1（3副本）的系统中，2PC需要12次通信，默认的Paxos Commit需要17次，Fast PC需要20次。当N非常大时，三种算法分别需要3N、4N、5N次通信。</p>
+<p>假设F为0，此时只有一个acceptor，且不可失败（RM仍然可以失败）。令acceptor与leader在相同节点上，此时2PC、Paxos Commit与Fast PC就相同了。因此2PC就是Paxos Commit在F为0时的特例。</p>
+<p><img src="/images/2021-03/consensus-commit-05.png"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/2PC/" rel="tag"># 2PC</a>
+              <a href="/tags/Paxos/" rel="tag"># Paxos</a>
+              <a href="/tags/Consensus/" rel="tag"># Consensus</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/" rel="prev" title="[笔记] Pig Latin: A Not-So-Foreign Language for Data Processing">
+      <i class="fa fa-chevron-left"></i> [笔记] Pig Latin: A Not-So-Foreign Language for Data Processing
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/25/paxos-made-live/" rel="next" title="[笔记] Paxos Made Live - An Engineering Perspective">
+      [笔记] Paxos Made Live - An Engineering Perspective <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Transaction-Commit"><span class="nav-number">2.</span> <span class="nav-text">Transaction Commit</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Two-Phase-Commit"><span class="nav-number">3.</span> <span class="nav-text">Two-Phase Commit</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Protocol"><span class="nav-number">3.1.</span> <span class="nav-text">Protocol</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Cost"><span class="nav-number">3.2.</span> <span class="nav-text">Cost</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Problem"><span class="nav-number">3.3.</span> <span class="nav-text">Problem</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Paxos-Commit"><span class="nav-number">4.</span> <span class="nav-text">Paxos Commit</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Paxos"><span class="nav-number">4.1.</span> <span class="nav-text">Paxos</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Paxos-Commit-1"><span class="nav-number">4.2.</span> <span class="nav-text">Paxos Commit</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Cost-1"><span class="nav-number">4.3.</span> <span class="nav-text">Cost</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Paxos-vs-Two-Phase-Commit"><span class="nav-number">5.</span> <span class="nav-text">Paxos vs. Two-Phase Commit</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

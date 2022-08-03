@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Cassandra: a decentralized structured storage system 可以参考Cassandra: structured storage system on a P2P network加深理解。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Cassandra: a decentralized structured storage system">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/09/23/cassandra-a-decentralized-structured-storage-system/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Cassandra: a decentralized structured storage system 可以参考Cassandra: structured storage system on a P2P network加深理解。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-09-23T08:54:37.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.651Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Cassandra">
+<meta property="article:tag" content="NoSQL">
+<meta property="article:tag" content="KV">
+<meta property="article:tag" content="开源系统">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/09/23/cassandra-a-decentralized-structured-storage-system/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Cassandra: a decentralized structured storage system | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/23/cassandra-a-decentralized-structured-storage-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Cassandra: a decentralized structured storage system
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-23 16:54:37" itemprop="dateCreated datePublished" datetime="2020-09-23T16:54:37+08:00">2020-09-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.cl.cam.ac.uk/~ey204/teaching/ACS/R212_2014_2015/papers/lakshman_ladis_2009.pdf">Cassandra: a decentralized structured storage system</a></p>
+<p>可以参考<a target="_blank" rel="noopener" href="https://static.last.fm/johan/nosql-20090611/cassandra_nosql.pdf">Cassandra: structured storage system on a P2P network</a>加深理解。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Cassandra的目标是：</p>
+<ul>
+<li>伸缩性，集群能承载的吞吐随着规模线性增加。</li>
+<li>容错性，大规模集群出错是常态。</li>
+<li>可用性，即使出现网络分区，也要能提供服务（类似于Dynamo）。</li>
+<li>跨机房数据复制。</li>
+<li>高写入吞吐。</li>
+</ul>
+<p>Cassandra的目标应用是Facebook的Inbox搜索，具有写入压力大、跨地域、不需要强一致等特点。</p>
+<h2 id="Data-Model"><a href="#Data-Model" class="headerlink" title="Data Model"></a>Data Model</h2><p>Cassandra的数据模型类似于BigTable，也是<code>&lt;rowkey, column, timestamp&gt;</code>，ColumnFamily和SuperColumn的叫法不同，但其实是一样的。</p>
+<blockquote>
+<p>后续版本中SuperColumn已经没有了，叫法不同，没有根本变化。</p>
+</blockquote>
+<h2 id="System-Architecture"><a href="#System-Architecture" class="headerlink" title="System Architecture"></a>System Architecture</h2><p>Cassandra在节点间的机制上类似于Dynamo，同样去中心化、使用一致性hash、使用gossip协议来传播成员列表、读写使用quorum协议。在节点内的存储上类似于BigTable，同样使用了WAL、MemTable、Compaction。</p>
+<h3 id="Partitioning"><a href="#Partitioning" class="headerlink" title="Partitioning"></a>Partitioning</h3><p>Cassandra使用了保序的一致性hash算法。</p>
+<p>为了解决原始的一致性hash分布不均匀的问题，Dynamo为每个node分配了多个virtual node，而Cassandra则是根据负载情况微调（参考Chord），原因是简单。</p>
+<blockquote>
+<p>后续版本中Cassandra也使用了virtual node。</p>
+</blockquote>
+<h3 id="Replication"><a href="#Replication" class="headerlink" title="Replication"></a>Replication</h3><p>Cassandra中每个key会有一个对应的coordinator node来管理，除此之外还需要选择N-1个node用于replication。选择的策略有很多种，可以考虑rack或datacenter。Cassandra会使用ZooKeeper选出一个leader来管理这些信息。</p>
+<h3 id="Membership"><a href="#Membership" class="headerlink" title="Membership"></a>Membership</h3><p>Cassandra使用了<a target="_blank" rel="noopener" href="https://dspace.jaist.ac.jp/dspace/bitstream/10119/4784/1/IS-RR-2004-010.pdf">The ϕ Accrual Failure Detector</a>方法来检测哪些node有问题。它也是基于gossip协议的，每T秒每个node会选择另一个node通信，然后更新本地的统计数据，并通过gossip协议与其它node交换。</p>
+<p>Accrual Failure Detector的特别之处在于它是基于概率的，ϕ为1表示判断出错概率为10%，2表示出错概率为1%，3表示出错概率为0.1%。当阈值设置为5时，Cassandra可以在10-15秒内检测到错误。</p>
+<h3 id="Bootstrapping"><a href="#Bootstrapping" class="headerlink" title="Bootstrapping"></a>Bootstrapping</h3><p>node首次启动时，会在环上随机找个位置，并持久化到本地和ZooKeeper上，随后通过gossip将自身的存在传播到整个集群。一个集群最初会有若干个contact points，称为seeds，保存在配置文件中或ZooKeeper上，这是node首选的位置。</p>
+<h3 id="Scaling-the-Cluster"><a href="#Scaling-the-Cluster" class="headerlink" title="Scaling the Cluster"></a>Scaling the Cluster</h3><p>新node会分走已有node负责的部分数据，这部分数据会通过kernel-kernel复制，未来可能考虑同时从多个replica并行传输以提高速度。</p>
+<h3 id="Local-Persistence"><a href="#Local-Persistence" class="headerlink" title="Local Persistence"></a>Local Persistence</h3><p>这部分Cassandra与BigTable非常类似，Cassandra会在内存中维护一些索引以加速查询。</p>
+<h3 id="Implementation-Details"><a href="#Implementation-Details" class="headerlink" title="Implementation Details"></a>Implementation Details</h3><p>Cassandra在读写上使用quorum协议，写入可以选择同步写或异步写。写失败和读的时候都可能触发repair。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Cassandra/" rel="tag"># Cassandra</a>
+              <a href="/tags/NoSQL/" rel="tag"># NoSQL</a>
+              <a href="/tags/KV/" rel="tag"># KV</a>
+              <a href="/tags/%E5%BC%80%E6%BA%90%E7%B3%BB%E7%BB%9F/" rel="tag"># 开源系统</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/" rel="prev" title="[笔记] Dremel: interactive analysis of web-scale datasets">
+      <i class="fa fa-chevron-left"></i> [笔记] Dremel: interactive analysis of web-scale datasets
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/" rel="next" title="[笔记] Map-reduce-merge: simplified relational data processing on large clusters">
+      [笔记] Map-reduce-merge: simplified relational data processing on large clusters <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Data-Model"><span class="nav-number">2.</span> <span class="nav-text">Data Model</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#System-Architecture"><span class="nav-number">3.</span> <span class="nav-text">System Architecture</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Partitioning"><span class="nav-number">3.1.</span> <span class="nav-text">Partitioning</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Replication"><span class="nav-number">3.2.</span> <span class="nav-text">Replication</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Membership"><span class="nav-number">3.3.</span> <span class="nav-text">Membership</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Bootstrapping"><span class="nav-number">3.4.</span> <span class="nav-text">Bootstrapping</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Scaling-the-Cluster"><span class="nav-number">3.5.</span> <span class="nav-text">Scaling the Cluster</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Local-Persistence"><span class="nav-number">3.6.</span> <span class="nav-text">Local Persistence</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Implementation-Details"><span class="nav-number">3.7.</span> <span class="nav-text">Implementation Details</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

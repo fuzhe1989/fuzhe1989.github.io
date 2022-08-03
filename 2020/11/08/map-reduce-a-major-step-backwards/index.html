@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：MapReduce: A Major step backwards  TL;DR 这篇文章是两位大佬（DeWitt和Stonebraker）对“MapReduce可以革掉传统的并行RDBMS的命”的论点的回击。 MapReduce对于DB社区而言：  在大规模数据密集型应用的编程范式角度是一种倒退。 并非最优化的实现，因其使用暴力搜索而不是索引。 一点也不新奇 —— 它就是25年前广为人知">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] MapReduce: A Major step backwards">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/11/08/map-reduce-a-major-step-backwards/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：MapReduce: A Major step backwards  TL;DR 这篇文章是两位大佬（DeWitt和Stonebraker）对“MapReduce可以革掉传统的并行RDBMS的命”的论点的回击。 MapReduce对于DB社区而言：  在大规模数据密集型应用的编程范式角度是一种倒退。 并非最优化的实现，因其使用暴力搜索而不是索引。 一点也不新奇 —— 它就是25年前广为人知">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-11-08T13:22:24.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.657Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="MapReduce">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/11/08/map-reduce-a-major-step-backwards/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] MapReduce: A Major step backwards | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/08/map-reduce-a-major-step-backwards/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] MapReduce: A Major step backwards
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-08 21:22:24" itemprop="dateCreated datePublished" datetime="2020-11-08T21:22:24+08:00">2020-11-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://pdfs.semanticscholar.org/08d1/2e771d811bcd0d4bc81fa3993563efbaeadb.pdf">MapReduce: A Major step backwards</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章是两位大佬（DeWitt和Stonebraker）对“MapReduce可以革掉传统的并行RDBMS的命”的论点的回击。</p>
+<p>MapReduce对于DB社区而言：</p>
+<ol>
+<li>在大规模数据密集型应用的编程范式角度是一种倒退。</li>
+<li>并非最优化的实现，因其使用暴力搜索而不是索引。</li>
+<li>一点也不新奇 —— 它就是25年前广为人知的技术的又一次实现。</li>
+<li>缺少当今DBMS必备的多种功能。</li>
+<li>与DBMS用户依赖的工具不兼容。</li>
+</ol>
+<p>（因此之后若干年大家用高度的热情将这两者又统一起来了）</p>
+<span id="more"></span>
+
+<h2 id="MapReduce是一种倒退"><a href="#MapReduce是一种倒退" class="headerlink" title="MapReduce是一种倒退"></a>MapReduce是一种倒退</h2><p>DB社区40年来达成的共识：</p>
+<ul>
+<li>要有schema。</li>
+<li>schema要与应用分离。</li>
+<li>要用高阶语言。</li>
+</ul>
+<p>有了schema，DB才可以确保输入都是合法的。而MapReduce没办法保证这点，应用可能被非预期的数据搞挂掉。</p>
+<p>schema要与应用分离，这样新应用的开发者直接看一下schema就可以，而不需要先检查一遍数据，或找到旧应用的代码 —— 而MapReduce的用户天天就在做着这样的事情。</p>
+<p>70年代的时候DB社区有过所谓的“Great Debate”，争论关系模型和CODASYL模型（一种网络模型）哪个更好，访问DB的代码该写成什么样：</p>
+<ul>
+<li>表达你想要什么（关系模型），或</li>
+<li>表达你用于访问数据的算法（CODASYL）。</li>
+</ul>
+<p>结论就是关系模型更易于写、维护、理解。CODASYL被批评“是访问DBMS的汇编语言”。而MapReduce就类似于CODASYL，是一种低阶语言，表达做什么，而不是要什么。</p>
+<p>MapReduce的拥护者可能质疑说MapReduce就是针对那些没有schema的数据，但实际上map和reduce就在依赖数据中有你要的字段。</p>
+<p>基于BigTable或HBase的MapReduce程序也有这些问题，每行数据都可能有不同的schema，而且它们还没有logical view，不能解耦应用schema与数据schema。</p>
+<h2 id="MapReduce是糟糕的实现"><a href="#MapReduce是糟糕的实现" class="headerlink" title="MapReduce是糟糕的实现"></a>MapReduce是糟糕的实现</h2><p>现代的DBMS都有比如B-tree实现的索引，可以用来减少搜索空间（经常可以减少两个数量级以上）。但MapReduce没有索引，只能暴力搜索。</p>
+<p>有种观点是MapReduce的价值在于它的并行执行，但从80年代以来已经有了很多的并行DBMS，如Gamma、Bubba、Grace、Teradata。</p>
+<p>MapReduce的其它缺点还包括数据倾斜与数据交换的效率低下。</p>
+<p>并行DBMS社区针对数据倾斜问题做了很多研究，已经有了一些方案，而MapReduce目前还没有采用。</p>
+<p>MapReduce在M个map任务和N个reduce任务之间要做M*N次数据交换，M和N很大时会带来非常多的磁盘访问（对网络带宽的要求也很高）。这也是并行DBMS不经常物化中间结果的原因。MapReduce依赖这些物化的中间结果来实现良好的容错性，因此MapReduce后续能否改成推&#x2F;拉模型还不明朗。</p>
+<p>MapReduce的数据分区和自定义函数也不新奇：前者早有研究，后者在80年代的Postgres就已经支持了。</p>
+<h2 id="MapReduce缺少特性"><a href="#MapReduce缺少特性" class="headerlink" title="MapReduce缺少特性"></a>MapReduce缺少特性</h2><p>以下是现代DBMS必备，但MapReduce缺少的特性：</p>
+<ul>
+<li>批量载入（Bulk loader）。</li>
+<li>索引。</li>
+<li>更新。</li>
+<li>事务。</li>
+<li>完整性约束（Integrity constraints）。</li>
+<li>引用约束（Referential constraint）。</li>
+<li>视图。</li>
+</ul>
+<h2 id="MapReduce不兼容于DBMS的工具"><a href="#MapReduce不兼容于DBMS的工具" class="headerlink" title="MapReduce不兼容于DBMS的工具"></a>MapReduce不兼容于DBMS的工具</h2><p>现代DBMS依赖的工具：</p>
+<ul>
+<li>报告生成工具。</li>
+<li>BI工具。</li>
+<li>数据挖掘工具。</li>
+<li>复制工具。</li>
+<li>DB设计工具。</li>
+</ul>
+<p>（但现在都有了）</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/MapReduce/" rel="tag"># MapReduce</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/10/22/mega-store-providing-scalable-highly-available-storage-for-interactive-services/" rel="prev" title="[笔记] Megastore: Providing scalable, highly available storage for interactive services">
+      <i class="fa fa-chevron-left"></i> [笔记] Megastore: Providing scalable, highly available storage for interactive services
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/11/11/building-a-database-on-s3/" rel="next" title="[笔记] Building a Database on S3">
+      [笔记] Building a Database on S3 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#MapReduce%E6%98%AF%E4%B8%80%E7%A7%8D%E5%80%92%E9%80%80"><span class="nav-number">1.</span> <span class="nav-text">MapReduce是一种倒退</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MapReduce%E6%98%AF%E7%B3%9F%E7%B3%95%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.</span> <span class="nav-text">MapReduce是糟糕的实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MapReduce%E7%BC%BA%E5%B0%91%E7%89%B9%E6%80%A7"><span class="nav-number">3.</span> <span class="nav-text">MapReduce缺少特性</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MapReduce%E4%B8%8D%E5%85%BC%E5%AE%B9%E4%BA%8EDBMS%E7%9A%84%E5%B7%A5%E5%85%B7"><span class="nav-number">4.</span> <span class="nav-text">MapReduce不兼容于DBMS的工具</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

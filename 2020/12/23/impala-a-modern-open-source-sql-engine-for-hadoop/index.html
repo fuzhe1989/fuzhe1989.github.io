@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Impala: A Modern, Open-Source SQL Engine for Hadoop  TL;DR Impala是建立在Hadoop生态之上的MPP query engine，它有以下特点：  MPP，所有节点都可以参与query执行。 代码生成。 基于pub-sub的元数据同步。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Impala: A Modern, Open-Source SQL Engine for Hadoop">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Impala: A Modern, Open-Source SQL Engine for Hadoop  TL;DR Impala是建立在Hadoop生态之上的MPP query engine，它有以下特点：  MPP，所有节点都可以参与query执行。 代码生成。 基于pub-sub的元数据同步。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/impala-01.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/impala-02.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/impala-03.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/impala-04.jpg">
+<meta property="article:published_time" content="2020-12-23T03:52:41.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.656Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLAP">
+<meta property="article:tag" content="开源系统">
+<meta property="article:tag" content="Codegen">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-12/impala-01.jpg">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Impala: A Modern, Open-Source SQL Engine for Hadoop | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Impala: A Modern, Open-Source SQL Engine for Hadoop
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-23 11:52:41" itemprop="dateCreated datePublished" datetime="2020-12-23T11:52:41+08:00">2020-12-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://2013.berlinbuzzwords.de/sites/2013.berlinbuzzwords.de/files/slides/Impala%20tech%20talk.pdf">Impala: A Modern, Open-Source SQL Engine for Hadoop</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Impala是建立在Hadoop生态之上的MPP query engine，它有以下特点：</p>
+<ul>
+<li>MPP，所有节点都可以参与query执行。</li>
+<li>代码生成。</li>
+<li>基于pub-sub的元数据同步。</li>
+</ul>
+<span id="more"></span>
+
+<h2 id="User-View-of-Impala"><a href="#User-View-of-Impala" class="headerlink" title="User View of Impala"></a>User View of Impala</h2><p>Impala是建立在Hadoop生态之上的MPP query engine，用到了多种Hadoop标准模块（Metastore&#x2F;HDFS&#x2F;HBase&#x2F;YARN&#x2F;Sentry）并提供了类似于RDBMS的体验。</p>
+<p>Impala瞄准的是标准BI场景，用户可以通过ODBC&#x2F;JDBC访问Impala。</p>
+<h3 id="Physical-Schema-Design"><a href="#Physical-Schema-Design" class="headerlink" title="Physical Schema Design"></a>Physical Schema Design</h3><p>用户可以在建表时提供一组partition列：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> T (...) PARTITIONED <span class="keyword">BY</span> (<span class="keyword">day</span> <span class="type">int</span>, <span class="keyword">month</span> <span class="type">int</span>) LOCATION <span class="string">&#x27;&lt;hdfs-path&gt;&#x27;</span> STORED <span class="keyword">AS</span> PARQUET;</span><br></pre></td></tr></table></figure>
+
+<p>类似于Hive，未分区的表的数据文件直接存放在表的根目录下，有分区的表的数据文件则存放在分区对应的子目录下，如<code>&lt;root&gt;/day=17/month=2/</code>。</p>
+<p>Impala支持多种文件格式，如文本文件（压缩&#x2F;未压缩）、sequence file、RCFile、Avro、Parquet。用户可以在<code>CREATE TABLE</code>或<code>ALTER TABLE</code>时指定文件格式，还可以指定具体受影响的分区，如<code>ALTER TABLE PARTITION（day=17, month=2) SET FILEFORMAT PARQUET</code>。</p>
+<h3 id="SQL-Support"><a href="#SQL-Support" class="headerlink" title="SQL Support"></a>SQL Support</h3><p>Impala支持：</p>
+<ul>
+<li>大多数SQL-92标准的SELECT语句；</li>
+<li>SQL-03标准的聚合函数；</li>
+<li>大多数标准标量类型；</li>
+<li>Java&#x2F;C++写的UDF和C++写的UDA。</li>
+</ul>
+<p>在写入方面，受限于HDFS，Impala只支持批量插入（<code>INSERT INTO ... SELECT ...</code>），但不支持<code>UPDATE</code>和<code>DELETE</code>。但与传统RDBMS不同的是，用户还可以直接把数据文件拷贝进HDFS目录，或者通过<code>LOAD DATA</code>语句导入数据。<code>ALTER TABLE DROP PARTITION</code>还可以直接删除某个分区的数据。</p>
+<p>在表数据发生比较大变化之后，用户可以执行<code>COMPUTE STATS &lt;table&gt;</code>，让Impala重新收集统计信息。</p>
+<h2 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h2><p>Impala在每台机器上有一个impalad进程，负责接收请求以及将请求分解发给整个集群执行。接受请求的impalad会作为coordinator。所有impalad是平等的，可以完成所有任务。</p>
+<p>Impala在分发请求时会考虑数据的局部性，优先让impalad读取它所在的datanode存储的数据。</p>
+<p>Statestore服务（statestored）是Impala的元数据pub-sub服务，负责将整个集群的元数据传播给所有Impala进程。</p>
+<p>Catalog服务（catalogd）负责管理Impala的元数据，数据的修改会通过statestore传播出去。</p>
+<p><img src="/images/2020-12/impala-01.jpg"></p>
+<h3 id="State-distribution"><a href="#State-distribution" class="headerlink" title="State distribution"></a>State distribution</h3><p>节点数量增加时，整个集群元数据同步与协调成本也会上升。Impala的MPP架构要求所有节点都有服务能力，就需要每个节点都能看到正确的集群状态，如节点列表等。</p>
+<p>Impala的一个设计信条是避免在关键路径上有同步RPC，因此没有选择用一个单独的元数据服务的方案。相反，Impala使用了statestore来把元数据的修改推送给感兴趣的节点。</p>
+<p>statestore会维护若干个topic，每个topic的数据格式为<code>(key, value, version)</code>。statestore不感知这里具体的数据类型，也不会持久化这些数据。节点在初次订阅某个topic时，statestore会把全量数据推送过去，之后会定期推送两类数据：更新和keepalive。</p>
+<p>如果statestore检测到某个订阅者宕机（连续的keepalive失败），它会停止发送更新。有些topic entry会被标记为“transient”，它们会有从属的订阅者，如果订阅者宕机了，这些entry也会跟着被移除。</p>
+<p>statestore只提供弱语义，不同的订阅者收到更新的速率可能不同，看到的topic状态也可能不同。但Impala的节点只使用topic中的元数据做本地决策，而不会与其它节点协同决策。比如impalad会使用catalog的元数据生成query plan，一旦plan生成好了，执行它所需的所有信息也会直接发给执行节点，因此不要求执行节点一定要看到与coordinator相同的topic状态。</p>
+<p>单个statestore节点足够支撑中等大小的集群了。statestore不持久化数据，当它启动时会在与订阅者的初次通信过程中恢复状态。</p>
+<h3 id="Catalog-service"><a href="#Catalog-service" class="headerlink" title="Catalog service"></a>Catalog service</h3><p>catalog service负责管理表的元数据，并通过statestore发布。它在启动时只会加载表的元数据的一个大概情况，后续如果还有访问的话再异步加载完整的元数据。</p>
+<h2 id="Frontend"><a href="#Frontend" class="headerlink" title="Frontend"></a>Frontend</h2><p>Impala的frontend负责解析SQL并生成query plan。它有一个基于cost的优化器。除了基本的SQL特性（select&#x2F;project&#x2F;join&#x2F;group by&#x2F;order by&#x2F;limit）外，Impala还支持inline view、非关联和关联的subquery、各种outer join、left&#x2F;right&#x2F;semi join、anti-join、分析窗口函数等。</p>
+<p>query生成过程分为query解析、语义分析、生成plan、优化几个阶段。</p>
+<p>执行plan生成需要先生成单节点的plan，再做分解和并行化。</p>
+<p>单节点plan树包含以下节点：</p>
+<ul>
+<li>HDFS&#x2F;HBase scan</li>
+<li>hash join</li>
+<li>cross join</li>
+<li>union</li>
+<li>hash聚合</li>
+<li>sort</li>
+<li>top-n</li>
+<li>分析求值</li>
+</ul>
+<p>这一阶段需要尽可能下推谓词、基于等价类做谓词推断、裁剪partition、设置limit&#x2F;offset、执行projection、执行一些基于cost的优化（如排序合并分析窗口函数、重排列join）。开销预测是基于table&#x2F;partition的基数与每列的不同值数量（使用HyperLogLog），目前还没有统计直方图。Impala使用了启发式方法，避免在整个join空间内枚举和计算。</p>
+<p>第二阶段会将单节点plan作为输入，生成分布式执行plan，原则是最小化数据移动，最大化扫描的数据局部度。向plan的节点中间插入exchange节点以使plan分布化，插入非exchange节点（如部分聚合节点）以最小化数据移动。这阶段所有join的策略都会被确定下来，目前支持broadcast和partitioned join（两边都hash分区）。</p>
+<p>所有聚合都会先在各个节点上预聚合，跟着一个最终的聚合。sort和top-n也使用类似的策略。</p>
+<p>最后plan树会在exchange处切分为若干个fragment，作为backend的执行单位。</p>
+<p><img src="/images/2020-12/impala-02.jpg"></p>
+<h2 id="Backend"><a href="#Backend" class="headerlink" title="Backend"></a>Backend</h2><p>Impala的backend是C++写的（frontend是Java），使用了代码生成（codegen）。它的执行方式是传统的Volcano风格，但每次<code>GetNext()</code>会返回一批record，而不是一个。除了sort等要hold数据的操作，其它操作都是完全流水线化的，最小化内存占用。在内存中处理期间，数据是按行组织的（提前组装）。</p>
+<p>在需要的时候，算子也可以把过多的数据暂存到磁盘上。Impala在hash join的时候会把内存中的hash table分为若干个partition，当内存吃紧的时候会把一些partition暂存到磁盘上。</p>
+<p>在构建hash table过程中，Impala也会生成bloom filter，这样能避免探测表传输太多数据。</p>
+<h3 id="Runtime-Code-Generation"><a href="#Runtime-Code-Generation" class="headerlink" title="Runtime Code Generation"></a>Runtime Code Generation</h3><p>Impala使用了LLVM来编译生成有JIT的代码，在一些典型场景中性能提升能达到5倍以上。代码生成的好处是可以去掉那些考虑到通用性的分支、虚函数、变量、循环、各种指针等，在编译过程中可以充分inline。Impala会对那些运行在内层循环中的函数使用codegen，比如将数据解析为内存格式的函数会per record调用，对它使用codegen是收益非常大的。</p>
+<p><img src="/images/2020-12/impala-03.jpg"></p>
+<p><img src="/images/2020-12/impala-04.jpg"></p>
+<h3 id="I-x2F-O-Management"><a href="#I-x2F-O-Management" class="headerlink" title="I&#x2F;O Management"></a>I&#x2F;O Management</h3><p>Impala会使用HDFS的short-circuit本地读取技术，绕过datanode的协议，直接读本地盘，从而充分利用磁盘带宽。HDFS的cache也帮助Impala减少了磁盘和cpu消耗。</p>
+<p>为了能匹配不同盘的能力，Impala会为每块HDD配一个线程，每块SSD配8个线程。</p>
+<h3 id="Storage-Formats"><a href="#Storage-Formats" class="headerlink" title="Storage Formats"></a>Storage Formats</h3><p>Impala推荐使用Parquet作为文件格式（细节略，参见<a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets">Dremel笔记</a>）。</p>
+<h2 id="Resource-x2F-Workload-Management"><a href="#Resource-x2F-Workload-Management" class="headerlink" title="Resource&#x2F;Workload Management"></a>Resource&#x2F;Workload Management</h2><p>略</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLAP/" rel="tag"># OLAP</a>
+              <a href="/tags/%E5%BC%80%E6%BA%90%E7%B3%BB%E7%BB%9F/" rel="tag"># 开源系统</a>
+              <a href="/tags/Codegen/" rel="tag"># Codegen</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/12/22/f1-a-distributed-sql-database-that-scales/" rel="prev" title="[笔记] F1: A distributed SQL database that scales">
+      <i class="fa fa-chevron-left"></i> [笔记] F1: A distributed SQL database that scales
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/12/24/kudu-storage-for-fast-analytics-on-fast-data/" rel="next" title="[笔记] Kudu: Storage for fast analytics on fast data">
+      [笔记] Kudu: Storage for fast analytics on fast data <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#User-View-of-Impala"><span class="nav-number">1.</span> <span class="nav-text">User View of Impala</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Physical-Schema-Design"><span class="nav-number">1.1.</span> <span class="nav-text">Physical Schema Design</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SQL-Support"><span class="nav-number">1.2.</span> <span class="nav-text">SQL Support</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Architecture"><span class="nav-number">2.</span> <span class="nav-text">Architecture</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#State-distribution"><span class="nav-number">2.1.</span> <span class="nav-text">State distribution</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Catalog-service"><span class="nav-number">2.2.</span> <span class="nav-text">Catalog service</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Frontend"><span class="nav-number">3.</span> <span class="nav-text">Frontend</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Backend"><span class="nav-number">4.</span> <span class="nav-text">Backend</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Runtime-Code-Generation"><span class="nav-number">4.1.</span> <span class="nav-text">Runtime Code Generation</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#I-x2F-O-Management"><span class="nav-number">4.2.</span> <span class="nav-text">I&#x2F;O Management</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Storage-Formats"><span class="nav-number">4.3.</span> <span class="nav-text">Storage Formats</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Resource-x2F-Workload-Management"><span class="nav-number">5.</span> <span class="nav-text">Resource&#x2F;Workload Management</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

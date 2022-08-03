@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads  TL;DR 这篇文章在尝试结合MapReduce（Hadoop）与DBMS（PostgreSQL），取MapReduce的伸缩性与容错性、DBMS的性能。 实现：  PostgreSQL作为Hadoop">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads  TL;DR 这篇文章在尝试结合MapReduce（Hadoop）与DBMS（PostgreSQL），取MapReduce的伸缩性与容错性、DBMS的性能。 实现：  PostgreSQL作为Hadoop">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-09-21T08:08:09.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.656Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="MapReduce">
+<meta property="article:tag" content="BigData">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-21 16:08:09" itemprop="dateCreated datePublished" datetime="2020-09-21T16:08:09+08:00">2020-09-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://people.eecs.berkeley.edu/~kubitron/courses/cs262a-F19/handouts/papers/vldb09-861.pdf">HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章在尝试结合MapReduce（Hadoop）与DBMS（PostgreSQL），取MapReduce的伸缩性与容错性、DBMS的性能。</p>
+<p>实现：</p>
+<ul>
+<li>PostgreSQL作为Hadoop的DataNode。</li>
+<li>将SQL翻译为MR任务，</li>
+<li>通过兼容于JDBC的InputFormat将具体查询交给PostgreSQL执行。</li>
+</ul>
+<p>结论：结合“A comparison of approaches to large-scale data analysis”的性能测试结果，HadoopDB相比Hadoop的分析性能好了一些，仍然达不到并行DBMS的水平，但验证了这个方向是有意义的。</p>
+<p>HadoopDB将Hive中对数据源的scan换成了单节点PostgreSQL的查询，但仍然是传输数据而不是传输逻辑，且还是要物化中间结果，这些提高了容错性，但显著降低了性能。</p>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>作者观察到的趋势：</p>
+<ul>
+<li>大规模分析的市场越来越大。</li>
+<li>shared-nothing架构因为其伸缩性，特别适合实现大型分析系统。</li>
+<li>典型分析workload的特点（大量scan、多维度聚合、星型join）也非常容易在shared-nothing系统中并行执行。</li>
+</ul>
+<p>但现在的并行DBMS的伸缩性并不好，节点数达到百级别就有点困难了，原因是：</p>
+<ul>
+<li>大规模系统的错误是常态，而并行DBMS的设计假设了错误很罕见。</li>
+<li>并行DBMS通常假设机器是同构的，而实际的大规模系统很难保证这一点。</li>
+<li>大规模系统的需求直到最近才多起来，因此大规模的并行DBMS没有得到过充分的测试，难以预料还有什么工程上的障碍。</li>
+</ul>
+<p>MapReduce可以支持非常高的规模，但它缺乏许多对结构化数据分析非常有用的特性，MR模型也不适合那种一次加载后多次处理的场景。</p>
+<p>HadoopDB就是要结合MapReduce和并行DBMS，用MapReduce作为通信层，将SQL翻译为MapReduce任务，尽可能多地下发查询给DBMS节点执行。</p>
+<p>HadoopDB的目标是尽可能地利用已有的开源资源，用Hadoop+PostgreSQL来实现。</p>
+<h2 id="HadoopDB的实现"><a href="#HadoopDB的实现" class="headerlink" title="HadoopDB的实现"></a>HadoopDB的实现</h2><p>HadoopDB提供了以下四个组件：</p>
+<ol>
+<li>DB Connector，允许TaskTracker访问DBMS。</li>
+<li>Catalog，维护DB的元数据。</li>
+<li>Data Loader，用于全局和本地的数据分区、加载数据到DBMS。它有global hasher和local hasher，前者用于将数据分为HDFS上的若干个文件，后者用于将HDFS的一个文件分区到本地文件系统中。通过两层分区，HadoopDB保证了每个chunk大小均匀，从而得到更好的负载均衡性。</li>
+<li>SQL to MapReduce to SQL Planner（SMS），将SQL转为MR任务，再将各个MR子任务转回SQL。SMS扩展自Hive。相比Hive，SMS可以利用collocation、相同partition key等信息下推尽可能多的信息到DBMS中，即Hive的scan加上filter、group by、join等操作，在SMS中可以结合到一个operator中完成。对于跨DBMS的操作，SMS看起来要走和Hive相同的operator，与底下的DBMS就没有关系了。</li>
+</ol>
+<h2 id="性能指标"><a href="#性能指标" class="headerlink" title="性能指标"></a>性能指标</h2><p>在加载阶段，HadoopDB的性能更接近于DBMS-X，相比Hadoop慢了很多。</p>
+<p>Grep任务中HadoopDB只比Hadoop略快一点点，原因是这个任务以扫描为主，HadoopDB只是省掉了实时的解析开销。</p>
+<p>Selection任务中，HadoopDB默认会将Rankings和UserVisits表一起分区，导致Rankings表被分成了20个只有50MB的chunk，20个map任务的调度开销显著降低了HadoopDB的性能。如果不分区Rankings表，HadoopDB可以利用它在pageRank列上的索引，显著提升了性能（超过了DBMS-X）。</p>
+<p>Aggregation任务中，在聚合度较高时，Hive使用了hash聚合，相比原生Hadoop性能提升了非常多；在聚合高较低时，Hive转而使用了基于sort的聚合策略，这就与原生Hadoop相同了，且Hive在保存中间结果时有额外开销，此时它的整体性能还差于原生Hadoop。PostgreSQL在两种场景下都使用了hash聚合，因此HadoopDB的性能超过了Hadoop。</p>
+<p>Join任务中，HadoopDB得益于使用索引和内建支持join，性能远高于Hadoop，接近于两种DBMS（差距仍然明显）。</p>
+<p>UDF任务中，几个系统的性能差不多。</p>
+<h2 id="容错性"><a href="#容错性" class="headerlink" title="容错性"></a>容错性</h2><p>文章测试了各个系统的正常执行时间，以及单错误节点、单慢节点时的执行时间，HadoopDB的容错性确实比DBMS要好很多。尴尬的是就算在有错误或慢节点时，DBMS的执行时间仍然远低于HadoopDB和Hadoop。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/MapReduce/" rel="tag"># MapReduce</a>
+              <a href="/tags/BigData/" rel="tag"># BigData</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/" rel="prev" title="[笔记] A comparison of approaches to large-scale data analysis">
+      <i class="fa fa-chevron-left"></i> [笔记] A comparison of approaches to large-scale data analysis
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/" rel="next" title="[笔记] Dremel: interactive analysis of web-scale datasets">
+      [笔记] Dremel: interactive analysis of web-scale datasets <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HadoopDB%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.</span> <span class="nav-text">HadoopDB的实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%A7%E8%83%BD%E6%8C%87%E6%A0%87"><span class="nav-number">3.</span> <span class="nav-text">性能指标</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%B9%E9%94%99%E6%80%A7"><span class="nav-number">4.</span> <span class="nav-text">容错性</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

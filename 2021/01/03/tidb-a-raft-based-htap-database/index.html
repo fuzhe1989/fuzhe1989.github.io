@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：TiDB: a Raft-based HTAP database  TL;DR TiDB是一个HTAP系统，目标是同时服务TP和AP服务，且能保证隔离性和数据新鲜度。它的架构受到了Spanner和F1的影响：计算层类似于F1，无状态；存储层类似于Spanner，支持分布式事务。 它的存储层分为了行存的TiKV和列存的TiFlash，其中TiKV各个replica之间通过Raft保持一致，T">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] TiDB: a Raft-based HTAP database">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/01/03/tidb-a-raft-based-htap-database/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：TiDB: a Raft-based HTAP database  TL;DR TiDB是一个HTAP系统，目标是同时服务TP和AP服务，且能保证隔离性和数据新鲜度。它的架构受到了Spanner和F1的影响：计算层类似于F1，无状态；存储层类似于Spanner，支持分布式事务。 它的存储层分为了行存的TiKV和列存的TiFlash，其中TiKV各个replica之间通过Raft保持一致，T">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-07.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-08.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-09.png">
+<meta property="article:published_time" content="2021-01-03T12:38:05.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.660Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="HTAP">
+<meta property="article:tag" content="Columnar">
+<meta property="article:tag" content="2PC">
+<meta property="article:tag" content="开源系统">
+<meta property="article:tag" content="Raft">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-01/tidb-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/01/03/tidb-a-raft-based-htap-database/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] TiDB: a Raft-based HTAP database | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/03/tidb-a-raft-based-htap-database/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] TiDB: a Raft-based HTAP database
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-01-03 20:38:05" itemprop="dateCreated datePublished" datetime="2021-01-03T20:38:05+08:00">2021-01-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3415478.3415535">TiDB: a Raft-based HTAP database</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>TiDB是一个HTAP系统，目标是同时服务TP和AP服务，且能保证隔离性和数据新鲜度。它的架构受到了Spanner和F1的影响：计算层类似于F1，无状态；存储层类似于Spanner，支持分布式事务。</p>
+<p>它的存储层分为了行存的TiKV和列存的TiFlash，其中TiKV各个replica之间通过Raft保持一致，TiFlash则作为Raft的learner保证看到最新的数据。相比<a href="/2020/12/24/kudu-storage-for-fast-analytics-on-fast-data">Kudu</a>，TiDB物理上分离了TP和AP，隔离性更好；相比<a href="/2020/11/30/f1-lightning-htap-as-a-service">F1-Lightning</a>的基于CDC的replay，TiDB的新鲜度更好。</p>
+<p>一些看法：</p>
+<ul>
+<li>TiKV底下使用了RocksDB，但LSM的compaction会导致性能不稳定，在高并发的TP场景可能会有问题，如何解决？</li>
+<li>TiFlash是绑在TiKV上的：<ul>
+<li>数据一定要先进TiKV再进TiFlash，对于没有强事务需求的场景而言有些浪费，是否能提供更低开销的ingestion？</li>
+<li>列存和行存的key order是一样的，是否能有列存格式的索引？</li>
+</ul>
+</li>
+<li>与Kudu等系统类似，TiKV的Raft与多副本是绑定的，对支持erasure coding有阻碍，对上云也有阻碍（使用云存储）。</li>
+</ul>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>（前面阐述HTAP的意义）HTAP除了像NewSQL系统一样要实现可伸缩、高可用、事务一致性，还有两个重要属性：新鲜度（freshness）和隔离性（isolation）。</p>
+<p>新鲜度指OLAP能看到多新的数据。基于ETL的HTAP方案保证不了实时新鲜度，甚至经常要延迟几小时以上。将ETL换成流计算能极大改善新鲜度，但这种方案涉及多个模块（OLTP、流计算、OLAP），维护代价高。</p>
+<p>隔离性指OLTP和OLAP的请求互不影响。一些内存数据库（如HyPer）允许一个server内的AP请求访问到最新的TP数据，但这就存在相互影响，没办法让TP和AP吞吐都达到最高（实际上有相当明显的影响）。</p>
+<p>让TP和AP使用不同的硬件资源（如不同server）能解决隔离问题，但问题在于如何保证用于AP的replica有着和用于TP的replica一样新的数据。注意到保证replica数据一致与高可用一样，都需要用到共识协议，如Paxos和Raft。</p>
+<p>TiDB的idea就来自这里，它使用了Raft来同步replica，其中AP replica身份为learner，只接受数据，不参与投票，且在收到数据后将行存格式转为列存格式。通过Raft保证了AP replica能看到最新的数据；通过引入learner，保证了AP replica对TP replica只有最小的影响（每多一个AP replica，多一次RPC的吞吐，但基本不增加延时）。</p>
+<h2 id="Raft-based-HTAP"><a href="#Raft-based-HTAP" class="headerlink" title="Raft-based HTAP"></a>Raft-based HTAP</h2><p><img src="/images/2021-01/tidb-01.png"></p>
+<p>从high level来看，数据保存在若干个Raft group中，其中每个leader和follower的数据是行存的，用来服务TP请求，learner数据是列存的，用来服务AP请求。query优化器会考虑两种引擎来生成query plan。</p>
+<p>以下是TiDB解决的几个工程问题：</p>
+<ol>
+<li>如何构建一个可伸缩的支持高并发读写的Raft存储系统？如果数据量超过了Raft各节点的可用空间，需要有办法将数据分片分散到各个server上。另外在基本的Raft协议中，请求是串行执行的，在回复client前必须要得到多数Raft节点的确认。这个过程引入了网络和磁盘操作，会导致leader成为系统的瓶颈。</li>
+<li>如何以低延时将数据同步给leaner？正在执行的事务可能产生很大的log，这些log需要快速在learner上重放、持久化。将log转换到列存的过程中可能因schema不匹配而出错，导致log同步延迟。</li>
+<li>如何同时高效处理TP和AP query且保证性能？大的TP query需要读写位于多个server上的大量数据，而AP query也会消耗大量资源，不应该影响到TP请求。需要能综合考虑行存和列存store来生成最优化的plan。</li>
+</ol>
+<h2 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h2><p><img src="/images/2021-01/tidb-02.png"></p>
+<p>TiDB支持MySQL协议，分为三层：分布式存储层、Placement Driver（PD）、计算层。</p>
+<p>分布式存储层有两种store：row store（TiKV）和columnar store（TiFlash）。TiKV中每个key-value pair对应一行数据，其中key使用tableID和rowID编码，value则是这行真正的数据：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Key: &#123;table&#123;tableID&#125;_record&#123;rowID&#125;&#125;</span><br><span class="line">Value: &#123;col0, col1, col2, col3&#125;</span><br></pre></td></tr></table></figure>
+
+<p>数据按key range分为若干个region，每个region对应一个Raft group。</p>
+<p>PD负责管理region，同时也是timestamp oracle，生成全局单调增的timestamp。PD可以有多个节点，本身是stateless的，每个节点在启动时会从其它节点和TiKV处收集信息。</p>
+<p>计算层也是stateless的，可以弹性伸缩。它有一个基于cost的优化器，和一个分布式query执行器。它使用了Percolator风格的2PC以支持分布式事务。</p>
+<p>此外TiDB还集成了Spark，从而允许将TiDB的数据与Spark生态连接起来。</p>
+<h2 id="Multi-Raft-Storage"><a href="#Multi-Raft-Storage" class="headerlink" title="Multi-Raft Storage"></a>Multi-Raft Storage</h2><p><img src="/images/2021-01/tidb-03.png"></p>
+<p>TiKV的多个region可能会对应TiFlash的一个partition，从而提高扫描的效率。</p>
+<h3 id="Row-based-Storage-TiKV"><a href="#Row-based-Storage-TiKV" class="headerlink" title="Row-based Storage (TiKV)"></a>Row-based Storage (TiKV)</h3><p>每个TiKV server会服务若干个region，每个region的状态机使用了RocksDB。默认每个region最大为96MB。</p>
+<p>基本的Raft协议执行过程如下：</p>
+<ol>
+<li>leader接收到请求。</li>
+<li>leader将数据追加到log中。</li>
+<li>leader将新的log entry发给follower，后者将数据追加到log中。</li>
+<li>leader等待多数follower确认后commit，并应用到本地状态机中。</li>
+<li>leader回复client。</li>
+</ol>
+<p>这个过程中数据在不同节点间的通信是串行的，还可能引入额外的I&#x2F;O开销（网络和磁盘），存在性能瓶颈。</p>
+<h4 id="Optimization-between-Leaders-and-Followers"><a href="#Optimization-between-Leaders-and-Followers" class="headerlink" title="Optimization between Leaders and Followers"></a>Optimization between Leaders and Followers</h4><p>上面的第2步和第3步是相互独立的，leader在本地追加log的同时就可以将数据发送给follower了，如果leader自己追加失败了，但follower已经达到多数了，这次请求仍然可以commit（leader自己重试，如果重试成功前发生leader切换，则之前写成功的某个follower会成为新leader，数据本身不会丢）。</p>
+<p>第3步中leader可以buffer未commit的log entry，在前一个log entry发给follower之后，不需要等待多数follower回应就可以开始处理下个log entry。如果其中某个log entry出错，leader可以回调log index，并重新发送log entry（与pangu1的pipeline类似）。</p>
+<p>第4步中leader应用log entry和回复response可以同时进行，到了这步请求的状态已经确定了。</p>
+<p>新的Raft执行过程如下：</p>
+<ol>
+<li>leader接收到请求。</li>
+<li>leader将log entry发送给follower并并行本地追加。</li>
+<li>leader继续接收请求，并重复第2步。</li>
+<li>leader收到多数回应后commit log entry（应该需要前缀都确认），并在另一个线程中应用。</li>
+<li>leader回复client。</li>
+</ol>
+<h4 id="Accelerating-Read-Requests-from-Clients"><a href="#Accelerating-Read-Requests-from-Clients" class="headerlink" title="Accelerating Read Requests from Clients"></a>Accelerating Read Requests from Clients</h4><p>TiKV的leader需要支持可线性化的读语义，即当时间t一个请求从leader处读到了某个值，所有晚于t的请求从leader处不能再读到更旧的值。基本的Raft协议需要leader写一个新的log entry以确保自己仍然是leader，从而确认自己的数据是最新的。但这就引入了一次I&#x2F;O，性能上无法接受。</p>
+<p>TiKV实现了两种Raft论文中的优化。</p>
+<p>优化一称为read index。当leader收到一个读请求时，它用自己的commit index作为read index，然后发送RPC给follower以确认自己仍然是leader，之后它就可以在read index被应用到本地状态机之后返回对应的值。这种优化节省了磁盘I&#x2F;O，但仍然有网络开销。</p>
+<p>优化二称为lease read，即leader和follower约定一个lease长度，follower保证在lease未过期前不会发起选举，这样leader在lease期间可以直接回复读请求，无需任何网络或磁盘I&#x2F;O。这种优化依赖于各个节点的时钟没有太大的偏差（但failover时间会变长）。</p>
+<p>follower也可以服务读请求。当它收到读请求时，它会请求leader获取当前最新的read index（leader的commit index），然后等到本地应用的index大于等于read index后返回。</p>
+<h4 id="Managing-Massive-Regions"><a href="#Managing-Massive-Regions" class="headerlink" title="Managing Massive Regions"></a>Managing Massive Regions</h4><p>大量的region会带来负载不均衡的问题（磁盘使用和访问），PD会从心跳中收集各个TiKV server的信息来移动region的replica。</p>
+<p>另一个问题是Raft group的心跳开销。一个没有请求的Raft group可以省略掉心跳，另外根据负载情况，不同Raft group可以有不同的心跳频率。</p>
+<h4 id="Dynamic-Region-Split-and-Merge"><a href="#Dynamic-Region-Split-and-Merge" class="headerlink" title="Dynamic Region Split and Merge"></a>Dynamic Region Split and Merge</h4><p>TiKV支持将一个region分裂为多个region，其中key range最大的新region会继承旧region的Raft group，而其它新region则使用新的Raft group。整个分裂过程：</p>
+<ol>
+<li>PD向region的leader发送split。</li>
+<li>leader将split转化为一个log entry并发送给所有follower。</li>
+<li>一旦多数确认，leader会commit这个log entry并应用到各个节点上。应用过程包括了更新旧region的key range和epoch，创建新region。整个应用过程是原子且持久化的。</li>
+<li>每个新region的replica开始工作，组成新的Raft group。leader将split结果回复给PD，整个过程结束。</li>
+</ol>
+<p>merge操作与split不同：PD将两个region的replica两两移动到相同server上，开始本地merge。本地merge分为两步：先停掉一个region的服务，再将它与另一个合并。merge与split的不同点在于它不能复用Raft的log机制。</p>
+<h3 id="Column-based-Storage-TiFlash"><a href="#Column-based-Storage-TiFlash" class="headerlink" title="Column-based Storage (TiFlash)"></a>Column-based Storage (TiFlash)</h3><p>用户可以用以下SQL语句设置列存格式的replica：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> x <span class="keyword">SET</span> TiFLASH REPLICA n;</span><br></pre></td></tr></table></figure>
+
+<p>TiFlash中每张表分为若干个partition，每个partition对应若干个TiKV的region。</p>
+<p>TiFlash的初始化过程分为两阶段：阶段一leader会把自己的一个snapshot发给TiFlash的replica；阶段二TiFlash的replica开始接收增量数据。</p>
+<h4 id="Log-Replayer"><a href="#Log-Replayer" class="headerlink" title="Log Replayer"></a>Log Replayer</h4><p>learner在收到log之后会以FIFO方式将行存的数据重放为列存数据，整个过程分为三步：</p>
+<ol>
+<li>compaction：事务log有三种状态：prewritten&#x2F;commited&#x2F;rollbacked。其中rollbacked的log不需要重放，因此第一步是基于rollback的log来删掉prewritten中的无效log，并将有效的log写到buffer中。</li>
+<li>解码：buffer中的log被解码为行格式，去掉事务相关的无用信息，写到row buffer中。</li>
+<li>转换：row buffer的大小达到阈值，或时间达到阈值后，整个row buffer中的行都会被转为列存格式，并写到本地的数据池中。转换会使用本地cache的schema，schema会定期与TiKV同步。</li>
+</ol>
+<p>（如何保证rollback对应的prewritten log一定在buffer中呢？）</p>
+<p><img src="/images/2021-01/tidb-04.png"></p>
+<p>转换生成的列存数据会写到DeltaTree中。</p>
+<h4 id="Schema-Synchronization"><a href="#Schema-Synchronization" class="headerlink" title="Schema Synchronization"></a>Schema Synchronization</h4><p>每张表最新的schema保存在TiKV里，每个TiFlash的节点会在本地缓存一份schema。当转换数据时，可能遇到schema不匹配，需要重新请求一份schema并重新转换数据。为了平衡schema同步的开销与schema不匹配的开销，TiFlash使用了两阶段的策略：</p>
+<ul>
+<li>定期同步schema。</li>
+<li>在不匹配时同步schema。</li>
+</ul>
+<h4 id="Columnar-Delta-Tree"><a href="#Columnar-Delta-Tree" class="headerlink" title="Columnar Delta Tree"></a>Columnar Delta Tree</h4><p><img src="/images/2021-01/tidb-05.png"></p>
+<p>TiFlash的数据分为两部分，base数据是列存的，按key-range分为若干个chunk。列存格式类似于Parquet，区别在于它的row group的meta是单独保存为一个文件，另外压缩格式上目前只支持LZ4。</p>
+<p>delta数据则是按写入顺序保存的（用作WAL），也会持久化到磁盘上和compaction。delta数据之上有一个B+树索引用来加速查找（compaction时如何更新索引？）。</p>
+<p>当读最新数据时要合并所有delta和对应的base数据，读放大系数很高，因此要定期将delta和base合并到一起。</p>
+<p>整个DeltaTree与LSM的性能对比：</p>
+<p><img src="/images/2021-01/tidb-06.png"></p>
+<p>DeltaTree的用时只有LSM（Tiered Compaction）的一半，主要归功于它的读放大会比较小（相当于只有L0和L1），缺点是写放大比较大，但可以接受。</p>
+<h2 id="HTAP-Engines"><a href="#HTAP-Engines" class="headerlink" title="HTAP Engines"></a>HTAP Engines</h2><p>在TiKV和TiFlash之上是计算层TiDB，它支持基于rule和cost的优化器、index、计算下推，使用Percolator风格的2PC来实现分布式事务，还实现了TiSpark作为Spark的connector。</p>
+<h3 id="Transactional-Processing"><a href="#Transactional-Processing" class="headerlink" title="Transactional Processing"></a>Transactional Processing</h3><p><img src="/images/2021-01/tidb-07.png"></p>
+<p>TiDB同时支持乐观锁和悲观锁，其中乐观锁参考了<a href="/2020/12/21/large-scale-incremental-processing-using-distributed-transactions-and-notifications">Percolator</a>。</p>
+<p>TiDB支持snapshot-isolation（SI）和repeatable-read（RR）两种语义。悲观锁使用RR语义，在加锁时会申请一个for_update_ts的时间戳，加锁失败可以只重试加锁，而不用回滚重试整个事务，且用for_update_ts来读数据。用户也可以指定悲观事务中使用read-committed（RC）语义，这样能减少冲突，但隔离性会下降。</p>
+<p>PD生成时间戳的方式类似于HLC，各个节点会批量申请时间戳，目前单机房内不是瓶颈（但geo的话延时会太高）。</p>
+<h3 id="Analytical-Processing"><a href="#Analytical-Processing" class="headerlink" title="Analytical Processing"></a>Analytical Processing</h3><h4 id="Query-Optimization-in-SQL-Engine"><a href="#Query-Optimization-in-SQL-Engine" class="headerlink" title="Query Optimization in SQL Engine"></a>Query Optimization in SQL Engine</h4><p>TiDB的优化过程分为两阶段：先用RBO生成逻辑plan，再用CBO生成物理plan。</p>
+<p>TiDB支持异步构建和移除索引。索引也保存在TiKV中。有唯一key的index编码为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Key: &#123;table&#123;tableID&#125;_index&#123;indexID&#125;_indexedColValue&#125;</span><br><span class="line">Value: &#123;rowID&#125;</span><br></pre></td></tr></table></figure>
+
+<p>没有唯一key的index编码为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Key: &#123;table&#123;tableID&#125;_index&#123;indexID&#125;_indexedColValue_rowID&#125;</span><br><span class="line">Value: &#123;null&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在生成物理plan时，TiDB会使用<a target="_blank" rel="noopener" href="https://github.com/pingcap/tidb/blob/master/docs/design/2019-01-25-skyline-pruning.md">skyline pruning算法</a>裁剪掉不用需要的index。如果有多个index分别匹配不同的条件，TiDB会合并这些部分结果。</p>
+<p>执行时存储层通过coprocessor来执行某个叶子子树。</p>
+<h4 id="TiSpark"><a href="#TiSpark" class="headerlink" title="TiSpark"></a>TiSpark</h4><p><img src="/images/2021-01/tidb-08.png"></p>
+<p>TiSpark相比于普通的connector有两方面区别：</p>
+<ol>
+<li>可以同时读取多个region。</li>
+<li>可以并发读取index。</li>
+</ol>
+<h3 id="Isolation-and-Coordination"><a href="#Isolation-and-Coordination" class="headerlink" title="Isolation and Coordination"></a>Isolation and Coordination</h3><p>TiDB中有三种读取数据的路径：扫描TiKV、扫描索引、扫描TiFlash。这三种路径有着不同的开销和key order。TiKV和TiFlash都是按primary key排序，索引则可以有多种排序。三种路径的开销如下：</p>
+<p><img src="/images/2021-01/tidb-09.png"> </p>
+<p>其中S<sub>tuple&#x2F;col&#x2F;index</sub>代表平均大小，N<sub>tuple&#x2F;reg</sub>代表记录数或region数。f<sub>scan</sub>代表扫描的I&#x2F;O开销，f<sub>seek</sub>代表seek的I&#x2F;O开销。</p>
+<p>考虑<code>select T.*, S.a from T join S on T.b=S.b where T.a between 1 and 100</code>，其中T和S在a列有索引，则优化器会选择使用T的索引和S的列存。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/HTAP/" rel="tag"># HTAP</a>
+              <a href="/tags/Columnar/" rel="tag"># Columnar</a>
+              <a href="/tags/2PC/" rel="tag"># 2PC</a>
+              <a href="/tags/%E5%BC%80%E6%BA%90%E7%B3%BB%E7%BB%9F/" rel="tag"># 开源系统</a>
+              <a href="/tags/Raft/" rel="tag"># Raft</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/12/28/the-snowflake-elastic-data-warehouse/" rel="prev" title="[笔记] The snowflake elastic data warehouse">
+      <i class="fa fa-chevron-left"></i> [笔记] The snowflake elastic data warehouse
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/" rel="next" title="[笔记] Integrating Compression and Execution in Column-Oriented Database Systems">
+      [笔记] Integrating Compression and Execution in Column-Oriented Database Systems <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-based-HTAP"><span class="nav-number">2.</span> <span class="nav-text">Raft-based HTAP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Architecture"><span class="nav-number">3.</span> <span class="nav-text">Architecture</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Multi-Raft-Storage"><span class="nav-number">4.</span> <span class="nav-text">Multi-Raft Storage</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Row-based-Storage-TiKV"><span class="nav-number">4.1.</span> <span class="nav-text">Row-based Storage (TiKV)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Optimization-between-Leaders-and-Followers"><span class="nav-number">4.1.1.</span> <span class="nav-text">Optimization between Leaders and Followers</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Accelerating-Read-Requests-from-Clients"><span class="nav-number">4.1.2.</span> <span class="nav-text">Accelerating Read Requests from Clients</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Managing-Massive-Regions"><span class="nav-number">4.1.3.</span> <span class="nav-text">Managing Massive Regions</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Dynamic-Region-Split-and-Merge"><span class="nav-number">4.1.4.</span> <span class="nav-text">Dynamic Region Split and Merge</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Column-based-Storage-TiFlash"><span class="nav-number">4.2.</span> <span class="nav-text">Column-based Storage (TiFlash)</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Log-Replayer"><span class="nav-number">4.2.1.</span> <span class="nav-text">Log Replayer</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Schema-Synchronization"><span class="nav-number">4.2.2.</span> <span class="nav-text">Schema Synchronization</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Columnar-Delta-Tree"><span class="nav-number">4.2.3.</span> <span class="nav-text">Columnar Delta Tree</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HTAP-Engines"><span class="nav-number">5.</span> <span class="nav-text">HTAP Engines</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Transactional-Processing"><span class="nav-number">5.1.</span> <span class="nav-text">Transactional Processing</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Analytical-Processing"><span class="nav-number">5.2.</span> <span class="nav-text">Analytical Processing</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Query-Optimization-in-SQL-Engine"><span class="nav-number">5.2.1.</span> <span class="nav-text">Query Optimization in SQL Engine</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#TiSpark"><span class="nav-number">5.2.2.</span> <span class="nav-text">TiSpark</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Isolation-and-Coordination"><span class="nav-number">5.3.</span> <span class="nav-text">Isolation and Coordination</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Building a Database on S3  TL;DR 这篇文章讲的是如何实现自己的“云原生”数据库，以及探索S3是否适合作为DB的共享存储。 S3的优点是安全、无需运维、按使用付费，缺点是访问延时高、使用廉价硬件可能会牺牲一致性（这里作者引用了Dynamo，不太确定Dynamo和S3的关系）、更新不保证顺序。 本文的贡献：  演示了如何在S3上实现需要被并发修改的小对象。 演示">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Building a Database on S3">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/11/11/building-a-database-on-s3/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Building a Database on S3  TL;DR 这篇文章讲的是如何实现自己的“云原生”数据库，以及探索S3是否适合作为DB的共享存储。 S3的优点是安全、无需运维、按使用付费，缺点是访问延时高、使用廉价硬件可能会牺牲一致性（这里作者引用了Dynamo，不太确定Dynamo和S3的关系）、更新不保证顺序。 本文的贡献：  演示了如何在S3上实现需要被并发修改的小对象。 演示">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/build-s3-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/build-s3-02.png">
+<meta property="article:published_time" content="2020-11-11T06:35:58.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.650Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="探索研究">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-11/build-s3-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/11/11/building-a-database-on-s3/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Building a Database on S3 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/building-a-database-on-s3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Building a Database on S3
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-11 14:35:58" itemprop="dateCreated datePublished" datetime="2020-11-11T14:35:58+08:00">2020-11-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1376616.1376645">Building a Database on S3</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章讲的是如何实现自己的“云原生”数据库，以及探索S3是否适合作为DB的共享存储。</p>
+<p>S3的优点是安全、无需运维、按使用付费，缺点是访问延时高、使用廉价硬件可能会牺牲一致性（这里作者引用了Dynamo，不太确定Dynamo和S3的关系）、更新不保证顺序。</p>
+<p>本文的贡献：</p>
+<ul>
+<li>演示了如何在S3上实现需要被并发修改的小对象。</li>
+<li>演示了S3上如何实现B树。</li>
+<li>提出了可以演示如何用S3实现不同一致性级别的协议。</li>
+<li>使用TPC-W基准测试了不同一致性级别下使用S3的成本。</li>
+</ul>
+<p>本文的目的是在保证可用性和资源利用率的前提下，探索如何将DB的性质尽可能多地搬到云上。</p>
+<p>结论：显然只是一次实验，验证了使用S3作为共享存储的可行性，但实用性不高。如果换成EBS的话可能更好一些。它的PU queue有点像Bw-tree。</p>
+<span id="more"></span>
+
+<h2 id="依赖的AWS服务"><a href="#依赖的AWS服务" class="headerlink" title="依赖的AWS服务"></a>依赖的AWS服务</h2><p>EC2和S3忽略。</p>
+<p>Simple Queueing System（SQS）是一种不保证顺序的队列服务，每个client在调用<code>receive</code>获取若干条消息后，SQS会锁住这些消息，等待client后续调用<code>delete</code>，或超时解锁。</p>
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p><img src="/images/2020-11/build-s3-01.png" alt="Shared-disk Architecture"></p>
+<p>这套架构假设client的数量可能达到百万这个量级。为了保证任何client挂掉都不会阻塞其它client，client不会去拿阻塞的锁，且都是无状态的。</p>
+<p>为了保证可用性，这套架构采用最终一致性，client可以缓存数据，也不支持完整的事务。</p>
+<p>与S3有关的有两层，RecordManager和PageManager。client只与前者以Record为单位交互，S3只与后者以Page为单位交互。除此之外，PU queue（Pending Update queue）负责序列化log record、Lock queue负责确保同时只有一个client能应用log record、Atomic Queue负责保证client不会只写入一个commit的不完整内容。</p>
+<p>这些模块可以组合出不同的一致性级别。</p>
+<h3 id="RecordManager与PageManager"><a href="#RecordManager与PageManager" class="headerlink" title="RecordManager与PageManager"></a>RecordManager与PageManager</h3><p>RecordManager向client暴露基于record的API，但内部会将这些record组成page，由PageManager管理。</p>
+<p>每个collection对应S3的一个bucket，每个page对应一个S3的一个object。</p>
+<p>PageManager会在本地有一个buffer pool（内存或本地存储），其中每个page可以有状态和TTL，过期的page被访问时会通过S3的<code>get-if-modified</code>请求来更新。client的修改开始时只应用到本地的page上，在commit时会将所有更新写进S3或PU queue，并将所有状态为modified的page置为unmodified。abort时会清除这些modified page。</p>
+<h3 id="Logging和B-tree"><a href="#Logging和B-tree" class="headerlink" title="Logging和B-tree"></a>Logging和B-tree</h3><p>S3上的数据组织为B树，每个节点对应一个object，实现上采用了<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/319628.319663">B-link tree</a>，即每个节点会包含指向同级兄弟节点的指针（这里是URI）（具体原理不清楚）。</p>
+<p>B树的root的URI会在创建collection时生成，之后保持不变。</p>
+<p>log record分为insert、delete、update三种，都要保证是幂等的：</p>
+<ul>
+<li><code>(insert, key, payload)</code></li>
+<li><code>(delete, key)</code>，如果要实现undo log，这里还需要记录<code>beforeimage</code>。</li>
+<li><code>(update, key, afterimage)</code>，update必须要与具体的page关联。如果要实现undo log，这里还需要记录<code>beforeimage</code>。</li>
+</ul>
+<h3 id="Security"><a href="#Security" class="headerlink" title="Security"></a>Security</h3><p>为了安全性考虑，数据可以加密后存进S3，且不同page可以用不同的key（记录到page header中），这样可以允许不同client只能访问不同的page。</p>
+<h2 id="commit协议"><a href="#commit协议" class="headerlink" title="commit协议"></a>commit协议</h2><p>为了保证不同的一致性级别，这篇文章提出了三种commit协议：basic、monotomic、atomic。</p>
+<p>三种协议都可以分为两个阶段：</p>
+<ul>
+<li>client将log record写入SQS。</li>
+<li>应用log record到S3（称为checkpointing）。</li>
+</ul>
+<p>其中第一步成功就被视为commit成功，只是数据还不可见。client可以继续干别的去了，等待数据异步可见。</p>
+<h3 id="Basic协议"><a href="#Basic协议" class="headerlink" title="Basic协议"></a>Basic协议</h3><p><img src="/images/2020-11/build-s3-02.png" alt="Shared-disk Architecture"></p>
+<p>在Basic协议中，B树的每个叶子节点对应一个PU queue，里面是对这个page的所有update，另外B树本身还有一个PU queue，里面是所有insert和delete。</p>
+<p>每个PU queue对应一个Lock queue，里面有一个元素。负责checkpointing的client会尝试去获取这个元素，如果获取成功，表明此刻只有它自己在操作这个PU queue，它就会开始应用log record到本地，之后如果没有timeout，再将新page更新到S3上并删除PU queue中应用过的log record。如果已经timeout了，则放弃更改。</p>
+<p>如果在更新到S3之后和删除PU queue中的record之间client挂了，这些record可能被应用两次，可能导致同一个key的值不一致（因为SQS不严格保序？），此时需要使用monotonic协议。</p>
+<p>checkpointing的触发间隔会影响数据的可见延时，但越小的checkpointing，整体的开销越大。</p>
+<p>默认是写时定期checkpoint，但为了避免有只写一次的page永远不更新，可以允许reader也能checkpoint。</p>
+<h3 id="Atomic协议"><a href="#Atomic协议" class="headerlink" title="Atomic协议"></a>Atomic协议</h3><p>如果一个client在commit一半时挂了，可能只写了部分内容到S3。为了解决这个问题，保证所有更新要么都成功，要么都失败，我们可以增加一个Atomic Queue。</p>
+<p>client每次commit时，先将所有log record写入自己的Atomic queue，最后再写一条表示所有record都写成功的commit record，里面包含commit id和record数量。之后再走正常的commit流程。</p>
+<p>如果client failover，它会检查Atomic queue，将其中不完整的事务对应的record都删掉，再重新commit完整的事务。</p>
+<p>注意，这里只保证了提交的all or none，不保证atomic的可见性。</p>
+<h3 id="一致性级别"><a href="#一致性级别" class="headerlink" title="一致性级别"></a>一致性级别</h3><p>以下讨论几种一致性级别该如何实现：</p>
+<ul>
+<li>Monotonic reads：一旦读到x，后续只会读到x或比x更新的值。client可以在本地记录每个page id上次读到的version，这样如果这个page读到了更旧的version，client可以重新从S3中读取。</li>
+<li>Monotonic writes：每个client的update record中可以记录一个client维度的counter，这样在checkpointing时可以按<code>(client, counter)</code>排序，将乱序的record留在PU queue中等待下一轮处理。</li>
+<li>Read your writes：client更新过x后，后续只会读到x或比x更新的值。默认满足。</li>
+<li>Write follows read：同一个client先读到x，后更新，只会取代x或比x更新的值。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/%E6%8E%A2%E7%B4%A2%E7%A0%94%E7%A9%B6/" rel="tag"># 探索研究</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/11/08/map-reduce-a-major-step-backwards/" rel="prev" title="[笔记] MapReduce: A Major step backwards">
+      <i class="fa fa-chevron-left"></i> [笔记] MapReduce: A Major step backwards
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store/" rel="next" title="[笔记] Dynamo: amazon's highly available key-value store">
+      [笔记] Dynamo: amazon's highly available key-value store <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BE%9D%E8%B5%96%E7%9A%84AWS%E6%9C%8D%E5%8A%A1"><span class="nav-number">1.</span> <span class="nav-text">依赖的AWS服务</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84"><span class="nav-number">2.</span> <span class="nav-text">架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#RecordManager%E4%B8%8EPageManager"><span class="nav-number">2.1.</span> <span class="nav-text">RecordManager与PageManager</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Logging%E5%92%8CB-tree"><span class="nav-number">2.2.</span> <span class="nav-text">Logging和B-tree</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Security"><span class="nav-number">2.3.</span> <span class="nav-text">Security</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#commit%E5%8D%8F%E8%AE%AE"><span class="nav-number">3.</span> <span class="nav-text">commit协议</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Basic%E5%8D%8F%E8%AE%AE"><span class="nav-number">3.1.</span> <span class="nav-text">Basic协议</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Atomic%E5%8D%8F%E8%AE%AE"><span class="nav-number">3.2.</span> <span class="nav-text">Atomic协议</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7%E7%BA%A7%E5%88%AB"><span class="nav-number">3.3.</span> <span class="nav-text">一致性级别</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

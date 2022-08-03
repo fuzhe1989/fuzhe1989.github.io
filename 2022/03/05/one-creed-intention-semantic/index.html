@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="TL;DR  为什么接口设计要表达清晰明确的语义？ 为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图？ 工作中为什么要树立自己的人设？ 如何让 OKR 发挥作用？ 如何三句话让客户为你的产品花钱？">
+<meta property="og:type" content="article">
+<meta property="og:title" content="纲领、意图、语义：从接口设计到公司治理">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/03/05/one-creed-intention-semantic/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="TL;DR  为什么接口设计要表达清晰明确的语义？ 为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图？ 工作中为什么要树立自己的人设？ 如何让 OKR 发挥作用？ 如何三句话让客户为你的产品花钱？">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-03-05T13:00:27.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.658Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/03/05/one-creed-intention-semantic/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>纲领、意图、语义：从接口设计到公司治理 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/03/05/one-creed-intention-semantic/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          纲领、意图、语义：从接口设计到公司治理
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-03-05 21:00:27" itemprop="dateCreated datePublished" datetime="2022-03-05T21:00:27+08:00">2022-03-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>TL;DR</strong></p>
+<ol>
+<li>为什么接口设计要表达清晰明确的语义？</li>
+<li>为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图？</li>
+<li>工作中为什么要树立自己的人设？</li>
+<li>如何让 OKR 发挥作用？</li>
+<li>如何三句话让客户为你的产品花钱？</li>
+</ol>
+<span id="more"></span>
+
+<p>智人的局限性：</p>
+<ol>
+<li>每次只能做好一件事，记住一句话。</li>
+<li>习惯机械地保持言行合一，且善于自我辩护（《影响力》）。</li>
+<li>面临过多不确定性时难以做出决定（《影响力》）。</li>
+</ol>
+<p>这些局限性每天都在影响着我们中的每个人，使得我们：</p>
+<ol>
+<li>事情多了就容易忘、走神、效果不好。</li>
+<li>没有明确的目标就会茫然、缺乏动力。</li>
+<li>面对不了解的事物时缺乏勇气、动力，难以做决定。</li>
+</ol>
+<p>相信我，在座的各位，在这些方面，很难不被称为垃圾。</p>
+<p>承认这些局限性是我们取得胜利的第一步，第二步则是利用这些局限性驱动自己（或引导他人）做出更有利于我们的行动。</p>
+<p>如何利用这些局限性？</p>
+<ol>
+<li>突出目的，用尽量少的记忆量表达尽量多的信息量，有利于智人们在它们有限的记忆力&#x2F;专注力范围内做好尽量多的事情。</li>
+<li>公开表达自己的意图，减少潜在的不确定性，帮助智人们更容易做出决定。</li>
+<li>公开自己的纲领，并坚持下去，智人们自然会根据它看到的纲领调整自己的姿势并自觉拥护。</li>
+</ol>
+<p>总之，把问题简化，对谁都好。</p>
+<p>以下讨论的主题从接口设计到公司治理，并没有什么新鲜的结论，只是试图从中归纳出一种统一的方法论。这很符合本文的主旨。</p>
+<h2 id="为什么接口设计要表达清晰明确的语义"><a href="#为什么接口设计要表达清晰明确的语义" class="headerlink" title="为什么接口设计要表达清晰明确的语义"></a>为什么接口设计要表达清晰明确的语义</h2><p>接口设计要遵循什么原则？“高内聚，低耦合”。</p>
+<p>什么叫“高内聚”？不同的元素之间，必要的交互越多，它们的聚合性（或称耦合性）越强。反之，就是“低耦合”。</p>
+<p>我们可以把一个程序&#x2F;系统看作一张图（Graph），每个元素看作一个顶点，元素之间的交互看作一条边。则接口设计、模块分割、微服务化，都在做着同一件事：聚类。我们找到一个元素集合，如果这个集合内部的聚合程序很高，但与外界的交互很少（或很统一），就可以将它视为一个整体，一个新的元素放回到图中。</p>
+<p>重复这个过程，元素的粒度由细到粗，从函数，到类，到模块，到服务，等等，图的复杂度越来越低，直到符合智人的脑容量。此时，神奇的事情发生了。每次只能做好一件事，记住一句话的智人，可以不费力地理解一个庞大的系统（想象一下一个分布式的、微服务化的业务系统，如果细化到具体的函数，该有多复杂多庞大）。天哪，这么神奇的吗？</p>
+<p>回看整个过程，我们可以找到其中最核心的一个操作（反复扣题），聚类。聚类意味着我们可以将多个元素的行为（或称语义）叠加起来，仍然视为一个元素，且只消耗智人相同量级的记忆量。这就需要我们为这些元素归纳出一个清晰、明确的语义。一句话，让你懂，尽管背后藏着千千万万的细节。</p>
+<p>code review 时，有些听起来很 naive、很不高端的问题：</p>
+<ol>
+<li>提出这个类的目的是什么？它有什么作用？</li>
+<li>这些参数都是必要的吗？有没有重复的、可以由其它参数推导出来的部分？</li>
+<li>为什么需要这个接口？</li>
+<li>考虑到对称性，为什么不增加另一个接口？</li>
+</ol>
+<p>是 reviewer 不懂吗？不一定，TA 也许只是为了减少未来读者（包括自己，也包括 1s 后的作者）的理解难度。给定一个类&#x2F;模块&#x2F;服务的名字，如果底下某个接口需要额外的解释，这个设计就还有提高的余地；如果每个接口都需要额外的解释，这个设计就是一次失败，会被无数次地用错、吐槽、直到被重构或抛弃掉。</p>
+<p><strong>总结</strong>：接口设计需要表达清晰明确的语义，争取一句话讲懂，多一句都差评。</p>
+<h2 id="为什么一次代码修改（cl-x2F-pr-x2F-commit）要有唯一明确的意图"><a href="#为什么一次代码修改（cl-x2F-pr-x2F-commit）要有唯一明确的意图" class="headerlink" title="为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图"></a>为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图</h2><blockquote>
+<ul>
+<li>CL：Change List</li>
+<li>PR：Pull Request</li>
+<li>Commit：问 git 去</li>
+</ul>
+</blockquote>
+<p>系统是由一次次代码修改组成的。我们要保证每次修改都可以用一句话描述，就需要它有唯一的、明确的意图。为什么？因为代码修改需要被阅读、被推理、被 review，而这些操作的另一边都是可怜的智人。而这些智人又通常是团队的瓶颈：人数越多，代码修改的生产速度越快；但 reviewer 通常跟不上这种速度。</p>
+<p>行数通常是 code review 速度的一项关键因素：</p>
+<ol>
+<li>一个 50 行的代码修改，通常扫一眼就清楚了；</li>
+<li>500 行的代码修改就需要随手准备个小本本画一下依赖关系；</li>
+<li>5000 行的代码修改则必须要拉上作者讲下前因后果，一点点抠了。</li>
+</ol>
+<p>然而行数不是唯一因素。一个很长的代码修改，如果意图明确，不会很难读；混杂了多种意图的代码修改，即使并不长，也明显增加了 reviewer 的精力消耗。举几个例子：</p>
+<ol>
+<li>5000 行的 code format 不怎么消耗 reviewer 精力，看一眼就可以放过。</li>
+<li>5000 行的 code format，但里面夹杂着一个 bugfix 就要了亲命了，reviewer 需要一行一行仔细阅读。</li>
+<li>既移动代码又对代码进行微小的功能修改，在现有的鶸 review 工具下，需要 reviewer 自己左右打开两份代码，手动对齐，再一行行对比。要是其中再加个函数拆分，谁爱看谁看，反正我不看。</li>
+</ol>
+<p>唯一的代码修改意图（refactor 还是 feature 还是 bugfix）避免了 reviewer 的精力浪费或不该有的忽视，该精读的能精读，该略读的能略读。</p>
+<p>接下来，常见的工作流程也要求代码修改的目的要单纯：考虑到 cherry-pick，一个代码修改最好不要包含无关的内容。</p>
+<p>最后，唯一的代码修改意图也在展现着作者的能力，我有能力总结出<strong>一种</strong>意图，且将其具象化为<strong>一次</strong>代码修改，这不失为一种“太成功了”。顺便，这样也不容易搞出乌龙（如写出低级 bug），在众人面前丢人。</p>
+<p><strong>总结</strong>：一次代码修改需要唯一的、明确的意图，为他好，也为你好。</p>
+<blockquote>
+<p>类似地，一个项目也要意图明确，三意二心的项目往往半途而废。</p>
+</blockquote>
+<h2 id="工作中为什么要树立自己的人设"><a href="#工作中为什么要树立自己的人设" class="headerlink" title="工作中为什么要树立自己的人设"></a>工作中为什么要树立自己的人设</h2><p>瑞·达利欧在《原则》中说，组织架构最好是树状的，每个子树都要有清晰的功能定位。如前所述，这也是一种聚类。现在，我们翻转一下问题，你，作为树中的某个叶子节点，如何获得满意的功能定位？</p>
+<p>我的答案是，要有人设。</p>
+<p>团队中每个人都有自己的人设。A 技术很 NB 但做事没规划；B 啥都能做，还能为老板抗事儿；C 能力有限，但很细心，总能按时完成；而你，D，没有特点。</p>
+<p>你怎么可能没有特点呢？你的野心（或称上进心）在燃烧，你也有自己的得意之处，你每天苦恼英雄无用武之地。但你缺少人设。人设是对一个智人的接口的一句话描述（又扣题了），你的所有内涵、能力、性格，最终也只能被归纳为一句话。这句话，就是别人想起你的第一句话。</p>
+<p>相信我，大多数主管不是坏人，他不是不给你好活，只是不知道该给你什么活合适：</p>
+<ol>
+<li>给需要深度的，怕你不会；</li>
+<li>给需要审美的，又不了解你；</li>
+<li>给有时限的，怕你耽误事儿。</li>
+</ol>
+<p>于是，最后只能把你归为“其它”，给你别人挑剩下的活。好心的主管给你简单但无关紧要的活，不那么良心的主管就给你谁都不想要的活。</p>
+<p>想改变这些，从立人设开始。你总是有擅长之处的，把它表达出来，告诉周围的人，告诉主管，说你想做，而且会做 xxx。立人设也是一种公开承诺。如前所述，智人拥有这种言行一致的倾向，当你立起人设了，你就会有自发的动力去维护它，这反过来会促进你强化这一人设，去学习必要的知识，练习相关的技能。立人设也可以简化主管面临的任务分配：现在的你对于他来说就不那么不确定了，他更容易做出决定。</p>
+<p>除了与主管的交互，当你立起人设后，同事之间的交互也会更简单、更顺利。类比良好的接口设计，你建立人设的过程，就是在完善自己对外的接口。这套接口越好用，其他人越乐于使用。</p>
+<p>接下来，立人设也不需要担心是否会把自己限制住。随着你的能力积累，其他人归纳你的方式也会变化，粒度越来越粗，从“擅长 xxx 问题”，到“技术大牛”或“项目推进大师”。智人们总是会用一句话来描述你的，别让这句话太无聊。</p>
+<p>立人设并不是一劳永逸的，你需要长年累月的积累、坚持，稍不留神还有翻车的风险。但这很值得。</p>
+<p><strong>总结</strong>：立人设也是一种接口设计；它能简化交互，消除未知，降低主管与同事与你交互的难度；同时它是一种公开承诺，你会更有动力维护你的公开承诺。</p>
+<h2 id="如何让-OKR-发挥作用"><a href="#如何让-OKR-发挥作用" class="headerlink" title="如何让 OKR 发挥作用"></a>如何让 OKR 发挥作用</h2><p>一个组织需要一个公开的纲领，否则无法保证成员的凝聚力。</p>
+<blockquote>
+<p>这句话是几年前从知乎上看到的，当时有人大概问了这么个问题：为什么一个政党不能隐瞒自己的意图。但现在找不到了。</p>
+</blockquote>
+<p>（涉及政治的部分就略过吧……）一个公司是一个组织，它也需要一个公开的纲领。</p>
+<p>工作几年以后，我们往往会把工作视作一种庸俗化的等价交换，你用自己的时间，从老板那里换钱。这种逻辑没错，但对于公司而言，只存在这种等价交换是非常危险的：公司需要员工的一部分超额劳动。</p>
+<p>如果工作只是工作，这种超额劳动只能归为一种资本家的压榨。但有趣的是，很多智人会在工作中获得一些满足感，他们可能会把工作视为爱好，视为社交，最终主动地奉献一些超额劳动。很难说这算不算是智人的另一种局限性。我很认同一种观点，不要把工作与生活截然分开，去寻找那些你休息时仍然愿意做的工作。</p>
+<p>成功的公司都或多或少意识到了这点，他们会想尽办法用最小的花销最大化提升员工的满足感、参与感，如免费零食、舒适的工作环境、定期的团建（翻车概率大）等。这里我们讨论公司的纲领，也就是 OKR。</p>
+<p>OKR 是什么？它是一种方法论，你瞄着一个目标，制定计划，最终将结果拿来和目标对比。一个公司有整体的 OKR，老板会瞄着这个目标，制定自己的计划。顺着组织架构，部门可以瞄着公司的 OKR 制定自己的 OKR，部门总监据此制定自己的计划。接下来是团队、个人。</p>
+<p>这个过程是自顶向下的，公司有一个纲领，一个目标，接下来每个部门、团队、个人，都根据自己所在的位置看到的这个目标的样子，制定自己的计划。这个过程中，每一级都只需要、且只能看到自己以上的 OKR，而不需要、也不应该关注自己以下的 OKR。大家都在朝着一个目标，只是因为所处位置不同而产生了不同的计划。这就是我对 OKR 的理解。</p>
+<p>相比而言，KPI 则是自底向上的，每一级都盯着自己的下级，将自己的目标分解为下级的目标。这个过程中每个人不需要关心更上一级的目标，只要完成自己的目标，明码标价，童叟无欺，只是没有了那种凝聚力。</p>
+<p>为了让 OKR 发挥作用，我们需要：</p>
+<ol>
+<li>纲领要公开，不要藏着掖着。</li>
+<li>纲领要明确、简短，让人看一次忘不了。</li>
+<li>纲领要能坚持不动摇。</li>
+<li>每一级都要明确地朝着这个目标制定计划，中间一旦掺杂了私货，下面各级都会走偏。</li>
+</ol>
+<p>一个公开的纲领就像一座灯塔，可以为整个公司指引方向。这种明确的、唯一的方向的重要性不言而喻。电子的运动方向越集中，电流强度越大。公司的方向越集中，内耗越小，成员之间的协同效应越强烈，整体执行能力越强。这种成功反过来又可以提升众人对纲领本身的认可程度。</p>
+<blockquote>
+<p>公开的纲领的另一个好处是可以筛选掉那些不认可它的员工。大家道不同不相为谋，不是坏事。反倒是不同思想的激烈冲突（或曰内耗）既耽误了员工，又影响了公司。</p>
+</blockquote>
+<p>纲领本身一旦被公司成员所认可，如前所述，智人善于自我辩护，公司成员就会反过来为纲领辩护。这种辩护也是凝聚力的一部分。而凝聚力越强，公司抵御风险的能力越强，越能克服困难，在险恶的环境中生存下来。</p>
+<p>如果公司还能将纲领坚持下去，言行一致的本能同样会提升众人对纲领的认可程度。</p>
+<p>最后，所有这些的前提是，整个公司都能看到相同的纲领。如果有人将 OKR 替换为局部的等价交换，上述推理链就不复存在了。做个不恰当的类比，一个是“同志们跟着我冲”，一个是“弟兄们给我顶住”。</p>
+<p><strong>总结</strong>：一家公司需要一个统一的、公开的纲领，它能以低成本的方式增强员工的凝聚力，减少内耗，提升执行能力。</p>
+<blockquote>
+<p>以上内容中，将公司替换为部门、团队仍然有效。</p>
+</blockquote>
+<h2 id="如何三句话让客户为你的产品花钱"><a href="#如何三句话让客户为你的产品花钱" class="headerlink" title="如何三句话让客户为你的产品花钱"></a>如何三句话让客户为你的产品花钱</h2><p>最后顺便提一下产品定位。</p>
+<p>一款产品，如果不能在几句话中讲清楚它的价值，就离失败不远了。智人那可怜的耐心与脑容量，当面对长达几页纸的产品介绍时，显得那么无助。你有且只有一次机会，用三句话，讲清楚产品的价值所在，接下来趁客户的脑细胞兴奋时，再去灌输那些细节。</p>
+<p>这样来说，一款产品也要服务于一个目的。如果定位 TiDB 是一个关系型数据库，那么集成数据湖类的功能就显得很尴尬；而如果定位 TiDB 是一站式的数据处理平台，那么任何可以简化客户数据处理流程的功能都是在服务于这个目的。</p>
+<p>一个需要增加一句话来解释的功能，会让这个产品更尴尬，而不是更强大。</p>
+<p><strong>总结</strong>：P 社加油。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/" rel="prev" title="[C++] 一定要 public 继承 std::enable_shared_from_this">
+      <i class="fa fa-chevron-left"></i> [C++] 一定要 public 继承 std::enable_shared_from_this
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/04/17/tiflash-executor-thread-model/" rel="next" title="TiFlash 执行器线程模型">
+      TiFlash 执行器线程模型 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%8E%A5%E5%8F%A3%E8%AE%BE%E8%AE%A1%E8%A6%81%E8%A1%A8%E8%BE%BE%E6%B8%85%E6%99%B0%E6%98%8E%E7%A1%AE%E7%9A%84%E8%AF%AD%E4%B9%89"><span class="nav-number">1.</span> <span class="nav-text">为什么接口设计要表达清晰明确的语义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%80%E6%AC%A1%E4%BB%A3%E7%A0%81%E4%BF%AE%E6%94%B9%EF%BC%88cl-x2F-pr-x2F-commit%EF%BC%89%E8%A6%81%E6%9C%89%E5%94%AF%E4%B8%80%E6%98%8E%E7%A1%AE%E7%9A%84%E6%84%8F%E5%9B%BE"><span class="nav-number">2.</span> <span class="nav-text">为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E4%B8%AD%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E6%A0%91%E7%AB%8B%E8%87%AA%E5%B7%B1%E7%9A%84%E4%BA%BA%E8%AE%BE"><span class="nav-number">3.</span> <span class="nav-text">工作中为什么要树立自己的人设</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E8%AE%A9-OKR-%E5%8F%91%E6%8C%A5%E4%BD%9C%E7%94%A8"><span class="nav-number">4.</span> <span class="nav-text">如何让 OKR 发挥作用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E4%B8%89%E5%8F%A5%E8%AF%9D%E8%AE%A9%E5%AE%A2%E6%88%B7%E4%B8%BA%E4%BD%A0%E7%9A%84%E4%BA%A7%E5%93%81%E8%8A%B1%E9%92%B1"><span class="nav-number">5.</span> <span class="nav-text">如何三句话让客户为你的产品花钱</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

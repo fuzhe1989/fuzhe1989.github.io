@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：C-store: a column-oriented DBMS  TL;DR 本文idea：面向ad-hoc读优化的分布式DBMS。 论证过程：  面向ad-hoc读优化需要： 列存，以提高压缩和扫描效率； 数据直接存成多种排序形式，从而应对ad-hoc查询； 只读事务避免加锁，需要读写分离以及snapshot isolation。   列存需要仔细地编码数据，因此需要区分不同情况编码。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] C-store: a column-oriented DBMS">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/08/13/c-store-a-column-oriented-dbms/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：C-store: a column-oriented DBMS  TL;DR 本文idea：面向ad-hoc读优化的分布式DBMS。 论证过程：  面向ad-hoc读优化需要： 列存，以提高压缩和扫描效率； 数据直接存成多种排序形式，从而应对ad-hoc查询； 只读事务避免加锁，需要读写分离以及snapshot isolation。   列存需要仔细地编码数据，因此需要区分不同情况编码。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-08-13T04:12:32.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.650Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="Columnar">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/08/13/c-store-a-column-oriented-dbms/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] C-store: a column-oriented DBMS | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/c-store-a-column-oriented-dbms/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] C-store: a column-oriented DBMS
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-13 12:12:32" itemprop="dateCreated datePublished" datetime="2020-08-13T12:12:32+08:00">2020-08-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3226595.3226638">C-store: a column-oriented DBMS</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文idea：面向ad-hoc读优化的分布式DBMS。</p>
+<p>论证过程：</p>
+<ol>
+<li>面向ad-hoc读优化需要：<ol>
+<li>列存，以提高压缩和扫描效率；</li>
+<li>数据直接存成多种排序形式，从而应对ad-hoc查询；</li>
+<li>只读事务避免加锁，需要读写分离以及snapshot isolation。</li>
+</ol>
+</li>
+<li>列存需要仔细地编码数据，因此需要区分不同情况编码。</li>
+<li>数据存成projection需要考虑：<ol>
+<li>不同replica可以用不同的projection，这样既满足了安全性，又有机会提高性能；</li>
+<li>anchor table物理上不存在，就需要通过storage key和join index组合多个projection来还原一行数据；</li>
+</ol>
+</li>
+<li>读写分离要考虑：<ol>
+<li>分成WS和RS，这样两者可以用不同的存储结构，分别在写和读上达到最优；</li>
+<li>任意时间的MVCC开销太大，可以把时间分成epoch，一段一段推进；</li>
+<li>需要有一个将WS合并进RS的操作。</li>
+</ol>
+</li>
+<li>考虑到C-Store的主要场景是写特别少读特别多，可以：<ol>
+<li>不压缩WS中的数据；</li>
+<li>使用简化的2PC而不需要考虑吞吐问题。</li>
+</ol>
+</li>
+</ol>
+<p>感想：</p>
+<ol>
+<li>学术界的paper画风和工业界的确实不太一样，到处都是idea，但细推敲又觉得缺点什么。</li>
+<li>列存的核心问题就是编码。</li>
+<li>不同replica用不同projection确实是非常棒的idea，但这样要求DB和FS必须耦合在一起，很多情况下不现实。</li>
+<li>关于读写分离的几个idea很棒，MVCC是可以不用那么细粒度的。</li>
+</ol>
+<span id="more"></span>
+
+<h2 id="Abstract"><a href="#Abstract" class="headerlink" title="Abstract"></a>Abstract</h2><p>C-Store是面向读优化的RDBMS，与当前面向写优化的RDBMS截然不同：</p>
+<ul>
+<li>列存 vs 行存</li>
+<li>内存中的数据与磁盘上的数据一样仔细紧凑地编码</li>
+<li>数据保存为若干个互有重叠的列存的projection，而不是传统的table和index</li>
+<li>保证了高可用性和对只读事务的snapshot isolation的非传统的事务实现</li>
+<li>大量结合使用B-tree和bitmap</li>
+</ul>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>传统的OLTP系统按行存，单次写就可以把一行所有字段写到磁盘上，面向写优化。</p>
+<p>ad-hoc查询需要面向读优化的系统。典型如data warehouse，运行模式是批量导入数据，之后长时间的ad-hoc查询。这类系统中使用列存会更高效。C-Store就是这样的系统。</p>
+<p>列存的优势在于，ad-hoc查询通常只需要少量列，使用列存可以只访问少量数据。但读优化的系统与写优化的系统在架构上还有其它区别。</p>
+<p>当前的DBMS通常将数据按字或字节对齐，这样对CPU，但CPU越来越快了，可以按两种方法用CPU换磁盘带宽：</p>
+<ul>
+<li>紧凑编码数据，如用6bit来表示州，而不是2Byte。</li>
+<li>紧凑排列数据，如一列的若干个值连续排列。</li>
+</ul>
+<p>DBMS最好能直接在压缩后的数据上查询，只在需要时解压数据。</p>
+<p>传统RDBMS使用B-tree存储table和index中的数据，这样对OLTP够用了，但在OLAP上不够高效。我们可以使用更高效的针对只读场景的存储结构。</p>
+<p>C-Store将数据保存为若干个projection，每个projection包含一行的部分列，不同的projection可以有相同列，但排序不同。因为每个projection都是排序的，压缩效率会比较高，这样数据保存多份的存储开销不会太大。</p>
+<p>C-Store使用若干台grid机器组成shard-nothing架构，数据分为多个partition保存在不同node上。</p>
+<p>C-Store一份数据会有若干个replica，但目的是高可用，缩短恢复时间，且不同replica可以是不同的projection（只要所有列都被覆盖到了）。这样同时兼顾了读优化和高可用。C-Store可以配置允许最多K个node出问题（目前还只支持K&#x3D;1）。</p>
+<p>一个趋势是data warehouse也需要支持在线写入。但兼顾高效的在线写与ad-hoc查询是非常困难的。C-Store的作法是将存储分为Writeable Store（WS）与Read-optimized Store（RS），通过tuple mover将WS转为RS。</p>
+<p>Insert会发给WS，而Delete会同时发给WS和RS（要在RS中记录）。Update实现为一次Delete加Insert。Tuple mover过程借鉴了LSM的merge，将较小的WS数据与巨大的RS数据作merge生成新的RS（似乎过程中会复制所有数据）。</p>
+<p>为了支持事务而不影响读性能，C-Store对只读事务使用了snapshot isolation，只能读到历史数据。</p>
+<p>最后，面向列存的优化器设计与传统的行存系统也是非常不同的（但我不懂这个领域）。</p>
+<p>C-Store的创新点：</p>
+<ul>
+<li>WS加RS的混合结构，同时支持高效写与读。</li>
+<li>不同replica使用不同projection，查询时可以选择最适合的replica。</li>
+<li>高压缩的列存格式。</li>
+<li>面向列的优化器与执行器。</li>
+<li>足够多的projection可以保证K-safety下的高可用性和高性能。</li>
+<li>使用snapshot isolation以避免2PC和读锁。</li>
+</ul>
+<h2 id="Data-Model"><a href="#Data-Model" class="headerlink" title="Data Model"></a>Data Model</h2><p>C-Store中table只在逻辑上存在，实际存储的只有projection。所有projection都有相同的行数。每个projection都按sort key range分为若干个segment。</p>
+<p>为了能还原table，C-Store使用了两种数据：</p>
+<ul>
+<li>Storage Keys：一个segment内同一行数据的不同列都有着相同的storage key。Storage key实际是这行在这个RS内的编号，因此不需要真的存下来，通过这行的位置就可以计算得到。对应的WS中的storage key保证大于所有RS segment中的storage key。</li>
+<li>Join Indexes：Join index实际是一组index，帮助组合一系列projection的数据，最终得到完整的一行。Join index是segment级别的，格式为<code>&#123;next_projection, sid, storage_key&#125;</code>。</li>
+</ul>
+<blockquote>
+<p>后面大篇幅在讲如何选择一条路径来最小化join得到一行的开销。</p>
+</blockquote>
+<p>因为join index的维护代价比较大，C-Store推荐在实践中选择若干个projection包含全部列。</p>
+<p>为了能确定projection、segment、sort key、join index等该如何分配才能同时满足K-safety和性能，可以先训练C-Store集群，比如记录所有请求并回放。</p>
+<h2 id="RS"><a href="#RS" class="headerlink" title="RS"></a>RS</h2><p>RS中按列分别保存数据，每列中数据都按sort key的顺序排列。</p>
+<h3 id="Encoding-Schemes"><a href="#Encoding-Schemes" class="headerlink" title="Encoding Schemes"></a>Encoding Schemes</h3><p>每列的数据格式按两个维度（是否是sort key、有多少distinct value）分为四种情况：</p>
+<ol>
+<li>是sort key，只有很少distinct value：每个值表示为<code>(v, f, n)</code>，其中v是值，f是v第一次出现的位置，n是出现次数。之后用B-tree索引这些值。</li>
+<li>不是sort key，只有很少distinct value：每个值表示为<code>(v, b)</code>，其中b是bitmap，记录每个值出现的位置，如001101001，预期这个bitmap是稀疏的，可以用RLE编码。为了高效实现查找第i个值的操作，还需要一个B-tree index。</li>
+<li>是sort key，很多distinct value：每列差值编码，之后用B-tree索引这些值。</li>
+<li>不是sort key，很多distinct value：直接保存原始值，用B-tree索引。</li>
+</ol>
+<h3 id="Join-Indexes"><a href="#Join-Indexes" class="headerlink" title="Join Indexes"></a>Join Indexes</h3><p>join index就是一系列<code>(sid, storage_key)</code>，和其它存储没什么区别。</p>
+<h2 id="WS"><a href="#WS" class="headerlink" title="WS"></a>WS</h2><p>为了避免维护两套optimizer，WS也是列存格式，也有projection和join index。WS中storage key是显式分配的（RS中是推算出来的），初始值大于任意一个RS中最大的storage key。</p>
+<p>WS与RS的segment是一一对应的，因此<code>(sid, storage_key)</code>既可能指向RS也可能指向WS。</p>
+<p>WS通常比较小，因此数据不考虑压缩，每个projection直接用B-tree保存数据。</p>
+<h2 id="Storage-Management"><a href="#Storage-Management" class="headerlink" title="Storage Management"></a>Storage Management</h2><p>C-Store使用storage allocator分配segment给各个node，规则是：</p>
+<ul>
+<li>同一个projection的同一个segment的不同列应该分配在一起。</li>
+<li>join index segment应该与sender segment分配在一起。</li>
+<li>对应的WS和RS segment应该分配在一起。</li>
+</ul>
+<p>值比较大的列（若干MB）会单独保存。</p>
+<h2 id="Updates-and-Transaction"><a href="#Updates-and-Transaction" class="headerlink" title="Updates and Transaction"></a>Updates and Transaction</h2><p>一次insert会在每个projection的每列新增一个值，所有这些值有着相同的storage key，这个key是在收到insert的node上分配的。每个node使用unique_id+local_counter来生成全局唯一的storage key。所有node的local counter初始值都大于任意RS的storage key。</p>
+<p>WS目前使用了BerkeleyDB，未来考虑使用大的内存池来降低实际写磁盘的分摊开销。</p>
+<p>C-Store中只读事务使用snapshot isolation，需要指定在low water mark（LWM）到high water mark（HWM）之间的一个effective time。这样只读事务就不需要加锁了。</p>
+<p>Update事务使用传统的2PL。</p>
+<h3 id="Providing-Snapshot-Isolation"><a href="#Providing-Snapshot-Isolation" class="headerlink" title="Providing Snapshot Isolation"></a>Providing Snapshot Isolation</h3><p>对于一个只读事务选择的effective time（ET），一条记录当且仅当它的插入时间小于ET且删除时间大于ET时可见。为了减少空间开销，C-Store使用了epoch，每个epoch是一个固定长度的时间段，每个WS会用insertion vector（IV）保存一个epoch中的所有insert。Tuple mover能保证不会有记录在LWM之后插入RS，所以RS不需要有IV。类似地还有deleted record vector（DRV），每个projection中每个值都对应DRV中的一个值1或0，很明显DRV也可以用RLE编码。DRV也保存在WS中。</p>
+<h4 id="Maintaining-the-High-Water-Mark"><a href="#Maintaining-the-High-Water-Mark" class="headerlink" title="Maintaining the High Water Mark"></a>Maintaining the High Water Mark</h4><p>C-Store定期向每个WS发送epoch+1，之后等所有WS的上一个epoch的请求都处理完，再向每个segment发送HWM&#x3D;epoch。</p>
+<p>C-Store会定期回收epoch以避免溢出，方法类似于TCP等协议。</p>
+<h3 id="Locking-based-Concurrency-Control"><a href="#Locking-based-Concurrency-Control" class="headerlink" title="Locking-based Concurrency Control"></a>Locking-based Concurrency Control</h3><p>C-Store中只有undo log，且实现了一种不严格的2PC（没有prepare），通过timeout实现了死锁检测。</p>
+<h4 id="Distributed-COMMIT-Processing"><a href="#Distributed-COMMIT-Processing" class="headerlink" title="Distributed COMMIT Processing"></a>Distributed COMMIT Processing</h4><p>C-Store中事务通过一个master来分配给各个worker，但没有prepare阶段，当需要commit时，它会等所有worker完成当前任务，然后要求worker commit或abort这个事务。一旦node完成了这个事务，就可以释放锁，删除undo log了。如果有node在需要commit时还没记下来undo log就挂了，它会在recovery阶段通过其它projection恢复状态。</p>
+<h4 id="Transaction-Rollback"><a href="#Transaction-Rollback" class="headerlink" title="Transaction Rollback"></a>Transaction Rollback</h4><p>C-Store记录logical log（statement），这样undo log的体积会远小于phisical log。在abort时它会从尾部开始扫描undo log，然后恢复状态。</p>
+<h3 id="Recovery"><a href="#Recovery" class="headerlink" title="Recovery"></a>Recovery</h3><p>如果node只是挂了，没有数据丢失，它只需要追上所有update就可以了。</p>
+<p>如果node的WS和RS都没了，它需要通过其它projection和join index来恢复数据，其中WS还需要能从其它projection获取IV和DRV。</p>
+<p>如果node的WS没了，但RS还在，只需要恢复WS。</p>
+<h4 id="Efficiently-Recovering-the-WS"><a href="#Efficiently-Recovering-the-WS" class="headerlink" title="Efficiently Recovering the WS"></a>Efficiently Recovering the WS</h4><p>需要恢复的WS要先选择一组覆盖它所有列的projection，这些projection的last tuple move时间早于要恢复的WS（保证IV和DRV完整），然后通过一组SQL获取数据。</p>
+<p>如果没有这样的projection（很罕见），WS要的数据就在其它RS中，可以要求tuple mover在执行时记录log，之后从log中恢复WS数据。</p>
+<h2 id="Tuple-Mover"><a href="#Tuple-Mover" class="headerlink" title="Tuple Mover"></a>Tuple Mover</h2><blockquote>
+<p>与LSM类似，略。</p>
+</blockquote>
+<h2 id="C-Store-Query-Execution"><a href="#C-Store-Query-Execution" class="headerlink" title="C-Store Query Execution"></a>C-Store Query Execution</h2><blockquote>
+<p>略</p>
+</blockquote>
+<h2 id="Performance-Comparison"><a href="#Performance-Comparison" class="headerlink" title="Performance Comparison"></a>Performance Comparison</h2><blockquote>
+<p>略</p>
+</blockquote>
+<h2 id="Related-Work"><a href="#Related-Work" class="headerlink" title="Related Work"></a>Related Work</h2><blockquote>
+<p>略</p>
+</blockquote>
+<h2 id="Conclusions"><a href="#Conclusions" class="headerlink" title="Conclusions"></a>Conclusions</h2><blockquote>
+<p>略</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/Columnar/" rel="tag"># Columnar</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/" rel="prev" title="[笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone">
+      <i class="fa fa-chevron-left"></i> [笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/08/13/explore-the-world-0002/" rel="next" title="随便看看 0002">
+      随便看看 0002 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Abstract"><span class="nav-number">1.</span> <span class="nav-text">Abstract</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">2.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Data-Model"><span class="nav-number">3.</span> <span class="nav-text">Data Model</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RS"><span class="nav-number">4.</span> <span class="nav-text">RS</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Encoding-Schemes"><span class="nav-number">4.1.</span> <span class="nav-text">Encoding Schemes</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Join-Indexes"><span class="nav-number">4.2.</span> <span class="nav-text">Join Indexes</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#WS"><span class="nav-number">5.</span> <span class="nav-text">WS</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Storage-Management"><span class="nav-number">6.</span> <span class="nav-text">Storage Management</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Updates-and-Transaction"><span class="nav-number">7.</span> <span class="nav-text">Updates and Transaction</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Providing-Snapshot-Isolation"><span class="nav-number">7.1.</span> <span class="nav-text">Providing Snapshot Isolation</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Maintaining-the-High-Water-Mark"><span class="nav-number">7.1.1.</span> <span class="nav-text">Maintaining the High Water Mark</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Locking-based-Concurrency-Control"><span class="nav-number">7.2.</span> <span class="nav-text">Locking-based Concurrency Control</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Distributed-COMMIT-Processing"><span class="nav-number">7.2.1.</span> <span class="nav-text">Distributed COMMIT Processing</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Transaction-Rollback"><span class="nav-number">7.2.2.</span> <span class="nav-text">Transaction Rollback</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Recovery"><span class="nav-number">7.3.</span> <span class="nav-text">Recovery</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Efficiently-Recovering-the-WS"><span class="nav-number">7.3.1.</span> <span class="nav-text">Efficiently Recovering the WS</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Tuple-Mover"><span class="nav-number">8.</span> <span class="nav-text">Tuple Mover</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#C-Store-Query-Execution"><span class="nav-number">9.</span> <span class="nav-text">C-Store Query Execution</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Performance-Comparison"><span class="nav-number">10.</span> <span class="nav-text">Performance Comparison</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Related-Work"><span class="nav-number">11.</span> <span class="nav-text">Related Work</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Conclusions"><span class="nav-number">12.</span> <span class="nav-text">Conclusions</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

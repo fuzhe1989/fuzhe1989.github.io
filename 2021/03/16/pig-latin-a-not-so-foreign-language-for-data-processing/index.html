@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Pig Latin: A Not-So-Foreign Language for Data Processing  TL;DR Pig Latin又是一个瞄准了MapReduce表达能力弱点的类SQL语言，它声称“集合了体现SQL精神的高阶查询与类MapReduce的过程式程序”。  关于Pig Latin的逸事：大数据那些事(7)：腾飞的拉丁猪">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Pig Latin: A Not-So-Foreign Language for Data Processing">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Pig Latin: A Not-So-Foreign Language for Data Processing  TL;DR Pig Latin又是一个瞄准了MapReduce表达能力弱点的类SQL语言，它声称“集合了体现SQL精神的高阶查询与类MapReduce的过程式程序”。  关于Pig Latin的逸事：大数据那些事(7)：腾飞的拉丁猪">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/pig-latin-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/pig-latin-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/pig-latin-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/pig-latin-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/pig-latin-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/pig-latin-06.png">
+<meta property="article:published_time" content="2021-03-16T04:29:41.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.659Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="BigData">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-03/pig-latin-02.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Pig Latin: A Not-So-Foreign Language for Data Processing | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Pig Latin: A Not-So-Foreign Language for Data Processing
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-16 12:29:41" itemprop="dateCreated datePublished" datetime="2021-03-16T12:29:41+08:00">2021-03-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1376616.1376726">Pig Latin: A Not-So-Foreign Language for Data Processing</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Pig Latin又是一个瞄准了MapReduce表达能力弱点的类SQL语言，它声称“集合了体现SQL精神的高阶查询与类MapReduce的过程式程序”。</p>
+<blockquote>
+<p>关于Pig Latin的逸事：<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/1OwY353VTfVrPfY2bxhGhA">大数据那些事(7)：腾飞的拉丁猪</a></p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>下面的SQL：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> category, <span class="built_in">AVG</span>(pagerank)</span><br><span class="line"><span class="keyword">FROM</span> urls <span class="keyword">WHERE</span> pagerank <span class="operator">&gt;</span> <span class="number">0.2</span></span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> category <span class="keyword">HAVING</span> <span class="built_in">COUNT</span>(<span class="operator">*</span>) <span class="operator">&gt;</span> <span class="number">100000</span>;</span><br></pre></td></tr></table></figure>
+
+<p>在Pig Latin中写成：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">good_urls = FILTER urls BY pagerank &gt; 0.2;</span><br><span class="line">groups = GROUP good_urls BY category;</span><br><span class="line">big_groups = FILTER groups BY COUNT(good_urls) &gt; 100000;</span><br><span class="line">output = FOREACH big_groups GENERATE category, AVG(good_urls.pagerank);</span><br></pre></td></tr></table></figure>
+
+<p>Pig Latin写起来比MapReduce更容易，表达能力更强，而又比SQL更过程化，更容易手动优化。</p>
+<p>Pig Latin内建对GROUP BY、FILTER、FOREACH、COUNT等操作的支持允许它的编译器和runtime对query plan进行深度优化，如果这些操作都藏在mapper和reducer内部，就没办法做这些优化了。</p>
+<p>SQL在这方面有比较大的优势，相同的query可以被解释为非常不同的plan，充分发挥声明式语言的优势。但同时用户一方面可能没办法很好预测最终的执行plan，缺乏掌控感，另一方面很多时候query optimizer无法生成最优的plan，要么因为人掌握的信息无法输入进去，要么因为optimizer能力不足。而这是Pig Latin的优势。</p>
+<p>Pig Latin的其它优点包括：</p>
+<ol>
+<li>支持嵌套类型（map、set、tuple）。</li>
+<li>支持Java的UDF。</li>
+<li>支持in-situ ad-hoc query，可以直接操作无schema的文件：<code>good_urls = FILTER urls BY $2 &gt; 0.2;</code>。</li>
+</ol>
+<h2 id="Details"><a href="#Details" class="headerlink" title="Details"></a>Details</h2><p>Pig Latin支持以下四种数据类型：</p>
+<ul>
+<li><p>atom：单个值，<code>&#39;alice&#39;</code>。</p>
+</li>
+<li><p>tuple：一组可以类型不同的值（还可以嵌套），<code>(&#39;alice&#39;, &#39;lakers&#39;)</code>。</p>
+</li>
+<li><p>bag：一组可以重复的tuple，不要求所有tuple有相同的field和元素数量。</p>
+<p>  <img src="/images/2021-03/pig-latin-02.png"></p>
+</li>
+<li><p>map：一组key-value对，其中key必须是atom，value可以是任意类型。</p>
+<p>  <img src="/images/2021-03/pig-latin-03.png"></p>
+</li>
+</ul>
+<p>下表是Pig Latin的表达式类型。</p>
+<p><img src="/images/2021-03/pig-latin-01.png"></p>
+<p>Pig Latin中通过<code>LOAD</code>来导入数据：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">queries = LOAD &#x27;query_log.txt&#x27;</span><br><span class="line">          USING myLoad()</span><br><span class="line">          AS (userId, queryString, timestamp);</span><br></pre></td></tr></table></figure>
+
+<p>queries的类型是bag。上面的<code>USING</code>和<code>AS</code>是可选的。注意整个Pig Latin的执行是lazy的，直到数据需要被输出（如<code>STORE</code>）的时候，<code>LOAD</code>等指令才会真正执行。</p>
+<p>Pig Latin中的<code>FOREACH</code>类似于<code>map</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">expanded_queries = FOREACH queries GENERATE</span><br><span class="line">                   userId, FLATTEN(expandQuery(queryString)）;</span><br></pre></td></tr></table></figure>
+
+<p>expanded_queries的类型也是bag。</p>
+<p>可以用<code>FLATTEN</code>来平铺嵌套类型（看起来像<code>CROSS JOIN</code>）：</p>
+<p><img src="/images/2021-03/pig-latin-04.png"></p>
+<p><code>FILTER</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">real_queries = FILTER queries BY userId neq &#x27;bot&#x27;;</span><br></pre></td></tr></table></figure>
+
+<p><code>COGROUP</code>会将不同set的数据按各自的group key做切分，再分别合并，与<code>JOIN</code>的区别在于它不会有一个product效果，如以下两个bag：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">results: (queryString, url, position)</span><br><span class="line">revenue: (queryString, adSlot, amount)</span><br></pre></td></tr></table></figure>
+
+<p>的<code>COGROUP</code>为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">grouped_data = COGROUP results BY queryString,</span><br><span class="line">                       revenue BY queryString;</span><br></pre></td></tr></table></figure>
+
+<p><img src="/images/2021-03/pig-latin-05.png"></p>
+<p><code>COGROUP</code>是Pig Latin与SQL之间的关键差异，前者会保留嵌套结构，而后者则产生平铺的relation。对大数据处理而言，前者更易于做二次处理。</p>
+<p><code>GROUP</code>是<code>COGROUP</code>在只有一个data set时的特例。</p>
+<p><code>JOIN</code>则是<code>COGROUP</code>后再进一步做cross-product+flatten，算是语法糖。</p>
+<p>此外Pig Latin支持的命令还包括：</p>
+<ul>
+<li><code>UNION</code>。</li>
+<li><code>CORSS</code>：多个bag的corss-product。</li>
+<li><code>DISTINCT</code>。</li>
+</ul>
+<p>Pig Latin还支持<code>FOREACH</code>中嵌套子查询（只支持<code>FILTER</code>、<code>ORDER</code>、<code>DISTINCT</code>）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">grouped_revenue = GROUP revenue BY queryString;</span><br><span class="line">query_revenue = FOREACH grouped_revenue &#123;</span><br><span class="line">    top_slot = FILTER revenue BY adSlot eq &#x27;top&#x27;;</span><br><span class="line">    GENERATE queryString, SUM(top_slot.amount), SUM(revenue.amount);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最终输出结果的命令是<code>STORE</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">STORE query_revenues INTO &#x27;myoutput&#x27; USING myStore();</span><br></pre></td></tr></table></figure>
+
+<h2 id="Implementation"><a href="#Implementation" class="headerlink" title="Implementation"></a>Implementation</h2><p>Pig Latin下面的运行时称为Pig。Pig支持多种执行引擎，默认Hadoop，此时整个plan会被编译为若干个MapReduce job：</p>
+<p><img src="/images/2021-03/pig-latin-06.png"></p>
+<p>（细节不说了，和<a href="2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/">MapReduceMerge</a>、<a href="/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines">FlumeJava</a>等都差不多）</p>
+<p>Pig Latin中bag会被延迟物化，甚至在求<code>COUNT</code>、<code>SUM</code>、<code>AVG</code>以及一些分布函数时，bag不会真的被物化出来。Pig Latin也会做两阶段聚合来减少聚合开销。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/BigData/" rel="tag"># BigData</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/13/one-size-fits-all-part2-benchmarking-results/" rel="prev" title="[笔记] One Size Fits All? - Part 2: Benchmarking Results">
+      <i class="fa fa-chevron-left"></i> [笔记] One Size Fits All? - Part 2: Benchmarking Results
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/16/consensus-on-transaction-commit/" rel="next" title="[笔记] Consensus on Transaction Commit">
+      [笔记] Consensus on Transaction Commit <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Details"><span class="nav-number">2.</span> <span class="nav-text">Details</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Implementation"><span class="nav-number">3.</span> <span class="nav-text">Implementation</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：AnalyticDB: Real-time OLAP Database System at Alibaba Cloud  TL;DR AnalyticDB（以下简称ADB）是一种支持复杂ad-hoc查询的实时分析系统。 ADB的主要特点：  读写节点分离，之间通过pangu异步交换数据，或通过RPC同步交换数据。优点是可以避免相互影响，缺点是高数据可见性就会有一定的性能损失。 索引功能强大">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] AnalyticDB: Real-time OLAP Database System at Alibaba Cloud">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：AnalyticDB: Real-time OLAP Database System at Alibaba Cloud  TL;DR AnalyticDB（以下简称ADB）是一种支持复杂ad-hoc查询的实时分析系统。 ADB的主要特点：  读写节点分离，之间通过pangu异步交换数据，或通过RPC同步交换数据。优点是可以避免相互影响，缺点是高数据可见性就会有一定的性能损失。 索引功能强大">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-01.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-02.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-03.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-04.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-05.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-06.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-11.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-07.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-08.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-09.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-12.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-13.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/adb-13.jpg">
+<meta property="article:published_time" content="2020-11-24T08:12:02.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.650Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLAP">
+<meta property="article:tag" content="Alibaba">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-11/adb-01.jpg">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] AnalyticDB: Real-time OLAP Database System at Alibaba Cloud | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] AnalyticDB: Real-time OLAP Database System at Alibaba Cloud
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-24 16:12:02" itemprop="dateCreated datePublished" datetime="2020-11-24T16:12:02+08:00">2020-11-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3352063.3352124">AnalyticDB: Real-time OLAP Database System at Alibaba Cloud</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>AnalyticDB（以下简称ADB）是一种支持复杂ad-hoc查询的实时分析系统。</p>
+<p>ADB的主要特点：</p>
+<ul>
+<li>读写节点分离，之间通过pangu异步交换数据，或通过RPC同步交换数据。优点是可以避免相互影响，缺点是高数据可见性就会有一定的性能损失。</li>
+<li>索引功能强大：<ul>
+<li>全量数据中所有列都有索引，增量数据也有简单的索引。</li>
+<li>运行期可以基于选择率跳过部分索引，不会因过度使用索引而导致性能下降。</li>
+<li>索引类型丰富，string、int、JSON、向量等类型的列都可以建索引，还可以创建全文搜索索引。</li>
+</ul>
+</li>
+<li>仔细设计过的列存格式。</li>
+<li>使用MapReduce做全量数据的compaction。</li>
+</ul>
+<p>这篇文章中有些细节看得不是很明白，以下内容部分来自脑补。</p>
+<p>总体感觉ADB的性能确实好。缺点是可能成本会比较高，索引的构建过程的计算开销与所有列的索引对应的存储开销都挺高的。存储开销可以通过更好的编码和压缩来控制，但会导致计算开销更高，这样base compaction时间会更长，常规路径的数据可见性会受到一些影响。</p>
+<p>如果将compaction分成更多级别，一步步提高优化等级，优点是数据可见性比较好，缺点是第一次compaction时如果还是要为每列都建索引，则优化不够的话存储开销大，或者读开销也会大。而通常query都会更倾向于读近期的数据，相当于大多数query都只享受到了低优化等级。</p>
+<p>本质上数据可见性与优化就是矛盾的，没有万能药，只能靠工程上的tradeoff。</p>
+<span id="more"></span>
+
+<h2 id="相关工作"><a href="#相关工作" class="headerlink" title="相关工作"></a>相关工作</h2><p>这部分对比了ADB与其它产品。</p>
+<ul>
+<li>OLTP，如MySQL、PostgreSQL，使用行存、B+树、写路径更新索引，这些是不利于分析的特性。</li>
+<li>OLAP。Vertica是列存，但不支持传统的索引，只记录Min&#x2F;Max值等信息，剪枝不顺利时查询延时高。Teradata和Greenplum是列存，支持用户指定要建索引的列，但有两点不足：写路径更新索引；列存格式点查性能不够。</li>
+<li>批处理系统，像Hive、SparkSQL这样的系统一次查询时间太长；Impala使用列存和pipeline，将查询延时减少到了秒级，但只有列的统计信息，没有索引，不善于处理复杂查询。</li>
+<li>实时OLAP。Druid和Pinot都使用列存和基于bitmap的倒排索引。Pinot在全部列上都有索引。Druid只在维度列上有索引，因此遇到非维度列上的条件时就很慢。两个系统都在写路径上更新索引，欠缺对JOIN、UPDATE、DELETE的支持，点查性能都不好。</li>
+<li>云产品。Redshift使用了列存和MPP架构，ADB的优点是读写节点分离。BigQuerry是列存加树形执行，没有索引，而ADB有丰富的索引，DAG执行。</li>
+</ul>
+<h2 id="建表与分区"><a href="#建表与分区" class="headerlink" title="建表与分区"></a>建表与分区</h2><p>ADB支持标准的DDL：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> db_name.table_name (</span><br><span class="line">    id <span class="type">int</span>,</span><br><span class="line">    city <span class="type">varchar</span>,</span><br><span class="line">    dob <span class="type">date</span>,</span><br><span class="line">    <span class="keyword">primary</span> key (id)</span><br><span class="line">)</span><br><span class="line"><span class="keyword">PARTITION</span> <span class="keyword">BY</span> HASH KEY(id)</span><br><span class="line"><span class="keyword">PARTITION</span> NUM <span class="number">50</span></span><br><span class="line">SUBPARTITION <span class="keyword">BY</span> LIST (dob)</span><br><span class="line">SUBPARTITION OPTIONS (available_partition_num <span class="operator">=</span> <span class="number">12</span>);</span><br></pre></td></tr></table></figure>
+
+<p>每张表可以有两级分区，其中primary partition只支持哈希。subpartition通常是有时间属性的列，用于做数据自动淘汰——一旦subpartition数量超过配置值，最老的会被整个淘汰掉。</p>
+<p>（看起来每张表的分区是静态分区的，这篇文章没有提到如何做resharding和schema change）</p>
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p><img src="/images/2020-11/adb-01.jpg"></p>
+<p>ADB的构架底座是标准的阿里云飞天三件套，即Fuxi用于调度，Pangu用于分布式存储，Nuwa用于分布式锁（图里没有，猜测后面出现的ZK实际指的是Nuwa）。在其上是ADB的三类节点：coordinators、write nodes、read nodes。其中读写节点是物理分离的。</p>
+<p>ADB中数据是以page（column block）为单位流动的，整个处理过程是pipeline的。</p>
+<p><img src="/images/2020-11/adb-02.jpg"></p>
+<h3 id="写节点"><a href="#写节点" class="headerlink" title="写节点"></a>写节点</h3><p>写节点中会选出一个master负责调度分区。coordinator接到请求后会转发给对应的写节点。写节点会先将数据写进memory buffer，再批量刷到pangu上，然后将对应的version（log sequence number）返回给coordinator。这个过程产生的pangu file是log file。</p>
+<p>一旦log file变多，ADB会启动base compaction，将所有log file和原本的data file、index、 file合并变成新的data file和index file。</p>
+<h3 id="读节点"><a href="#读节点" class="headerlink" title="读节点"></a>读节点</h3><p>每个读节点会被coordinator按哈希值分配若干个partition（疑问1：哪个coordinator，是每个DB有自己的coordinator，还是所有读节点也有一个leader？疑问2：普通哈希还是一致性哈希？有coordinator的话可能更像是普通哈希，那如何解决节点加入离开的扰动？）</p>
+<p><img src="/images/2020-11/adb-03.jpg"></p>
+<p>这种分配方式避免了equi join时的数据重分布（ADB表示超过80%）。</p>
+<p>同一个partition可能会被分配给多个读节点，从而保证了可靠性。</p>
+<p>读节点会从pangu加载全量数据，之后从写节点定期拉增量数据，再更新到本地SSDCache中。这么做的好处是不需要与写节点同步（compaction后会重新载入全量和增量数据吗？）。</p>
+<p>读节点支持两种数据可见性：real-time会去写节点拉数据，保证写完立即可读，但开销大；bounded-staleness只读本地数据，开销低，但看不见新写的数据，其数据延时最大为拉取增量数据的间隔。</p>
+<p>为了不影响读延时，ADB中写节点可以主动将数据推给对应的读节点。如果读节点拉数据失败，它可以直接从pangu上读取log file并应用到本地cache上。</p>
+<p><img src="/images/2020-11/adb-04.jpg"></p>
+<h3 id="集群管理"><a href="#集群管理" class="headerlink" title="集群管理"></a>集群管理</h3><p>在Fuxi之上，ADB构建了一个管理模块，称为Gallardo，负责分配节点给物理机器。（看起来每当有新DB创建时，就会有新节点，因此这三类节点是在DB间隔离的）</p>
+<h2 id="存储"><a href="#存储" class="headerlink" title="存储"></a>存储</h2><p>ADB中数据文件分为若干个row group（每3万行），每个row group内每列数据是一个data block，这样兼顾了列存的扫描效率与行存的点查效率。</p>
+<p><img src="/images/2020-11/adb-05.jpg"></p>
+<p>复杂类型（如JSON和向量）的每个值可能很长，ADB采用了另一种方式。每个复杂类型列的数据会单独写进一个文件，里面分为若干个32KB的FBlock，这样data block中只需要记FBlock的索引和行范围，就把变长数据转为定长了。一行可能特别大，可能跨FBlock。</p>
+<p><img src="/images/2020-11/adb-06.jpg"></p>
+<p>数据文件的元数据也被保存为了单独的文件，且默认缓存在内存中，如Figure 6。</p>
+<p>元数据文件包含了列的统计信息，如MIN&#x2F;MAX、NULL数量、cardinality、SUM、字典、block map等。</p>
+<p>读节点会为增量数据生成简单的sorted index，即按数据值排序的row_id数组（目测row_id是每个分区自己产生的自增ID）。</p>
+<p><img src="/images/2020-11/adb-11.jpg"></p>
+<p>每个data block有3万行，每个row_id占2B（short），则每个sorted index block占60KB。sorted index block会和增量数据一起写进读节点的cache，而不进pangu。</p>
+<p>另外读节点还会维护一个bitmap，记录哪些row_id被删除了。这个bitmap是分段copy on write的，因此读不需要加锁。</p>
+<p><img src="/images/2020-11/adb-07.jpg"></p>
+<p>在做全量compaction时，当前的增量数据会被freeze，与全量数据一起由MapReduce任务转换为新的全量数据。</p>
+<p><img src="/images/2020-11/adb-08.jpg"></p>
+<h2 id="索引管理"><a href="#索引管理" class="headerlink" title="索引管理"></a>索引管理</h2><p>ADB中所有索引都是局部索引。每列都有倒排索引，索引值为row_id数组。每个索引单独保存为一个文件。在查询的时候从存储层出去的就只是row_id了。</p>
+<p><img src="/images/2020-11/adb-09.jpg"></p>
+<p>为了避免过度使用索引导致的性能损失，ADB会在查询时按每个索引的选择率从低到高排序，依次执行。如果应用了某个索引后，整个节点的选择率已经低过阈值了，后面的索引就会被跳过，直接根据当前已经拿到的row_id的原始值进行过滤。</p>
+<p>在处理JSON类型的值时，ADB会把JSON整个拍平，如<code>&#123;id, product_name, properties &#123;color, size&#125;&#125;</code>会被分为<code>id</code>、<code>product_name</code>、<code>properties.color</code>、<code>properties.size</code>四列保存。这个JSON列的所有子列索引会被保存在一个文件中。（但没说怎么处理JSON数组，猜测要么按Dremel的方式，要么不为数组建索引）</p>
+<p>ADB也支持全文索引和向量索引（不太懂，跳过）。</p>
+<p>在实际保存索引时，ADB会自适应使用bitmap或int数组。用户也可以显式关闭某些列的索引以节省空间。</p>
+<p>读节点上除了会缓存索引数据外，还会缓存query条件。通常开销大的query会被反复执行，命中率高，而命中率低的query通常比较轻量，或对延时敏感低，因此不命中也没关系。</p>
+<h2 id="优化器"><a href="#优化器" class="headerlink" title="优化器"></a>优化器</h2><p>ADB中的优化策略分为CBO（基于开销）和RBO（基于规则）。规则包括：</p>
+<ul>
+<li>基础优化：<ul>
+<li>剪枝</li>
+<li>下推&#x2F;合并算子</li>
+<li>去重</li>
+<li>常量折叠</li>
+<li>谓词推导</li>
+</ul>
+</li>
+<li>针对不同join（broadcast hash join、redistributed hash join、index join等）、聚合、join重排列、groupby下推、excahnge下推、sort下推等的探测优化</li>
+<li>高级优化（如公共表表达式Common Table Expression）</li>
+</ul>
+<p>除了这些，ADB还有两种优化技术，存储感知优化（storage-aware optimization），以及实时采样。</p>
+<h3 id="存储感知优化"><a href="#存储感知优化" class="headerlink" title="存储感知优化"></a>存储感知优化</h3><p>在下推谓词时，主要工作在于判断哪些是要下推到存储层，哪些留在计算层。其它系统通常只能下推单列的<code>AND</code>的谓词，而没办法下推函数和join。</p>
+<p>ADB引入了STARs框架来做谓词下推，它可以把存储引擎的能力抽象为一种关系代数能处理的概念，从而可以将计算层和存储层的开销统一起来做下推优化。</p>
+<p><img src="/images/2020-11/adb-12.jpg"></p>
+<p>在下推join时，前文介绍了ADB将相同哈希值的partition分配给同一个读节点，这样equi join就不需要传输数据了。对于不满足这一条件的join，ADB会从存储层获取到两张表的大小，以决定最高效的传输方式。</p>
+<p>如果参与join的列大多数都是partition列且有索引，那么ADB会将hash join转为LeftDeepTree形状的lookup join。ADB还会将很多算子下推到索引中，如<code>count</code>等。</p>
+<p><img src="/images/2020-11/adb-13.jpg"></p>
+<h3 id="实时采样"><a href="#实时采样" class="headerlink" title="实时采样"></a>实时采样</h3><p>传统的实时收集统计信息的方式不适合ADB的低延时需求。ADB会根据多种规则，定期发送采样请求给存储层来计算cardinality等统计信息。</p>
+<h2 id="执行器"><a href="#执行器" class="headerlink" title="执行器"></a>执行器</h2><p>ADB的执行器是面向列的（不会过早组装行），以DAG形式执行，执行过程是向量化的。</p>
+<p>ADB使用了ANTLR ASM来做代码生成，不同机器可以生成不同的代码，如是否使用SIMD指令（包括AVX512）。</p>
+<p>计算层和存储层之间的协议使用不需要反序列化的二进制格式。</p>
+<h2 id="评估"><a href="#评估" class="headerlink" title="评估"></a>评估</h2><p>（只是一些摘要）</p>
+<p><img src="/images/2020-11/adb-13.jpg"></p>
+<p>ADB和Greenplum的索引构建对比。ADB时间更长，但存储空间更小，且不影响在线请求。</p>
+<p>Greenplum的索引不支持ORDER BY，遇到了会变成full scan。</p>
+<p>Druid可以根据时间排除掉不要的partition，但剩余的partition仍然会遇到非维度列没有索引的问题。且Druid只对字符串建索引。</p>
+<p>Greenplum会使用hash join，有构造HashMap的开销，因此比ADB慢。</p>
+<p>ADB的查询性能不怎么受到表大小的影响，严重受到索引计算和参与的行数的影响。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLAP/" rel="tag"># OLAP</a>
+              <a href="/tags/Alibaba/" rel="tag"># Alibaba</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/11/21/druid-a-real-time-analytical-data-store/" rel="prev" title="[笔记] Druid: A real-time analytical data store">
+      <i class="fa fa-chevron-left"></i> [笔记] Druid: A real-time analytical data store
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/11/25/alibaba-hologres-a-cloud-native-service-for-hybrid-serving-analytical-processing/" rel="next" title="[笔记] Alibaba Hologres: A Cloud-Native Service for Hybrid Serving/Analytical Processing">
+      [笔记] Alibaba Hologres: A Cloud-Native Service for Hybrid Serving/Analytical Processing <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E5%B7%A5%E4%BD%9C"><span class="nav-number">1.</span> <span class="nav-text">相关工作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BB%BA%E8%A1%A8%E4%B8%8E%E5%88%86%E5%8C%BA"><span class="nav-number">2.</span> <span class="nav-text">建表与分区</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84"><span class="nav-number">3.</span> <span class="nav-text">架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E8%8A%82%E7%82%B9"><span class="nav-number">3.1.</span> <span class="nav-text">写节点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%BB%E8%8A%82%E7%82%B9"><span class="nav-number">3.2.</span> <span class="nav-text">读节点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9B%86%E7%BE%A4%E7%AE%A1%E7%90%86"><span class="nav-number">3.3.</span> <span class="nav-text">集群管理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AD%98%E5%82%A8"><span class="nav-number">4.</span> <span class="nav-text">存储</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B4%A2%E5%BC%95%E7%AE%A1%E7%90%86"><span class="nav-number">5.</span> <span class="nav-text">索引管理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BC%98%E5%8C%96%E5%99%A8"><span class="nav-number">6.</span> <span class="nav-text">优化器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E6%84%9F%E7%9F%A5%E4%BC%98%E5%8C%96"><span class="nav-number">6.1.</span> <span class="nav-text">存储感知优化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E6%97%B6%E9%87%87%E6%A0%B7"><span class="nav-number">6.2.</span> <span class="nav-text">实时采样</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E5%99%A8"><span class="nav-number">7.</span> <span class="nav-text">执行器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%84%E4%BC%B0"><span class="nav-number">8.</span> <span class="nav-text">评估</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：The Google File System  IntroductionGFS在设计上与传统的文件系统的几个区别：  分布式系统中错误是常态，因此持续监控、错误检测、容错机制、自动恢复都是必要的。 文件普遍非常大，达到GB级别以上，要重新审视对I&#x2F;O操作和块大小的预期。 文件的追加写远多于覆盖写。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] The Google File System">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/09/15/the-google-file-system/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：The Google File System  IntroductionGFS在设计上与传统的文件系统的几个区别：  分布式系统中错误是常态，因此持续监控、错误检测、容错机制、自动恢复都是必要的。 文件普遍非常大，达到GB级别以上，要重新审视对I&#x2F;O操作和块大小的预期。 文件的追加写远多于覆盖写。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-09-15T13:20:10.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.660Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="FileSystem">
+<meta property="article:tag" content="Google">
+<meta property="article:tag" content="DistributedSystem">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/09/15/the-google-file-system/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] The Google File System | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/15/the-google-file-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] The Google File System
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-15 21:20:10" itemprop="dateCreated datePublished" datetime="2020-09-15T21:20:10+08:00">2020-09-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub51.pdf">The Google File System</a></p>
+</blockquote>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>GFS在设计上与传统的文件系统的几个区别：</p>
+<ul>
+<li>分布式系统中错误是常态，因此持续监控、错误检测、容错机制、自动恢复都是必要的。</li>
+<li>文件普遍非常大，达到GB级别以上，要重新审视对I&#x2F;O操作和块大小的预期。</li>
+<li>文件的追加写远多于覆盖写。</li>
+</ul>
+<span id="more"></span>
+
+<h2 id="Design-Overview"><a href="#Design-Overview" class="headerlink" title="Design Overview"></a>Design Overview</h2><h3 id="Assumptions"><a href="#Assumptions" class="headerlink" title="Assumptions"></a>Assumptions</h3><ul>
+<li>整个系统由廉价易坏的硬件组成。</li>
+<li>典型文件大小在100MB以上。支持小文件但不做特殊优化。</li>
+<li>主要有两种读模式，大块顺序读和小块随机读。应用也可以自行将多个随机读排序转化为一次顺序读。</li>
+<li>要支持高效的并发追加写同一个文件。</li>
+<li>高吞吐优先于低延时。</li>
+</ul>
+<h3 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h3><p>一个GFS集群由单master和若干个chunkserver组成。文件由固定大小的chunk组成。</p>
+<p>master负责维护：</p>
+<ul>
+<li>所有metadata，包括namespace、ACL、file到chunk的映射、chunk当前所在的chunkserver。</li>
+<li>全局动作，包括chunk的lease管理和chunk的迁移。</li>
+</ul>
+<p>client的数据读写都直接与chunkserver通信，只在需要metadata时才与master通信。</p>
+<p>client和chunkserver都不缓存数据，前者不需要，后者通过Linux的page cache就可以达到目的了。</p>
+<h3 id="Single-Master"><a href="#Single-Master" class="headerlink" title="Single Master"></a>Single Master</h3><p>单master极大简化了设计，但要非常小心地避免它成为读写路径的瓶颈。client只在第一次访问一个chunk时找master要它的位置，之后会缓存这一信息，直接与对应的chunkserver通信完成读写。</p>
+<h3 id="Chunk-Size"><a href="#Chunk-Size" class="headerlink" title="Chunk Size"></a>Chunk Size</h3><p>GFS的chunk size默认为64MB，远大于传统文件系统的block size。大的chunk size的好处：</p>
+<ul>
+<li>减少了client与master的通信次数。</li>
+<li>client一次在大chunk上完成的操作数会更多，减少了每次与chunkserver建立TCP连接的开销。</li>
+<li>减少了master要维护的metadata。</li>
+</ul>
+<p>但大chunk使小文件经常只有非常少量的chunk，容易成为热点。一个场景是应用先写入一个单chunk的文件，之后大量job同时读取这个文件。解法是给这个文件分配更多的replica，同时应用端在job启动时加一个随机的延迟。</p>
+<h3 id="Metadata"><a href="#Metadata" class="headerlink" title="Metadata"></a>Metadata</h3><p>metadata主要为两类：</p>
+<ul>
+<li>namespace和file-chunk映射，修改会记录在operation log中。</li>
+<li>chunk的位置，不持久化，master启动时和有chunkserver加入时，master主动访问chunkserver得到。</li>
+</ul>
+<h4 id="In-Memory-Data-Structures"><a href="#In-Memory-Data-Structures" class="headerlink" title="In-Memory Data Structures"></a>In-Memory Data Structures</h4><p>master管理的所有metadata都常驻内存，好处略。隐患是chunk太多的话master的内存可能成问题（注：pangu1的常见问题），但相比而言给master机器加内存还是比较容易的。</p>
+<h4 id="Chunk-Locations"><a href="#Chunk-Locations" class="headerlink" title="Chunk Locations"></a>Chunk Locations</h4><p>master通过与chunkserver的心跳获得chunk位置，而不持久化这些信息，原因是：</p>
+<ul>
+<li>持久化的话就要保持master与chunkserver关于chunk位置的一致，考虑到chunkserver的扩缩容、failover、改名等情况，比较复杂。</li>
+<li>chunkserver才拥有chunk位置的最终话语权，比如chunk损坏了等。</li>
+</ul>
+<h4 id="Operation-Log"><a href="#Operation-Log" class="headerlink" title="Operation Log"></a>Operation Log</h4><p>operation log不仅记录事件，还充当一个逻辑时钟。</p>
+<p>checkpoint文件本身组织为B-tree，可以直接mmap到内存中访问。</p>
+<h3 id="Consistency-Model"><a href="#Consistency-Model" class="headerlink" title="Consistency Model"></a>Consistency Model</h3><h4 id="Guarantees-by-GFS"><a href="#Guarantees-by-GFS" class="headerlink" title="Guarantees by GFS"></a>Guarantees by GFS</h4><p>一个文件区域在被修改后，如果所有client从无论哪个replica总是看到相同的状态，称其为一致的；如果不光是一致的，client知道修改后的状态，称其为确定的。</p>
+<p>成功的串行修改总是确定的，成功的并行修改是一致但不确定的，失败的修改是不一致的。</p>
+<p>一次成功的追加写至少会写入一份数据，并返回确定区域的offset。</p>
+<p>GFS通过两点保证多次成功的修改后，被修改的文件区域是确定的，包含最后一次写入的内容：</p>
+<ul>
+<li>所有replica应用相同的修改顺序。</li>
+<li>使用chunk version来标识哪些replica已过期。</li>
+</ul>
+<p>过期的repilca不会参与后续的读写，后面会被gc掉。</p>
+<p>在client的chunk位置的cache过期前，有一个小的时间窗口client可能读到过期数据。但因为过期的replica通常都提前结束了，client会与master通信，从而获取到最新的chunk位置。</p>
+<p>master会在chunk有replica损坏或过期后尽快恢复出一个新的replica，除非非常短时间内所有replica都损坏了，此时数据也只是丢失，而不是写坏了，应用可以得到确定的异常，而不是错误的数据。</p>
+<h4 id="Implications-for-Applications"><a href="#Implications-for-Applications" class="headerlink" title="Implications for Applications"></a>Implications for Applications</h4><ul>
+<li>依赖追加写而不是覆盖写，从而可以只用checkpoint就知道哪块文件区域是确定的。</li>
+<li>记录应用自己的checkpoint，读的时候只读到最新的checkpoint，避免读到那些GFS认为成功写入但应用认为没有的区域。</li>
+<li>数据要能自检验、自识别，能知道哪些记录是无效的或重复的。</li>
+</ul>
+<h2 id="System-Interactions"><a href="#System-Interactions" class="headerlink" title="System Interactions"></a>System Interactions</h2><h3 id="Leases-and-Mutation-Order"><a href="#Leases-and-Mutation-Order" class="headerlink" title="Leases and Mutation Order"></a>Leases and Mutation Order</h3><p>master会为每个chunk挑选一个primary，primary负责决定这个chunk的所有修改的顺序。</p>
+<p>master与primary chunk间的lease默认为60s，但master可以提前结束lease（如禁止修改改名中的文件）。假设master与primary chunk断开了，它可以在当前lease过期后再挑选新的primary。</p>
+<p>client执行一次修改操作的过程（类似于2PC）：</p>
+<ol>
+<li>client找master要chunk对应的replica，此时如果这个chunk没有primary，master会临时授予一个。</li>
+<li>client将数据推给所有replica，不需要考虑顺序。chunkserver会将这些数据缓存在LRU队列中（如果过期了后续会导致请求失败）。</li>
+<li>client向primary发送写请求，primary为所有它收到还未处理的数据分配sequence number，并在本地执行修改。</li>
+<li>primary将写请求转发给所有replica，每个replica按相同顺序执行这些写请求。</li>
+<li>secondary回复primary。</li>
+<li>primary回复client。</li>
+</ol>
+<p>任何replica的失败都会使写请求失败，文件的对应区域此时是不一致的。GFS的client默认会重试请求（如何处理留下来的不一致区域？）。</p>
+<p>如果一次写跨chunk，GFS会将其分为多次写，可能导致并发写的数据交织在一起（追加写）或相互覆盖（覆盖写），即一致但未定义。</p>
+<h3 id="Data-Flow"><a href="#Data-Flow" class="headerlink" title="Data Flow"></a>Data Flow</h3><p>为了充分利用整个集群的网络带宽，数据在不同chunkserver间是串行传输的，每个chunkserver会把数据发送给离自己最近的还没收到数据的chunkserver。这里距离是直接用IP地址计算出来的。</p>
+<h3 id="Atomic-Record-Appends"><a href="#Atomic-Record-Appends" class="headerlink" title="Atomic Record Appends"></a>Atomic Record Appends</h3><p>primary接收到一个atomic append请求时，它先判断当前chunk是否有足够空间，如果没有的话，它会先补全当前chunk，再返回client一个可重试的错误。否则primary先在本地追加，再告诉secondary具体的offset，最后回复client。</p>
+<p>如果任一replica写失败，整个请求就失败了，client重试可能导致不同repilca不完全一致：每个replica上可能写了一次或多次或不完整的记录。GFS不保证每个replica完全一致，它只保证数据至少被原子写入一次。成功的请求表明数据一定在所有replica上写到了相同的offset上；每个replica的数据长度都至少等于这条记录的结束位置，因此任何后续的记录都会写到更高的offset或新chunk上（不会覆盖老数据）。追加写保证会得到确定（因此一致）的结果，而交替的覆盖写则是不一致（因此不确定）的。</p>
+<h3 id="Snapshot"><a href="#Snapshot" class="headerlink" title="Snapshot"></a>Snapshot</h3><p>master收到snapshot请求时，先取消所有涉及到的chunk的lease，保证后续写请求都必须先与master通信。之后master将snapshot记入opeartion log，再复制源文件或文件树的metadata。新创建出来的snapshot文件指向与源文件相同的chunk。</p>
+<p>client后续要写snapshot过的chunk C时，它会先找master，master发现C有多个引用，于是要求所有持有C的replica的chunkserver复制出一个C’，再为C’挑选一个primary，此后的流程与正常写相同。</p>
+<h2 id="Master-Operation"><a href="#Master-Operation" class="headerlink" title="Master Operation"></a>Master Operation</h2><h3 id="Namespace-Management-and-Locking"><a href="#Namespace-Management-and-Locking" class="headerlink" title="Namespace Management and Locking"></a>Namespace Management and Locking</h3><p>GFS没有使用树形结构来维护namespace，而是将所有namespace保存在一个表中，每条记录的key就是完整path，如”&#x2F;d1&#x2F;d2&#x2F;…&#x2F;dn&#x2F;leaf”对应着”&#x2F;d1”、”&#x2F;d1&#x2F;d2”、”&#x2F;d1&#x2F;d2&#x2F;…&#x2F;dn&#x2F;leaf”等一系列key。每条记录对应一个读写锁，在访问一个路径时，要持有它的所有前缀记录的读锁。文件创建不需要持有前缀记录的写锁，只要读锁就足够保证前缀记录不被删除了。</p>
+<p>这一性质的一大优点是它允许在同一目录内并发地修改。</p>
+<h3 id="Replica-Placement"><a href="#Replica-Placement" class="headerlink" title="Replica Placement"></a>Replica Placement</h3><p>chunk的replica位置服务于两个目的：</p>
+<ul>
+<li>最大化数据可靠性和可用性；</li>
+<li>最大化网络带宽利用率。</li>
+</ul>
+<p>因此要将replica分布于不同rack的机器上，从而避免某个rack出问题导致整个chunk数据丢失，也有利于读的时候充分利用整个rack的网络带宽。代价就是写的时候数据要流经多个rack。</p>
+<h3 id="Creation-Re-replication-Rebalancing"><a href="#Creation-Re-replication-Rebalancing" class="headerlink" title="Creation, Re-replication, Rebalancing"></a>Creation, Re-replication, Rebalancing</h3><p>新创建chunk时位置选择的考虑：</p>
+<ul>
+<li>磁盘空闲的chunkserver优先；</li>
+<li>控制每个chunkserver上新创建的chunk不要太多，避免后续流量集中在这个chunkserver上；</li>
+<li>分散在不同rack上。</li>
+</ul>
+<p>一旦master发现某个chunk的replica少了，就会触发re-replication。它的优先级是看replica少了几份，chunk是否活跃，以及是否阻塞了client的请求。</p>
+<p>master定期会做rebalance，但不会直接填满新加入的chunkserver，而是渐进式的。</p>
+<h3 id="Garbage-Collection"><a href="#Garbage-Collection" class="headerlink" title="Garbage Collection"></a>Garbage Collection</h3><p>文件被删除时，master先记录到operation log中，再将文件rename为一个名字包含删除时间戳的隐藏文件。之后master会定期扫描这些文件，删除超过若干天的就被真正删除掉。master给chunkserver的心跳回复中会包含chunkserver持有的哪些chunk需要被删除。</p>
+<p>通过这种异步的、基于状态对比的、批量通知的方式，GFS的回收可以处理多种情况造成的垃圾，简化了流程，也平摊了开销，缺点就是回收延迟比较大。补救措施是，隐藏文件被删除时会立即执行删除、用户可以指定强制删除、用户可以指定某个路径下的文件不参与replication。</p>
+<h3 id="Stale-Replica-Detection"><a href="#Stale-Replica-Detection" class="headerlink" title="Stale Replica Detection"></a>Stale Replica Detection</h3><p>对于每个chunk，master都维护了一个version，每次授予lease时增加，master和replica都会持久化这个version。master如果遇到了比它自己记录的更大的version，可能是master之前failover过了，master会将自己记录的version提升上去；如果遇到了更小的version就会认为这个replica过期了，变成垃圾了。</p>
+<p>master在回复replica位置给client时，也会带上这个version，从而避免client访问过期的replica。</p>
+<h2 id="Fault-Tolerance-and-Diagnosis"><a href="#Fault-Tolerance-and-Diagnosis" class="headerlink" title="Fault Tolerance and Diagnosis"></a>Fault Tolerance and Diagnosis</h2><p>GFS的容量决定了错误是常态。</p>
+<h3 id="High-Availability"><a href="#High-Availability" class="headerlink" title="High Availability"></a>High Availability</h3><h4 id="Fast-Recovery"><a href="#Fast-Recovery" class="headerlink" title="Fast Recovery"></a>Fast Recovery</h4><p>master和chunkserver不区分正常退出和意外退出，都走一样的快速恢复流程。</p>
+<h4 id="Chunk-Replication"><a href="#Chunk-Replication" class="headerlink" title="Chunk Replication"></a>Chunk Replication</h4><ul>
+<li>不同namespace可以有不同的replication level。</li>
+<li>master会尽快复制replica不足的chunk。</li>
+<li>正在探索奇偶校验码、纠删码等其它冗余方案，这是基于GFS追加和读远多于小块随机写的场景的。</li>
+</ul>
+<h4 id="Master-Replication"><a href="#Master-Replication" class="headerlink" title="Master Replication"></a>Master Replication</h4><p>master的修改要等到自身和所有replica的operation log落盘才算提交成功。</p>
+<p>master的replica是shadow而不是mirror，状态可能会落后于primary，但它们也可以提供非最新的读能力。</p>
+<p>shadow replica也会用与primary相同的顺序执行修改，也会从chunkserver获取chunk列表，只有新创建的chunk和被回收的chunk必须从primary处得知。</p>
+<h3 id="Data-Integrity"><a href="#Data-Integrity" class="headerlink" title="Data Integrity"></a>Data Integrity</h3><p>GFS一个集群会有大量磁盘，时常会有磁盘错误，但一一比较每个chunk replica很不现实。而且不同replica也可能不一致。因此chunkserver会通过checksum来校验chunk是否正确。</p>
+<p>chunk的每个block都有checksum，是常驻内存的，读的时候会校验。这对性能的影响非常小，因为对比checksum不会有I&#x2F;O，而计算checksum的开销会被I&#x2F;O平摊掉。client会按block大小对齐读的范围。</p>
+<p>追加写的时候直接基于旧的checksum计算新的checksum。如果之前这个block状态已经不一致了，checksum不对，后续读的时候会发现。</p>
+<p>覆盖写需要读出整个范围的block重新计算checksum。</p>
+<p>chunkserver会在空闲时挑选一些不活跃的chunk校验数据。</p>
+<h1 id="Experiences"><a href="#Experiences" class="headerlink" title="Experiences"></a>Experiences</h1><p>GFS发展过程中遇到的问题：</p>
+<ul>
+<li>后续才增加了权限和配额的支持。</li>
+<li>磁盘驱动版本。</li>
+<li>Linux 2.2的<code>fsync()</code>有性能bug。</li>
+<li>Linux一个进程读写页面时有一个大的读写锁，加载page和通过<code>mmap</code>更新page互斥。后续通过将<code>mmap</code>改为<code>pread</code>解决。</li>
+</ul>
+<blockquote>
+<p>pangu1也是单master，与GFS的区别主要在于：</p>
+<ul>
+<li>似乎没有primary chunk的概念。</li>
+<li>master会记录chunk的长度。</li>
+</ul>
+<p>pangu1中文件分成了LogFile、NormalFile、以及一个可以随机写的File（不记得名字了）。</p>
+<p>NormalFile类似于GFS的File，链式replication，只支持追加写。它的主要的写接口是<code>append()</code>、<code>commit()</code>和<code>truncate()</code>，<code>append</code>写入的数据不会改变master端记录的size，这个是在<code>commit</code>时确定的。当出现写失败时，不同replica可能不一致，此时可以通过<code>truncate</code>到上次<code>commit</code>时的offset来解决这种不一致。对于<code>commit</code>超时的情况，client需要重新打开文件，触发master主动获取各个replica的size。</p>
+<p>LogFile是专门针对小的record设计的类型，星型写，只支持追加写，不需要额外的<code>commit</code>，也不支持<code>truncate</code>。它的size更新逻辑似乎是如果三份都成功，则不立即更新；当写失败时，client需要重新打开文件，触发master主动封存当前chunk，此时master会确认chunk的size。</p>
+<p>master也会在与chunkserver的日常通信过程中确认chunk的size。</p>
+<p>pangu2将单master按功能拆成若干种master node，从而解决了单master内存爆炸的问题。另外不同的文件类型也统一掉了，具体的细节不清楚。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/FileSystem/" rel="tag"># FileSystem</a>
+              <a href="/tags/Google/" rel="tag"># Google</a>
+              <a href="/tags/DistributedSystem/" rel="tag"># DistributedSystem</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/" rel="prev" title="[笔记] OLTP Through the Looking Glass, and What We Found There">
+      <i class="fa fa-chevron-left"></i> [笔记] OLTP Through the Looking Glass, and What We Found There
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/" rel="next" title="[笔记] A comparison of approaches to large-scale data analysis">
+      [笔记] A comparison of approaches to large-scale data analysis <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Design-Overview"><span class="nav-number">2.</span> <span class="nav-text">Design Overview</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Assumptions"><span class="nav-number">2.1.</span> <span class="nav-text">Assumptions</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Architecture"><span class="nav-number">2.2.</span> <span class="nav-text">Architecture</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Single-Master"><span class="nav-number">2.3.</span> <span class="nav-text">Single Master</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Chunk-Size"><span class="nav-number">2.4.</span> <span class="nav-text">Chunk Size</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Metadata"><span class="nav-number">2.5.</span> <span class="nav-text">Metadata</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#In-Memory-Data-Structures"><span class="nav-number">2.5.1.</span> <span class="nav-text">In-Memory Data Structures</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Chunk-Locations"><span class="nav-number">2.5.2.</span> <span class="nav-text">Chunk Locations</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Operation-Log"><span class="nav-number">2.5.3.</span> <span class="nav-text">Operation Log</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Consistency-Model"><span class="nav-number">2.6.</span> <span class="nav-text">Consistency Model</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Guarantees-by-GFS"><span class="nav-number">2.6.1.</span> <span class="nav-text">Guarantees by GFS</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Implications-for-Applications"><span class="nav-number">2.6.2.</span> <span class="nav-text">Implications for Applications</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#System-Interactions"><span class="nav-number">3.</span> <span class="nav-text">System Interactions</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Leases-and-Mutation-Order"><span class="nav-number">3.1.</span> <span class="nav-text">Leases and Mutation Order</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Data-Flow"><span class="nav-number">3.2.</span> <span class="nav-text">Data Flow</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Atomic-Record-Appends"><span class="nav-number">3.3.</span> <span class="nav-text">Atomic Record Appends</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Snapshot"><span class="nav-number">3.4.</span> <span class="nav-text">Snapshot</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Master-Operation"><span class="nav-number">4.</span> <span class="nav-text">Master Operation</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Namespace-Management-and-Locking"><span class="nav-number">4.1.</span> <span class="nav-text">Namespace Management and Locking</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Replica-Placement"><span class="nav-number">4.2.</span> <span class="nav-text">Replica Placement</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Creation-Re-replication-Rebalancing"><span class="nav-number">4.3.</span> <span class="nav-text">Creation, Re-replication, Rebalancing</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Garbage-Collection"><span class="nav-number">4.4.</span> <span class="nav-text">Garbage Collection</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Stale-Replica-Detection"><span class="nav-number">4.5.</span> <span class="nav-text">Stale Replica Detection</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Fault-Tolerance-and-Diagnosis"><span class="nav-number">5.</span> <span class="nav-text">Fault Tolerance and Diagnosis</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#High-Availability"><span class="nav-number">5.1.</span> <span class="nav-text">High Availability</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Fast-Recovery"><span class="nav-number">5.1.1.</span> <span class="nav-text">Fast Recovery</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Chunk-Replication"><span class="nav-number">5.1.2.</span> <span class="nav-text">Chunk Replication</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Master-Replication"><span class="nav-number">5.1.3.</span> <span class="nav-text">Master Replication</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Data-Integrity"><span class="nav-number">5.2.</span> <span class="nav-text">Data Integrity</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Experiences"><span class="nav-number"></span> <span class="nav-text">Experiences</span></a></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

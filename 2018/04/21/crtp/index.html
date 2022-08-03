@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="CRTPC++中有一种很特别的模式，称为Curiously Recurring Template Pattern，缩写是CRTP。从它的名字看，前三个词都是关键字。Curiously，意思是奇特的。Recurring，说明它是递归的。Template，说明它与模板有关。 最常见的CRTP形式就很符合这三个关键字： 12345678template &lt;typename T&gt;class B">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Curiously Recurring Template Pattern(CRTP)">
+<meta property="og:url" content="http://fuzhe1989.github.io/2018/04/21/crtp/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="CRTPC++中有一种很特别的模式，称为Curiously Recurring Template Pattern，缩写是CRTP。从它的名字看，前三个词都是关键字。Curiously，意思是奇特的。Recurring，说明它是递归的。Template，说明它与模板有关。 最常见的CRTP形式就很符合这三个关键字： 12345678template &lt;typename T&gt;class B">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-04-20T16:53:59.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.653Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2018/04/21/crtp/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>Curiously Recurring Template Pattern(CRTP) | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/04/21/crtp/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Curiously Recurring Template Pattern(CRTP)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-04-21 00:53:59" itemprop="dateCreated datePublished" datetime="2018-04-21T00:53:59+08:00">2018-04-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="CRTP"><a href="#CRTP" class="headerlink" title="CRTP"></a>CRTP</h2><p>C++中有一种很特别的模式，称为Curiously Recurring Template Pattern，缩写是CRTP。从它的名字看，前三个词都是关键字。Curiously，意思是奇特的。Recurring，说明它是递归的。Template，说明它与模板有关。</p>
+<p>最常见的CRTP形式就很符合这三个关键字：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base&lt;Derived&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>猛一看这段代码，确实挺奇特的：派生类继承自一个用派生类特化的基类，相当于自己特化了自己。</p>
+<p>这里面应用到了C++模板的一个特性：与模板参数有关的代码的编译会推迟到模板实例化时进行。</p>
+<h2 id="静态多态"><a href="#静态多态" class="headerlink" title="静态多态"></a>静态多态</h2><p>CRTP的第一个用途就是实现静态多态。</p>
+<p>传统的C++中我们想要实现多态首先要有继承和虚函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">int</span> <span class="title">Foo</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">Foo</span><span class="params">()</span> <span class="keyword">override</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>并通过基类的指针或引用来触发多态：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(Base&amp; b)</span> </span>&#123;</span><br><span class="line">    cout &lt;&lt; b.<span class="built_in">Foo</span>() &lt;&lt; endl;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但这套方案有两个问题：</p>
+<ol>
+<li>虚函数会影响类型的内存布局，空间上增加一个虚表指针。</li>
+<li>虚函数调用需要增加一次跳转，增加了运行时开销。</li>
+</ol>
+<p>而用CRTP，我们可以实现编译时的静态多态。在这个方案中，基类负责定义接口，而派生类则负责实现接口：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">Foo</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;T*&gt;(<span class="keyword">this</span>)-&gt;<span class="built_in">Foo</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base&lt;Derived&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">Foo</span><span class="params">()</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这个方案中，基类的<code>Foo()</code>会去调用派生类的<code>Foo()</code>，相当于前者是接口，而后者是实现。</p>
+<p>注意在<code>Base::Foo</code>中，我们为了调用<code>Derived::Foo</code>，需要通过<code>static_cast</code>来显式转换<code>this</code>的类型。为什么这里用<code>static_cast</code>而不是<code>dynamic_cast</code>呢？因为<code>Base</code>自己是不知道<code>T</code>是它的派生类的，因此这里也不应该用<code>dynamic_cast</code>，而因为这里我们没有虚函数，用<code>static_cast</code>也是安全的。</p>
+<p>CRTP方案的优点：</p>
+<ol>
+<li>没有虚函数，不会改变派生类的内存布局，空间上开销更小。</li>
+<li><code>b.Foo()</code>不是虚函数调用，不会增加一次跳转，运行时开销更小。</li>
+<li><code>Base::Foo()</code>甚至可以内联掉，进一步降低了运行时开销。</li>
+<li>模板对接口的要求是“Duck Typing”，比虚函数的要求更低。这个例子中，只要派生类满足有一个public的，名字为<code>Foo</code>，接受0个参数，返回类型可隐式转换为<code>int</code>的函数，就满足了<code>Base</code>的接口要求。</li>
+</ol>
+<p>当然静态多态就导致了<code>Base</code>的不同的派生类实际继承自不同的基类，因此没有办法把它们的指针或引用放到某个容器中。另外，这样每个派生类都会实例化一个基类类型，会导致目标代码多于普通的继承。</p>
+<h2 id="mixin"><a href="#mixin" class="headerlink" title="mixin"></a>mixin</h2><p>CRTP的第二个用途就是为其它类型增加功能，此时CRTP的基类就是一种mixin类型。</p>
+<p>当CRTP用于mixin时，它的写法与静态多态很类似，只不过此时我们要的不是多态，而是新的功能，因此基类与派生类的方法名要不同：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Repeatable</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Repeat</span><span class="params">(<span class="type">int</span> n)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; ++i) &#123;</span><br><span class="line">            <span class="built_in">static_cast</span>&lt;<span class="type">const</span> T*&gt;(<span class="keyword">this</span>)-&gt;<span class="built_in">Foo</span>();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">ZeroPrinter</span> : <span class="keyword">public</span> Repeatable&lt;ZeroPrinter&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Foo</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;0&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们用CRTP为<code>ZeroPrinter</code>增加了一个<code>Repeat</code>功能，此时<code>Repeatable</code>就是一种mixin。而在这个方案中，我们不需要让<code>ZeroPrinter</code>去实现某个接口，去把自己已有的函数改成虚函数。</p>
+<p>而且我们还可以为已经存在的类型增加功能。假如<code>ZeroPrinter</code>是第三方库提供的类型，我们没办法让它继承自<code>Repeatable</code>，那么我们可以增加一种新类型，同时继承<code>ZeroPrinter</code>和<code>Repeatable</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">RepeatableZeroPrinter</span>: <span class="keyword">public</span> ZeroPrinter, <span class="keyword">public</span> Repeatable&lt;RepeatableZeroPrinter&gt; &#123;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>注意，当我们用CRTP来实现mixin时，要注意派生类与基类的函数名不能相同，因为派生类会屏蔽掉基类的名字，而导致我们想增加的功能无法被使用。</p>
+<p>另一个mixin的例子是<code>Counter</code>，我们可以利用<code>Base&lt;T&gt;</code>和<code>Base&lt;R&gt;</code>不是一个类型的特性，为不同的类型增加实例个数的Counter统计的功能。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Counter</span> &#123;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> mObjectsCreated;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> mObjectsAlive;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">Counter</span>() &#123;</span><br><span class="line">        ++mObjectsCreated;</span><br><span class="line">        ++mObjectsAlive;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="built_in">Counter</span>(<span class="type">const</span> Counter&amp;) &#123;</span><br><span class="line">        ++mObjectsCreated;</span><br><span class="line">        ++mObjectsAlive;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">protected</span>:</span><br><span class="line">    <span class="comment">// objects should never be removed through pointers of this type</span></span><br><span class="line">    ~<span class="built_in">Counter</span>() &#123;</span><br><span class="line">        --mObjectsAlive;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt; <span class="type">int</span> Counter&lt;T&gt;::<span class="built_in">mObjectsCreated</span>(<span class="number">0</span>);</span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt; <span class="type">int</span> Counter&lt;T&gt;::<span class="built_in">mObjectsAlive</span>(<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">X</span> : Counter&lt;X&gt; &#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Y</span> : Counter&lt;Y&gt; &#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，<code>X</code>和<code>Y</code>各自通过<code>Counter&lt;X&gt;</code>和<code>Counter&lt;Y&gt;</code>来实现统计功能。</p>
+<h2 id="链式多态"><a href="#链式多态" class="headerlink" title="链式多态"></a>链式多态</h2><p>假设有基类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Printer</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Printer</span><span class="params">(ostream&amp; pstream)</span> : mStream(pstream) &#123;</span>&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function">Printer&amp; <span class="title">Print</span><span class="params">(T&amp;&amp; t)</span> </span>&#123;</span><br><span class="line">        mStream &lt;&lt; t;</span><br><span class="line">        <span class="keyword">return</span> *<span class="keyword">this</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function">Printer&amp; <span class="title">Println</span><span class="params">(T&amp;&amp; t)</span> </span>&#123;</span><br><span class="line">        mStream &lt;&lt; t &lt;&lt; endl;</span><br><span class="line">        <span class="keyword">return</span> *<span class="keyword">this</span>;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    ostream&amp; mStream;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以链式调用：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Printer&#123;myStream&#125;.<span class="built_in">Println</span>(<span class="string">&quot;hello&quot;</span>).<span class="built_in">Println</span>(<span class="number">500</span>);</span><br></pre></td></tr></table></figure>
+
+<p>但派生类就不行：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">CoutPrinter</span> : <span class="keyword">public</span> Printer &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">CoutPrinter</span>() : <span class="built_in">Printer</span>(cout) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">CoutPrinter&amp; <span class="title">SetConsoleColor</span><span class="params">(Color c)</span> </span>&#123; ... <span class="keyword">return</span> *<span class="keyword">this</span>; &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">                             v-- we have a &#x27;Printer&#x27; here, not a &#x27;CoutPrinter&#x27;</span><br><span class="line">CoutPrinter().Print(&quot;Hello &quot;).SetConsoleColor(Color.red).Println(&quot;Printer!&quot;); // compile error</span><br></pre></td></tr></table></figure>
+
+<p>因为<code>print</code>只会返回<code>Printer&amp;</code>。</p>
+<p>用CRTP就可以解决这个问题：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Base class</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> ConcretePrinter&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Printer</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Printer</span><span class="params">(ostream&amp; pstream)</span> : mStream(pstream) &#123;</span>&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function">ConcretePrinter&amp; <span class="title">Print</span><span class="params">(T&amp;&amp; t)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        mStream &lt;&lt; t;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;ConcretePrinter&amp;&gt;(*<span class="keyword">this</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function">ConcretePrinter&amp; <span class="title">Println</span><span class="params">(T&amp;&amp; t)</span></span></span><br><span class="line"><span class="function">    </span>&#123;</span><br><span class="line">        mStream &lt;&lt; t &lt;&lt; endl;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;ConcretePrinter&amp;&gt;(*<span class="keyword">this</span>);</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    ostream&amp; mStream;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="comment">// Derived class</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">CoutPrinter</span> : <span class="keyword">public</span> Printer&lt;CoutPrinter&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">CoutPrinter</span>() : <span class="built_in">Printer</span>(cout) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">CoutPrinter&amp; <span class="title">SetConsoleColor</span><span class="params">(Color c)</span> </span>&#123; ... <span class="keyword">return</span> *<span class="keyword">this</span>; &#125;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="comment">// usage</span></span><br><span class="line"><span class="built_in">CoutPrinter</span>().<span class="built_in">Print</span>(<span class="string">&quot;Hello &quot;</span>).<span class="built_in">SetConsoleColor</span>(Color.red).<span class="built_in">Println</span>(<span class="string">&quot;Printer!&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<h2 id="利用CRTP提供默认Clone"><a href="#利用CRTP提供默认Clone" class="headerlink" title="利用CRTP提供默认Clone"></a>利用CRTP提供默认Clone</h2><p>当要通过基类指针获得对象的拷贝时，通常做法是加个虚的<code>Clone</code>函数，而用CRTP可以避免在每个派生类中重复这个函数，只要派生类允许复制构造即可：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Base class has a pure virtual function for cloning</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Shape</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Shape</span>() &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Shape* <span class="title">Clone</span><span class="params">()</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// This CRTP class implements clone() for Derived</span></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Derived&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Shape_CRTP</span> : <span class="keyword">public</span> Shape &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function">Shape* <span class="title">Clone</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Derived</span>(<span class="built_in">static_cast</span>&lt;Derived <span class="type">const</span>&amp;&gt;(*<span class="keyword">this</span>));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Square</span> : <span class="keyword">public</span> Shape_CRTP&lt;Square&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Circle</span> : <span class="keyword">public</span> Shape_CRTP&lt;Circle&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="摆脱static-cast"><a href="#摆脱static-cast" class="headerlink" title="摆脱static_cast"></a>摆脱<code>static_cast</code></h2><p>上面每个CRTP例子中都有<code>static_cast</code>，我们可以通过一个辅助类来避免每次都直接调用<code>static_cast</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">CRTP</span> &#123;</span><br><span class="line">    <span class="function">T&amp; <span class="title">Underlying</span><span class="params">()</span> </span>&#123; <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;T&amp;&gt;(*<span class="keyword">this</span>); &#125;</span><br><span class="line">    <span class="function">T <span class="type">const</span>&amp; <span class="title">Underlying</span><span class="params">()</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;T <span class="type">const</span>&amp;&gt;(*<span class="keyword">this</span>); &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这样前面的例子就可以写成：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">emplate &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> : <span class="keyword">private</span> CRTP&lt;T&gt;&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">Foo</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>-&gt;<span class="built_in">Underlying</span>().<span class="built_in">Foo</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>注意1：这里要private继承，是因为我们不想把<code>Underlying</code>函数暴露出去。</p>
+<p>注意2：这里为什么要用<code>this-&gt;Underlying()</code>而不是直接使用<code>Underlying()</code>？参见<a href="/2017/09/05/how-to-call-method-of-base-class-in-template/">模板类中如何调用其模板基类中的函数</a>。</p>
+<h2 id="避免继承错误的基类"><a href="#避免继承错误的基类" class="headerlink" title="避免继承错误的基类"></a>避免继承错误的基类</h2><p>当我们写多个CRTP类型时，可能会因为copy&#x2F;paste而不小心继承错基类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Derived1</span> : <span class="keyword">public</span> Base&lt;Derived1&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived2</span> : <span class="keyword">public</span> Base&lt;Derived1&gt; &#123; <span class="comment">// bug in this line of code</span></span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>解法很简单，将<code>Base</code>的构造函数声明为private，并将<code>T</code>设置为友元，这样<code>Derived2</code>根本就没办法调用<code>Base&lt;Derived1&gt;</code>的构造函数，从而制造编译错误：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="built_in">Base</span>()&#123;&#125;;</span><br><span class="line">    <span class="keyword">friend</span> T;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h2 id="避免菱形继承"><a href="#避免菱形继承" class="headerlink" title="避免菱形继承"></a>避免菱形继承</h2><p>想象我们有两个mixin类型，都使用了CRTP来实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Scalable</span> : <span class="keyword">private</span> CRTP&lt;T&gt; &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Scale</span><span class="params">(<span class="type">double</span> multiplicator)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">this</span>-&gt;<span class="built_in">Underlying</span>().<span class="built_in">SetValue</span>(<span class="keyword">this</span>-&gt;<span class="built_in">Underlying</span>().<span class="built_in">GetValue</span>() * multiplicator);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Squarable</span> : <span class="keyword">private</span> CRTP&lt;T&gt; &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Square</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> v = <span class="keyword">this</span>-&gt;<span class="built_in">Underlying</span>().<span class="built_in">GetValue</span>();</span><br><span class="line">        <span class="keyword">this</span>-&gt;<span class="built_in">Underlying</span>().<span class="built_in">SetValue</span>(v * v);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>现在我们把这两个功能加到一个类型上：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Sensitivity</span> : <span class="keyword">public</span> Scalable&lt;Sensitivity&gt;, <span class="keyword">public</span> Squarable&lt;Sensitivity&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">double</span> <span class="title">GetValue</span><span class="params">()</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> mValue; &#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">SetValue</span><span class="params">(<span class="type">double</span> value)</span> </span>&#123; mValue = value; &#125;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">double</span> mValue;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>BOOM！编译错误：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">error: &#x27;CRTP&lt;Sensitivity&gt;&#x27; is an ambiguous base of &#x27;Sensitivity&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>问题出在我们不小心搞出来菱形继承了！</p>
+<ul>
+<li><code>Sensitivity</code> -&gt; <code>Scalable&lt;Sensitivity&gt;</code> -&gt; <code>CRTP&lt;Sensitivity&gt;</code></li>
+<li><code>Sensitivity</code> -&gt; <code>Squarable&lt;Sensitivity&gt;</code> -&gt; <code>CRTP&lt;Sensitivity&gt;</code></li>
+</ul>
+<p>一种解法是将mixin的类型也加到<code>CRTP</code>的模板参数中：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T, <span class="keyword">template</span> &lt;<span class="keyword">typename</span>&gt; <span class="keyword">class</span> <span class="title class_">CrtpType</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">CRTP</span> &#123;</span><br><span class="line">    <span class="function">T&amp; <span class="title">Underlying</span><span class="params">()</span> </span>&#123; <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;T&amp;&gt;(*<span class="keyword">this</span>); &#125;</span><br><span class="line">    <span class="function">T <span class="type">const</span>&amp; <span class="title">Underlying</span><span class="params">()</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;T <span class="type">const</span>&amp;&gt;(*<span class="keyword">this</span>); &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="built_in">CRTP</span>() &#123;&#125;</span><br><span class="line">    <span class="keyword">friend</span> CrtpType&lt;T&gt;;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>注意这里的<code>CrtpType</code>不是普通的模板参数类型，它前面的<code>template</code>说明它本身也是一个模板类型。我们没有直接用到<code>CrtpType</code>，只是用它保证同样的<code>T</code>加上不同的mixin会产生不同的<code>CRTP</code>类型。</p>
+<p>新的<code>Sensitivity</code>的继承关系：</p>
+<ul>
+<li><code>Sensitivity</code> -&gt; <code>Scalable&lt;Sensitivity&gt;</code> -&gt; <code>CRTP&lt;Sensitivity, Scalable&gt;</code></li>
+<li><code>Sensitivity</code> -&gt; <code>Squarable&lt;Sensitivity&gt;</code> -&gt; <code>CRTP&lt;Sensitivity, Squarable&gt;</code></li>
+</ul>
+<p>这样我们只要保证一个类型不要多次集成了同一个mixin，就没问题了。</p>
+<h1 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h1><ul>
+<li><a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern">Curiously recurring template pattern</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.fluentcpp.com/2017/05/12/curiously-recurring-template-pattern/">The Curiously Recurring Template Pattern (CRTP)</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.fluentcpp.com/2017/05/16/what-the-crtp-brings-to-code/">What the Curiously Recurring Template Pattern can bring to your code</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.fluentcpp.com/2017/05/19/crtp-helper/">An Implementation Helper For The Curiously Recurring Template Pattern</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/03/25/cpp-object-model-copy-move/" rel="prev" title="C++对象模型（六）复制与移动">
+      <i class="fa fa-chevron-left"></i> C++对象模型（六）复制与移动
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/04/21/mixin/" rel="next" title="通过mixin组合功能">
+      通过mixin组合功能 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#CRTP"><span class="nav-number">1.</span> <span class="nav-text">CRTP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%99%E6%80%81%E5%A4%9A%E6%80%81"><span class="nav-number">2.</span> <span class="nav-text">静态多态</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#mixin"><span class="nav-number">3.</span> <span class="nav-text">mixin</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%93%BE%E5%BC%8F%E5%A4%9A%E6%80%81"><span class="nav-number">4.</span> <span class="nav-text">链式多态</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%A9%E7%94%A8CRTP%E6%8F%90%E4%BE%9B%E9%BB%98%E8%AE%A4Clone"><span class="nav-number">5.</span> <span class="nav-text">利用CRTP提供默认Clone</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%91%86%E8%84%B1static-cast"><span class="nav-number">6.</span> <span class="nav-text">摆脱static_cast</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%81%BF%E5%85%8D%E7%BB%A7%E6%89%BF%E9%94%99%E8%AF%AF%E7%9A%84%E5%9F%BA%E7%B1%BB"><span class="nav-number">7.</span> <span class="nav-text">避免继承错误的基类</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%81%BF%E5%85%8D%E8%8F%B1%E5%BD%A2%E7%BB%A7%E6%89%BF"><span class="nav-number">8.</span> <span class="nav-text">避免菱形继承</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E9%93%BE%E6%8E%A5"><span class="nav-number"></span> <span class="nav-text">相关链接</span></a></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

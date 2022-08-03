@@ -1,0 +1,593 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Fu Zhe&#39;s Blog</title>
+  
+  
+  <link href="http://fuzhe1989.github.io/atom.xml" rel="self"/>
+  
+  <link href="http://fuzhe1989.github.io/"/>
+  <updated>2022-08-03T13:33:41.315Z</updated>
+  <id>http://fuzhe1989.github.io/</id>
+  
+  <author>
+    <name>Fu Zhe</name>
+    
+  </author>
+  
+  <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>一种通过 skip cache 加速重复查询的方法</title>
+    <link href="http://fuzhe1989.github.io/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/"/>
+    <id>http://fuzhe1989.github.io/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/</id>
+    <published>2022-08-03T13:33:18.000Z</published>
+    <updated>2022-08-03T13:33:41.315Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><p>AP 系统中缓存算子结果是一种很有效的针对重复查询的优化手段。但这种方法严重依赖于结果的不变性，因此并不适用于频繁更新的场景（如 TiFlash）。本文提出一种通过维护运行期的 skip cache，尽可能跳过无效 page 的优化方法，<strong>应该</strong>对这种场景有效。</p><blockquote><p>有 paper 已经讲过这种优化的话求告知。</p></blockquote><span id="more"></span><h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>任何缓存结果的方法，其核心都是要寻找到某种不变的东西。传统的离线数仓系统，其数据更新频率极低，相同 query plan 通常扫过的数据集是不变的。如果 plan 中不存在非幂等的函数&#x2F;算子（通常是这样），则每个算子的结果也是不变的。这是缓存算子结果的基础。</p><p>但在 TiFlash 中，我们需要考虑到用户可能频繁在更新数据，同时 query plan 也很难保证稳定。因此直接缓存算子结果可能并不合适。</p><blockquote><p>虽然但是，有机会还是得搞，见文末。</p></blockquote><p>materialize 这样的实时物化是另一种方案，但计算开销较大。而且人家属于另一个赛道了。我们还是从简单的优化入手。</p><h2 id="从-skip-index-到-skip-cache"><a href="#从-skip-index-到-skip-cache" class="headerlink" title="从 skip index 到 skip cache"></a>从 skip index 到 skip cache</h2><p>Skip index 是 AP 系统非常关键的模块，它的作用是记录每个 page（或者叫 block）的一些 metadata（如 min&#x2F;max 等），在 TableScan 时提前过滤那些不可能包含所需数据的 page，从而节省大量 IO 与计算资源。</p><blockquote><p>为什么 AP 系统通常不使用 secondary index 来加速查询？</p><ol><li>维护 secondary index 的代价是非常高的。</li><li>查询 secondary index 时通常会引入大量随机 I&#x2F;O（无论是读 index 还是回表时）。而 AP 系统可以通过 skip index 跳过大量无效的 page，而对剩余部分进行顺序扫描的效率是非常高的（I&#x2F;O 和 cache 友好）。</li></ol></blockquote><p>skip index 的缺点是它通常只能包含静态数据，一旦遇到复杂一点的表达式就无能为力了（比如 <code>year(a) = 2022</code> 或者 <code>concat(a, b) like &#39;%PingCAP%&#39;</code>)。对于这种复合表达式的 filter，很多系统（如现阶段的 TiFlash）只能无脑扫全表了。</p><p>一种很直接的想法就是，如果我能知道一个表达式是否命中了一个 page，就可以在下次遇到这个表达式时提前排除掉对应的 page，重新让 skip index 生效。显然这种信息是非常动态的，不适合持久化，只能放到内存中。</p><p>方案一：在内存中缓存每个表达式扫描未命中的 page list。</p><p>注意，这个方案中，page 指的是 stable file 中的 page。如前所述，我们要缓存结果，就要找到某种不变的东西。TiFlash 是按 delta 和 stable 来划分数据的，前者变化频繁，后者变化较少，显然我们只能针对 stable 来缓存。恰好，TiFlash 的 skip index 也是只存在于 stable 部分的。</p><p>stable 只是变化不那么频繁，不代表它永远不变。方案一要保证不能跳过新生成的 page，就要记录未命中的 page list，将所有新 page 视为可能命中。这对方案的实现提出了要求：</p><ol><li>能识别哪些 page 是在缓存更新之后生成的。通常记录某种单调增的 version 即可。</li><li>每个 page 要有稳定的唯一标识，即新 page 不能重用老 page 的标识。这个可以用 fileid+pageid 来实现。</li></ol><p>skip cache 可以用 LRU 或 LFU 等策略管理。</p><h2 id="降低内存占用"><a href="#降低内存占用" class="headerlink" title="降低内存占用"></a>降低内存占用</h2><p>方案一的缺点是当 page 很多时，内存占用较高。我们需要有办法将 page list 占用的空间降下来。我们可以将 page list 替换为 bloomfilter，后者通过引入适量的 false positive 来降低空间占用。</p><blockquote><p>另一种类似的结构是 cuckoo filter。</p></blockquote><p>但换用 bloomfilter 之后，我们就要将方案一中记录未命中的 page list 改为记录命中的 page list 了，否则 false positive 会导致有 page 被错误地跳过。</p><p>方案二：在内存中缓存每个表达式扫描命中的 page list 对应的 bloomfilter。</p><p>同样地，方案二也要求显式处理新生成的 page。</p><h2 id="在分布式-plan-中寻找不变量"><a href="#在分布式-plan-中寻找不变量" class="headerlink" title="在分布式 plan 中寻找不变量"></a>在分布式 plan 中寻找不变量</h2><p>上面的方案只是针对单个 TableScan 算子。接下来我想做点不成熟的探讨。</p><p>我们知道分布式 plan 对各种结果 cache 都不太友好：</p><ol><li>数据可能更新，而 planner 很难及时知道这点。</li><li>数据分布可能变化，同上。</li><li>参与计算的节点可能变化。</li></ol><p>但总还是有些不变量存在的，我们要做的就是充分地将其挖掘出来。</p><p>对于 TiFlash 而言：</p><ol><li>首先 planner 要能知道 query 是否存在缓存。如果做得好的话，可以针对 subplan 设置缓存。</li><li>接下来，planner 是知道这次需要扫描的 region list 的，它需要知道从上次请求到当前 tso，这期间哪些 region 数据没有发生变化。</li><li>接下来，针对这些没有变化过的 region，自底向上计算每个算子的输入是否可能发生变化。</li><li>接下来，计算每个 task 命中缓存的收益，从而决定要不要生成相同的 task 且分发给相同的 node。</li></ol><p>即使如此，如果算子产生的数据过多的话，需要将其物化才能重复利用，开销一下子就上去了。</p><p>从上述内容可以看出，想用上算子的缓存还是不太容易的。</p>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;AP 系统中缓存算子结果是一种很有效的针对重复查询的优化手段。但这种方法严重依赖于结果的不变性，因此并不适用于频繁更新的场景（如 TiFlash）。本文提出一种通过维护运行期的 skip cache，尽可能跳过无效 page 的优化方法，&lt;strong&gt;应该&lt;/strong&gt;对这种场景有效。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;有 paper 已经讲过这种优化的话求告知。&lt;/p&gt;
+&lt;/blockquote&gt;</summary>
+    
+    
+    
+    
+  </entry>
+  
+  <entry>
+    <title>C++ 变参宏的两个技巧</title>
+    <link href="http://fuzhe1989.github.io/2022/08/01/cpp-variadic-macro-tips/"/>
+    <id>http://fuzhe1989.github.io/2022/08/01/cpp-variadic-macro-tips/</id>
+    <published>2022-08-01T13:22:09.000Z</published>
+    <updated>2022-08-03T11:39:58.051Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><blockquote><p>小朋友不要乱学</p></blockquote><ol><li>基于参数数量重载宏函数。</li><li>当 <code>__VA_ARGS__</code> 为空时，忽略多余的逗号。</li></ol><span id="more"></span><h2 id="基于参数数量重载宏函数"><a href="#基于参数数量重载宏函数" class="headerlink" title="基于参数数量重载宏函数"></a>基于参数数量重载宏函数</h2><blockquote><p>参考这个回答：<a href="https://stackoverflow.com/questions/11761703/overloading-macro-on-number-of-arguments">Overloading Macro on Number of Arguments</a></p></blockquote><p>大概套路就是：</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">f0</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f1</span><span class="params">(<span class="type">int</span> a)</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f2</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b)</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f3</span><span class="params">(<span class="type">int</span> a, <span class="type">int</span> b, <span class="type">int</span> c)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// define K concrete macro functions</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> FUNC_0() f0()</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> FUNC_1(a) f1(a)</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> FUNC_2(a, b) f2((a), (b))</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> FUNC_3(a, b, c) f3((a), (b), (c))</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// define a chooser on arguments count</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> FUNC_CHOOSER(...) GET_4TH_ARG(__VA_ARGS__, FUNC_3, FUNC_2, FUNC_1, FUNC_0)</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// define a helper macro</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> GET_4TH_ARG(a1, a2, a3, a4, ...) a4</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// define the entry macro</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> FUNC(...) FUNC_CHOOSER(__VA_ARGS__)(__VA_ARGS__)</span></span><br></pre></td></tr></table></figure><p>上面这个例子中，我们希望通过一个统一的入口（<code>FUNC</code>），根据参数数量重载几个具体的宏（<code>FUNC_0</code> 到 <code>FUNC_3</code>）。</p><p>具体做法是将宏定义分成两部分，首先通过参数数量来选择具体的宏名字，再将参数传入这个具体的宏，完成调用。</p><p>第一部分入口是：</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">FUNC_CHOOSER</span>(__VA_ARGS__)</span><br></pre></td></tr></table></figure><p>我们看到它会被展开成</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">GET_4TH_ARG</span>(__VA_ARGS__, FUNC_3, FUNC_2, FUNC_1, FUNC_0)</span><br></pre></td></tr></table></figure><p>假如我们传入的参数为 <code>FUNC(0, 1)</code>，则 <code>__VA_ARGS__</code> 展开成 <code>0, 1</code>，上面的表达式展开成</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GET_4TH_ARG(0, 1, FUNC_3, FUNC_2, FUNC_1, FUNC_0)</span><br></pre></td></tr></table></figure><p><code>GET_4TH_ARG</code> 的结果是只保留第 4 个参数，恰好就是我们要的 <code>FUNC_2</code>。再之后的过程就很直接了。</p><p>这种方法的关键就是 <code>FUNC_CHOOSER</code> 中目标宏的顺序要逆序，从而实现根据参数数量选择正确的目标宏。</p><p>上面的方案有几点要注意：</p><ol><li>参数数量要连续。如果只存在 <code>FUNC_3</code> 和 <code>FUNC_0</code>，我们需要填充几个 dummy name 人为制造报错。</li><li>数量数量必须是确定的。对于不定数量的调用，只能硬着头皮从 1 定义到某个超大的数（如 67）。（比如<a href="https://github.com/pingcap/tiflash/pull/5512">这个例子</a>）</li></ol><h2 id="忽略多余的逗号"><a href="#忽略多余的逗号" class="headerlink" title="忽略多余的逗号"></a>忽略多余的逗号</h2><blockquote><p>参考这个回答：<a href="https://stackoverflow.com/questions/39291976/c-preprocessor-remove-trailing-comma">C Preprocessor Remove Trailing Comma</a></p></blockquote><p><a href="https://godbolt.org/z/jdfbzxac6">这个例子</a> 中我们用到了一个可变参数的宏来调用一个可变参数的函数：</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;fmt/format.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> S, <span class="keyword">typename</span>... Args&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">print</span><span class="params">(<span class="type">const</span> S &amp; fmt_str, Args &amp;&amp;... args)</span> </span>&#123;</span><br><span class="line">    fmt::<span class="built_in">print</span>(fmt_str, std::forward&lt;Args&gt;(args)...);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> PRINT(fmt_str, ...) print(fmt_str, __VA_ARGS__)</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="built_in">PRINT</span>(<span class="string">&quot;a = &#123;&#125;, b = &#123;&#125;&quot;</span>, <span class="number">1</span>, <span class="number">2</span>);</span><br><span class="line">    <span class="built_in">PRINT</span>(<span class="string">&quot;xxx&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>看起来一切都 OK，直到编译时：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"># gcc</span><br><span class="line">&lt;source&gt;: In function &#x27;int main()&#x27;:</span><br><span class="line">&lt;source&gt;:8:55: error: expected primary-expression before &#x27;)&#x27; token</span><br><span class="line">    8 | #define PRINT(fmt_str, ...) print(fmt_str, __VA_ARGS__)</span><br><span class="line">      |                                                       ^</span><br><span class="line">&lt;source&gt;:12:5: note: in expansion of macro &#x27;PRINT&#x27;</span><br><span class="line">   12 |     PRINT(&quot;xxx&quot;);</span><br><span class="line">      |     ^~~~~</span><br><span class="line"></span><br><span class="line"># clang</span><br><span class="line">&lt;source&gt;:12:5: error: expected expression</span><br><span class="line">    PRINT(&quot;xxx&quot;);</span><br><span class="line">    ^</span><br><span class="line">&lt;source&gt;:8:55: note: expanded from macro &#x27;PRINT&#x27;</span><br><span class="line">#define PRINT(fmt_str, ...) print(fmt_str, __VA_ARGS__)</span><br><span class="line">                                                      ^</span><br></pre></td></tr></table></figure><p>原因是 <code>PRINT(&quot;xxx&quot;)</code> 会导致 <code>PRINT</code> 中的 <code>__VA_ARGS__</code> 为空，展开时产生了一个多余的逗号：</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">print</span>(fmt_str, )</span><br></pre></td></tr></table></figure><p>这个问题看起来有两种解法：</p><ol><li>用 <code>__VA_OPT__(,)</code> 处理逗号。亲测可用，但只能用于 <a href="https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html">gcc</a>。</li><li>用 <code>##__VA_ARGS__</code>，它可以在展开为空时消除掉前面的逗号。亲测 gcc 与 clang 都可用。</li></ol>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;小朋友不要乱学&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;ol&gt;
+&lt;li&gt;基于参数数量重载宏函数。&lt;/li&gt;
+&lt;li&gt;当 &lt;code&gt;__VA_ARGS__&lt;/code&gt; 为空时，忽略多余的逗号。&lt;/li&gt;
+&lt;/ol&gt;</summary>
+    
+    
+    
+    
+    <category term="C++" scheme="http://fuzhe1989.github.io/tags/C/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>数据丢失概率与节点数量的关系</title>
+    <link href="http://fuzhe1989.github.io/2022/07/01/probability-of-data-loss-when-nodes-increase/"/>
+    <id>http://fuzhe1989.github.io/2022/07/01/probability-of-data-loss-when-nodes-increase/</id>
+    <published>2022-07-01T04:23:54.000Z</published>
+    <updated>2022-07-26T00:01:50.659Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><p>分布式系统中我们经常会使用多副本策略来保证数据的可靠性。常见的多副本策略可以按容错能力分为两类。假设系统需要能容忍最多 f 个节点失败：</p><ol><li>需要 2f+1 个副本的 Quorum 策略，如 Paxos&#x2F;Raft </li><li>需要 f+1 个副本，如 chain replication（下文称 CR）。</li></ol><p>本文通过简单的模拟计算，得到以下结论：</p><ol><li>固定节点失败概率与每个节点上的 shard 数量，数据丢失概率是节点数量的凸函数，即随着节点数量增加，数据丢失概率逐渐增大，到达峰值后再逐渐减小。</li><li>同等存储成本下，CR 的数据丢失概率远低于 Quorum。</li></ol><span id="more"></span><p>我们假设节点失败概率为 P，每个节点上有 K 个 shard，每个 shard 有 3 个副本。对于 Quorum，shard 容忍最多一个副本失败。对于 CR，shard 容忍最多两个副本失败。</p><p>数据丢失可以被定义为：当有超过 f 个节点同时失败，且存在 shard 恰好有超过 f 个副本位于这些节点上。这样我们可以将数据丢失概率计算为以下两个概率的乘积：</p><ol><li>超过 f 个节点同时失败的概率。</li><li>存在 shard 恰好有超过 f 个副本位于这些节点的概率。</li></ol><p>前者我们记为 P<sub>n</sub>，后者记为 P<sub>s</sub>。为了简化计算，下面我们只计算 shard 恰好有 f+1 个副本位于这些节点的概率。且记 P<sub>ss</sub> 为一个 shard 发生数据丢失的概率。则 P<sub>s</sub> &#x3D; (1-P<sub>ss</sub>)<sup>NK</sup>。</p><p>对于Quorum，f &#x3D; 1，则发生了超过 2 个节点失败，且有 shard 有 2 个副本位于其上的概率为：</p><ul><li>P<sub>n</sub> &#x3D; P<sub>n</sub> &#x3D; 1 - (1-P)<sup>n</sup> - C(N, 1) * P(1-P)<sup>N-1</sup></li><li>P<sub>ss</sub> &#x3D; C(2, 2) * C(N-2, 1) &#x2F; C(N, 3)</li><li>P<sub>s</sub> &#x3D; (1-P<sub>ss</sub>)<sup>NK</sup></li><li>P<sub>res</sub> &#x3D; P<sub>n</sub> * P<sub>s</sub></li></ul><p>对于 CR，f &#x3D; 2，则发生了超过 3 个节点失败，且有 shard 有 3 个副本位于其上的概率为：</p><ul><li>P<sub>n</sub> &#x3D; 1 - (1-P)<sup>n</sup> - C(N, 1) * P(1-P)<sup>N-1</sup> - C(N, 2) * P<sup>2</sup>(1-P)<sup>(N-2)</sup>，其中分别减掉了：<ul><li>所有节点都正常的概率</li><li>只有一个节点失败的概率</li><li>只有两个节点失败的概率</li></ul></li><li>P<sub>ss</sub> &#x3D; C(3, 3) &#x2F; C(N, 3)</li><li>P<sub>s</sub> &#x3D; (1-P<sub>ss</sub>)<sup>NK</sup></li><li>P<sub>res</sub> &#x3D; P<sub>n</sub> * P<sub>s</sub></li></ul><blockquote><p>以上对于 P<sub>ss</sub> 的计算做了一些简化，但不影响结论。</p></blockquote><p>可以看到 P<sub>n</sub> 是关于 n 的单调增函数，而 P<sub>s</sub> 则是关于 n 的单调减函数。</p><p>接下来直接上图。</p><p>Quorum</p><p>P &#x3D; 0.001，K &#x3D; 1000</p><p><img src="/images/2022-07/data-loss-prob-01.png"></p><p>P &#x3D; 0.001，K &#x3D; 5000</p><p><img src="/images/2022-07/data-loss-prob-02.png"></p><p>P &#x3D; 0.0001，K &#x3D; 5000</p><p><img src="/images/2022-07/data-loss-prob-03.png"></p><p>P &#x3D; 0.00001，K &#x3D; 5000</p><p><img src="/images/2022-07/data-loss-prob-04.png"></p><p>Chain replication（注意 Y 轴）</p><p>P &#x3D; 0.001，K &#x3D; 1000</p><p><img src="/images/2022-07/data-loss-prob-05.png"></p><p>P &#x3D; 0.001，K &#x3D; 5000</p><p><img src="/images/2022-07/data-loss-prob-06.png"></p><p>P &#x3D; 0.0001，K &#x3D; 5000</p><p><img src="/images/2022-07/data-loss-prob-07.png"></p><p>P &#x3D; 0.00001，K &#x3D; 5000</p><p><img src="/images/2022-07/data-loss-prob-08.png"></p><p>可以看到：</p><ol><li>随着节点数量增加，数据丢失概率先增大后减小。</li><li>同样 3 副本，CR 因为可以容忍 2 副本失败，相同参数下数据丢失概率远小于 Quorum。</li></ol><p>如果我们将 CR 设置为 2 副本，因此同样容忍 1 副本失败（但更省存储空间），此时 P<sub>n</sub> 与 Quorum 相同，而 P<sub>ss</sub> &#x3D; C(2, 2) &#x2F; C(N, 2)，小于 Quorum。</p><p>P &#x3D; 0.001，K &#x3D; 1000</p><p><img src="/images/2022-07/data-loss-prob-09.png"></p><p>P &#x3D; 0.00001，K &#x3D; 5000</p><p><img src="/images/2022-07/data-loss-prob-10.png"></p><p>可以看到，CR 用更少的存储空间实现了更低的数据丢失概率。</p><p>启示：</p><ol><li>只考虑存储空间与数据可靠性的话，Chain replication 相比 Quorum（Paxos&#x2F;Raft）更适合用于数据平面。</li><li>在集群节点数量增加时，需要考虑是否有必要增加副本数量。</li></ol><p>上述结论与数据分布无关，如 Copyset 等策略相当于降低了 P<sub>ss</sub>，正交于具体的共识算法。</p><blockquote><p>安利一个网站：<a href="https://www.desmos.com/calculator">https://www.desmos.com/calculator</a></p></blockquote>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;分布式系统中我们经常会使用多副本策略来保证数据的可靠性。常见的多副本策略可以按容错能力分为两类。假设系统需要能容忍最多 f 个节点失败：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;需要 2f+1 个副本的 Quorum 策略，如 Paxos&amp;#x2F;Raft &lt;/li&gt;
+&lt;li&gt;需要 f+1 个副本，如 chain replication（下文称 CR）。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;本文通过简单的模拟计算，得到以下结论：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;固定节点失败概率与每个节点上的 shard 数量，数据丢失概率是节点数量的凸函数，即随着节点数量增加，数据丢失概率逐渐增大，到达峰值后再逐渐减小。&lt;/li&gt;
+&lt;li&gt;同等存储成本下，CR 的数据丢失概率远低于 Quorum。&lt;/li&gt;
+&lt;/ol&gt;</summary>
+    
+    
+    
+    
+  </entry>
+  
+  <entry>
+    <title>基于 fs 抽象实现 cloud native kv engine</title>
+    <link href="http://fuzhe1989.github.io/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/"/>
+    <id>http://fuzhe1989.github.io/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/</id>
+    <published>2022-05-29T04:28:12.000Z</published>
+    <updated>2022-07-26T00:01:50.650Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><p>本文探讨如何基于 AWS 的多种存储介质（本地 SSD、EBS 与 S3）实现一个 cloud native 版的 kv engine（比如 TiKV [狗头]），以及其中为什么要引入文件系统这一层抽象。</p><span id="more"></span><h2 id="目前的-Cloud-TiKV"><a href="#目前的-Cloud-TiKV" class="headerlink" title="目前的 Cloud TiKV"></a>目前的 Cloud TiKV</h2><p>长话短说。TiKV 的架构如下：</p><p><img src="/images/2022-05/build-cloud-native-kv-engine-based-on-a-dfs-01.png"></p><p>每个节点都维护一个本地的 kv store，节点间通过 raft 协议保证多副本的一致性。如果将 TiKV 直接搬上 AWS，每个 TiKV node 底下需要挂载一块盘当作本地存储。截止到 TiDB 6.0，Cloud TiKV 仍然挂载的是 EBS。</p><p>这带来几个问题：</p><ol><li>成本。EBS 相比 S3 很贵，而相比本地 SSD 又 IOPS 受限。</li><li>弹性。EBS 不支持被多个 instance 挂载（EFS 又贵又不好用），因此只能被当作本地磁盘使用。这导致了 TiKV 在扩缩容的时候真的在搬数据。集群扩容规模大一点动辄需要几个小时。</li><li>资源浪费。TiKV 的每个副本会独立进行 compaction。我们知道 lsmt engine 中 compaction 通常是非常消耗计算资源的。当使用可靠存储介质时，我们完成可以只让写节点（比如 leader）compaction 一次，而让生成的文件被多个读节点（比如 follower）反复使用。</li></ol><blockquote><p>TiKV 的存储实际可以分为 WAL 与 Data 两部分，两者对存储介质的需求差别较大，且通常前者成本远低于后者。本文主要探讨 Data 的管理，可以假设 WAL 仍然以多副本的形式保存在 EBS 上。</p><p>免责声明：本文只是以 TiKV 为例，以下内容不保证符合 TiKV 实现。</p></blockquote><h2 id="为什么不直接用本地-SSD"><a href="#为什么不直接用本地-SSD" class="headerlink" title="为什么不直接用本地 SSD"></a>为什么不直接用本地 SSD</h2><p>相比 EBS，本地 SSD 有以下问题：</p><ol><li>可靠性较差，带来额外的容错负担。</li><li>容量有限，如 r5d.2xlarge（8C 64GB）只能挂载 300GB 的 NVME SSD。</li></ol><h2 id="为什么不直接用-S3"><a href="#为什么不直接用-S3" class="headerlink" title="为什么不直接用 S3"></a>为什么不直接用 S3</h2><p>S3 可以解决前面说的几个问题：</p><ol><li>成本。S3 的存储成本远低于 EBS。</li><li>弹性。S3 提供了一种 global namespace，这样扩缩容期间数据不需要真正被移动，新节点直接 load S3 上的数据就可以了。</li><li>资源浪费。基于 S3 的高可靠性与 global namespace，只需要写节点写一份数据，其它读节点就可以直接 load 使用。</li></ol><p>但对于 OLTP 应用来说，S3 会带来几个新问题：</p><ol><li>读延时太高，且不稳定。</li><li>IOPS 受限。</li><li>频繁的 PUT&#x2F;GET 成本并不低。</li></ol><blockquote><p>对于 WAL，S3 的另一个问题是不支持 append。这也是本文假设 WAL 仍然保存在 EBS 上的原因之一。</p></blockquote><h2 id="结合-S3-与本地-SSD"><a href="#结合-S3-与本地-SSD" class="headerlink" title="结合 S3 与本地 SSD"></a>结合 S3 与本地 SSD</h2><p>S3 的种种不足，提示着我们，它需要一层 cache。翻出经典的 <a href="https://en.wikipedia.org/wiki/Memory_hierarchy">Computer Memory Hierarchy</a>：</p><p><img src="/images/2022-05/build-cloud-native-kv-engine-based-on-a-dfs-02.png"></p><p>对于 S3 这种 remote storage，最适合的 cache 就是 local storage。恰好这种定位能够解决本地 SSD 容量有限的问题（cache 不需要保存全量数据）。</p><p>我们的新设计中，WAL 仍然会写三份 EBS，但只有 leader 会做 flush 与 compaction 这样的写操作。数据直到存放到 S3 上才算持久化完成。之后 follower 异步将需要的数据缓存到自己的本地 SSD 上。</p><p>这样：</p><ol><li>存储主要在 S3 上，且只存一份。</li><li>扩缩容不再需要大量移动数据。</li><li>命中本地 SSD 的请求不再需要访问 S3，降低了请求成本，也降低了延时。</li></ol><p>整套架构与 <a href="/2020/12/05/separate-write-read-compaction-by-file-meta-service/">解耦NoSQL系统的写、读、Compaction</a> 差不多。</p><p>leader 会向 follower 发送两类数据：</p><ol><li>data。</li><li>manifest change。</li></ol><p>当收到 data 之后，follower 仍然会将其写入 Memory，但<strong>不持久化</strong>。这样基于一个 manifest 的 snapshot 与足够新的 memory data，follower 仍然可以正确服务读请求（假设我们需要 follower read）。此时本地 SSD 上的数据可能部分与 memory data 重复，但不影响结果正确性，后续也可以异步清理。</p><h2 id="抽象为分布式文件系统"><a href="#抽象为分布式文件系统" class="headerlink" title="抽象为分布式文件系统"></a>抽象为分布式文件系统</h2><p>前面的设计中，隐含的假设是本地 SSD cache 的单位是 S3 object，也就是单个文件。但我们知道文件是可以很大的，比如达到几十上百 GB 都是可能的，这个粒度显然太粗了。Block 这个粒度又可能太细了。我们需要有办法将文件分成较小的块（如 4-64 MB）。</p><p>另一方面，为了能快速过滤数据，文件中的 meta 与 data 也需要不同的管理策略，如 meta 要尽可能保持在 cache 中（无论是本地 SSD 还是 memory）。</p><p>这些都要求我们细粒度管理文件中的不同块。</p><p>在实际动手之前，请先停一下。我们回看整个设计在做什么：</p><ol><li>global namespace，每个 client（即 TiKV 节点）可以访问任意文件。</li><li>一写多读，且文件写完之后不再更新。</li><li>文件需要被切割成较小的块。</li></ol><p>有没有分布式文件系统的意思？</p><blockquote><ul><li><a href="/2020/09/15/the-google-file-system/">GFS</a></li><li><a href="/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/">Azure Storage</a></li></ul></blockquote><p>我们可以将前面的设计抽象为一个基于 AWS 的分布式文件系统：</p><ol><li>需要额外的 metadata service 管理 chunk objects。</li><li>不需要单独的 chunk server，直接将 chunk 保存为 S3 object。每个 chunk 大小在 4-64 MB 之间。</li><li>托管本地 SSD 与 S3 之间的换入换出和写回（针对 leader）。</li></ol><p>这样，我们可以将文件分成几类：</p><ol><li>manifest，维护文件列表。</li><li>meta file，包含各种 index 与 filter。</li><li>data file，包含实际数据。</li></ol><p>上层 kv store 在访问时仍然基于 &lt;filename, offset&gt;，底下 fs 负责将其翻译为 &lt;chunk_object, offset&gt;。如果这个 chunk 命中本地 SSD cache，就直接返回；如果没命中，再访问 S3 加载对应的 chunk。</p><p>这样上层应用不再需要关心底层的存储介质，同时仍然可以在成本与性能之间达到一个平衡。</p><blockquote><p>难道 TiFlash 就不需要这样的一个文件系统吗？</p></blockquote>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;本文探讨如何基于 AWS 的多种存储介质（本地 SSD、EBS 与 S3）实现一个 cloud native 版的 kv engine（比如 TiKV [狗头]），以及其中为什么要引入文件系统这一层抽象。&lt;/p&gt;</summary>
+    
+    
+    
+    
+  </entry>
+  
+  <entry>
+    <title>TiFlash 执行器线程模型</title>
+    <link href="http://fuzhe1989.github.io/2022/04/17/tiflash-executor-thread-model/"/>
+    <id>http://fuzhe1989.github.io/2022/04/17/tiflash-executor-thread-model/</id>
+    <published>2022-04-17T15:45:38.000Z</published>
+    <updated>2022-07-26T00:01:50.660Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><p><a href="https://github.com/pingcap/tiflash">TiFlash</a> 是 MPP + 列存的 HTAP 引擎，这篇主要介绍它的执行器的线程模型。</p><span id="more"></span><p>TiFlash 的执行器目前使用了一种比较粗犷的多线程模型（继承自较早版本的 ClickHouse）：</p><ul><li>每个任务（MPPTask）会独立地创建一组线程，任务间不会共享线程。</li><li>算子间使用 push 模型。</li><li>通过特定算子控制不同阶段的并发：<ul><li><code>UnionBlockInputStream</code></li><li><code>SharedQueryBlockInputStream</code></li><li><code>ParallelAggregatingBlockInputStream</code></li><li><code>CreatingSetsBlockInputStream</code></li></ul></li><li><code>Exchange</code> 会单独创建线程与 gRPC 交互。</li></ul><p>本文使用的 sql：</p><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> t1.a, <span class="built_in">sum</span>(t2.c)</span><br><span class="line"><span class="keyword">FROM</span> t1, t2</span><br><span class="line"><span class="keyword">WHERE</span> t1.a <span class="operator">=</span> t2.b <span class="keyword">AND</span> t1.a <span class="operator">&lt;</span> <span class="number">10</span></span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> t1.a</span><br><span class="line"><span class="keyword">HAVING</span> <span class="built_in">sum</span>(t2.c) <span class="operator">&gt;</span> <span class="number">1000</span></span><br></pre></td></tr></table></figure><h1 id="背景知识"><a href="#背景知识" class="headerlink" title="背景知识"></a>背景知识</h1><h2 id="MPP"><a href="#MPP" class="headerlink" title="MPP"></a>MPP</h2><blockquote><p>MPP 不是本文重点，点到为止。</p></blockquote><p>下图为两节点上的 MPP plan 结构，可以看到它分为两个 stage，各有 2 个 MPP task：</p><p><img src="/images/2022-04/tiflash-executor-thread-model-02.png" alt="图1"></p><p>TiFlash 的 MPP 的入口在 TiDB。</p><p>TiDB optimizer 会根据规则与 cost 决定为这条 query 生成 MPP plan。每个 MPP plan 会被切分为多个 stage，每个 stage 则会实例化为若干个 MPP task。不同的 MPP task 之间通过 Exchange 算子进行通信。TiDB 与 root stage（上图中的 stage 2）之间也通过 Exchange 进行通信。</p><p>Exchange 算子是由 receiver 端主动建立连接，之后 sender 端会源源不断地将数据推送到 receiver 端。</p><h2 id="算子"><a href="#算子" class="headerlink" title="算子"></a>算子</h2><p>下图为 stage 2 的 MPP task 内部执行树（并发为 3）：</p><p><img src="/images/2022-04/tiflash-executor-thread-model-01.png" alt="图2"></p><p>TiFlash 使用了类似于 volcano 的 pull 模型，执行流是由一个个 IBlockInputStream（下文简称 InputStream）组成的，可以认为它们就是 TiFlash 的算子。每个 InputStream） 支持以下基本接口：</p><ul><li>readPrefix：类似于 open。</li><li>read：类似于 next。</li><li>readSuffix：类似于 close。</li></ul><p>大多数 InputStream 都只能被一个线程访问。为了能利用上多核，我们需要在执行流中显式插入几种特定的 InputStream 以实现并发：</p><ul><li><code>UnionBlockInputStream</code>：实现 1:N 的并发，将 N 个 InputStream 的输出合并为一个流。</li><li><code>SharedQueryBlockInputStream</code>：实现 N:1 的并发，将 1 个 InputStream 的输出分为 N 个流使用。</li><li><code>ParallelAggregatingBlockInputStream</code>：两阶段聚合，partial 阶段分别在 N 个线程构建 HashTable，merge 阶段则单线程或并发将 N 个 HashTable 合并起来，对外输出一个流。</li><li><code>CreatingSetsBlockInputStream</code>：接受一个数据 InputStream 和代表 JoinBuild 的若干个 Subquery，并发启动这些 Subquery，并等待它们执行结束之后再开始启动数据 InputStream。</li></ul><p>上图中：</p><ul><li>每个小长方形代表一个 InputStream。</li><li>每个虚线框代表一个线程。</li><li>实线代表数据流向。</li><li>虚线代表控制流。</li></ul><p>（图中省略了 RPC 相关的线程）</p><p>可以通过 <a href="https://github.com/pingcap/tiflash/blob/bd50b0efc629a30959c9fe908849084a891077b3/dbms/src/Flash/Coprocessor/InterpreterDAG.cpp#L58">InterpreterDAG::execute</a> 进一步了解 TiFlash 构建执行树的细节。</p><h1 id="正文"><a href="#正文" class="headerlink" title="正文"></a>正文</h1><h2 id="为什么要用多线程模型"><a href="#为什么要用多线程模型" class="headerlink" title="为什么要用多线程模型"></a>为什么要用多线程模型</h2><p>TiFlash 的类 volcano 执行过程中会存在大量阻塞。</p><blockquote><p>例子：<a href="https://github.com/pingcap/tiflash/blob/bd50b0efc629a30959c9fe908849084a891077b3/dbms/src/DataStreams/FilterBlockInputStream.cpp#L91">FilterBlockInputStream::readImpl</a></p></blockquote><p>如果我们使用线程池，就会遇到以下问题：</p><ul><li><p>阻塞的算子会占用线程资源，整体资源利用率上不去。</p></li><li><p>线程资源无法令一个 task 的所有 job 同时运行，有死锁风险。</p><p>  有两类死锁风险：</p><ul><li>一个 task 内部。假设一台机器有 40 个线程，我们有 40 个 JoinBuild job 和 40 个 JoinProbe job，则显然这些 job 没办法一次运行完成。假如不幸发生了，我们没有保证这些 job 按依赖顺序调度（比如简单地令所有算子同时运行），则可能出现以下场景：40 个 JoinProbe job 占据了所有线程，等待着 JoinBuild 完成，但后者永远无法得到可用线程。</li><li>多个 task 之间。假设有两台机器，A 服务 task1 和 task2，B 服务 task3 和 task 4。task1 阻塞在向 task3 发送数据，因此导致 task2 无法执行；task4 阻塞在向 task2 发送数据，因此导致 task3 无法执行。由此 4 个 task 都无法执行。</li></ul></li></ul><p>而简单地令每个 task 各自创建线程，就避开了死锁和资源利用率的问题。但这种模式也有问题：</p><ul><li>并发过高时，线程太多，最终会到达 OS 的限制。</li><li>这种频繁创建销毁线程的模式会带来额外的性能损耗（见下节）。另外对于大量依赖 thread-local 的基础库（如 jemalloc）不太友好。</li></ul><h2 id="你知道-TiFlash-有多努力吗"><a href="#你知道-TiFlash-有多努力吗" class="headerlink" title="你知道 TiFlash 有多努力吗"></a>你知道 TiFlash 有多努力吗</h2><p>TiFlash 在 6.0 版本中引入了三个 feature 以改善线程模型：</p><ul><li>弹性线程池，在 task 间复用线程以避免创建销毁线程的开销。注意它不同于常见的固定大小的线程池，弹性线程池在负载满时一定会额外分配线程，以避免死锁。当然代价是弹性线程池仍然无法控制住线程数的上限。这项功能后面会有专门的文章介绍，这里只简单说下效果：在高并发短查询场景中，线程创建销毁的开销会成为明显瓶颈，导致平均 CPU 利用率只能维持在 50% 左右，而在打开弹性线程池之后，CPU 利用率可以基本稳定在接近 100%。</li><li>Async gRPC，将 TiFlash 中用于 RPC 的线程数控制在接近常数个。其中 server 端实现得比较好，已经将 RPC 线程数控制在常数个了，但 client 端还差一些，目前只能控制为与 task 数量成正比，后续还可以进一步改进。</li><li><a href="https://zhuanlan.zhihu.com/p/495745028">基于 min tso 的 local task 调度</a>，在每台机器上根据 query 的 tso 按顺序进行调度，从而控制总体线程数，同时避免死锁。</li></ul><p>这三项功能可以很大程度上改善 TiFlash 在高并发场景中的性能和稳定性。</p><h2 id="如何让-TiFlash-用上线程池"><a href="#如何让-TiFlash-用上线程池" class="headerlink" title="如何让 TiFlash 用上线程池"></a>如何让 TiFlash 用上线程池</h2><p>为了能让 TiFlash 用上线程池，一种方案是将它的 pull 模型改为 push 模型。不再一启动就创建全部算子，而是将整个 task 划分为若干个 pipeline，每个 pipeline 只在有数据时触发 job 提交到线程池中。这样每个 job 都是纯计算的，不存在阻塞。</p><p>这种方案我印象中是在 morsel driven 之后逐渐普及开的，目前最新的 ClickHouse、StarRocks、DuckDB 等系统也都使用了类似的方式。</p><blockquote><p><a href="https://bohutang.me/2020/06/11/clickhouse-and-friends-processor/">ClickHouse和他的朋友们（4）Pipeline处理器和调度器</a></p></blockquote><p>对于 TiFlash 而言，这就需要重构整个执行模型，风险还是比较高的。</p><p>另一种方案则可以在不改变执行模型的情况下使用固定大小的线程池：用协程。</p><p>在 push 模型中每个 pipeline 都需要做状态判断，把等待数据的阻塞转换为异步操作。常见的转换方法可以用 callback，也可以依赖于上下游算子轮询。通常我们可以假设一个 query 执行过程中算子是不变的，因此每个算子的上下游都是固定的，这样轮询状态也是可以接受的。</p><p>而使用协程就相当于自动将阻塞操作给异步化了：被阻塞的协程自动挂起，等待被唤醒，物理线程则调度执行下个可运行的协程。这样我们可以保留 pull 模型，继续使用同步代码，但不需要担心阻塞问题。</p><p>我们知道协程可以分为有栈协程（stackful coroutine）和无栈协程（stackless coroutine），通常认为前者因为需要为协程分配栈，内存开销大，另外协程间的切换成本也略高于后者。但在 OLAP 这个特定领域，尤其是在结合向量化之后，通常不会有大量协程，也不会有大量切换。此时有栈协程的编程简单、侵入性低的优势就体现出来了。</p><blockquote><p>参见 <a href="https://www.zhihu.com/question/65647171/answer/2175274060">async&#x2F;await异步模型是否优于stackful coroutine模型？ - 付哲的回答</a></p></blockquote><p>我在去年 10 月尝试向 TiFlash 中引入 boost::fiber（一个有栈协程库），大概也只用了两个晚上就得到了一个基本可用的版本（需要禁掉部分依赖于 thread-local 的特性）。</p><p><a href="https://github.com/fuzhe1989/tiflash/tree/fuzhe/fiber_tiflash">这里是前段时间基于 6.0 重新 patch 的基于 boost::fiber 的 TiFlash</a>，可能还有点小问题。可以看到我只做了几项改动：</p><ol><li>将 C++ 标准库的 <code>std::mutex</code>、<code>std::condition_variable</code> 等同步原语替换为 boost::fiber 对应的类型。</li><li>在特定位置（实际就是每个线程的 entry function）显式插入 <code>yield</code>，以避免一个协程消耗过多 CPU 时间片。</li><li>在 TableScan 上面插入一个 <code>IOAdapterBlockInputStream</code>，这样 TableScan 仍然在 OS 线程中执行，但与上游算子之间通过 <code>boost::fibers::buffered_channel</code> 通信。</li></ol><p>使用 boost::fiber 的好处很明显，是用了非常小的改动换来了实际控制住了线程数（如果有时间将 IO 也异步化，那么 TableScan 也可以在协程中执行）。它的缺点是：</p><ol><li>需要仔细 review 各种同步原语的使用，尤其是三方库中隐式使用的。如果不小心在协程中使用了会导致 OS 线程阻塞的函数，则整个系统的执行效率会大受影响，甚至还有死锁的风险。这点在之前阿里云 pangu 的异步化改造过程中曾经多次出现过，造成了非常坏的后果。</li><li>相比之前直接使用 OS 线程，使用 boost::fiber 之后 debug 难度极剧增加：没办法通过 pstack&#x2F;gdb 看线程栈了。这样一旦出现了逻辑死锁，某个协程永远无法执行，我们很难在系统之外找到这个协程。但这也是所有异步化系统的通病，通常要么深度改造协程库，允许注入一些业务逻辑的标识；要么业务方自己引入一些 tracing 机制。</li></ol><p>当然因为种种原因，这个分支在去年 10 月开发测试完成后，并没有再进一步。鉴于我即将离开 TiFlash，协程这条路应该在相当长一段时间不会出现在 TiFlash 的主干代码中。如果有朋友对我上面的分支感兴趣，欢迎评论、私信交流。</p>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&quot;https://github.com/pingcap/tiflash&quot;&gt;TiFlash&lt;/a&gt; 是 MPP + 列存的 HTAP 引擎，这篇主要介绍它的执行器的线程模型。&lt;/p&gt;</summary>
+    
+    
+    
+    
+  </entry>
+  
+  <entry>
+    <title>纲领、意图、语义：从接口设计到公司治理</title>
+    <link href="http://fuzhe1989.github.io/2022/03/05/one-creed-intention-semantic/"/>
+    <id>http://fuzhe1989.github.io/2022/03/05/one-creed-intention-semantic/</id>
+    <published>2022-03-05T13:00:27.000Z</published>
+    <updated>2022-07-26T00:01:50.658Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><ol><li>为什么接口设计要表达清晰明确的语义？</li><li>为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图？</li><li>工作中为什么要树立自己的人设？</li><li>如何让 OKR 发挥作用？</li><li>如何三句话让客户为你的产品花钱？</li></ol><span id="more"></span><p>智人的局限性：</p><ol><li>每次只能做好一件事，记住一句话。</li><li>习惯机械地保持言行合一，且善于自我辩护（《影响力》）。</li><li>面临过多不确定性时难以做出决定（《影响力》）。</li></ol><p>这些局限性每天都在影响着我们中的每个人，使得我们：</p><ol><li>事情多了就容易忘、走神、效果不好。</li><li>没有明确的目标就会茫然、缺乏动力。</li><li>面对不了解的事物时缺乏勇气、动力，难以做决定。</li></ol><p>相信我，在座的各位，在这些方面，很难不被称为垃圾。</p><p>承认这些局限性是我们取得胜利的第一步，第二步则是利用这些局限性驱动自己（或引导他人）做出更有利于我们的行动。</p><p>如何利用这些局限性？</p><ol><li>突出目的，用尽量少的记忆量表达尽量多的信息量，有利于智人们在它们有限的记忆力&#x2F;专注力范围内做好尽量多的事情。</li><li>公开表达自己的意图，减少潜在的不确定性，帮助智人们更容易做出决定。</li><li>公开自己的纲领，并坚持下去，智人们自然会根据它看到的纲领调整自己的姿势并自觉拥护。</li></ol><p>总之，把问题简化，对谁都好。</p><p>以下讨论的主题从接口设计到公司治理，并没有什么新鲜的结论，只是试图从中归纳出一种统一的方法论。这很符合本文的主旨。</p><h2 id="为什么接口设计要表达清晰明确的语义"><a href="#为什么接口设计要表达清晰明确的语义" class="headerlink" title="为什么接口设计要表达清晰明确的语义"></a>为什么接口设计要表达清晰明确的语义</h2><p>接口设计要遵循什么原则？“高内聚，低耦合”。</p><p>什么叫“高内聚”？不同的元素之间，必要的交互越多，它们的聚合性（或称耦合性）越强。反之，就是“低耦合”。</p><p>我们可以把一个程序&#x2F;系统看作一张图（Graph），每个元素看作一个顶点，元素之间的交互看作一条边。则接口设计、模块分割、微服务化，都在做着同一件事：聚类。我们找到一个元素集合，如果这个集合内部的聚合程序很高，但与外界的交互很少（或很统一），就可以将它视为一个整体，一个新的元素放回到图中。</p><p>重复这个过程，元素的粒度由细到粗，从函数，到类，到模块，到服务，等等，图的复杂度越来越低，直到符合智人的脑容量。此时，神奇的事情发生了。每次只能做好一件事，记住一句话的智人，可以不费力地理解一个庞大的系统（想象一下一个分布式的、微服务化的业务系统，如果细化到具体的函数，该有多复杂多庞大）。天哪，这么神奇的吗？</p><p>回看整个过程，我们可以找到其中最核心的一个操作（反复扣题），聚类。聚类意味着我们可以将多个元素的行为（或称语义）叠加起来，仍然视为一个元素，且只消耗智人相同量级的记忆量。这就需要我们为这些元素归纳出一个清晰、明确的语义。一句话，让你懂，尽管背后藏着千千万万的细节。</p><p>code review 时，有些听起来很 naive、很不高端的问题：</p><ol><li>提出这个类的目的是什么？它有什么作用？</li><li>这些参数都是必要的吗？有没有重复的、可以由其它参数推导出来的部分？</li><li>为什么需要这个接口？</li><li>考虑到对称性，为什么不增加另一个接口？</li></ol><p>是 reviewer 不懂吗？不一定，TA 也许只是为了减少未来读者（包括自己，也包括 1s 后的作者）的理解难度。给定一个类&#x2F;模块&#x2F;服务的名字，如果底下某个接口需要额外的解释，这个设计就还有提高的余地；如果每个接口都需要额外的解释，这个设计就是一次失败，会被无数次地用错、吐槽、直到被重构或抛弃掉。</p><p><strong>总结</strong>：接口设计需要表达清晰明确的语义，争取一句话讲懂，多一句都差评。</p><h2 id="为什么一次代码修改（cl-x2F-pr-x2F-commit）要有唯一明确的意图"><a href="#为什么一次代码修改（cl-x2F-pr-x2F-commit）要有唯一明确的意图" class="headerlink" title="为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图"></a>为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图</h2><blockquote><ul><li>CL：Change List</li><li>PR：Pull Request</li><li>Commit：问 git 去</li></ul></blockquote><p>系统是由一次次代码修改组成的。我们要保证每次修改都可以用一句话描述，就需要它有唯一的、明确的意图。为什么？因为代码修改需要被阅读、被推理、被 review，而这些操作的另一边都是可怜的智人。而这些智人又通常是团队的瓶颈：人数越多，代码修改的生产速度越快；但 reviewer 通常跟不上这种速度。</p><p>行数通常是 code review 速度的一项关键因素：</p><ol><li>一个 50 行的代码修改，通常扫一眼就清楚了；</li><li>500 行的代码修改就需要随手准备个小本本画一下依赖关系；</li><li>5000 行的代码修改则必须要拉上作者讲下前因后果，一点点抠了。</li></ol><p>然而行数不是唯一因素。一个很长的代码修改，如果意图明确，不会很难读；混杂了多种意图的代码修改，即使并不长，也明显增加了 reviewer 的精力消耗。举几个例子：</p><ol><li>5000 行的 code format 不怎么消耗 reviewer 精力，看一眼就可以放过。</li><li>5000 行的 code format，但里面夹杂着一个 bugfix 就要了亲命了，reviewer 需要一行一行仔细阅读。</li><li>既移动代码又对代码进行微小的功能修改，在现有的鶸 review 工具下，需要 reviewer 自己左右打开两份代码，手动对齐，再一行行对比。要是其中再加个函数拆分，谁爱看谁看，反正我不看。</li></ol><p>唯一的代码修改意图（refactor 还是 feature 还是 bugfix）避免了 reviewer 的精力浪费或不该有的忽视，该精读的能精读，该略读的能略读。</p><p>接下来，常见的工作流程也要求代码修改的目的要单纯：考虑到 cherry-pick，一个代码修改最好不要包含无关的内容。</p><p>最后，唯一的代码修改意图也在展现着作者的能力，我有能力总结出<strong>一种</strong>意图，且将其具象化为<strong>一次</strong>代码修改，这不失为一种“太成功了”。顺便，这样也不容易搞出乌龙（如写出低级 bug），在众人面前丢人。</p><p><strong>总结</strong>：一次代码修改需要唯一的、明确的意图，为他好，也为你好。</p><blockquote><p>类似地，一个项目也要意图明确，三意二心的项目往往半途而废。</p></blockquote><h2 id="工作中为什么要树立自己的人设"><a href="#工作中为什么要树立自己的人设" class="headerlink" title="工作中为什么要树立自己的人设"></a>工作中为什么要树立自己的人设</h2><p>瑞·达利欧在《原则》中说，组织架构最好是树状的，每个子树都要有清晰的功能定位。如前所述，这也是一种聚类。现在，我们翻转一下问题，你，作为树中的某个叶子节点，如何获得满意的功能定位？</p><p>我的答案是，要有人设。</p><p>团队中每个人都有自己的人设。A 技术很 NB 但做事没规划；B 啥都能做，还能为老板抗事儿；C 能力有限，但很细心，总能按时完成；而你，D，没有特点。</p><p>你怎么可能没有特点呢？你的野心（或称上进心）在燃烧，你也有自己的得意之处，你每天苦恼英雄无用武之地。但你缺少人设。人设是对一个智人的接口的一句话描述（又扣题了），你的所有内涵、能力、性格，最终也只能被归纳为一句话。这句话，就是别人想起你的第一句话。</p><p>相信我，大多数主管不是坏人，他不是不给你好活，只是不知道该给你什么活合适：</p><ol><li>给需要深度的，怕你不会；</li><li>给需要审美的，又不了解你；</li><li>给有时限的，怕你耽误事儿。</li></ol><p>于是，最后只能把你归为“其它”，给你别人挑剩下的活。好心的主管给你简单但无关紧要的活，不那么良心的主管就给你谁都不想要的活。</p><p>想改变这些，从立人设开始。你总是有擅长之处的，把它表达出来，告诉周围的人，告诉主管，说你想做，而且会做 xxx。立人设也是一种公开承诺。如前所述，智人拥有这种言行一致的倾向，当你立起人设了，你就会有自发的动力去维护它，这反过来会促进你强化这一人设，去学习必要的知识，练习相关的技能。立人设也可以简化主管面临的任务分配：现在的你对于他来说就不那么不确定了，他更容易做出决定。</p><p>除了与主管的交互，当你立起人设后，同事之间的交互也会更简单、更顺利。类比良好的接口设计，你建立人设的过程，就是在完善自己对外的接口。这套接口越好用，其他人越乐于使用。</p><p>接下来，立人设也不需要担心是否会把自己限制住。随着你的能力积累，其他人归纳你的方式也会变化，粒度越来越粗，从“擅长 xxx 问题”，到“技术大牛”或“项目推进大师”。智人们总是会用一句话来描述你的，别让这句话太无聊。</p><p>立人设并不是一劳永逸的，你需要长年累月的积累、坚持，稍不留神还有翻车的风险。但这很值得。</p><p><strong>总结</strong>：立人设也是一种接口设计；它能简化交互，消除未知，降低主管与同事与你交互的难度；同时它是一种公开承诺，你会更有动力维护你的公开承诺。</p><h2 id="如何让-OKR-发挥作用"><a href="#如何让-OKR-发挥作用" class="headerlink" title="如何让 OKR 发挥作用"></a>如何让 OKR 发挥作用</h2><p>一个组织需要一个公开的纲领，否则无法保证成员的凝聚力。</p><blockquote><p>这句话是几年前从知乎上看到的，当时有人大概问了这么个问题：为什么一个政党不能隐瞒自己的意图。但现在找不到了。</p></blockquote><p>（涉及政治的部分就略过吧……）一个公司是一个组织，它也需要一个公开的纲领。</p><p>工作几年以后，我们往往会把工作视作一种庸俗化的等价交换，你用自己的时间，从老板那里换钱。这种逻辑没错，但对于公司而言，只存在这种等价交换是非常危险的：公司需要员工的一部分超额劳动。</p><p>如果工作只是工作，这种超额劳动只能归为一种资本家的压榨。但有趣的是，很多智人会在工作中获得一些满足感，他们可能会把工作视为爱好，视为社交，最终主动地奉献一些超额劳动。很难说这算不算是智人的另一种局限性。我很认同一种观点，不要把工作与生活截然分开，去寻找那些你休息时仍然愿意做的工作。</p><p>成功的公司都或多或少意识到了这点，他们会想尽办法用最小的花销最大化提升员工的满足感、参与感，如免费零食、舒适的工作环境、定期的团建（翻车概率大）等。这里我们讨论公司的纲领，也就是 OKR。</p><p>OKR 是什么？它是一种方法论，你瞄着一个目标，制定计划，最终将结果拿来和目标对比。一个公司有整体的 OKR，老板会瞄着这个目标，制定自己的计划。顺着组织架构，部门可以瞄着公司的 OKR 制定自己的 OKR，部门总监据此制定自己的计划。接下来是团队、个人。</p><p>这个过程是自顶向下的，公司有一个纲领，一个目标，接下来每个部门、团队、个人，都根据自己所在的位置看到的这个目标的样子，制定自己的计划。这个过程中，每一级都只需要、且只能看到自己以上的 OKR，而不需要、也不应该关注自己以下的 OKR。大家都在朝着一个目标，只是因为所处位置不同而产生了不同的计划。这就是我对 OKR 的理解。</p><p>相比而言，KPI 则是自底向上的，每一级都盯着自己的下级，将自己的目标分解为下级的目标。这个过程中每个人不需要关心更上一级的目标，只要完成自己的目标，明码标价，童叟无欺，只是没有了那种凝聚力。</p><p>为了让 OKR 发挥作用，我们需要：</p><ol><li>纲领要公开，不要藏着掖着。</li><li>纲领要明确、简短，让人看一次忘不了。</li><li>纲领要能坚持不动摇。</li><li>每一级都要明确地朝着这个目标制定计划，中间一旦掺杂了私货，下面各级都会走偏。</li></ol><p>一个公开的纲领就像一座灯塔，可以为整个公司指引方向。这种明确的、唯一的方向的重要性不言而喻。电子的运动方向越集中，电流强度越大。公司的方向越集中，内耗越小，成员之间的协同效应越强烈，整体执行能力越强。这种成功反过来又可以提升众人对纲领本身的认可程度。</p><blockquote><p>公开的纲领的另一个好处是可以筛选掉那些不认可它的员工。大家道不同不相为谋，不是坏事。反倒是不同思想的激烈冲突（或曰内耗）既耽误了员工，又影响了公司。</p></blockquote><p>纲领本身一旦被公司成员所认可，如前所述，智人善于自我辩护，公司成员就会反过来为纲领辩护。这种辩护也是凝聚力的一部分。而凝聚力越强，公司抵御风险的能力越强，越能克服困难，在险恶的环境中生存下来。</p><p>如果公司还能将纲领坚持下去，言行一致的本能同样会提升众人对纲领的认可程度。</p><p>最后，所有这些的前提是，整个公司都能看到相同的纲领。如果有人将 OKR 替换为局部的等价交换，上述推理链就不复存在了。做个不恰当的类比，一个是“同志们跟着我冲”，一个是“弟兄们给我顶住”。</p><p><strong>总结</strong>：一家公司需要一个统一的、公开的纲领，它能以低成本的方式增强员工的凝聚力，减少内耗，提升执行能力。</p><blockquote><p>以上内容中，将公司替换为部门、团队仍然有效。</p></blockquote><h2 id="如何三句话让客户为你的产品花钱"><a href="#如何三句话让客户为你的产品花钱" class="headerlink" title="如何三句话让客户为你的产品花钱"></a>如何三句话让客户为你的产品花钱</h2><p>最后顺便提一下产品定位。</p><p>一款产品，如果不能在几句话中讲清楚它的价值，就离失败不远了。智人那可怜的耐心与脑容量，当面对长达几页纸的产品介绍时，显得那么无助。你有且只有一次机会，用三句话，讲清楚产品的价值所在，接下来趁客户的脑细胞兴奋时，再去灌输那些细节。</p><p>这样来说，一款产品也要服务于一个目的。如果定位 TiDB 是一个关系型数据库，那么集成数据湖类的功能就显得很尴尬；而如果定位 TiDB 是一站式的数据处理平台，那么任何可以简化客户数据处理流程的功能都是在服务于这个目的。</p><p>一个需要增加一句话来解释的功能，会让这个产品更尴尬，而不是更强大。</p><p><strong>总结</strong>：P 社加油。</p>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;为什么接口设计要表达清晰明确的语义？&lt;/li&gt;
+&lt;li&gt;为什么一次代码修改（cl&amp;#x2F;pr&amp;#x2F;commit）要有唯一明确的意图？&lt;/li&gt;
+&lt;li&gt;工作中为什么要树立自己的人设？&lt;/li&gt;
+&lt;li&gt;如何让 OKR 发挥作用？&lt;/li&gt;
+&lt;li&gt;如何三句话让客户为你的产品花钱？&lt;/li&gt;
+&lt;/ol&gt;</summary>
+    
+    
+    
+    
+  </entry>
+  
+  <entry>
+    <title>[C++] 一定要 public 继承 std::enable_shared_from_this</title>
+    <link href="http://fuzhe1989.github.io/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/"/>
+    <id>http://fuzhe1989.github.io/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/</id>
+    <published>2021-07-24T16:23:17.000Z</published>
+    <updated>2022-07-26T00:01:50.651Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><p><code>std::enable_shared_from_this</code>必须要<code>public</code>继承，否则调用<code>shared_from_this()</code>不会编译失败，但运行时会抛<code>std::bad_weak_ptr</code>的异常。</p><span id="more"></span><p>我看到项目中有个类是<code>struct</code>，成员都暴露在外面，感觉不太安全，就把它改成了<code>class</code>，保证了所有对其成员的访问都通过<code>public</code>方法。看起来是个无害的操作，结果 ci test 挂了一大片，报错是<code>std::bad_weak_ptr</code>。</p><p>我一看这个类，还真是继承了<code>std::enable_shared_from_this</code>：</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Task</span>: std::enable_shared_from_this &#123;</span><br><span class="line"> <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure><p>这个报错通常是因为一个类继承自<code>std::enable_shared_from_this</code>，但某个没有被包裹在<code>std::shared_ptr</code>中的实例调用了<code>shared_from_this()</code>，然后就炸了，因为此时<code>std::enable_shared_from_this</code>没办法返回一个安全的<code>std::shared_ptr</code>。</p><p>但人肉确认过它的所有分配都是走<code>std::shared_ptr</code>，且为了确保这点，我还把<code>Task</code>的构造函数也藏起来了，对外只暴露一个<code>static</code>构造器：</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Task</span>: std::enable_shared_from_this &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line"> <span class="keyword">template</span> &lt;<span class="keyword">typename</span>... Args&gt;</span><br><span class="line"> <span class="function"><span class="type">static</span> std::shared_ptr&lt;Task&gt; <span class="title">newTask</span><span class="params">(Args... args)</span> </span>&#123;</span><br><span class="line"> <span class="keyword">return</span> std::<span class="built_in">shared_ptr</span>(<span class="keyword">new</span> <span class="built_in">Task</span>(std::forward&lt;Args&gt;(args)...));</span><br><span class="line"> &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line"> <span class="built_in">Task</span>(Arg0 arg0, Arg1 arg1);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure><p>再跑一遍，还是不行。</p><p>略过 debug 过程，最终我发现是新的<code>Task</code>类继承<code>std::enable_shared_from_this</code>的方式有问题：它在<code>private</code>继承。此时搞笑的事情发生了，我手头的 gcc7.5 的<code>std::enable_shared_from_this</code>的实现不会在这种情况下为<code>Task</code>实例构造必要的<code>_M_weak_this</code>成员，导致后续调用<code>shared_from_this()</code>时报错。</p><p>我觉得这里的设计不好，此时<code>std::enable_shared_from_this</code>已经失去作用了，但没有产生编译错误，而是延迟到运行时再报错，极大增加了 debug 的成本。按理说这里既然可以有不同的特化版本，就应该可以在编译期发现这类错误。</p><p>结论：</p><ol><li><code>struct</code>默认继承级别是<code>public</code>，而<code>class</code>则是<code>private</code>。</li><li>所有继承都应该显式写出继承级别。</li><li>继承<code>std::enable_shared_from_this</code>时请<code>public</code>继承。</li></ol>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;std::enable_shared_from_this&lt;/code&gt;必须要&lt;code&gt;public&lt;/code&gt;继承，否则调用&lt;code&gt;shared_from_this()&lt;/code&gt;不会编译失败，但运行时会抛&lt;code&gt;std::bad_weak_ptr&lt;/code&gt;的异常。&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="C++" scheme="http://fuzhe1989.github.io/tags/C/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[C++] 带有引用类型成员的类居然默认允许移动</title>
+    <link href="http://fuzhe1989.github.io/2021/07/24/cpp-move-ctor-with-ref-member/"/>
+    <id>http://fuzhe1989.github.io/2021/07/24/cpp-move-ctor-with-ref-member/</id>
+    <published>2021-07-24T15:58:12.000Z</published>
+    <updated>2022-07-26T00:01:50.652Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><p>对于一个成员 X 是另一个成员 Y 的引用的类，C++编译器会默认为它生成移动构造函数和移动赋值函数，但这两个函数是有问题的。建议手动禁掉这种类的移动函数。</p><p>但这类问题（dangling）是 C++的根本缺陷，没有好的解法，不要想着有什么万全之策了，接受它。</p><span id="more"></span><p>C++中带有引用类型成员的类不会默认生成复制构造函数和复制赋值函数，但也许是因为兼容性方面的考虑，它会默认生成移动构造函数和移动赋值函数。移动前后引用类型成员指向同一个地址。当类中一个成员 X 是另一个成员 Y 的引用时，这个默认生成的移动构造函数就有问题了：Y 在移动前后地址已经变了，X 却仍然指向前地址，产生 dangling reference。</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">X</span> &#123;</span><br><span class="line"> <span class="type">int</span> data;</span><br><span class="line"> <span class="type">int</span>&amp; ref;</span><br><span class="line"></span><br><span class="line"> <span class="function"><span class="keyword">explicit</span> <span class="title">X</span><span class="params">(<span class="type">int</span> v)</span> : data(v), ref(data) &#123;</span>&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">test</span><span class="params">()</span> </span>&#123;</span><br><span class="line"> std::vector&lt;X&gt; vec;</span><br><span class="line"> <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10</span>; ++i) &#123;</span><br><span class="line"> vec.<span class="built_in">emplace_back</span>(i);</span><br><span class="line"> &#125;</span><br><span class="line"> <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span> &amp; x: vec) &#123;</span><br><span class="line"> std::cout &lt;&lt; x.ref &lt;&lt; std::endl; <span class="comment">// boom!</span></span><br><span class="line"> &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p><strong>建议：手动禁掉这种一个成员引用另一个成员的类的移动函数。</strong></p><p>如：</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">X</span> &#123;</span><br><span class="line"> <span class="type">int</span> data;</span><br><span class="line"> <span class="type">int</span>&amp; ref;</span><br><span class="line"></span><br><span class="line"> <span class="function"><span class="keyword">explicit</span> <span class="title">X</span><span class="params">(<span class="type">int</span> v)</span> : data(v), ref(data) &#123;</span>&#125;</span><br><span class="line"> <span class="built_in">X</span>(X&amp;&amp;) = <span class="keyword">delete</span>;</span><br><span class="line"> X&amp; <span class="keyword">operator</span>=(X&amp;&amp;) = <span class="keyword">delete</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure><p>再展开一点。C++的内存安全性的一大隐患就是 dangling reference&#x2F;pointer。我们需要保证一个对象在被指针或引用指向期间在内存中保持不动。这是一个非常强的要求：对象本身无法知道它是否正在被指向（除非使用 counter 来统计指向的数量，比如使用<code>std::shared_ptr</code>管一切，但这是极端场景）。但由程序员来保证又太难了，有太多情况下对象会被无意间移动（或干脆析构了）。</p><p>上面的建议只是封掉了一个特定场景的口子，但假如<code>data</code>不由<code>X</code>自己持有呢？<code>X</code>是没办法知道<code>ref</code>已经 dangling 了，外面的<code>data</code>也没办法知道这里有个引用在指向它。</p><p>没有银弹，但我们仍要前进。<strong>使用 ASan 这类工具可以很大程度上发现这类问题，但前提是你要有测试。</strong></p><p>最后回到正题。我们是在使用 ClickHouse 的 <a href="https://github.com/ClickHouse/ClickHouse/blob/master/src/IO/WriteBufferFromString.h"><code>WriteBufferFromOwnString</code></a> 时发现的这个问题。看起来这个类没有被直接或间接（作为其它类的成员）放到<code>std::vector</code>等会移动元素的容器中，真是幸运。</p>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;对于一个成员 X 是另一个成员 Y 的引用的类，C++编译器会默认为它生成移动构造函数和移动赋值函数，但这两个函数是有问题的。建议手动禁掉这种类的移动函数。&lt;/p&gt;
+&lt;p&gt;但这类问题（dangling）是 C++的根本缺陷，没有好的解法，不要想着有什么万全之策了，接受它。&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="C++" scheme="http://fuzhe1989.github.io/tags/C/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] Hekaton: SQL Server&#39;s Memory-Optimized OLTP Engine</title>
+    <link href="http://fuzhe1989.github.io/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/"/>
+    <id>http://fuzhe1989.github.io/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/</id>
+    <published>2021-05-18T05:07:16.000Z</published>
+    <updated>2022-07-26T00:01:50.656Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://dl.acm.org/doi/abs/10.1145/2463676.2463710">Hekaton: SQL Server’s Memory-Optimized OLTP Engine</a></p><p>年代：2013</p></blockquote><p>Hekaton是SQL Server的一个内存数据库子系统，它有以下特点：</p><ul><li>数据全在内存中，但具备持久化存储能力（不会丢数据）。</li><li>使用无锁结构（latch-free&#x2F;lock-free）。</li><li>MVCC结合乐观并发控制（optimistic concurrency control）。</li><li>存储过程可以预编译为C代码，再进一步编译为机器指令。</li></ul><span id="more"></span><p>Hekaton的目标是将现有的SQL Server的吞吐提升10-100倍以上，有三个方向：</p><ul><li>提升scalability；</li><li>提升CPI；</li><li>减少指令数。</li></ul><p>有分析表明前两个方向只能提供3-4倍的提升，那么就要在减少指令数方面有巨大的进步：10倍提升需要减少90%的指令；100倍提升需要减少99%的指令。这就需要重新设计存储与数据处理系统。</p><p>Hekaton的解法是无锁结构、乐观并发控制、预编译存储过程、不使用分区。最后一个比较有意思，其它很多内存数据库都将DB分为若干个partition，分别由不同的CPU核服务。但Hekaton认为这种做法对query的限制过强，一旦query跨分区性能就急剧下降，无法为各种各样的workload提供稳定的服务。</p><p><img src="/images/2021-05/hekaton-01.png" alt="image"></p><p>整体架构上Hekaton是基于SQL Server之上的，通过定制的Compiler、Runtime、Storage三个模块来提供内存数据的服务。</p><p>Hekaton的MVCC是通过每个record中记录begin time和end time来实现的，一行的所有版本的begin和end time连续且不重叠，对任意时间T，都只有一个版本是有效的。</p><p><img src="/images/2021-05/hekaton-02.png" alt="image"></p><p>每个record中还有一些link用于构建索引。</p><p>Hekaton支持两种索引，hash index（基于lock-free的hash table）与range index（基于lock-free的Bw-tree）。hash index会使用record的第一个link，将每个桶的所有record链接起来。Bw-tree中保存的是指向record的指针，且使用第二个link将相同key的record链接起来（此时Bw-tree中指针指向链表的第一项）。</p><p>当执行读时，Hekaton会先指定read time，然后用这个时间去找那些有效（begin &lt;&#x3D; rt &lt; end）的记录。如前所述，每行只会有一个版本出现在read set中。</p><p>当执行写时，事务提交前，Hekaton会将被删除的record的end time和插入的record的begin time改为事务ID，在提交时再修改为提交时间。</p><p>与很多其它支持MVCC的系统一样，Hekaton也支持snapshot isolation，但为了提供serializable isolation，Hekaton还增加了以下两种检查：</p><ul><li>读集合不变（Read stability）：在事务T提交前检查它读过的数据没有被修改过。</li><li>避免幻读（Phantom avoidance）：在事务T提交前再次scan，确保没有新的数据出现。</li></ul><p>更弱的isolation只需要放宽这两项检查：repeatable read只需要第一项，snapshot isolation与read committed不需要额外检查。</p><p>这两项检查都是在提交时进行，具体来说是在获得commit time后。Hekaton认为这两项检查的开销还好，不是那么恐怖，原因是检查过程中会touch的数据大概率仍然在L1&#x2F;L2 cache中（存疑）。</p><p>这里Hekaton要解决的一个问题是，在乐观并发控制下，如果T1读到了T2写的数据，当T2先进入提交检查的阶段，T1就需要依赖于T2检查的结果。这就产生了一个commit dependency：T2如果abort，则T1也需要跟着abort（避免dirty read）；T1如果要commit，需要等待T2的commit结束。</p><p>事务提交过程中还会记logical redo log（不需要undo），包含所有新增与删除的record，因此每个事务需要维护自己的write set直到提交。index不需要写log。</p><p>被删除或被abort的record在没有活跃事务引用之后就可以gc掉了，但前提是所有index也都不再引用这个record。</p><p>整个gc过程分为两阶段：</p><ul><li>协作阶段，每个工作线程扫index过程中遇到无效的record都可以unlink掉，最后一个unlink的线程就可以回收这个record了。</li><li>有背景线程定期并发扫无效的record，尝试将其在所有引用的index中unlink，再回收。</li></ul><p>最后是Hekaton的预编译。</p><p><img src="/images/2021-05/hekaton-03.png" alt="image"></p><p>Hekaton因为是一个OLTP系统，不值得对ad-hoc query做JIT，因此它的预编译发生在两个时刻：表创建时、存储过程创建时。</p><p>Hekaton会在表创建时将每张表的schema编译为一组callback，其中包含了对record的处理，如hash、compare、serialize等，这样保证了Hekaton仍然是不需要感知表结构的。</p><p>而当创建一个存储过程时，Hekaton会先为其生成C代码，再进一步编译为机器指令。</p><p>Hekaton的代码生成有两个特点：</p><ul><li>整个query生成一个函数，其中大量使用goto跳转。这样虽然降低了可读性，但生成的代码本来就不是给人读的，且这样的代码执行效率最高。</li><li>虽然executor是自顶向下的volcano风格，但生成的代码是自底向上的，函数入口是最底层operator。这个过程相当于将operator的pipeline转换为了全局的状态机。</li></ul><p>如下图这个简单的query：</p><p><img src="/images/2021-05/hekaton-04.png" alt="image"></p><p>会生成下面这种执行流：</p><p><img src="/images/2021-05/hekaton-05.png" alt="image"></p>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://dl.acm.org/doi/abs/10.1145/2463676.2463710&quot;&gt;Hekaton: SQL Server’s Memory-Optimized OLTP Engine&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;年代：2013&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Hekaton是SQL Server的一个内存数据库子系统，它有以下特点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;数据全在内存中，但具备持久化存储能力（不会丢数据）。&lt;/li&gt;
+&lt;li&gt;使用无锁结构（latch-free&amp;#x2F;lock-free）。&lt;/li&gt;
+&lt;li&gt;MVCC结合乐观并发控制（optimistic concurrency control）。&lt;/li&gt;
+&lt;li&gt;存储过程可以预编译为C代码，再进一步编译为机器指令。&lt;/li&gt;
+&lt;/ul&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="Database" scheme="http://fuzhe1989.github.io/tags/Database/"/>
+    
+    <category term="OLTP" scheme="http://fuzhe1989.github.io/tags/OLTP/"/>
+    
+    <category term="Microsoft" scheme="http://fuzhe1989.github.io/tags/Microsoft/"/>
+    
+    <category term="MainMemoryDatabase" scheme="http://fuzhe1989.github.io/tags/MainMemoryDatabase/"/>
+    
+    <category term="LockFree" scheme="http://fuzhe1989.github.io/tags/LockFree/"/>
+    
+    <category term="MVOCC" scheme="http://fuzhe1989.github.io/tags/MVOCC/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] LLAMA: A Cache/Storage Subsystem for Modern Hardware</title>
+    <link href="http://fuzhe1989.github.io/2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/"/>
+    <id>http://fuzhe1989.github.io/2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/</id>
+    <published>2021-05-08T04:25:47.000Z</published>
+    <updated>2022-07-26T00:01:50.657Z</updated>
+    
+    <content type="html"><![CDATA[<p>LLAMA是一种无锁的page管理系统，它包含内存cache与磁盘log structured store（LSS）两部分，并自动控制page在两者之间移动（flush、换入&#x2F;换出）。</p><p>它有以下特点：</p><ul><li><p>所有操作都是无锁的（latch-free），内存部分基于epoch机制回收数据。</p><p>  优点：系统并行度高；epoch机制几乎是额外开销最小的回收机制，且容易实现。</p></li><li><p>所有page都是immutable的，对page的修改要通过附加一个delta来实现，并通过对mapping table进行CAS来让新的page可见。</p><p>  优点：既满足了无锁的需求，又对cache非常友好。</p></li><li><p>磁盘部分是一种log structured store，可以写入完整的page，或delta。</p><p>  优点：可以只写入delta能显著降低写放大；LSS这种append-only的结构将所有随机写转化为了顺序写，性能更高，且可以省掉Flash的FTL。</p></li></ul><p>LLAMA可以作为Bw-tree的底层系统。</p><span id="more"></span><p>LLAMA的核心是一个mapping table，维护每个pageID到具体的pageAddr。这里的pageAddr既可以是内存地址，又可以是LSS的地址，使用最高位来区分。</p><p><img src="/images/2021-05/llama-01.png" alt="image"></p><p>LLAMA提供两种更新page的方式：</p><ul><li><code>Update-D(pid, in-ptr, out-ptr, data)</code>：增量更新，向pid对应的page上附加一个delta，会产生一个新的delta item指向旧的pageAddr。</li><li><code>Update-R(pid, in-ptr, out-ptr, data)</code>：全量更新，将pid替换为新的page。</li></ul><p>无论是哪种方式，最终都需要通过CAS来替换mapping table中的pageAddr。</p><p>另外LLAMA的<code>Read(pid, out-ptr)</code>也可能会修改mapping table：对应的page在LSS中，<code>Read</code>会将它载入内存，并CAS修改mapping table。</p><p>上面的操作只是在修改内存数据，另外LLAMA还提供了与LSS交互的接口：</p><ul><li><code>Flush(pid, in-ptr, out-ptr, annotation)</code>：将page的状态（完整page或只是delta item）拷贝到LSS的buffer中，<strong>但不一定落盘</strong>。</li><li><code>Mk-Stable(LSS address)</code>：保证LSS address及之前的数据都落盘。</li><li><code>Hi-Stable(out-addr)</code>：返回最高的已经stable的LSS addr。</li><li><code>Allocate(out-pid)</code>：分配一个新的pid，需要使用系统事务来完成操作。</li><li><code>Free(pid)</code>：释放一个pid，每个epoch被释放的pid会组成一个free-list。同样，<code>Free</code>也需要使用系统事务来完成操作。</li></ul><p><img src="/images/2021-05/llama-02.png" alt="image"></p><p>系统事务可以理解为原子的修改+<code>Flush</code>，Bw-tree会用它来实现树结构的修改（SMO）。每个活跃的系统事务在LLAMA的active transaction table（ATT）中对应一个entry list，其中保存着这个事务所有的修改。如果事务最终commit成功，这些修改会拷贝到LSS buffer中并flush，否则所有修改会逆序rollback掉（包括<code>Allocate</code>和<code>Free</code>）。</p><p>注意：<code>Update-R</code>因为不方便rollback，不能用于事务中。</p><p>支持事务的操作（如<code>Update-D</code>）可以传入tid和annotation，它们会被放到delta item中，其中annotation是给应用自己用的。</p><p>注意系统事务只是保证了多个操作的原子性，并不保证它们与其它操作相互隔离，用户需要理解这种受限事务的语义，并小心避免预期之外的结果。</p><p>Bw-tree的SMO被设计为不依赖事务的隔离性：</p><ol><li>在mapping table中分配page。</li><li>写page（此时page对其它线程不可见）。</li><li>更新已有的page，将新page连接上去，或移除已有的page。</li></ol><p>即用户需要自己注意操作的顺序，人为保证隔离。</p><p>但上面的第3步既要更新mapping table，让修改可见，又要保证接下来commit（flush）成功。因此LLAMA提供了一种事务性的<code>Update-D</code>，即修改后直接flush。</p><p>整个系统事务只在内存层面可见，即abort的事务不会进入磁盘存储，因此recovery不需要感知事务。</p><p>LLAMA中flush是非常重要的操作，被flush过的page就可以被换出内存了。但因为LLAMA的无锁机制，flush就有点麻烦。</p><p>flush需要解决的问题：</p><ul><li>flush过程中page可能被修改，需要保证如果page被修改过，则flush失败。</li><li>一个page被多次flush的话，需要保证它们进入LSS的顺序与flush顺序相同。</li><li>因为flush也是一次CAS，需要有办法区分LSS中哪些entry是flush失败的（否则recovery不好实现）。</li></ul><p>flush过程：</p><ul><li>获得当前page状态。</li><li>从LSS buffer中预分配足够的空间。</li><li>生成flush delta（其中包括刚刚分配的LSS addr），并执行CAS。</li><li>如果CAS成功，开始向LSS buffer拷贝数据，LLAMA保证这期间不会有磁盘I&#x2F;O（避免数据不完整）。</li><li>如果CAS失败，向LSS buffer中写入“Failed Flush”，这样recovery期间可以跳过这样的entry。</li></ul><p>flush过的page就可以换出内存了。如果被换出的page被完整flush了，则mapping table中它的地址会被换成对应的LSS addr。LLAMA还支持只换出page的一部分（可能还有部分delta在内存中），此时LLAMA会生成一个partial swap delta，其中指向page原来的地址，以及最高的被换出的LSS addr，再CAS替换mapping table。</p><p><img src="/images/2021-05/llama-03.png" alt="image"></p><p>接下来是LLAMA中LSS的管理。LSS分为两部分，一部分是内存中的buffer，一部分是磁盘存储。</p><p><img src="/images/2021-05/llama-04.png" alt="image"></p><p>每个写线程都可以执行<code>Flush</code>，将数据拷贝进LSS的buffer，步骤是先预分配空间，再拷贝。如果分配空间时超出了LSS buffer的容量，就会进入seal buffer的流程。</p><p><img src="/images/2021-05/llama-05.png" alt="image"></p><p>seal buffer的线程先通过CAS将buffer的seal位设置为1，然后等待所有现存的writer都结束（active writers降为0），最后触发一次异步I&#x2F;O。这次I&#x2F;O结束后buffer会被重置，继续使用。</p><p>LSS可以同时有多个buffer，但只有一个是CURRENT。seal buffer的线程也负责更新CURRENT。</p><p>LSS的磁盘存储可以认为是一个环形buffer，定期的cleaning就是从头部（最老的）将仍然在使用的page重新写到尾部。cleaning既可以释放空间，还可以将page不连续的各部分合并起来，I&#x2F;O更高效。</p><p>LSS的recovery关键是要定期生成mapping table的checkpoint，过程为：</p><ul><li>记录当前LSS buffer的addr，称为recovery start position（RSP）；当前GC的位置。</li><li>遍历mapping table，记录每个非空的page对应的不高于RSP的最新addr（只需要记录已经在LSS中的page状态）。</li></ul><p><img src="/images/2021-05/llama-06.png" alt="image"></p>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;LLAMA是一种无锁的page管理系统，它包含内存cache与磁盘log structured store（LSS）两部分，并自动控制page在两者之间移动（flush、换入&amp;#x2F;换出）。&lt;/p&gt;
+&lt;p&gt;它有以下特点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;所有操作都是无锁的（latch-free），内存部分基于epoch机制回收数据。&lt;/p&gt;
+&lt;p&gt;  优点：系统并行度高；epoch机制几乎是额外开销最小的回收机制，且容易实现。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;所有page都是immutable的，对page的修改要通过附加一个delta来实现，并通过对mapping table进行CAS来让新的page可见。&lt;/p&gt;
+&lt;p&gt;  优点：既满足了无锁的需求，又对cache非常友好。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;磁盘部分是一种log structured store，可以写入完整的page，或delta。&lt;/p&gt;
+&lt;p&gt;  优点：可以只写入delta能显著降低写放大；LSS这种append-only的结构将所有随机写转化为了顺序写，性能更高，且可以省掉Flash的FTL。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;LLAMA可以作为Bw-tree的底层系统。&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="Atomic" scheme="http://fuzhe1989.github.io/tags/Atomic/"/>
+    
+    <category term="Cache" scheme="http://fuzhe1989.github.io/tags/Cache/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>How DBMS handle dead locks: wound-wait and wait-die</title>
+    <link href="http://fuzhe1989.github.io/2021/05/06/wound-wait-and-wait-die/"/>
+    <id>http://fuzhe1989.github.io/2021/05/06/wound-wait-and-wait-die/</id>
+    <published>2021-05-06T13:22:58.000Z</published>
+    <updated>2022-07-26T00:01:50.661Z</updated>
+    
+    <content type="html"><![CDATA[<p><strong>TL;DR</strong></p><p>Wound-wait 与 wait-die 是 DBMS 中处理死锁的两种常见策略，它们的优缺点为：</p><ul><li>Wait-die 会导致更多 rollback，但 rollback 的代价更低：被 rollback 的事务做过的事情比较少。</li><li>Wound-wait 导致的 rollback 较少，但 rollback 的代价更高：被 rollback 的事务做过的事情比较多。</li></ul><p>另外 [<a href="https://www.zhihu.com/question/344517681/answer/815329816">1</a>] 中提到：</p><blockquote><p>还有一种方法，no wait，就是请求不到锁就回滚，不去做判断。现在的一般看法是，不等比等好，尤其是应用于分布式事务时。</p></blockquote><span id="more"></span><p><strong>wait-die 与 wound-wait</strong></p><p>在基于锁的事务实现中，当事务 T<sub>i</sub>需要获得某个 data item 的锁时，发现这把锁当前正在被事务 T<sub>j</sub>持有，我们不能直接让 T<sub>i</sub>等待这把锁，否则可能造成死锁。</p><p>在一个单机 DBMS，或有全局死锁检测的分布式 DBMS 中，可以通过死锁检测来做决定。但如果无法获得全局状态，我们可以使用 wait-die 或 wound-wait 策略来避免产生死锁。</p><p>这里我们有三种选择：</p><ol><li>T<sub>i</sub>直接 abort。</li><li>T<sub>i</sub>等待 T<sub>j</sub>执行完，再获取这把锁。</li><li>强行终止 T<sub>j</sub>的执行，从而让 T<sub>i</sub>获取到锁。</li></ol><p>Wait-die 是比较 T<sub>i</sub>与 T<sub>j</sub>的 timestamp，如果 Ts<sub>i</sub> &lt; Ts<sub>j</sub>（即 T<sub>i</sub>更老），则 T<sub>i</sub>等待（wait）；否则（T<sub>i</sub>更新）T<sub>i</sub>直接 abort（die）。</p><p>Wound-wait 同样是比较 timestamp，但相反，如果 Ts<sub>i</sub> &lt; Ts<sub>j</sub>（即 T<sub>i</sub>更老），则强行终止 T<sub>j</sub>（wound）；否则（T<sub>i</sub>更新）T<sub>i</sub>等待（wait）。</p><p>两种策略都只用 timestamp 来做判断，避免依赖各自的读写集，从而获得更好的性能。但需要系统不同节点产生的 timestamp 是可比较的（TimeStatusOracle、TrueTime、HLC 都可以）。</p><p><strong>两者的相同点</strong></p><ul><li>更老的事务总会有机会执行。</li><li>被 abort 的事务随后会使用<strong>相同的</strong>timestamp 重启。最终这些事务会成为系统中最老的事务，从而不再被 abort。</li></ul><p><strong>两者的区别</strong></p><ul><li>Wait-die 中被 abort 的新事务是试图获取锁的一方</li><li>Wound-wait 中被 abort 的新事务是持有锁，正在运行的一方。</li></ul><p><strong>比较两者的代价</strong></p><p>关于 abort 代价：</p><ul><li>更新的事务通常持有更少的锁，且已经读写过的数据更少。</li><li>更老的事务通常持有更多的锁，且已经读写过的数据更多。</li></ul><p>因此更老的事务的 abort 代价更高。</p><p>关于 abort 数量：</p><ul><li>大多数锁被老事务持有。</li><li>大多数加锁请求由新事务发起（新事务持有的锁更少，因此加锁请求更多）。</li><li>因此大多数冲突是新事务试图获取老事务持有的锁。</li></ul><p>Wait-die 中新事务试图获取老事务持有的锁会导致自身被 abort；而 wound-wait 中类似情况下则是 wait，因此 wait-die 会导致更多的 abort。</p><p>但 wound-wait 中被 abort 的事务必须已经持有了一部分锁，它们通常也已经读写过一些数据了（并非刚开始的事务），这些事务的 abort 代价更大；而 wait-die 中大多数被 abort 的事务可能一点读写都没做过，它们的 abort 代价更小。因此 wait-die 每个 abort 的代价会更小一些。</p><p>结论就是很难说哪种策略更优（视具体情况讨论）。</p><h2 id="References"><a href="#References" class="headerlink" title="References"></a>References</h2><ol><li><a href="https://www.zhihu.com/question/344517681/answer/815329816">有哪些分布式数据库可以提供交互式事务？ - 陈广胜的回答 - 知乎</a></li><li><a href="https://stackoverflow.com/q/32794142">What is the difference between wait-die and wound-wait algorithms - Stackoverflow</a></li><li><a href="http://www.mathcs.emory.edu/~cheung/Courses/554/Syllabus/8-recv+serial/deadlock-compare.html">Comparing the wait-die and wound-wait schemes</a></li></ol>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Wound-wait 与 wait-die 是 DBMS 中处理死锁的两种常见策略，它们的优缺点为：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Wait-die 会导致更多 rollback，但 rollback 的代价更低：被 rollback 的事务做过的事情比较少。&lt;/li&gt;
+&lt;li&gt;Wound-wait 导致的 rollback 较少，但 rollback 的代价更高：被 rollback 的事务做过的事情比较多。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;另外 [&lt;a href=&quot;https://www.zhihu.com/question/344517681/answer/815329816&quot;&gt;1&lt;/a&gt;] 中提到：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;还有一种方法，no wait，就是请求不到锁就回滚，不去做判断。现在的一般看法是，不等比等好，尤其是应用于分布式事务时。&lt;/p&gt;
+&lt;/blockquote&gt;</summary>
+    
+    
+    
+    
+    <category term="Database" scheme="http://fuzhe1989.github.io/tags/Database/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency</title>
+    <link href="http://fuzhe1989.github.io/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/"/>
+    <id>http://fuzhe1989.github.io/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/</id>
+    <published>2021-05-02T15:18:12.000Z</published>
+    <updated>2022-07-26T00:01:50.661Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://dl.acm.org/doi/abs/10.1145/2043556.2043571">Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency</a></p><p>年代：2011</p></blockquote><p>Windows Azure Storage（WAS）是Azure的存储层，它的特色在于基于同一套架构提供了对象存储（Blob）、结构化存储（Table）和队列服务（Queue）。</p><p>这三种服务共享了一个提供了强一致、global namespace、多地容灾、支持多租户的存储层。</p><blockquote><p>个人猜测这种设计（同时推出三种服务）更多出于组织架构的考虑，而不是技术层面上有非这么做的理由。</p><p>以及这篇文章作者中有多名后来加入阿里云存储的大佬，所以可以从这里面看到一些后来阿里云存储产品发展的影子。</p></blockquote><span id="more"></span><p>三种服务都使用了同一套global namespace，格式为：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http(s)://AccountName.&lt;service&gt;.core.windows.net/PartitionName/ObjectName</span><br></pre></td></tr></table></figure><p>其中：</p><ul><li>AccountName会作为DNS解析的一部分，来确定这个account对应的primary data center（如果需要跨地域就需要使用多个account）。</li><li>PartitionName是跨对象事务的边界。</li><li>ObjectName是可选的，Blob就没有。</li></ul><p>Table的每行的primary key由PartitionName和ObjectName组成。Queue的PartitionName用来标识队列，而ObjectName则用来标识消息。</p><p>WAS的底座是Windows Azure Fabric Controller，负责分配和管理资源，WAS会从它那里获取网络拓扑、集群物理布局、存储节点的硬件信息等。</p><p>一套WAS环境由若干套storage stamp和一套location service组成：</p><p><img src="/images/2021-05/was-01.png"></p><p>每套storage stamp是一个小集群，典型的大小是10-20个rack，每个rack有18个节点。第一代storage stamp容量是2PB，下一代会提升到30PB。storage stamp的目标是达到70%的使用率，包括了容量、计算、带宽。</p><p>location service负责管理account到storage stamp的映射与迁移（一个account只能有一个primary storage stamp）。</p><p>storage stamp内部分为三层：</p><ul><li>stream层提供类似于GFS的能力。数据组织为extent（类比chunk），extent再组织为stream（类比file）。这一层是三种服务共享的。</li><li>partition层提供三种服务特有的能力。它负责提供应用层抽象、namespace、事务与强一致的能力、数据的组织、cache。partition和stream的server是部署在一起的，这样最小化通信成本。</li><li>front-end（FE）负责处理请求。它会缓存partition map从而快速转发请求。另外它还可以直接访问和缓存stream层的数据。</li></ul><p>storage stamp提供了两种replication：</p><ul><li>stamp内部，在stream层提供同步的replication，提供数据的强一致性。</li><li>stamp之间，在partition层提供异步的replication，提供数据的多地容灾能力。</li></ul><p>区分两种replication还有一个好处是stream层不需要感知global namespace，只需要维护stamp内的meta，这样metadata就不会那么多，更容易全部缓存到内存中。</p><p>在stream层数据组织为三层：</p><ul><li>block是读写的最小单元，但不同block可以有不同大小。每个block有自己的checksum，每次读都会校验。另外所有block定期还会被后台校验checksum。</li><li>extent是stream层replication的单元，它由一系列block组成。每个extent最终会长到1GB大小，partition层可以控制将大量小对象存储到一个extent，甚至一个block中。</li><li>stream类似于一个大文件，但它不拥有extent，只是保存了若干个有序的extent引用。将已有的extent组织起来就可以得到新的stream。</li></ul><p><img src="/images/2021-05/was-02.png"></p><p>注意stream层是append-only的，每个stream只有最后一个extent可以被写入，其它extent都是不可变的（immutable，被seal了）。（猜测未seal的extent不可被多个stream共享）</p><p>stamp内部有两类组件：stream manager（SM）和extent node（EN），前者是master，后者是data node。</p><p><img src="/images/2021-05/was-03.png"></p><p>（大概讲SM怎么与EN通信来管理extent，类似于GFS，略过）</p><p>extent支持原子append多个block，但因为重试原因可能数据会被写入多次，client要有能力处理这种情况。</p><p>client会控制extent的大小，如果超过阈值则发送seal指令。被seal的extent不可再被写入，stream层会对sealed extent做一些优化，如使用erasure coding等。</p><p>stream层提供的强一致保证：</p><ul><li>一旦写入成功的消息告知了client，后续所有replica上这次写入的数据都可见（read committed）。</li><li>一旦extent被seal了，后续所有已经seal的replica的读保证看到相同内容（immutable）。</li></ul><p>每个extent有一个primary EN和若干个secondary EN，未被seal的extent的EN是不会变的，因此它们之间不需要有lease等同步协议。extent的写入只能由primary EN处理，但可以读取任意secondary EN（即使未seal）。primary会将所有写入排好序，确定每笔写入的offset，再发给所有secondary EN。所有replica都写成功了之后primary才会告知client。</p><p>client在写入过程中会本地缓存extent的meta，不需要与SM通信（直到需要分配新extent）。如果某次写入失败了，client可以要求SM来seal这个extent，然后立即开始写新extent，而不需要关心旧extent末尾是否有数据不一致。</p><p>seal过程中SM会与每个replica EN通信，并使用可用的EN中<strong>最小的</strong>commit length。这样能保证所有告知过client的数据都不会丢，但有可能会有数据还没来得及告知client。这是client需要自己处理的一种情况。（是不是可以让client缓存一个commit length，seal时告知SM）</p><p>client在读多副本的extent时可以设置一个deadline，这样一旦当前EN无法在deadline之前读到数据，client还有机会读另一个EN。而在读erasure coded数据时，client也可以设置deadline，超过deadline后向所有fragment发送读请求，并使用最先返回的N个fragment重新计算缺少的数据。</p><p>WAS还实现了自己的I&#x2F;O调度器，如果某个spindle（这个怎么翻译？）已经调度的I&#x2F;O请求预计超过100ms，或有单个I&#x2F;O已经排队超过200ms，调度器就不再向这个spindle发送新的I&#x2F;O请求。这样牺牲了一些延时，但达到了更好的公平性。</p><p>为了进一步加速I&#x2F;O，EN会使用单独的一块盘（HDD或SSD）作为journal drive，写入这台EN的数据会同时append到journal drive上，以及正常写extent，哪笔写先完成都可以返回。写入journal drive的数据还会缓存在内存中，直到数据写extent成功（阿里云的pangu使用了类似的方案）。journal drive方案的优点：</p><ul><li>将大量随机写转换为了顺序写。除了写journal drive天然是顺序的，这种设计还使得写extent时可以使用更倾向batch的I&#x2F;O调度策略，进一步提高了磁盘带宽的利用率。</li><li>关键路径上读写请求分离，前者读数据盘（或cache），后者写journal drive。</li></ul><p>使用了journal drive可以极大降低I&#x2F;O的延时波动率（对在线业务意义重大）。</p><p>（Partition层的设计类似于BigTable，略过部分信息）</p><p>Partition层数据保存在了不同的Object Table（OT）中，每个OT分为若干个RangePartition。OT包括：</p><ul><li>Account Table</li><li>Blob Table</li><li>Entity Table</li><li>Message Table</li><li>Schema Table</li><li>Partition Map Table</li></ul><p>Partition层的架构：</p><ul><li>Partition Manager（PM）：类似于BigTable的Master，管理所有RangePartition。</li><li>Partition Server（PS）：类似于BigTable的Tablet Server，加载RangePartition，处理请求。</li><li>Lock Service：类似于Chubby。</li></ul><p><img src="/images/2021-05/was-04.png"></p><p><img src="/images/2021-05/was-05.png"></p><p>Blob Table有个类似于后面Wisckey[<a href="/2017/05/19/wisckey-separating-keys-from-values-in-ssd-conscious-storage">1</a>]的优化，就是大块数据进commit log，但不进入row data（不进cache、不参与常规compaction等），相反row data中只记录数据的位置（extent+offset），并且在checkpoint的时候直接用commit log的extent拼装成data stream。</p><p>RangePartition的分裂（Split）过程：</p><ul><li>PM向PS发请求，要求将B分裂为C和D。</li><li>PS生成B的checkpoint，然后B停止服务（此时是不是可以不停读）。</li><li>PS使用B的所有stream的extent组装成C和D的stream。</li><li>C和D开始服务（client还不知道C和D，此时应该不会有请求发过来）。</li><li>PS告知PM分裂结果，PM更新Partition Map Table，之后将其中一个新Partition移到另一台PS上（分散压力）。</li></ul><p>合并（Merge）过程类似：</p><ul><li>PM将C和D移动到相同PS上，之后告知PS将C和D合并为E。</li><li>PS生成C和D的checkpoint，之后C和D停止服务。</li><li>PS使用C和D的stream的extent组装为E的stream，每个stream中C的extent在D之前。</li><li>PS生成E的metadata stream，其中包括了新的stream的名字、key range、C和D的commit log的start和end位置、新的data stream的root index。（这里commit log的meta管理有点复杂，如果连续分裂怎么办？Tablestore是先停止服务再生成checkpoint，就不需要分别记录C和D的log meta，但停止服务时间会比较长；WAS这种方案停止服务时间短，但meta管理复杂）</li><li>E开始服务。</li><li>PS告知PM合并结果。</li></ul><p>最后是一些经验教训的总结：</p><ul><li>计算存储分离。好处是弹性、隔离性，但对网络架构有要求，需要网络拓扑更平坦、点对点的双向带宽更高等。</li><li>Range vs Hash。WAS使用Range的一个原因是它更容易实现性能上的隔离（天然具有局部性），另外客户如果需要hash，总是可以基于Range自己实现，而反过来则不然。</li><li>流控（Throttling）与隔离（Isolation）。WAS使用了SimpleHold算法[<a href="https://dl.acm.org/doi/abs/10.1145/633025.633056">2</a>]来记录请求最多的N个AccountName和PartitionName。当需要流控时，PS会使用这个信息来选择性拒绝请求，大概原则是请求越多，被拒绝概率越大（保护小用户）。而WAS会汇总整个系统的信息来判断哪些account有问题（异常访问），如果LoadBalance解决不了就更高层面上控制这种用户的流量。</li><li>自动负载均衡（LoadBalancing）：WAS一开始使用单维度“load”（延时*请求速率）来均衡，但无法应对复杂场景。现在的均衡算法是每N秒收集所有Partition的信息，然后基于每个维度排序，找出需要分裂的Partition。之后PM再将PS按各维度排序，找出负载过重的PS，将其中一部分Partition移到相对空闲的PS上（整体思路与Tablestore的LoadBalance差不多，更系统化一些，但Tablestore的LoadBalance策略更多，更灵活）。</li><li>每个Partition使用自己的log file。这点与BigTable的整个Tablet Server共享log file区别比较大。单独log file在load&#x2F;unload上更快，且隔离性更好，而共享log file更节省I&#x2F;O（综合来看单独log file更好一些，尤其是随着存储性能的提升、计算存储分离架构的流行，共享log file的优势越来越小，劣势越来越大了）。</li><li>Journal drive。它的意义是降低I&#x2F;O波动。BigTable使用了另一种方案，用2个log来规避长I&#x2F;O，但导致了更多的网络流量与更高的管理成本。</li><li>Append-only。（与log as database理念差不多）</li><li>End-to-end checksum。</li><li>Upgrade。重点是在每一层将节点分为若干个upgrade domain，再使用rolling upgrade来控制upgrade的影响。</li><li>基于相同Stack的多种数据抽象。就是指Blob、Table、Queue（其实还应该有Block）。</li><li>使用预定义的Object Table，而不允许应用定义自己的Table。意义在于更容易维护（真的有意义吗）。</li><li>限制每个Bucket大小为100TB。这个是教训，WAS计划增大单个storage stamp。</li><li>CAP。WAS认为自己在实践层面上同时实现了C和A（高可用、强一致），具体策略上是通过切换新extent来规避掉不可访问的节点（实践上有意义，但也不能说是同时实现了C和A）。另外[<a href="https://static.usenix.org/events/osdi04/tech/full_papers/renesse/renesse.pdf">3</a>]表示使用chain replication就可以同时实现高可用和强一致。</li><li>高性能的debug log。这点很重要。</li><li>压力点测试。WAS可以单独测试多个预定义的压力点（如checkpoint、split、merge、gc等）。（除此之外现在还需要考虑chaos test）。</li></ul>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://dl.acm.org/doi/abs/10.1145/2043556.2043571&quot;&gt;Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;年代：2011&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Windows Azure Storage（WAS）是Azure的存储层，它的特色在于基于同一套架构提供了对象存储（Blob）、结构化存储（Table）和队列服务（Queue）。&lt;/p&gt;
+&lt;p&gt;这三种服务共享了一个提供了强一致、global namespace、多地容灾、支持多租户的存储层。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;个人猜测这种设计（同时推出三种服务）更多出于组织架构的考虑，而不是技术层面上有非这么做的理由。&lt;/p&gt;
+&lt;p&gt;以及这篇文章作者中有多名后来加入阿里云存储的大佬，所以可以从这里面看到一些后来阿里云存储产品发展的影子。&lt;/p&gt;
+&lt;/blockquote&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="Storage" scheme="http://fuzhe1989.github.io/tags/Storage/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] Hyper: A Hybrid OLTP&amp;OLAP Main Memory Database System Based on Virtual Memory Snapshots</title>
+    <link href="http://fuzhe1989.github.io/2021/04/28/hyper-a-hybrid-oltp-olap-main-memory-database-system-based-on-virtual-memory-snapshots/"/>
+    <id>http://fuzhe1989.github.io/2021/04/28/hyper-a-hybrid-oltp-olap-main-memory-database-system-based-on-virtual-memory-snapshots/</id>
+    <published>2021-04-28T14:48:13.000Z</published>
+    <updated>2022-07-26T00:01:50.656Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://ieeexplore.ieee.org/abstract/document/5767867/">Hyper: A Hybrid OLTP&amp;OLAP Main Memory Database System Based on Virtual Memory Snapshots</a></p><p>年代：2011</p></blockquote><p><strong>TL;DR</strong></p><p>HyPer是一种内存数据库，它有以下特点：</p><ol><li>基于H-Store的设计，串行（因而无锁）执行事务（存储过程）。</li><li>通过fork子进程方式服务OLAP请求。</li></ol><p>通过fork来隔离OLTP与OLAP还挺有创意的，OS的实现显然比自己控制请求间的数据隔离更高效。</p><p>目测这仍然是研究大于实用的项目（至少在文章发表时）。</p><span id="more"></span><p>首先HTAP的重要性就不用说了。</p><p>HyPer接下来开始认证内存数据库的可行性：</p><p>有研究表明关键业务的TP数据量并不大，可以放得进单机内存中。比如Amazon每年营收150B$，假设每笔订单金额是15$，需要54Byte存储（TPC-C就是这样的）则每年的订单数据量只有54GB（还能这么算）。作者认为可以放心预言内存容量的增长速度要超过大客户的业务需求（的增长速度）。</p><p>还是上面的例子，Amazon每年1B个订单，则平均每秒32个，峰值也顶多在每秒几千这个量级。</p><p>HyPer选择了基于H-Store[<a href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite">1</a>]的无锁架构，即单线程串行处理事务，这样所有数据结构都不需要有锁（锁对传统RDBMS性能的影响见[<a href="/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there">2</a>]）。但H-Store这种架构无法处理交互式事务，因此需要所有事务都写成存储过程预先加载到系统中，业务调用时只能指定存储过程的名字和参数。</p><p>为了隔离OLTP与OLAP请求（主要是不想让OLAP请求阻塞OLTP请求运行），HyPer选择了fork子进程来处理OLAP请求。这样由OS和MMU来实现高效的page shadowing。基于磁盘的DB如果使用page shadowing的话会破坏page的连续性，但内存数据库就不用顾虑这点了。SolidDB[<a href="https://ieeexplore.ieee.org/abstract/document/1617467/">3</a>]是另一种内存数据库，使用了tuple shadowing，比page shadowing粒度更细，据说提升了30%吞吐。</p><p>HyPer还去掉了传统RDBMS的buffer管理与page结构，所有数据结构都是专门为内存访问优化的。</p><p>HyPer中所有事务都需要写成存储过程，这些存储过程最终会被编译为可以直接访问上述数据结构。</p><p>这些优化加起来，作者表示处理一个典型的OLTP请求只需要10us。</p><p><img src="/images/2021-04/hyper-01.png"></p><p>上图中我们可以看到HyPer中OLTP与OLAP各有一个队列。当收到OLAP请求时，HyPer会fork出一个子进程来处理这个请求。这样就可以在不加锁的前提下隔离OLTP与OLAP的处理。</p><p>当然为了保证OLAP请求看到完整的snapshot，fork只能发生在两个事务之间（但后面讲到可以用undo来放宽这个限制）。</p><p>注意OLAP请求处理时可以使用磁盘，不需要像OLTP一样严格控制数据量在内存可用范围。</p><p>OLAP子进程本身是只读的，不会修改任何数据，因此可以同时有多个子进程存在。HyPer会通过绑核的方式避免这些子进程影响到OLTP的处理。</p><p><img src="/images/2021-04/hyper-02.png"></p><p>每个OLAP子进程可以服务于一个session，当session结束时退出，OS会自动释放被shadow的内存page。这里不需要担心长时间运行的OLAP请求会占用太多内存，OS的COW机制保证了每个OLAP子进程独自占用的内存量与它和它的下一个OLAP请求之间修改过的数据量相关，而与请求执行时间无关（但内存控制仍然挺难做的，需要在内存吃紧时拒绝请求吗）。</p><p>接下来作者开始试图在OLTP处理中用上多线程。首先只读事务是可以并行做的，而且现实世界中只读事务远多于有写的事务。其次有些业务天然支持分区，不同partition的事务是可以并行做的。</p><p><img src="/images/2021-04/hyper-03.png"></p><p>但分区就需要能处理跨分区的事务。VoltDB讨论过两个方案：悲观锁，或是乐观锁（但可能有连锁的rooback）。</p><p>HyPer的方案是在partition级别加锁，这样避免了partition内数据加锁。但这种方案只能用在单节点系统中，无法用在分布式系统中（后面有讨论）。</p><p>在分布式系统中可以把经常要读的partition复制到多个节点上，从而避免同步开销。</p><p>接下来是recovery。HyPer仍然会持久化redo log，但只需要记录logical的log。不需要记录physical log的原因是HyPer保证总能保证checkpoint是事务级别完整的，这样只要保证logical log按执行顺序恢复就行。多线程下只要保证partition级别log有序即可。</p><p>undo log不需要持久化，类似于InnoDB，undo log可以用于实现MVCC。有了undo log，OLAP子进程fork就不需要等待当时的事务完成，而是fork完成后使用undo log把所有活跃事务都rollback掉就得到了完整的snapshot。做checkpoint时也是用类似的方法。</p><p><img src="/images/2021-04/hyper-04.png"></p><p>记录redo log可能成为瓶颈（毕竟有I&#x2F;O），此时可以使用group commit或async commit来优化，但后者可能造成数据丢失。</p>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://ieeexplore.ieee.org/abstract/document/5767867/&quot;&gt;Hyper: A Hybrid OLTP&amp;amp;OLAP Main Memory Database System Based on Virtual Memory Snapshots&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;年代：2011&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;HyPer是一种内存数据库，它有以下特点：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;基于H-Store的设计，串行（因而无锁）执行事务（存储过程）。&lt;/li&gt;
+&lt;li&gt;通过fork子进程方式服务OLAP请求。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;通过fork来隔离OLTP与OLAP还挺有创意的，OS的实现显然比自己控制请求间的数据隔离更高效。&lt;/p&gt;
+&lt;p&gt;目测这仍然是研究大于实用的项目（至少在文章发表时）。&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="Database" scheme="http://fuzhe1989.github.io/tags/Database/"/>
+    
+    <category term="OLTP" scheme="http://fuzhe1989.github.io/tags/OLTP/"/>
+    
+    <category term="OLAP" scheme="http://fuzhe1989.github.io/tags/OLAP/"/>
+    
+    <category term="HTAP" scheme="http://fuzhe1989.github.io/tags/HTAP/"/>
+    
+    <category term="MainMemoryDatabase" scheme="http://fuzhe1989.github.io/tags/MainMemoryDatabase/"/>
+    
+    <category term="H-Store" scheme="http://fuzhe1989.github.io/tags/H-Store/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data</title>
+    <link href="http://fuzhe1989.github.io/2021/04/26/crush-controlled-scalable-decentralized-placement-of-replicated-data/"/>
+    <id>http://fuzhe1989.github.io/2021/04/26/crush-controlled-scalable-decentralized-placement-of-replicated-data/</id>
+    <published>2021-04-26T10:07:45.000Z</published>
+    <updated>2022-07-26T00:01:50.653Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://ieeexplore.ieee.org/abstract/document/4090205/">CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data</a></p><p>Ceph笔记：</p><ul><li><a href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system">Ceph</a></li><li><a href="/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems">Dynamic Metadata Management</a></li><li>CRUSH: Data Placement</li></ul></blockquote><p><strong>TL;DR</strong></p><p>CRUSH是一种确定性的hash算法，用来计算数据（对象）的存储位置。</p><p>Ceph中CRUSH的价值在于MDS和client都通过CRUSH来计算对象位置，这样client可以直接与OSD（Object Storage Device）通信，MDS也不需要维护对象与OSD之间的映射了。</p><p>另一方面，相比其它hash算法，CRUSH有以下优势：</p><ol><li>相比平坦的hash，CRUSH支持层级结构和权重，可以实现复杂的分布策略。</li><li>在有节点变动时，CRUSH可以最小化数据的迁移（根据分布策略），而简单的hash则会导致大量数据迁移。</li><li>对failed和overloaded的设备有特殊处理。</li></ol><span id="more"></span><p>CRUSH的策略受到两个变量的控制，一个是cluster map，其中支持多个层级，如root、row、cabinet、disk；另一个是placement rules，控制replica的数量和相应的限制。</p><p>CRUSH的输入是一个整数x（比如对象名字的hash值），输出是n个设备的列表。</p><p>cluster map中叶子节点称为device，可以有权重，其它内部节点称为bucket，权重是底下所有叶子权重之和。在选择设备时，CRUSH会根据hash一层层递归计算bucket，最终确定需要哪些device。注意：bucket本身有类型（如uniform、list、tree、straw），不同类型的bucket有不同的选择算法。</p><p>placement rules里面可以根据物理位置、电源供应、网络拓扑等条件将对象的不同replica分散开，从而降低不可用的风险。每个rule包含一系列操作，如下图。</p><p><img src="/images/2021-04/crush-01.png"></p><p><img src="/images/2021-04/crush-02.png"></p><p>其中<code>take</code>表示选择一个节点加到当前列表中，<code>select</code>会在列表中每个节点上应用，选择n个符合条件的节点出来。</p><p>一个rule中有多个<code>take</code>和<code>emit</code>可以从不同的存储池中选择不同设备。</p><p>在选择过程中，CRUSH会考虑三种异常：</p><ol><li>failed和overloaded（在cluster map中标记），此时CRUSH会在当前层级重试（见下面算法的11行）。</li><li>冲突（设备已被选中），此时CRUSH会在下一层重试（见下面算法的14行）。</li></ol><p>同层重试时，有两种策略：</p><ol><li>first n，下图中r’ &#x3D; r + f，b挂了则选择后面的g、h等。这种适合于primary copy这种不同设备存储相同replica的情况。</li><li>r’ &#x3D; r + f<sub>r</sub>n，b挂了则选择第2 + 1*6个设备h。这种适合于parity、erasure coding等不同设备存储不同内容的情况。</li></ol><p><img src="/images/2021-04/crush-03.png"></p><p><img src="/images/2021-04/crush-04.png"></p><p>failed和overloaded两种设备都会留在cluster map中，只是有不同的标记。failed设备上的已有对象会被迁移到其它正常设备上，预期迁移比例为W<sub>failed</sub>&#x2F;W。overloaded设备只是不再接受新对象，已有对象不需要迁移。</p><p>当有设备加入或移除时，需要迁移的数据量也与权重有关：权重被降低的子树会有数据迁移到权重被升高的子树上。</p><p><img src="/images/2021-04/crush-05.png"></p><p>数据迁移量的下界是φ&#x2F;W，而上界是hφ&#x2F;W，其中h是树的高度，但达到上界的概率非常小：需要每层数据都映射到一个权重非常小的设备上。</p><p>最后是不同的bucket type。</p><p>CRUSH支持4种bucket，分别有不同的选择算法:</p><ol><li><p>uniform</p><p> 所有设备权重相同。公式为：c(r, x) &#x3D; (hash(x) + rp) % m。其中p是某个大于bucket大小m的质数。</p><p> 优点是选择的时间复杂度为O(1)，缺点是一旦有设备变动，几乎所有数据都需要迁移。适合设备不怎么变动的场景。</p></li><li><p>list</p><p> 有点像链表，支持权重，选择时比较head的权重与剩余权重和来决定选择head还是继续。</p><p> 优点是当新设备加入时迁移量最优（与权重比例相同），缺点是当移除非head节点时会引起大量数据迁移（越接近tail越多）。适合设备几乎不移除的场景。</p></li><li><p>tree</p><p> 根据左右子树的权重和选择插入路径。为了避免树扩张或收缩过程中节点的label发生变化，tree bucket使用了一种路径标记的方式（左子树1，右子树0）来生成label。</p><p> <img src="/images/2021-04/crush-06.png"></p></li><li><p>straw</p><p> 这种似乎用得比较多？根据item和节点的权重，每个节点生成一个hash值，然后选择其中最大的那个。</p><p> c(r, x) &#x3D; max<sub>i</sub>(f(w<sub>i</sub>)hash(x, r, i))</p></li></ol><p><img src="/images/2021-04/crush-07.png"></p>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://ieeexplore.ieee.org/abstract/document/4090205/&quot;&gt;CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Ceph笔记：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system&quot;&gt;Ceph&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems&quot;&gt;Dynamic Metadata Management&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;CRUSH: Data Placement&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;CRUSH是一种确定性的hash算法，用来计算数据（对象）的存储位置。&lt;/p&gt;
+&lt;p&gt;Ceph中CRUSH的价值在于MDS和client都通过CRUSH来计算对象位置，这样client可以直接与OSD（Object Storage Device）通信，MDS也不需要维护对象与OSD之间的映射了。&lt;/p&gt;
+&lt;p&gt;另一方面，相比其它hash算法，CRUSH有以下优势：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;相比平坦的hash，CRUSH支持层级结构和权重，可以实现复杂的分布策略。&lt;/li&gt;
+&lt;li&gt;在有节点变动时，CRUSH可以最小化数据的迁移（根据分布策略），而简单的hash则会导致大量数据迁移。&lt;/li&gt;
+&lt;li&gt;对failed和overloaded的设备有特殊处理。&lt;/li&gt;
+&lt;/ol&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="ConsistentHash" scheme="http://fuzhe1989.github.io/tags/ConsistentHash/"/>
+    
+    <category term="Ceph" scheme="http://fuzhe1989.github.io/tags/Ceph/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] Dynamic Metadata Management for Petabyte-scale File Systems</title>
+    <link href="http://fuzhe1989.github.io/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems/"/>
+    <id>http://fuzhe1989.github.io/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems/</id>
+    <published>2021-04-23T15:09:00.000Z</published>
+    <updated>2022-07-26T00:01:50.653Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://ieeexplore.ieee.org/abstract/document/1392934/">Dynamic Metadata Management for Petabyte-scale File Systems</a></p><p><a href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system">之前Ceph的笔记</a></p></blockquote><p><strong>TL;DR</strong></p><p>这篇文章介绍了Ceph的Metadata Server（MDS）如何管理metadata，尤其是如何做目录树的动态负载均衡。</p><p>（不是很有趣……）</p><span id="more"></span><p>文章首先强调MDS的重要性：</p><blockquote><p>尽管metadata在数据量上只占了非常小的一部分，但操作数上却可以超过50%。</p></blockquote><p>另一方面，metadata又很难scale，因此很容易成为大规模分布式文件系统的瓶颈。</p><p>Ceph的解法是：</p><ul><li>client通过CRUSH算法获得数据位置，不需要询问MDS。</li><li>维护树型的metadata结构，可以动态均衡任意子树。</li><li>优化常见workload。</li></ul><p><img src="/images/2021-04/ceph-mds-management-01.png"></p><p>这里第一条很重要，询问数据分布是高频操作，client自己计算就能得到就极大降低了MDS的负担。另一方面MDS只需要为每个文件维护很少的固定长度的meta，可以在内存中维护更多文件的metadata。</p><p>MDS需要执行的操作可以分为两类：</p><ol><li>应用在文件和目录的inode上的操作，如<code>open</code>、<code>close</code>、<code>setattr</code>。</li><li>应用在目录项上，可能会改变层级结构的操作，如<code>rename</code>、<code>unlink</code>。</li></ol><p>另外还有一些非常常见的操作序列，如：</p><ol><li><code>open</code>加上<code>close</code>。</li><li><code>readdir</code>加上大量<code>stat</code>。</li></ol><p>其它系统的常见设计有：</p><ol><li><p>树型结构，但子树到server的映射是静态的，如NFS等。这种设计的优点就是简单，缺点就是难以适应workload的变化。</p></li><li><p>平坦结构，hash分布。</p><p> 这种设计优点非常多，但缺点是：</p><ol><li>无法消除单个文件的热点。GFS使用了shadow server来分担压力。</li><li>更严重的是，hash消除了层级结构的局部性。比如POSIX语义要求文件的ACL检查需要向上而下遍历所有目录项的ACL，hash会导致这个过程访问多个server。</li></ol><p> Lazy Hybrid（LH）在每个文件处维护它前缀目录项的ACL，这种设计将压力从check ACL转移到了update ACL，而后者的频率远低于前者，且可以异步进行。有分析指出update的开销可以分摊到每个文件一次网络trip。但这种设计仍然丧失了局部性，且依赖于对workload的强假设。</p></li></ol><p>Ceph保留了层级结构，但不同子树可以位于不同MDS上：&#x2F;usr和&#x2F;usr&#x2F;local可以位于不同MDS上。这种设计既保留了局部性，又能灵活分散压力。为了降低ACL检查的I&#x2F;O开销，MDS会保证cache中每个inode的所有前缀inode也在cache中，始终维持层级结构，cache expiration一定从叶子开始。这样在检查ACL时就不需要任何额外I&#x2F;O了。</p><p>MDS之间有主备replication，每个metadata项都有一个leader MDS，所有修改必须由leader进行，leader也有责任保持replica的cache的一致性。比如：</p><ul><li>如果某个item被载入到replica的cache中，leader就需要将这个item的更新同步给replica。</li><li>当replica换出某个item时，也需要通知leader。</li></ul><p>（听起来挺难维护的）</p><p>某些特定操作（如更新mtime和file size）也可以由replica来执行，定期告知leader即可。</p><p>当子树需要在MDS之间迁移时，旧leader需要把所有活跃状态和cache都传输给新leader，既是为了保持cache一致，也是为了减少failover的I&#x2F;O。</p><p>（讨论load-balancing策略的部分略）</p><p>作者的心得：</p><ul><li>平衡的workload分布不一定能达到最大的总吞吐。</li><li>不是所有metadata项都平等重要，离root越近，往往越重要。</li></ul><p>接下来为了处理热点文件，可以牺牲一些一致性：非热点文件必须由leader处理，热点文件可以由replica处理只读请求。这里需要MDS与client之间交换信息，让client有足够的信息能路由到replica上。</p><p>最后是如何利用局部性。</p><p>Ceph利用局部性的方式是尽可能地将直接相关的信息保存在一起，还要做预读。传统的文件系统会有一个全局的inode表，这种设计在单机系统中对性能有明显的好处：访问更集中，更容易缓存，减少磁盘I&#x2F;O。但在分布式系统中这种设计就不太适合了。Ceph是直接将inode保存在对应的目录项中，这样<code>readdir</code>可以直接返回整个目录的信息。</p><p>但缺乏全局inode表也导致了几个问题：</p><ol><li>需要能分配全局唯一的inode id。</li><li>只有管理对应目录的MDS才能知道哪些inode在使用，这些MDS需要记住client正在使用的inode（比如文件被逻辑删除后要保留对应inode）。</li><li>hard link很难处理。我们知道通常hard link是非常罕见的，因此Ceph对于hard link做了特殊处理，使用一个global inode table保存所有hard link。</li></ol>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://ieeexplore.ieee.org/abstract/document/1392934/&quot;&gt;Dynamic Metadata Management for Petabyte-scale File Systems&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&quot;/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system&quot;&gt;之前Ceph的笔记&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这篇文章介绍了Ceph的Metadata Server（MDS）如何管理metadata，尤其是如何做目录树的动态负载均衡。&lt;/p&gt;
+&lt;p&gt;（不是很有趣……）&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="FileSystem" scheme="http://fuzhe1989.github.io/tags/FileSystem/"/>
+    
+    <category term="Ceph" scheme="http://fuzhe1989.github.io/tags/Ceph/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications</title>
+    <link href="http://fuzhe1989.github.io/2021/04/23/chord-a-scalable-peer-to-peer-lookup-protocol-for-internet-applications/"/>
+    <id>http://fuzhe1989.github.io/2021/04/23/chord-a-scalable-peer-to-peer-lookup-protocol-for-internet-applications/</id>
+    <published>2021-04-23T05:49:48.000Z</published>
+    <updated>2022-07-26T00:01:50.651Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://ieeexplore.ieee.org/abstract/document/1180543/">Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications</a></p></blockquote><p><strong>TL;DR</strong></p><p>Chord解决的是P2P系统（去中心化）中如何高效确定数据位置的问题。</p><p>P2P系统中最常见的方案是将数据按一致性hash分散到不同节点上，这样显著减少了节点增减时产生的数据迁移。这套方案中最重要的是每个节点需要维护一个路由表，在接收到请求时，如果数据不在自己上面，需要根据路由表将请求转发给对应的节点。传统的一致性hash里路由表需要包含全部节点信息，产生了<code>O(N)</code>的维护代价，规模大了就会有问题。</p><p>Chord在一致性hash基础上，只需要每个节点维护<code>O(logN)</code>大小的路由表，同样能实现<code>O(logN)</code>的查找，即使路由信息过时了也能回退到<code>O(n)</code>查找。减少了路由表的大小，显著地降低了Chord的维护代价，能在节点不停变化时仍然保持不错的性能。</p><p><a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store">Dynamo</a>似乎使用了类似Chord的方案。</p><span id="more"></span><p>Chord的前提：</p><ul><li>节点间数据按一致性hash分布，可以使用虚拟节点。</li></ul><p>假设网络是：</p><ul><li>对称的（如果A能访问B，则B也能访问A）。</li><li>可传递的（如果A能访问B，B能访问C，则A也能访问C）。</li></ul><p>（真实网络不是这样的，此时需要有其它协议做错误检测并踢掉导致网络问题的节点，如Cassandra使用的<a href="https://dspace.jaist.ac.jp/dspace/bitstream/10119/4784/1/IS-RR-2004-010.pdf">The ϕ Accrual Failure Detector</a>）</p><p><strong>定理4.1</strong>：对于任意N个节点和K个key，以下大概率成立：</p><ul><li>每个节点负责最多(1+ε)K&#x2F;N个key。</li><li>节点N+1加入或离开会导致O(K&#x2F;N)个key发生迁移（到或出这个节点）。</li></ul><p><img src="/images/2021-04/chord-01.png"></p><p>在这样的环上查找时，每个节点最少只需要知道它的下家（successor）是谁，此时就是线性查找。</p><p><img src="/images/2021-04/chord-02.png"></p><p>接下来每个节点要维护的信息变成了一个finger table，其中包含最多O(logm)项（m是hash最大值），每项记录base+2<sup>i-1</sup>的位置（1&lt;&#x3D;i&lt;&#x3D;m），这样就可以以O(logN)的时间复杂度完成查找（此时整个环类似于一个skiplist）。</p><p><img src="/images/2021-04/chord-03.png"></p><p><img src="/images/2021-04/chord-04.png"></p><p><strong>定理4.2</strong>：N个节点的Chord网络中，<code>find_successor</code>要通信的节点数大概率是O(logN)。</p><p>接下来我们看Chord怎么处理节点的加入和离开。</p><p>为了保证finger table不过时，每个节点会定期执行“stabilization”以更新finger table和successor&#x2F;predecessor。</p><p><img src="/images/2021-04/chord-05.png"></p><p>新节点join后还不会立即进入Chord环，以及其它节点的finger table，随着后续的stabilization，最终会被识别并加入。</p><p><strong>定理4.3</strong>：任意的join与stabilization交错执行后，所有节点的successor会在某个时间构成完整的。</p><p>注意stabilization无法处理整个环分裂为多个环的情况，不过正常的join&#x2F;leave不会导致这种情况的发生。</p><p>接下来考虑stabilization之前的查找，有三种可能：</p><ol><li>finger table不需要修改，指向正确的位置。这是最可能的情况，此时正确性和性能都不是问题。</li><li>finger table不准确，但successor正确，此时正确性不是问题，但性能会有一定的退化。</li><li>successor也不正确，或对应数据还没做完迁移，此时可能查找不到数据，上层应用要考虑等待一段时间再重试。</li></ol><p><strong>定理4.4</strong>：假设有N个节点的稳定（finger table和successor都正确）网络，此时再加入最多N个节点，保证所有successor指针正确（但不保证finger table正确），则查找仍然大概率需要O(logN)次跳转。</p><p>接下来我们考虑节点fail的情况。</p><p>Chord协议的正确性依赖于每个节点的successor指针正确，但当有节点fail了，如图4中节点14、21、32都fail的话，节点8的successor应该是节点38，但它的finger table里没有节点38，此时查找就会失败。比如节点8要查找30，就会转发给节点42。</p><p>Chord的对策是每个节点除了finger table外，还维护下面r个successor，当直接successor不响应的时候，节点就依次询问successor列表中后面的节点。只有当r个全失败了才会导致查找失败。</p><p>维护successor list的方式是定期获取直接successor的successor list，将它加进去，再踢掉最后一个。</p><p>有了successor list后，图5中的<code>closest_preceding_node</code>就会同时考虑finger table和successor list了。</p><p><strong>定理4.5</strong>：在一个初始稳定的网络中，如果successor list长度r &#x3D; Ω(logN)，之后每个节点有50%概率失败，则大概率<code>find_successor</code>仍然能返回正确的节点。</p><p><strong>定理4.6</strong>：在一个初始稳定的网络中，如果每个节点的失败概率为50%，则<code>find_successor</code>的预期执行时间仍然为O(logN)。</p><p>successor list还可以被上层应用用来实现replication（如Dynamo）。</p><p>节点离开可以不走失败的处理路径，而是主动迁移数据并告知它的successor&#x2F;predecessor，这样就能显著降低节点离开的影响。</p><p>当然现实场景中Chord系统可能永远无法处于稳定状态，但有研究表明只要stabilization以合理的频率运行，Chord环仍然能以<strong>几乎稳定</strong>的状态运行，并保证正确性和性能。</p><p>接下来我们看如何改进路由的延时。</p><p>考虑到地域因素，尽管一次路由的通信数可以保证在(1&#x2F;2)logN，但延时可能会很大：环上相近的节点现实中可能距离很远。</p><p>作者之前的一个idea是在构建finger table时同时考虑环上距离和现实中的延时，但这种方案的性能很难评估。</p><p>这里作者的idea是每个finger维护多个节点，并维护与它们的通信延时，在路由时尽量发请求给延时最低的节点。</p><p>最后作者讨论了如何维护Chord环的一致性，误操作、bug、恶意节点都可能导致Chord环分裂。一种方案是每个节点x定期在环上查找自己负责范围内的key y，如果找不到，或结果不是x，说明一致性可能被破坏了。</p>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://ieeexplore.ieee.org/abstract/document/1180543/&quot;&gt;Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;strong&gt;TL;DR&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Chord解决的是P2P系统（去中心化）中如何高效确定数据位置的问题。&lt;/p&gt;
+&lt;p&gt;P2P系统中最常见的方案是将数据按一致性hash分散到不同节点上，这样显著减少了节点增减时产生的数据迁移。这套方案中最重要的是每个节点需要维护一个路由表，在接收到请求时，如果数据不在自己上面，需要根据路由表将请求转发给对应的节点。传统的一致性hash里路由表需要包含全部节点信息，产生了&lt;code&gt;O(N)&lt;/code&gt;的维护代价，规模大了就会有问题。&lt;/p&gt;
+&lt;p&gt;Chord在一致性hash基础上，只需要每个节点维护&lt;code&gt;O(logN)&lt;/code&gt;大小的路由表，同样能实现&lt;code&gt;O(logN)&lt;/code&gt;的查找，即使路由信息过时了也能回退到&lt;code&gt;O(n)&lt;/code&gt;查找。减少了路由表的大小，显著地降低了Chord的维护代价，能在节点不停变化时仍然保持不错的性能。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&quot;/2020/11/11/dynamo-amazons-highly-available-key-value-store&quot;&gt;Dynamo&lt;/a&gt;似乎使用了类似Chord的方案。&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="P2P" scheme="http://fuzhe1989.github.io/tags/P2P/"/>
+    
+    <category term="ConsistentHash" scheme="http://fuzhe1989.github.io/tags/ConsistentHash/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>Why Uber Engineering Switched from Postgres to MySQL</title>
+    <link href="http://fuzhe1989.github.io/2021/04/22/why-uber-engineering-switched-from-postgres-to-mysql/"/>
+    <id>http://fuzhe1989.github.io/2021/04/22/why-uber-engineering-switched-from-postgres-to-mysql/</id>
+    <published>2021-04-22T12:51:05.000Z</published>
+    <updated>2022-07-26T00:01:50.661Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://eng.uber.com/postgres-to-mysql-migration/">Why Uber Engineering Switched from Postgres to MySQL</a></p></blockquote><p>Uber之前一直用Postgres作为DBMS（最终版本是9.2），后来遇到了很多困难，最终迁移到了MySQL&#x2F;InnoDB上。</p><span id="more"></span><p>导致问题的是以下Postgres的核心设计：</p><ol><li>row（tuple）是不可变的，每次更新会写入新的tuple，产生新的ctid。</li><li>primary和secondary index引用的是ctid。</li><li>主备之间replication传输物理log（WAL）而不是逻辑log。</li><li>依赖于OS的page cache，自身只维护非常小的内部cache。</li><li>多进程（per-connection）而不是多线程。</li></ol><p>这里面引起问题最多的就是物理replication协议。后续PG增加了pglogical，但文章中表示pglogical还没有合入主线，只能是辅助使用。</p><h2 id="严重问题"><a href="#严重问题" class="headerlink" title="严重问题"></a>严重问题</h2><p><strong>写放大</strong></p><p>P1和P2导致每次写除了要写heap file外，还需要更新1个primary index和N个secondary index（ctid变了），无论这次更新的列是否与索引有关。</p><p>MySQL没有heap file，数据直接存在primary index中，每次修改只产生delta，secondary index只索引primary key。这些设计都显著降低了写放大。</p><p><strong>Replication放大</strong></p><p>P3（传输WAL）可以时刻保持主备文件级别一致，有问题了甚至可以直接<code>rsync</code>修复。但它太过于底层，包含很多不必要的数据，导致了网络流量放大。在跨datacenter的replication中这就成问题了。</p><p>另外每笔写入都导致索引跟着更新，都在WAL里，也增大了replication的流量。</p><p>MySQL支持三种replication模式：</p><ul><li>语句级别：<code>UPDATE users SET birth_year=770 WHERE id = 4</code>。</li><li>行级别。</li><li>两者混合。</li></ul><p>语句级别最精简，但replica还需要重新执行，开销较大；行级别数据量较大，但更精确，重要的是只需要传输主表的逻辑修改，replica自己会应用到index上。这就显著降低了replication的流量。</p><p><strong>数据损坏</strong></p><p>Postgres 9.2有个bug，replica可能会漏掉一些WAL。因为replication传输的是物理修改，漏掉一条log会导致整个B-tree都有错位的风险，可能整个DB会挂掉。而这样的检测又非常困难。</p><p>MySQL的replication传输逻辑修改就没有这种风险了，顶多是某行出错，不会有不相关数据跟着出错的风险。</p><p><strong>Replica不支持MVCC</strong></p><p>Postgres的replica不真的支持MVCC，当replica上有query执行时，为了避免后续修改破坏它的snapshot，它会持有相关的行，不让其被修改。这就导致replication可能被阻塞（WAL线程会等到相关事务结束）。为了避免无限等待，Postgres会在WAL被阻塞太长时间后kill掉对应的事务。</p><p>这种设计导致两个问题：</p><ol><li>replica随时可能落后于master相当长（分钟级别）的时间。</li><li>用户端写代码变困难，因为事务不知道什么时候就会被kill。</li></ol><p><strong>升级困难</strong></p><p>Postgres的replication导致在开启了主备之后，跨版本升级变得特别困难：主备如果版本不同，物理格式可能不兼容。</p><p>作者总结的升级步骤：</p><ul><li>停掉master。</li><li>在master机器上运行<code>pg_upgrade</code>升级数据格式，可能需要好几个小时，过程中master不能服务。</li><li>启动master。</li><li>创建一个master的snapshot，这一步需要物理复制master的所有文件，也可能需要好几个小时。</li><li>停掉并清空每个replica的文件，再将master的snapshot复制过去。</li><li>加回每个replica，等待追上master的进度。</li></ul><p>一看这个步骤就太吓人了，Uber做了一次9.1到9.2的升级，之后就再也没动了Postgres的版本了。</p><p>而MySQL的逻辑replication的设计使它可以几乎无停服地升级master和所有replica。</p><h2 id="其它问题"><a href="#其它问题" class="headerlink" title="其它问题"></a>其它问题</h2><p><strong>无法利用大内存</strong></p><p>Postgres自身管理的cache通常比较小，因此在大内存机器上它依赖于OS的page cache来提升性能。</p><p>但访问page cache的开销远大于访问进程内部的cache，原因是要经过系统调用，且无法实现自定义的换出策略。</p><p>MySQL则会主动管理大cache，这样做的缺点是可能增加TLB miss，但可以通过使用huge page缓解。</p><p><strong>多进程</strong></p><p>Postgres会为每个connection创建一个新进程，但相比多线程，这种设计有以下缺点：</p><ol><li>无法支持高连接数。</li><li>进程间通信开销远大于进程内通信。</li></ol>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://eng.uber.com/postgres-to-mysql-migration/&quot;&gt;Why Uber Engineering Switched from Postgres to MySQL&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Uber之前一直用Postgres作为DBMS（最终版本是9.2），后来遇到了很多困难，最终迁移到了MySQL&amp;#x2F;InnoDB上。&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="Database" scheme="http://fuzhe1989.github.io/tags/Database/"/>
+    
+    <category term="Engineering" scheme="http://fuzhe1989.github.io/tags/Engineering/"/>
+    
+    <category term="MySQL" scheme="http://fuzhe1989.github.io/tags/MySQL/"/>
+    
+    <category term="PostgreSQL" scheme="http://fuzhe1989.github.io/tags/PostgreSQL/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] Deuteronomy: Transaction Support for Cloud Data</title>
+    <link href="http://fuzhe1989.github.io/2021/04/22/deuteronomy-transaction-support-for-cloud-data/"/>
+    <id>http://fuzhe1989.github.io/2021/04/22/deuteronomy-transaction-support-for-cloud-data/</id>
+    <published>2021-04-22T05:02:12.000Z</published>
+    <updated>2022-07-26T00:01:50.653Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://www.microsoft.com/en-us/research/publication/deuteronomy-transaction-support-for-cloud-data/">Deuteronomy: Transaction Support for Cloud Data</a></p></blockquote><p>与Percolator和Omid类似，Deuteronomy也是为多个数据节点提供分布式事务能力的。在Deuteronomy中，提供事务能力的中心节点称为transactional component（TC），数据节点称为data component（DC）。</p><p>与Percolator和Omid不同的是，Deuteronomy类似于ARIES，提供的是悲观锁，不需要MVCC支持。它的TC和DC更像是传统的单机RDBMS的一种功能拆分，相互功能依赖比较多，而不像Percolator和Omid一样依赖于分布式KV。</p><p>目测Deuteronomy性能不会太好（没有MVCC）。</p><span id="more"></span><p><img src="/images/2021-04/deuteronomy-01.png"></p><p>Deuteronomy中TC拥有传统单机DB的除了buffer pool之外的全部组件：</p><ul><li>Session manager</li><li>Record manager</li><li>Table manager</li><li>Lock manager</li><li>Log manager</li></ul><p>DC需要维护buffer pool与storage。</p><p>无论TC还是DC都需要支持多线程。</p><p><strong>Session manager</strong>负责维护与client之间的session，保证每个session同时间最多执行一个事务。</p><p><strong>Record manager</strong>提供record层面的接口，它也需要与table manager、lock manager、log manager交互。</p><p>无论读写请求，第一步都是要加锁。之后读请求会直接转发给对应的DC。写请求的流程则是：产生LSN、写请求发给DC、写log、放锁、回复client。</p><p>几个需要注意的点：</p><ul><li>Record manager需要先加锁再产生LSN，这样保证相互冲突的事务间LSN顺序与加锁顺序一致。但整体上log中LSN是不保证顺序的。</li><li>先写DC，拿到response（里面包含before value）再写log，这样看起来违背了WAL（不ahead了），但保证了log只写一次。因为Deuteronomy只提供悲观锁，在这个事务放锁之前DC对应的page不会被其它事务读到，而TC也能保证如果事务最终abort了，DC会收到rollback；TC如果挂了，在recovery阶段可以令DC状态回退到一个一致的状态 。</li><li>DC需要支持幂等写入，且保证完全按照TC的控制指令来刷盘。</li></ul><p><strong>Table manager</strong>负责两件事：</p><ul><li>管理table&#x2F;column的meta，保存到某个特定的DC中。</li><li>管理table的逻辑partition（按key range），作为介于table与record之间的加锁粒度。这是因为TC不管理数据，无法实现按page加锁。</li></ul><p><strong>Lock manager</strong>有几点要注意：</p><ul><li>提供table&#x2F;partition&#x2F;record三种粒度的锁。</li><li>partition粒度的锁用来提供range lock。</li><li>不提供next key lock，原因是TC不管理数据，如果要查询next key就需要访问一次DC，开销太大。</li></ul><p>Log manager是ARIES风格的，但有几点区别：</p><ul><li>只记录logical log（per-record），因为TC不管数据。</li><li>log中LSN不保证顺序（如果保证顺序就需要等待LSN更小但更晚结束的事务）。</li></ul><p>Log manager的复杂性来自TC与DC的分离，TC管理log，DC管理buffer pool，这样TC与DC间就需要通信来保证log与cache一致。</p><p>具体而言，TC会向DC发送两种指令：</p><ul><li><strong>End Of Stable Log（EOSL）</strong>：发送eLSN给DC，表示这之前的log都已经刷盘成功，DC可以放心将所有LSN &lt;&#x3D; eLSN的page刷下去了（可以不刷，但不能越过eLSN刷盘）。</li><li><strong>Redo Scan Start Point（RSSP）</strong>：发送rLSN给DC，表示DC一定要把这之前的数据刷下去。所有DC的RSSP返回之后，TC就会更新checkpoint，后面recovery时就从RSSP开始。</li></ul><p><strong>具体执行EOSL的流程</strong></p><p>TC维护一个LSN-V（LSN的数组），从上次的eLSN开始，按LSN排列，每项都是<code>&lt;LSN, LP&gt;</code>（LP即log point，log中的物理位置）。需要发送EOSL时，记当时持久化好的log位置是sLP，则遍历LSN-V，直到找到某项为空（表示这个事务还在执行中）或LP超过了sLP。</p><p><strong>具体执行RSSP的流程</strong></p><p>值得注意的是rLSN是发送给DC强制刷盘的，但TC自己记录的则是rLP，两者不一定对应，但需要满足：</p><ul><li>任何LSN &lt;&#x3D; rLSN的log都应该已经持久化了，暗示着rLSN可以是某个过去的eLSN。</li><li>任何LSN &gt; rLSN的log，其LP &gt;&#x3D; rLP，保证recovery阶段不会漏掉这条log。</li></ul><p>我们在LSN-V的基础上，每次执行EOSL时记录三个值：eLSN、sLP、maxLSN，其中maxLSN表示当时最大的LSN。这样我们就得到了EOSL-V（前面三元组的数组）。这三个值的关系为：eLSN &lt;&#x3D; sLP.LSN &lt;&#x3D; maxLSN，eLSN.LP &lt;&#x3D; sLP &lt;&#x3D; maxLSN.LP</p><p>我们先确定rLSN。初始的rLP可以是E[0].sLP，对于E[i].eLSN &gt;&#x3D; E[0].maxLSN，我们知道它的LP也大于E[0].sLP，这样就满足了对rLSN的2个要求。任何这样的eLSN都可以作为rLSN。</p><p>在确定了rLSN后，我们再去找最大的满足j，满足rLSN &gt;&#x3D; E[j].maxLSN，则E[j].sLP就是rLP。</p><p><strong>整体流程</strong></p><p><img src="/images/2021-04/deuteronomy-02.png"></p><p><img src="/images/2021-04/deuteronomy-03.png"></p><p><strong>优化</strong></p><p>两种优化：</p><ol><li>Fast Commit，即log进队列后就放锁，之后等刷盘成功再返回client。因为log是按队列顺序落盘的，这样整体结果是确定的。代价是只读请求也要有空log进队列（这个代价其实有点大）。</li><li>Group Commit。</li></ol>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://www.microsoft.com/en-us/research/publication/deuteronomy-transaction-support-for-cloud-data/&quot;&gt;Deuteronomy: Transaction Support for Cloud Data&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;与Percolator和Omid类似，Deuteronomy也是为多个数据节点提供分布式事务能力的。在Deuteronomy中，提供事务能力的中心节点称为transactional component（TC），数据节点称为data component（DC）。&lt;/p&gt;
+&lt;p&gt;与Percolator和Omid不同的是，Deuteronomy类似于ARIES，提供的是悲观锁，不需要MVCC支持。它的TC和DC更像是传统的单机RDBMS的一种功能拆分，相互功能依赖比较多，而不像Percolator和Omid一样依赖于分布式KV。&lt;/p&gt;
+&lt;p&gt;目测Deuteronomy性能不会太好（没有MVCC）。&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="OLTP" scheme="http://fuzhe1989.github.io/tags/OLTP/"/>
+    
+    <category term="ARIES" scheme="http://fuzhe1989.github.io/tags/ARIES/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>[笔记] Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</title>
+    <link href="http://fuzhe1989.github.io/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics/"/>
+    <id>http://fuzhe1989.github.io/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics/</id>
+    <published>2021-04-21T04:31:17.000Z</published>
+    <updated>2022-07-26T00:01:50.660Z</updated>
+    
+    <content type="html"><![CDATA[<blockquote><p>原文：<a href="https://dl.acm.org/doi/abs/10.14778/3229863.3229868">Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</a></p><p>Omid三部曲：</p><ol><li><a href="/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores">Omid: Lock-free transactional support for distributed data stores</a></li><li><a href="/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing">Omid, Reloaded: Scalable and Highly-Available Transaction Processing</a></li><li>Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</li></ol></blockquote><p>这是Omid的第三篇（2018年），主要改进是提出了两种降低延时的新协议，从而满足新的实时事务的需求（作为Phoenix的后端）。</p><p>两种新协议分别是：</p><ul><li>Omid Low Latency（Omid LL），将Omid中写CT的工作由TM转交给client，从而分散了负载，降低了延时。</li><li>Omid Fast Path（Omid FP），处理单key事务时绕开TM，从而达到原生HBase操作的延时（代价是隔离级别从snapshot isolation（SI）降低到了generalized snapshot isolation（GSI）[<a href="https://ieeexplore.ieee.org/abstract/document/1541186/">1</a>]）。</li></ul><p>Omid再改进就要考虑分散冲突检测了。</p><p>Omid LL中TM有两个角色，一个是TSO，通常不会是瓶颈；另一个是全局冲突检测。我们知道Omid中冲突检测是per bucket进行的，每个bucket独立判断。假如bucket足够小，小到只有一个key，就相当于每个key独立判断一下冲不冲突。此时TM的必要性就不存在了，client可以直接与data server通信判断。</p><p>此时Omid就变成了Percolator的变种，即将commit meta放到了单独的commit table中，而不是与数据在一起。</p><span id="more"></span><h2 id="Omid-LL"><a href="#Omid-LL" class="headerlink" title="Omid LL"></a>Omid LL</h2><p>Omid 14中TM在内存中维护事务meta，还需要与client保持meta replication，负担比较重，成为了全局吞吐的瓶颈。</p><p>Omid 17因此增加了commit table（CT），将事务meta信息下放到表中，这样client不需要meta replication，直接查询表就可以得到事务信息。但Omid 17中的CT只由TM更新，又成为了新的全局瓶颈。</p><p>Omid LL的主要改进就是由client来写CT，从而极大降低了TM的负载，后者主要工作只剩下TSO和冲突检测。</p><p><img src="/images/2021-04/omid-18-01.png"></p><p>Omid LL中TM的Commit只会返回一个timestamp：</p><p><img src="/images/2021-04/omid-18-02.png"></p><p>主要工作都转交给了client：</p><p><img src="/images/2021-04/omid-18-03.png"></p><p>注意READ中有几个race condition需要考虑：</p><ul><li>如果rec中的commit为空，对应的事务可能pending，也可能在post-writing，client需要通过一次get or abort来判断。</li><li>如果CT中没有对应事务，client需要再读一次rec，如果发现又有commit了，就说明刚刚对应事务已经完成了post-writing和清理CT，client需要把自己插入CT的abort再删掉（如果没删掉也没关系，后面清理任务会做的）。</li></ul><p>在COMMIT的post-writing阶段，Omid 17需要读出修改过的每一行再执行清理或写入commit，Omid LL则改成了blind write。这里没有正确性问题，因为每个事务的write set只有一个writer，client实际拥有所有需要的信息，不需要每行再读一次。</p><h2 id="Omid-FP"><a href="#Omid-FP" class="headerlink" title="Omid FP"></a>Omid FP</h2><p>Omid FP提供了几个针对单key的事务API，将事务的BEGIN和COMMIT并入后续的一次读写操作中，从而降低延时。</p><p>几个API为：</p><ul><li><code>brc(key)</code>：BEGIN，读key，COMMIT。</li><li><code>bwc(key, val)</code>：BEGIN，写key，ts大于已有版本，COMMIT。</li><li><code>br(key)</code>：BEGIN，读key，返回value和对应版本，不COMMIT。</li><li><code>wc(ver, key, val)</code>：检测key没有大于ver的写入，写key，ts大于已有版本，COMMIT。</li></ul><p>注意<code>br</code>和<code>wc</code>要配套使用。</p><p>Omid FP的实现分为两部分，分别由client和HBase server（通过coprocessor）提供：</p><p><img src="/images/2021-04/omid-18-04.png"></p><p>可以看到<code>brc</code>和<code>br</code>实际就是HBase的<code>get</code>。</p><p><code>bwc</code>需要看key的当前版本是否已经提交了，如果遇到了未提交的版本就直接abort。这里为了降低延时，没有像client的READ一样尝试abort掉对应的事务。</p><p><code>bwc</code>和<code>wc</code>需要产生一个新的version，需要保证以下性质</p><ol><li>新version大于所有旧version，但小于未来TM产生的version。</li><li>能检测出与普通事务的冲突。</li></ol><p>这就与TM作为全局TSO冲突了。为此Omid FP引入了HLC，TM的timestamp作为physical ts，在<code>putVersion</code>中只增加logical ts。如果非常罕见地logical ts满了，这个FP的事务会被abort掉，client可以使用普通路径重试。</p><p>如果普通事务早于FP事务写入，前面提到了FP事务会abort。但如果FP事务在某个普通事务的读和提交之间完成了：</p><p><img src="/images/2021-04/omid-18-05.png"></p><p>因为FP事务不在CT中记录，旧的检测机制失效了。为了能让T1提交时检测出冲突，Omid FP做了以下改动：</p><ul><li>每个key对应一个maxVersion，保证不小于这个key的任何已提交版本。</li><li><code>putVersion</code>提升maxVersion。</li><li>普通事务的读会提升maxVersion到不小于事务ts。</li><li>普通事务的写会检查maxVersion不大于事务ts。</li></ul><p>这个改动增加了普通路径的开销。为了降低内存使用，Omid FP在每个HBase的region server上维护了一个local version clock（LVC），即整个server的maxVersion。这个优化增加了false abortion，但降低了维护代价。</p><p>LVC不会持久化，每个region server在第一次请求处理中会访问TM获得physical ts。</p>]]></content>
+    
+    
+    <summary type="html">&lt;blockquote&gt;
+&lt;p&gt;原文：&lt;a href=&quot;https://dl.acm.org/doi/abs/10.14778/3229863.3229868&quot;&gt;Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Omid三部曲：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;a href=&quot;/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores&quot;&gt;Omid: Lock-free transactional support for distributed data stores&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing&quot;&gt;Omid, Reloaded: Scalable and Highly-Available Transaction Processing&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这是Omid的第三篇（2018年），主要改进是提出了两种降低延时的新协议，从而满足新的实时事务的需求（作为Phoenix的后端）。&lt;/p&gt;
+&lt;p&gt;两种新协议分别是：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Omid Low Latency（Omid LL），将Omid中写CT的工作由TM转交给client，从而分散了负载，降低了延时。&lt;/li&gt;
+&lt;li&gt;Omid Fast Path（Omid FP），处理单key事务时绕开TM，从而达到原生HBase操作的延时（代价是隔离级别从snapshot isolation（SI）降低到了generalized snapshot isolation（GSI）[&lt;a href=&quot;https://ieeexplore.ieee.org/abstract/document/1541186/&quot;&gt;1&lt;/a&gt;]）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Omid再改进就要考虑分散冲突检测了。&lt;/p&gt;
+&lt;p&gt;Omid LL中TM有两个角色，一个是TSO，通常不会是瓶颈；另一个是全局冲突检测。我们知道Omid中冲突检测是per bucket进行的，每个bucket独立判断。假如bucket足够小，小到只有一个key，就相当于每个key独立判断一下冲不冲突。此时TM的必要性就不存在了，client可以直接与data server通信判断。&lt;/p&gt;
+&lt;p&gt;此时Omid就变成了Percolator的变种，即将commit meta放到了单独的commit table中，而不是与数据在一起。&lt;/p&gt;</summary>
+    
+    
+    
+    
+    <category term="笔记" scheme="http://fuzhe1989.github.io/tags/%E7%AC%94%E8%AE%B0/"/>
+    
+    <category term="OLTP" scheme="http://fuzhe1989.github.io/tags/OLTP/"/>
+    
+    <category term="Snapshot Isolation" scheme="http://fuzhe1989.github.io/tags/Snapshot-Isolation/"/>
+    
+    <category term="2PC" scheme="http://fuzhe1989.github.io/tags/2PC/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>ClickHouse基础库学习：StrongTypedef</title>
+    <link href="http://fuzhe1989.github.io/2021/04/20/clickhouse-code-strong-type-def/"/>
+    <id>http://fuzhe1989.github.io/2021/04/20/clickhouse-code-strong-type-def/</id>
+    <published>2021-04-20T09:08:52.000Z</published>
+    <updated>2022-07-26T00:01:50.651Z</updated>
+    
+    <content type="html"><![CDATA[<p>位置：base&#x2F;common&#x2F;strong_typedef.h</p><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">T</span>, <span class="keyword">class</span> <span class="title class_">Tag</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">StrongTypedef</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">using</span> Self = StrongTypedef;</span><br><span class="line">    T t;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">using</span> UnderlyingType = T;</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">Enable</span> = <span class="keyword">typename</span> std::is_copy_constructible&lt;T&gt;::type&gt;</span><br><span class="line">    <span class="keyword">explicit</span> <span class="built_in">StrongTypedef</span>(<span class="type">const</span> T &amp; t_) : <span class="built_in">t</span>(t_) &#123;&#125;</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> Enable = <span class="keyword">typename</span> std::is_move_constructible&lt;T&gt;::type&gt;</span><br><span class="line">    <span class="keyword">explicit</span> <span class="built_in">StrongTypedef</span>(T &amp;&amp; t_) : <span class="built_in">t</span>(std::<span class="built_in">move</span>(t_)) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> Enable = <span class="keyword">typename</span> std::is_default_constructible&lt;T&gt;::type&gt;</span><br><span class="line">    <span class="built_in">StrongTypedef</span>(): <span class="built_in">t</span>() &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">StrongTypedef</span>(<span class="type">const</span> Self &amp;) = <span class="keyword">default</span>;</span><br><span class="line">    <span class="built_in">StrongTypedef</span>(Self &amp;&amp;) = <span class="keyword">default</span>;</span><br><span class="line"></span><br><span class="line">    Self &amp; <span class="keyword">operator</span>=(<span class="type">const</span> Self &amp;) = <span class="keyword">default</span>;</span><br><span class="line">    Self &amp; <span class="keyword">operator</span>=(Self &amp;&amp;) = <span class="keyword">default</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">Enable</span> = <span class="keyword">typename</span> std::is_copy_assignable&lt;T&gt;::type&gt;</span><br><span class="line">    Self &amp; <span class="keyword">operator</span>=(<span class="type">const</span> T &amp; rhs) &#123; t = rhs; <span class="keyword">return</span> *<span class="keyword">this</span>;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">Enable</span> = <span class="keyword">typename</span> std::is_move_assignable&lt;T&gt;::type&gt;</span><br><span class="line">    Self &amp; <span class="keyword">operator</span>=(T &amp;&amp; rhs) &#123; t = std::<span class="built_in">move</span>(rhs); <span class="keyword">return</span> *<span class="keyword">this</span>;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">operator</span> <span class="type">const</span> T &amp; () <span class="type">const</span> &#123; <span class="keyword">return</span> t; &#125;</span><br><span class="line">    <span class="keyword">operator</span> T &amp; () &#123; <span class="keyword">return</span> t; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">bool</span> <span class="keyword">operator</span>==(<span class="type">const</span> Self &amp; rhs) <span class="type">const</span> &#123; <span class="keyword">return</span> t == rhs.t; &#125;</span><br><span class="line">    <span class="type">bool</span> <span class="keyword">operator</span>&lt;(<span class="type">const</span> Self &amp; rhs) <span class="type">const</span> &#123; <span class="keyword">return</span> t &lt; rhs.t; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">T &amp; <span class="title">toUnderType</span><span class="params">()</span> </span>&#123; <span class="keyword">return</span> t; &#125;</span><br><span class="line">    <span class="function"><span class="type">const</span> T &amp; <span class="title">toUnderType</span><span class="params">()</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> t; &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> STRONG_TYPEDEF(T, D) \</span></span><br><span class="line"><span class="meta">    struct D ## Tag &#123;&#125;; \</span></span><br><span class="line"><span class="meta">    using D = StrongTypedef<span class="string">&lt;T, D ## Tag&gt;</span>; \</span></span><br></pre></td></tr></table></figure><p><code>StrongTypedef</code>提供了<code>T</code>的一种别名，它支持以下操作：</p><ul><li>默认构造、复制&#x2F;移动×构造&#x2F;赋值。</li><li><code>T</code>到<code>StrongTypedef</code>：复制&#x2F;移动×构造&#x2F;赋值。</li><li><code>StrongTypedef</code>到<code>T</code>以及<code>T</code>可以隐式转换的类型<code>U</code>：隐式转换，<code>toUnderType</code>。</li></ul><p>关键是<code>StrongTypedef</code>禁止了哪些操作：</p><ul><li><p><code>T</code>相同但<code>Tag</code>不同的两个<code>StrongTypedef</code>，好处是可以避免语义混淆：</p>  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> Days = StrongTypedef&lt;<span class="type">int32_t</span>, Tag0&gt;;</span><br><span class="line"><span class="keyword">using</span> Months = StrongTypedef&lt;<span class="type">int32_t</span>, Tag1&gt;;</span><br><span class="line"><span class="function">Days <span class="title">d</span><span class="params">(<span class="number">100</span>)</span></span>;</span><br><span class="line">Months d1 = d; <span class="comment">// error!</span></span><br></pre></td></tr></table></figure></li></ul><p>（说实话我觉得<code>StrongTypedef</code>不应该支持到<code>T</code>的隐式转换，避免当<code>T</code>是某种整数类型时无意的narrowing）</p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;p&gt;位置：base&amp;#x2F;common&amp;#x2F;strong_typedef.h&lt;/p&gt;
+&lt;figure class=&quot;highlight cpp&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;span class=&quot;line&quot;&gt;1&lt;/span</summary>
+      
+    
+    
+    
+    
+    <category term="ClickHouse" scheme="http://fuzhe1989.github.io/tags/ClickHouse/"/>
+    
+    <category term="C++" scheme="http://fuzhe1989.github.io/tags/C/"/>
+    
+  </entry>
+  
+</feed>

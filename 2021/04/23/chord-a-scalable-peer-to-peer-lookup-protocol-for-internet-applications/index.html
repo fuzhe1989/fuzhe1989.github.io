@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications  TL;DR Chord解决的是P2P系统（去中心化）中如何高效确定数据位置的问题。 P2P系统中最常见的方案是将数据按一致性hash分散到不同节点上，这样显著减少了节点增减时产生的数据迁移。这套方案中最重要的是每个节点需要维护一个路由表，在接收">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/04/23/chord-a-scalable-peer-to-peer-lookup-protocol-for-internet-applications/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications  TL;DR Chord解决的是P2P系统（去中心化）中如何高效确定数据位置的问题。 P2P系统中最常见的方案是将数据按一致性hash分散到不同节点上，这样显著减少了节点增减时产生的数据迁移。这套方案中最重要的是每个节点需要维护一个路由表，在接收">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/chord-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/chord-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/chord-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/chord-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/chord-05.png">
+<meta property="article:published_time" content="2021-04-23T05:49:48.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.651Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="P2P">
+<meta property="article:tag" content="ConsistentHash">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-04/chord-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/04/23/chord-a-scalable-peer-to-peer-lookup-protocol-for-internet-applications/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/23/chord-a-scalable-peer-to-peer-lookup-protocol-for-internet-applications/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-23 13:49:48" itemprop="dateCreated datePublished" datetime="2021-04-23T13:49:48+08:00">2021-04-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1180543/">Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Chord解决的是P2P系统（去中心化）中如何高效确定数据位置的问题。</p>
+<p>P2P系统中最常见的方案是将数据按一致性hash分散到不同节点上，这样显著减少了节点增减时产生的数据迁移。这套方案中最重要的是每个节点需要维护一个路由表，在接收到请求时，如果数据不在自己上面，需要根据路由表将请求转发给对应的节点。传统的一致性hash里路由表需要包含全部节点信息，产生了<code>O(N)</code>的维护代价，规模大了就会有问题。</p>
+<p>Chord在一致性hash基础上，只需要每个节点维护<code>O(logN)</code>大小的路由表，同样能实现<code>O(logN)</code>的查找，即使路由信息过时了也能回退到<code>O(n)</code>查找。减少了路由表的大小，显著地降低了Chord的维护代价，能在节点不停变化时仍然保持不错的性能。</p>
+<p><a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store">Dynamo</a>似乎使用了类似Chord的方案。</p>
+<span id="more"></span>
+
+<p>Chord的前提：</p>
+<ul>
+<li>节点间数据按一致性hash分布，可以使用虚拟节点。</li>
+</ul>
+<p>假设网络是：</p>
+<ul>
+<li>对称的（如果A能访问B，则B也能访问A）。</li>
+<li>可传递的（如果A能访问B，B能访问C，则A也能访问C）。</li>
+</ul>
+<p>（真实网络不是这样的，此时需要有其它协议做错误检测并踢掉导致网络问题的节点，如Cassandra使用的<a target="_blank" rel="noopener" href="https://dspace.jaist.ac.jp/dspace/bitstream/10119/4784/1/IS-RR-2004-010.pdf">The ϕ Accrual Failure Detector</a>）</p>
+<p><strong>定理4.1</strong>：对于任意N个节点和K个key，以下大概率成立：</p>
+<ul>
+<li>每个节点负责最多(1+ε)K&#x2F;N个key。</li>
+<li>节点N+1加入或离开会导致O(K&#x2F;N)个key发生迁移（到或出这个节点）。</li>
+</ul>
+<p><img src="/images/2021-04/chord-01.png"></p>
+<p>在这样的环上查找时，每个节点最少只需要知道它的下家（successor）是谁，此时就是线性查找。</p>
+<p><img src="/images/2021-04/chord-02.png"></p>
+<p>接下来每个节点要维护的信息变成了一个finger table，其中包含最多O(logm)项（m是hash最大值），每项记录base+2<sup>i-1</sup>的位置（1&lt;&#x3D;i&lt;&#x3D;m），这样就可以以O(logN)的时间复杂度完成查找（此时整个环类似于一个skiplist）。</p>
+<p><img src="/images/2021-04/chord-03.png"></p>
+<p><img src="/images/2021-04/chord-04.png"></p>
+<p><strong>定理4.2</strong>：N个节点的Chord网络中，<code>find_successor</code>要通信的节点数大概率是O(logN)。</p>
+<p>接下来我们看Chord怎么处理节点的加入和离开。</p>
+<p>为了保证finger table不过时，每个节点会定期执行“stabilization”以更新finger table和successor&#x2F;predecessor。</p>
+<p><img src="/images/2021-04/chord-05.png"></p>
+<p>新节点join后还不会立即进入Chord环，以及其它节点的finger table，随着后续的stabilization，最终会被识别并加入。</p>
+<p><strong>定理4.3</strong>：任意的join与stabilization交错执行后，所有节点的successor会在某个时间构成完整的。</p>
+<p>注意stabilization无法处理整个环分裂为多个环的情况，不过正常的join&#x2F;leave不会导致这种情况的发生。</p>
+<p>接下来考虑stabilization之前的查找，有三种可能：</p>
+<ol>
+<li>finger table不需要修改，指向正确的位置。这是最可能的情况，此时正确性和性能都不是问题。</li>
+<li>finger table不准确，但successor正确，此时正确性不是问题，但性能会有一定的退化。</li>
+<li>successor也不正确，或对应数据还没做完迁移，此时可能查找不到数据，上层应用要考虑等待一段时间再重试。</li>
+</ol>
+<p><strong>定理4.4</strong>：假设有N个节点的稳定（finger table和successor都正确）网络，此时再加入最多N个节点，保证所有successor指针正确（但不保证finger table正确），则查找仍然大概率需要O(logN)次跳转。</p>
+<p>接下来我们考虑节点fail的情况。</p>
+<p>Chord协议的正确性依赖于每个节点的successor指针正确，但当有节点fail了，如图4中节点14、21、32都fail的话，节点8的successor应该是节点38，但它的finger table里没有节点38，此时查找就会失败。比如节点8要查找30，就会转发给节点42。</p>
+<p>Chord的对策是每个节点除了finger table外，还维护下面r个successor，当直接successor不响应的时候，节点就依次询问successor列表中后面的节点。只有当r个全失败了才会导致查找失败。</p>
+<p>维护successor list的方式是定期获取直接successor的successor list，将它加进去，再踢掉最后一个。</p>
+<p>有了successor list后，图5中的<code>closest_preceding_node</code>就会同时考虑finger table和successor list了。</p>
+<p><strong>定理4.5</strong>：在一个初始稳定的网络中，如果successor list长度r &#x3D; Ω(logN)，之后每个节点有50%概率失败，则大概率<code>find_successor</code>仍然能返回正确的节点。</p>
+<p><strong>定理4.6</strong>：在一个初始稳定的网络中，如果每个节点的失败概率为50%，则<code>find_successor</code>的预期执行时间仍然为O(logN)。</p>
+<p>successor list还可以被上层应用用来实现replication（如Dynamo）。</p>
+<p>节点离开可以不走失败的处理路径，而是主动迁移数据并告知它的successor&#x2F;predecessor，这样就能显著降低节点离开的影响。</p>
+<p>当然现实场景中Chord系统可能永远无法处于稳定状态，但有研究表明只要stabilization以合理的频率运行，Chord环仍然能以<strong>几乎稳定</strong>的状态运行，并保证正确性和性能。</p>
+<p>接下来我们看如何改进路由的延时。</p>
+<p>考虑到地域因素，尽管一次路由的通信数可以保证在(1&#x2F;2)logN，但延时可能会很大：环上相近的节点现实中可能距离很远。</p>
+<p>作者之前的一个idea是在构建finger table时同时考虑环上距离和现实中的延时，但这种方案的性能很难评估。</p>
+<p>这里作者的idea是每个finger维护多个节点，并维护与它们的通信延时，在路由时尽量发请求给延时最低的节点。</p>
+<p>最后作者讨论了如何维护Chord环的一致性，误操作、bug、恶意节点都可能导致Chord环分裂。一种方案是每个节点x定期在环上查找自己负责范围内的key y，如果找不到，或结果不是x，说明一致性可能被破坏了。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/P2P/" rel="tag"># P2P</a>
+              <a href="/tags/ConsistentHash/" rel="tag"># ConsistentHash</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/22/why-uber-engineering-switched-from-postgres-to-mysql/" rel="prev" title="Why Uber Engineering Switched from Postgres to MySQL">
+      <i class="fa fa-chevron-left"></i> Why Uber Engineering Switched from Postgres to MySQL
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems/" rel="next" title="[笔记] Dynamic Metadata Management for Petabyte-scale File Systems">
+      [笔记] Dynamic Metadata Management for Petabyte-scale File Systems <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

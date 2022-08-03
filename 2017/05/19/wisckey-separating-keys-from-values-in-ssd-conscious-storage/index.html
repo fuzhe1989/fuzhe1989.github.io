@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="WiscKey: Separating Keys from Values in SSD-Conscious Storage WiscKey是一个基于LSM的KV存储引擎，特点是：针对SSD的顺序和随机读写都高效的特点，Key和Value分开存储以最小化IO放大效应。YCSB场景中它比LevelDB和RocksDB都快。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] WiscKey: Separating Keys from Values in SSD-Conscious Storage">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/05/19/wisckey-separating-keys-from-values-in-ssd-conscious-storage/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="WiscKey: Separating Keys from Values in SSD-Conscious Storage WiscKey是一个基于LSM的KV存储引擎，特点是：针对SSD的顺序和随机读写都高效的特点，Key和Value分开存储以最小化IO放大效应。YCSB场景中它比LevelDB和RocksDB都快。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-07.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-08.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-09.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-10.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-11.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-12.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-13.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-14.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-15.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-16.png">
+<meta property="article:published_time" content="2017-05-19T02:03:07.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.661Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="KV">
+<meta property="article:tag" content="LSM">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-11/wisc-key-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/05/19/wisckey-separating-keys-from-values-in-ssd-conscious-storage/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] WiscKey: Separating Keys from Values in SSD-Conscious Storage | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/05/19/wisckey-separating-keys-from-values-in-ssd-conscious-storage/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] WiscKey: Separating Keys from Values in SSD-Conscious Storage
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-05-19 10:03:07" itemprop="dateCreated datePublished" datetime="2017-05-19T10:03:07+08:00">2017-05-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>WiscKey: Separating Keys from Values in SSD-Conscious Storage</p>
+<p>WiscKey是一个基于LSM的KV存储引擎，特点是：针对SSD的顺序和随机读写都高效的特点，Key和Value分开存储以最小化IO放大效应。YCSB场景中它比LevelDB和RocksDB都快。</p>
+<span id="more"></span>
+
+<h2 id="1-介绍"><a href="#1-介绍" class="headerlink" title="1 介绍"></a>1 介绍</h2><p>目前的KV存储引擎中，对写性能要求比较高的大多数都采用了LSM，典型的有BigTable&#x2F;LevelDB&#x2F;Cassandra&#x2F;HBase&#x2F;RocksDB&#x2F;PNUTS&#x2F;Riak。LSM相比其它索引树（如B树）的主要优势在于，它的写都是顺序写。B树在有少量修改时，都可能产生大量的随机写，不管是SSD还是SATA上都表现不佳。</p>
+<p>为了保证写性能，LSM会不停的批量把KV对写成文件；为了保证读性能，LSM还需要不停的做背景compaction，把这些文件合并成单个按Key有序的文件。这就导致了相同的数据在它的生命期中被反复读写。一个典型的LSM系统中数据的IO放大系数可以达到50倍以上。</p>
+<p>LSM的成功在于，它充分利用了SATA磁盘顺序IO性能远超随机IO的特点（100倍以上），只要IO放大不超过这个数字，那么用顺序IO来替代随机IO就是成功的。</p>
+<p>但到了SSD上就不一样了。SSD与SATA的几个不同：</p>
+<ol>
+<li>顺序IO和随机IO的差别没那么大，这让LSM为了减少随机IO而付出的额外的IO变得不再必要。</li>
+<li>SSD可以承受高并发的IO，而LSM利用的并不好。</li>
+<li>长期大量的重复写会影响SSD的性能和寿命。</li>
+</ol>
+<p>以上3个因素综合起来，会导致LSM在SSD上损失90%的吞吐，并增加10倍的写负载。</p>
+<p>本文介绍的WiscKey是专门面向SSD的改良LSM系统，其核心思想是分离Key和Value，只在LSM中维护Key，把Value放在log中。这样Key的排序和Value的GC就分开了，在排序时避免了Value的写放大，整个LSM更小，cache效率更高。</p>
+<p>分离Key和Value带来的挑战：</p>
+<ol>
+<li>Scan时性能受影响，因为Value不再按Key的顺序排列了。WiscKey的解法是充分利用SSD的高并发。</li>
+<li>需要单独做GC来清理无效数据，回收空间。WiscKey提出在线做轻量GC，只需要顺序IO，最小化对前台负载的影响。</li>
+<li>crash时如何保证一致性。WiscKey利用了现代文件系统的一个特性：append不会产生垃圾。</li>
+</ol>
+<p>大多数场景WiscKey的性能都远超LevelDB和RocksDB，除了一个场景：小Value随机写，且需要大范围的Scan。</p>
+<h2 id="2-背景和动机"><a href="#2-背景和动机" class="headerlink" title="2 背景和动机"></a>2 背景和动机</h2><h3 id="2-1-LSM"><a href="#2-1-LSM" class="headerlink" title="2.1 LSM"></a>2.1 LSM</h3><p><img src="/images/2020-11/wisc-key-01.png" alt="wisckey_lsm.png"></p>
+<p>可以看到LSM中一个kv对要经历5次写：</p>
+<ol>
+<li>log文件；</li>
+<li>memtable；</li>
+<li>immutable memtable;</li>
+<li>L0文件；</li>
+<li>其它level的文件。</li>
+</ol>
+<p>LSM用多次的顺序IO来避免随机IO，从而在SATA磁盘上获得比B树高得多的写性能。</p>
+<blockquote>
+<p>（下面是对compaction的介绍，LevelDB的基于层的compaction，略）</p>
+</blockquote>
+<p>在读的时候，LSM需要在所有可能包含这个Key的memtable和文件中查找，与B树相比，多了很多IO。因此LSM适合于写多读少的场景。</p>
+<h3 id="2-2-LevelDB"><a href="#2-2-LevelDB" class="headerlink" title="2.2 LevelDB"></a>2.2 LevelDB</h3><p>LevelDB的整体架构见上节的图。LevelDB包括一个磁盘上的logfile，两个内存中的memtable（memtable和immutable memtable)，以及若干个磁盘上的L0-L6的SSTable文件。</p>
+<p>LevelDB插入时先写logfile，再写进memtable；memtable满了之后变成immutable memtable，再写成L0的SSTable文件。每层SSTable文件的size比例差不多是10。L1-L6的SSTable都是通过compaction生成的，LevelDB保证每一层的各个SSTable文件的KeyRange不重叠，L0除外。</p>
+<p>查找时就是在所有memtable和SSTable中做归并。</p>
+<h3 id="2-3-读写放大"><a href="#2-3-读写放大" class="headerlink" title="2.3 读写放大"></a>2.3 读写放大</h3><p>读写放大是LSM的主要问题。</p>
+<p>写放大：文件从L<sub>i-1</sub>到L<sub>i</sub>的过程中，因为两层的size limit差10倍，因此这次Compaction的放大系数最大可以到10。这样从L0到L6的放大系数可以达到50（L1-L6每层10）。</p>
+<p>读放大：假设L0有8个文件，那么查找时最多需要读14个文件(L1-L6每层最多1个文件)；假设要读1KB的数据，那么每个文件最多要读24KB的数据（index block + bloom-filter blocks + data block）。这么算下来读的放大系数就是14*24&#x3D;336。如果要读的数据更小，这个系数会更大。</p>
+<p>一项测试中可以看到实际系统中的读写放大系数：</p>
+<p><img src="/images/2020-11/wisc-key-02.png" alt="wisckey_wr_amplification.png"></p>
+<p>必须要说明的是，LSM的这种设计是为了在SATA磁盘上获得更好的性能。SATA磁盘的一组典型数据是寻址10ms，吞吐100MB&#x2F;s，而顺序读下一个Block的数据可能只要10us，与寻址相比延时是1:1000，因此只要LSM的写放大系数不超过1000，就能获得比B树更好的性能。而B树的读放大也不低，比如读1KB的数据，B树可能要读6个4KB的Block，那么读放大系数是24，没有完全拉开和LSM的差距。</p>
+<h3 id="2-4-快速存储硬件"><a href="#2-4-快速存储硬件" class="headerlink" title="2.4 快速存储硬件"></a>2.4 快速存储硬件</h3><p>SSD上仍然不推荐随机写，因为SSD的整块擦除再写以及代价高昂的回收机制，当SSD上预留的Block用光时，它的写性能会急剧下降。LSM的最大化顺序写的特性很适合SSD。</p>
+<p><img src="/images/2020-11/wisc-key-03.png" alt="wisckey_ssd_performance.png"></p>
+<p>但与SATA非常不同的是，SSD的随机读性能非常好，且支持高并发。</p>
+<h2 id="3-WiscKey"><a href="#3-WiscKey" class="headerlink" title="3 WiscKey"></a>3 WiscKey</h2><p>WickKey的设计出发点就是如何利用上SSD的新特性：</p>
+<ol>
+<li>Key与Value分离，Key由LSM维护，而Value则写入logfile。</li>
+<li>鉴于Value不再排序，WiscKey在读的时候会并发随机读。</li>
+<li>WiscKey在Value log的管理上有自己的一致性和回收机制。</li>
+</ol>
+<p>WiscKey在去除了LSM的logfile后仍然能保证一致性。</p>
+<h3 id="3-1-设计目标"><a href="#3-1-设计目标" class="headerlink" title="3.1 设计目标"></a>3.1 设计目标</h3><p>WiscKey脱胎于LevelDB，可以作为关系型DB和分布式KV的存储引擎。它兼容LevelDB的API。</p>
+<p>设计目标：</p>
+<ol>
+<li>低写放大：既为了写性能，也为了SSD的寿命。</li>
+<li>低读放大：读放大会降低读的吞吐，同时还降低了cache效率。</li>
+<li>面向SSD优化。</li>
+<li>丰富的API。</li>
+<li>针对实际的Key-Value大小，不做太不实际的假设。通常的Key都很小（16B），Value则从100B到4KB都很常见。</li>
+</ol>
+<h3 id="3-2-Key与Value分离"><a href="#3-2-Key与Value分离" class="headerlink" title="3.2 Key与Value分离"></a>3.2 Key与Value分离</h3><p>compaction就是导致LSM低效的主要原因：一遍遍的过数据。但不做compaction又没办法保证读的性能。</p>
+<p>WiscKey受到了这么一个小发现的启示：我们要排序的只是Key，Value完全可以另行处理。通常Key要比Value小很多，那么排序Key的开销也就比Value要小很多。</p>
+<p>WiscKey中与Key放在一起的只是Value的位置，Value本身存放在其它地方。</p>
+<p><img src="/images/2020-11/wisc-key-04.png" alt="wisckey_ssd_layout.png"></p>
+<p>常见的使用场景下，WiscKey中的LSM要比LevelDB小得多。这样就大大降低了写的放大系数。Key为16B，Value为1KB的场景，假设Key的放大系数是10（LSM带来的），Value的放大系数是1，那么WiscKey的整体放大系数是(10 × 16 + 1024) &#x2F; (16 + 1024) &#x3D; 1.14。</p>
+<p>查找的时候，WiscKey先在LSM中查找Key，再根据Key中Value的位置查找Value。因为WiscKey中的LSM比LevelDB中的小很多，前面的查找会快很多，绝大多数情况下都能命中cache，这样整个开销就是一次随机查找。而SSD的随机查找性能又这么好，因此WiscKey的读性能就比LevelDB好很多。</p>
+<p>插入一组kv时，WiscKey先把Value写入ValueLog，然后再把Key插入到LSM中。删除一个Key则只从LSM中删除它，不动ValueLog。</p>
+<p>当然这样的设计也遇到了很多挑战。</p>
+<h3 id="3-3-挑战"><a href="#3-3-挑战" class="headerlink" title="3.3 挑战"></a>3.3 挑战</h3><h4 id="3-3-1-并发范围查找"><a href="#3-3-1-并发范围查找" class="headerlink" title="3.3.1 并发范围查找"></a>3.3.1 并发范围查找</h4><p>LevelDB中这么做RangeQuery：先Seek()，然后根据需求反复调用Next()或Prev()读出数据。LevelDB中Key和Value是存放在一起的，这么扫一遍对应底层就只有顺序IO，性能很好（不考虑读放大）。</p>
+<p>WiscKey中Key和Value是分开存放的，这么做就会带来大量的串行随机IO，不够高效。WiscKey利用SSD的高并发随机读的特性，在对LSM调用RangeQuery期间，并发预读后面的N个Value。</p>
+<h4 id="3-3-2-垃圾回收"><a href="#3-3-2-垃圾回收" class="headerlink" title="3.3.2 垃圾回收"></a>3.3.2 垃圾回收</h4><p>LSM都是通过compaction来回收无效数据的。WiscKey中Value不参与compaction，就需要单独为Value设计GC机制。</p>
+<p>一个土办法是扫描LSM，每个Key对应的Value就是有效的，没有Key对应的Value就是无效的。这么做效率太低。</p>
+<p>WiscKey的做法是每次写入Value时也写入对应的Key。</p>
+<p><img src="/images/2020-11/wisc-key-05.png" alt="wisckey_log_layout.png"></p>
+<p>上图中的head总是指向ValueLog的尾部，新数据写到这里。而tail会随着GC的进行向后移动。所有有效数据都在tail~head区间中，每次GC都从tail开始，也只有GC线程可以修改tail。</p>
+<p>GC时WiscKey每次从tail开始读若干MB的数据，然后再查找对应的Key，看这个Key现在对应的Value还是不是log中的Value，如果是，再把数据追加到head处。最终，ValueLog中的无效数据就都被清理掉了。</p>
+<p>为了避免GC时crash导致丢数据，WiscKey要保证在真正回收空间前先把新追加的数据和新的tail持久化下去：</p>
+<ol>
+<li>追加数据；</li>
+<li>GC线程调用fsync()将新数据写下去；</li>
+<li>向LSM中同步写一条记录：<code>&lt;&#39;tail&#39;, tail-vlog-offset&gt;</code>；</li>
+<li>回收空间。</li>
+</ol>
+<p>WiscKey的GC是可配置的，如果Key的删除和更新都很少发生，就不需要怎么做GC。</p>
+<h4 id="3-3-3-崩溃时的一致性"><a href="#3-3-3-崩溃时的一致性" class="headerlink" title="3.3.3 崩溃时的一致性"></a>3.3.3 崩溃时的一致性</h4><p>WiscKey为了保证系统崩溃时的一致性，使用了现代文件系统（ext4&#x2F;btrfs&#x2F;xfs等）的一个特性：追加写不会产生垃圾，只可能在尾部缺少一些数据。在WiscKey中这个特性意味着：如果Value X在一次crash后从ValueLog中丢失了，那么所有X后面写入的Value就都丢了。</p>
+<p>crash中丢失的Key是没办法被发现的，这个Key对应的Value会被当作无效数据GC掉。如果查找时发现Key存在，但对应的Value不在ValueLog中，就说明这个Value丢失了，WiscKey会将这个Key从LSM中删除，并返回”Key不存在”。（没办法找回上一个Value了是吗？）</p>
+<p>如果用户配置了sync，WiscKey会在每次写完ValueLog后，写LSM前，调用一次fsync。</p>
+<p>总之WiscKey保证了与LevelDB相同的一致性。</p>
+<h3 id="3-4-优化"><a href="#3-4-优化" class="headerlink" title="3.4 优化"></a>3.4 优化</h3><h4 id="3-4-1-ValueLog的写缓冲"><a href="#3-4-1-ValueLog的写缓冲" class="headerlink" title="3.4.1 ValueLog的写缓冲"></a>3.4.1 ValueLog的写缓冲</h4><p>WiscKey不会每笔写入都调用一次ValueLog的write，这样效率太低。WiscKey为ValueLog准备了一个buffer，所有写都写进buffer，当写满或者有sync请求时再write写到ValueLog中。读取的时候优先读取buffer。</p>
+<p>缺点是在crash丢的数据会多一些，这点与LevelDB类似。</p>
+<p><img src="/images/2020-11/wisc-key-06.png" alt="wisckey_write_unit_size.png"></p>
+<h4 id="3-4-2-优化LSM的log"><a href="#3-4-2-优化LSM的log" class="headerlink" title="3.4.2 优化LSM的log"></a>3.4.2 优化LSM的log</h4><p>WiscKey中LSM只用于存储Key，而ValueLog中也存储了Key，那么就没必要再写一遍LSM的log了。</p>
+<p>WiscKey在LSM中存储了一条记录<code>&lt;&#39;head&#39;, head-vlog-offset&gt;</code>，在打开一个DB时就可以从head-vlog-offset处开始恢复数据。将head保存在LSM中也保证了一致性不低于LevelDB，因此整体的一致性仍然不低于LevelDB。</p>
+<h3 id="3-5-实现"><a href="#3-5-实现" class="headerlink" title="3.5 实现"></a>3.5 实现</h3><p>ValueLog会被两种方式访问：</p>
+<ol>
+<li>读取时会随机访问ValueLog。</li>
+<li>写入时会顺序写入ValueLog。</li>
+</ol>
+<p>WiscKey用pthread_fadvise()在不同场景声明不同的访问模式。</p>
+<p>WiscKey为RangeQuery准备了一个32个线程的背景线程池来随机读ValueLog。</p>
+<p>为了有效地从ValueLog中回收空间，WiscKey利用了现代文件系统的另一个特性：可以给文件打洞（fallocate)。现代文件系统允许的最大文件大小足够WiscKey用了（ext4允许64TB，xfs允许8EB，btrfs允许16EB），这样就不需要考虑ValueLog的切换了。</p>
+<h2 id="4-评价"><a href="#4-评价" class="headerlink" title="4 评价"></a>4 评价</h2><p>机器配置：</p>
+<ol>
+<li>CPU：Intel(R) Xeon(R) CPU E5-2667 v2 @ 3.30GHz * 2；</li>
+<li>内存：64GB；</li>
+<li>OS：64-bit Linux 3.14；</li>
+<li>文件系统：ext4；</li>
+<li>SSD：500-GB Samsung 840 EVO SSD，顺序读500MB&#x2F;s，顺序写400MB&#x2F;s。</li>
+</ol>
+<h3 id="4-1-基准测试"><a href="#4-1-基准测试" class="headerlink" title="4.1 基准测试"></a>4.1 基准测试</h3><ol>
+<li>工具：db_bench；</li>
+<li>DB：LevelDB&#x2F;WiscKey；</li>
+<li>Key：16B；</li>
+<li>Value：很多大小；</li>
+<li>压缩：关闭。</li>
+</ol>
+<h4 id="4-1-1-Load"><a href="#4-1-1-Load" class="headerlink" title="4.1.1 Load"></a>4.1.1 Load</h4><p>第一轮：顺序插入100GB的数据。第二轮：uniform随机写。注意第一轮顺序写不会导致LevelDB和WiscKey做compaction。</p>
+<p><img src="/images/2020-11/wisc-key-07.png" alt="wisckey_load_perf_seq.png"></p>
+<p>即使在256KB场景中，LevelDB的写入吞吐仍然距离磁盘的带宽上限很远。</p>
+<p><img src="/images/2020-11/wisc-key-08.png" alt="wisckey_load_perf_ldb_dist.png"></p>
+<p>可以看到小Value时LevelDB的延时主要花在写log上，而大Value时延时主要花在等待写memtable上。</p>
+<p><img src="/images/2020-11/wisc-key-09.png" alt="wisckey_load_perf_rand.png"></p>
+<p>LevelDB的吞吐如此之低，原因在于compaction占了太多资源，造成了太大的写放大。WiscKey的compaction则只占了很少的资源。</p>
+<p>下图是不同ValueSize下LevelDB的写放大系数。</p>
+<p><img src="/images/2020-11/wisc-key-10.png" alt="wisckey_load_perf_write_amp.png"></p>
+<h4 id="4-1-2-Query"><a href="#4-1-2-Query" class="headerlink" title="4.1.2 Query"></a>4.1.2 Query</h4><p>第一轮：在100GB随机生成的DB上做100000次随机查找。第二轮：在100GB随机生成的DB上做4GB的范围查找。</p>
+<p><img src="/images/2020-11/wisc-key-11.png" alt="wisckey_query_perf_rand.png"></p>
+<p>LevelDB的低吞吐原因是读放大和compaction资源占用多。</p>
+<p><img src="/images/2020-11/wisc-key-12.png" alt="wisckey_query_perf_range.png"></p>
+<p>ValueSize超过4KB后，LevelDB生成的SSTable文件变多，吞吐变差。此时WiscKey吞吐是LevelDB的8.4倍。而在ValueSize为64B时，受限于SSD的随机读能力，LevelDB的吞吐是WiscKey的12倍。如果换一块支持更高并发的盘，这里的性能差距会变小一些。</p>
+<p>但如果数据是顺序插入的，那么WiscKey的ValueLog也会被顺序访问，差距就没有这么大。64B时LevelDB是WiscKey的1.3倍，而大Value时WiscKey是LevelDB的2.8倍。</p>
+<h4 id="4-1-3-垃圾回收"><a href="#4-1-3-垃圾回收" class="headerlink" title="4.1.3 垃圾回收"></a>4.1.3 垃圾回收</h4><p>测试内容：1. 随机生成DB；2. 删掉一定比例的kv；3. 随机插入数据同时后台做GC。作者固定Key+Value为4KB，但第二步删除的kv的比例从25%-100%不等。</p>
+<p><img src="/images/2020-11/wisc-key-13.png" alt="wisckey_gc_perf.png"></p>
+<p>100%删除时，GC扫过的都是无效的Value，也就不会写数据，因此只降低了10%的吞吐。后面的场景GC都会把有效的Value再写进ValueLog，因此降低了35%的吞。</p>
+<p>无论哪个场景，WiscKey都比LevelDB快至少70倍。</p>
+<h4 id="4-1-4-崩溃时的一致性"><a href="#4-1-4-崩溃时的一致性" class="headerlink" title="4.1.4 崩溃时的一致性"></a>4.1.4 崩溃时的一致性</h4><p>作者一边做异步和同步的Put()，一边用ALICE工具来模拟多种系统崩溃场景。ALICE模拟了3000种系统崩溃场景，没有发现WiscKey引入的一致性问题。（不比LevelDB差）</p>
+<p>WiscKey在恢复时要做的工作比LevelDB多一点，但都与LSM最后一次持久化memtable到崩溃发生之间写入的数据量成正比。在一个最坏的场景中，ValueSize为1KB，LevelDB恢复花了0.7秒，而WiscKey花了2.6秒。</p>
+<p>WiscKey可以通过加快LSM中<code>head</code>记录的持久化频率来降低恢复时间。</p>
+<h4 id="4-1-5-空间放大"><a href="#4-1-5-空间放大" class="headerlink" title="4.1.5 空间放大"></a>4.1.5 空间放大</h4><p>我们在评估一个kv系统时，往往只看它的读写性能。但在SSD上，它的空间放大也很重要，因为单GB的成本变高了。所谓空间放大就是kv系统实际占用的磁盘空间除以用户写入的数据大小。压缩能降低空间放大，而垃圾、碎片、元数据则在增加空间放大。作者关掉了压缩，简化讨论。</p>
+<p>完全顺序写入的场景，空间放大系数很接近1。而对于随机写入，或是有更新的场景，空间放大系数就会大于1了。</p>
+<p>下图是LevelDB和WiscKey在载入一个100GB的随机写入的数据集后的DB大小。</p>
+<p><img src="/images/2020-11/wisc-key-14.png" alt="wisckey_space_amp_perf.png"></p>
+<p>LevelDB多出来的空间主要是在加载结束时还没来得及回收掉的无效kv对。WiscKey多出来的空间包括了无效的数据、元数据（LSM中的Value索引，ValueLog中的Key)。在GC后无效数据就没有了，而元数据又非常少，因此整个DB的大小非常接近原始数据大小。</p>
+<p>KV存储没办法兼顾写放大、读放大、空间放大，只能从中做取舍。LevelDB中GC和排序是在一起的，它选择了高的写放大来换取低的空间放大，但与此同时在线请求就会受影响。WiscKey则用更多的空间来换取更低的IO放大，因为GC和排序被解耦了，GC可以晚一点做，对在线请求的影响就会小很多。</p>
+<h4 id="4-1-6-CPU使用率"><a href="#4-1-6-CPU使用率" class="headerlink" title="4.1.6 CPU使用率"></a>4.1.6 CPU使用率</h4><p><img src="/images/2020-11/wisc-key-15.png" alt="wisckey_cpu_usage.png"></p>
+<p>可以看到除了顺序写入之外，LevelDB的CPU使用率都要比WiscKey低。</p>
+<p>顺序写入场景LevelDB要把kv都写进log，还要编码kv，占了很多CPU。WiscKey写的log更少，因此CPU消耗更低。</p>
+<p>范围读场景WiscKey要用32个读线程做背景的随机读，必然用多得多的CPU。</p>
+<p>LevelDB不是一个面向高并发的DB，因此CPU不是瓶颈，这点RocksDB做得更好。</p>
+<h3 id="4-2-YCSB测试"><a href="#4-2-YCSB测试" class="headerlink" title="4.2 YCSB测试"></a>4.2 YCSB测试</h3><p><img src="/images/2020-11/wisc-key-16.png" alt="wisckey_ycsb.png"></p>
+<p>（直接上图，结论不说了）</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/KV/" rel="tag"># KV</a>
+              <a href="/tags/LSM/" rel="tag"># LSM</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/05/16/cpp-delete-incomplete-pointer/" rel="prev" title="C++：delete不完整类型的指针">
+      <i class="fa fa-chevron-left"></i> C++：delete不完整类型的指针
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/05/19/cpp-different-role-of-deleter-in-unique-ptr-and-shared-ptr/" rel="next" title="C++：为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？">
+      C++：为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？ <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E4%BB%8B%E7%BB%8D"><span class="nav-number">1.</span> <span class="nav-text">1 介绍</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-%E8%83%8C%E6%99%AF%E5%92%8C%E5%8A%A8%E6%9C%BA"><span class="nav-number">2.</span> <span class="nav-text">2 背景和动机</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-LSM"><span class="nav-number">2.1.</span> <span class="nav-text">2.1 LSM</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-LevelDB"><span class="nav-number">2.2.</span> <span class="nav-text">2.2 LevelDB</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E8%AF%BB%E5%86%99%E6%94%BE%E5%A4%A7"><span class="nav-number">2.3.</span> <span class="nav-text">2.3 读写放大</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-%E5%BF%AB%E9%80%9F%E5%AD%98%E5%82%A8%E7%A1%AC%E4%BB%B6"><span class="nav-number">2.4.</span> <span class="nav-text">2.4 快速存储硬件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-WiscKey"><span class="nav-number">3.</span> <span class="nav-text">3 WiscKey</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E8%AE%BE%E8%AE%A1%E7%9B%AE%E6%A0%87"><span class="nav-number">3.1.</span> <span class="nav-text">3.1 设计目标</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-Key%E4%B8%8EValue%E5%88%86%E7%A6%BB"><span class="nav-number">3.2.</span> <span class="nav-text">3.2 Key与Value分离</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-%E6%8C%91%E6%88%98"><span class="nav-number">3.3.</span> <span class="nav-text">3.3 挑战</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-3-1-%E5%B9%B6%E5%8F%91%E8%8C%83%E5%9B%B4%E6%9F%A5%E6%89%BE"><span class="nav-number">3.3.1.</span> <span class="nav-text">3.3.1 并发范围查找</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-3-2-%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6"><span class="nav-number">3.3.2.</span> <span class="nav-text">3.3.2 垃圾回收</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-3-3-%E5%B4%A9%E6%BA%83%E6%97%B6%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7"><span class="nav-number">3.3.3.</span> <span class="nav-text">3.3.3 崩溃时的一致性</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-4-%E4%BC%98%E5%8C%96"><span class="nav-number">3.4.</span> <span class="nav-text">3.4 优化</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#3-4-1-ValueLog%E7%9A%84%E5%86%99%E7%BC%93%E5%86%B2"><span class="nav-number">3.4.1.</span> <span class="nav-text">3.4.1 ValueLog的写缓冲</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-4-2-%E4%BC%98%E5%8C%96LSM%E7%9A%84log"><span class="nav-number">3.4.2.</span> <span class="nav-text">3.4.2 优化LSM的log</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-5-%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.5.</span> <span class="nav-text">3.5 实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E8%AF%84%E4%BB%B7"><span class="nav-number">4.</span> <span class="nav-text">4 评价</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E5%9F%BA%E5%87%86%E6%B5%8B%E8%AF%95"><span class="nav-number">4.1.</span> <span class="nav-text">4.1 基准测试</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#4-1-1-Load"><span class="nav-number">4.1.1.</span> <span class="nav-text">4.1.1 Load</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4-1-2-Query"><span class="nav-number">4.1.2.</span> <span class="nav-text">4.1.2 Query</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4-1-3-%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6"><span class="nav-number">4.1.3.</span> <span class="nav-text">4.1.3 垃圾回收</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4-1-4-%E5%B4%A9%E6%BA%83%E6%97%B6%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7"><span class="nav-number">4.1.4.</span> <span class="nav-text">4.1.4 崩溃时的一致性</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4-1-5-%E7%A9%BA%E9%97%B4%E6%94%BE%E5%A4%A7"><span class="nav-number">4.1.5.</span> <span class="nav-text">4.1.5 空间放大</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4-1-6-CPU%E4%BD%BF%E7%94%A8%E7%8E%87"><span class="nav-number">4.1.6.</span> <span class="nav-text">4.1.6 CPU使用率</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-YCSB%E6%B5%8B%E8%AF%95"><span class="nav-number">4.2.</span> <span class="nav-text">4.2 YCSB测试</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

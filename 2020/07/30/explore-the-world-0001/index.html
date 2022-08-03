@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="随便看看哥德尔定理是否支持不可知论？ - 罗心澄的回答 - 知乎  数学意义上的「真」和「可证」是两个不重叠的概念。  是否存在「可证明」的对于世界的解释？ - oldgoat的回答 - 知乎  一般来说，仅根据经验事实就可以确认某个判断为真，这就叫做“证实”（verify），具有这种特征的判断就叫做可证实（verifiability）的。  如何简单清晰地解释哥德尔不完备定理？ - 叶青杰的回答">
+<meta property="og:type" content="article">
+<meta property="og:title" content="随便看看 0001">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/07/30/explore-the-world-0001/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="随便看看哥德尔定理是否支持不可知论？ - 罗心澄的回答 - 知乎  数学意义上的「真」和「可证」是两个不重叠的概念。  是否存在「可证明」的对于世界的解释？ - oldgoat的回答 - 知乎  一般来说，仅根据经验事实就可以确认某个判断为真，这就叫做“证实”（verify），具有这种特征的判断就叫做可证实（verifiability）的。  如何简单清晰地解释哥德尔不完备定理？ - 叶青杰的回答">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-07-30T07:44:57.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.655Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="随便看看">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/07/30/explore-the-world-0001/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>随便看看 0001 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/07/30/explore-the-world-0001/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          随便看看 0001
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-07-30 15:44:57" itemprop="dateCreated datePublished" datetime="2020-07-30T15:44:57+08:00">2020-07-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/25648987/answer/31410048">哥德尔定理是否支持不可知论？ - 罗心澄的回答 - 知乎</a></p>
+<blockquote>
+<p>数学意义上的「真」和「可证」是两个不重叠的概念。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/23289984/answer/24131288">是否存在「可证明」的对于世界的解释？ - oldgoat的回答 - 知乎</a></p>
+<blockquote>
+<p>一般来说，仅根据经验事实就可以确认某个判断为真，这就叫做“证实”（verify），具有这种特征的判断就叫做可证实（verifiability）的。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/27528796/answer/1346097249">如何简单清晰地解释哥德尔不完备定理？ - 叶青杰的回答 - 知乎</a></p>
+<blockquote>
+<p>哥德尔数与不动点。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/27528796/answer/246963736">如何简单清晰地解释哥德尔不完备定理？ - LLLBK的回答 - 知乎</a></p>
+<blockquote>
+<p>他认为自己的不完全性定理表明，存在一些确实为真的东西是人为构造的逻辑系统无法达到的，这些确实为真的东西就是数学的理念世界，它们跟人无关，它们有自己确定的真值，不论人有没有去研究它。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.nature.com/news/paradox-at-the-heart-of-mathematics-makes-physics-problem-unanswerable-1.18983">Paradox at the heart of mathematics makes physics problem unanswerable</a></p>
+<blockquote>
+<p>凝聚态计算spectral gap，当模型为无限大小的2D平面时，无法预测计算是否能结束，即spectral gap是否存在。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/410353226/answer/1370123832">如何看待南京一中高考成绩令部分家长不满，家长要求「校长下课」？ - 不想上吊王承恩的回答 - 知乎</a></p>
+<blockquote>
+<p>任何东西都是拥有了才有资格不在乎。像我这种工贼太多了，所以全世界的鸡蛋联合不起来，石头也不允许鸡蛋联合起来。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/408092992/answer/1353007308">如何看待杭州某物业私自将业主别墅出租给《我和我的儿女们》剧组拍摄，业主看剧才发现是自己家这件事？ - stan的回答 - 知乎</a></p>
+<blockquote>
+<p>法律常识学习：侵权还是违约？无权代理还是无权处分？合同效力？剧组是否应当承担责任？</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/409332169/answer/1370797027">为什么金属乐迷大多热衷于将金属从摇滚中独立出来？ - 远古邪恶小人物的回答 - 知乎</a></p>
+<blockquote>
+<p>摇滚乐是一场人类文化运动；类型文化总是具有原教旨倾向。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/410072393/answer/1365721848">如何看待美国防长 7 月 21 日谈中美关系时，称「我们不是要寻找冲突」？ - 王子君的回答 - 知乎</a></p>
+<blockquote>
+<p>华盛顿的态度是：我们又不是到摊牌的地步，你们为什么反应这么激烈嘛；北京的态度是：你们不能老是把你们国情的代价转移给我们。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/60779831/answer/1367943371">就目前（2017年）的国际局势来看，美国的联俄制中政策会取得成功吗? - 王子君的回答 - 知乎</a></p>
+<blockquote>
+<p>之所以折腾到今天，美俄还是冷眼互看，主要是内外都有阻力：外部反对；内部阻力。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/408451534/answer/1368146776">如何评价睡前消息第147期？ - 离离图总裂夫的回答 - 知乎</a></p>
+<blockquote>
+<p>一个没有核心价值的威权主义组织，有两个问题：第一，领袖稍微不行就一堆破事，组织开始涣散。从商周到罗马以色列，再到俄罗斯台湾全都是这样；第二，没有产生合格领袖的机制。</p>
+<p>纲不举的结果，就是目不张。</p>
+<p>新加坡其实适合走西方议会制路线的。因为英、美的制度设计，本质就是一种精英寡头政治。西方议会政治建立在社会中产以上有着强共识，而且统治集团人数很少，和中产没有根本利益冲突的前提下。这种制度下，一旦社会出现分裂，立马就混不下去。</p>
+<p>要说西方真对我们有什么贡献的话，就是让中国人明白，有时候还是得放下过去。（避免路线依赖）</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/406597161/answer/1344659749">如何看待「香港或被踢出 SWIFT 银行结算系统」的消息？如果属实，将会造成什么样的影响？ - Mason Wu的回答 - 知乎</a></p>
+<blockquote>
+<p>什么是SWIFT？为什么会有这个谣言？</p>
+</blockquote>
+<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a target="_blank" rel="noopener" href="https://www.memsql.com/resources/ebook-oreilly-pulsar-vs-kafka">O’Reilly eBook: Apache Pulsar Versus Apache Kafka - MemSQL</a></p>
+<blockquote>
+<p>只有33页的新书，各方面对比了一下Pulsar和Kafka，不是特别有新意。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/392213415/answer/1362966848">为什么有线网络可以全双工，而无线网络只能半双工呢? - 甜草莓的回答 - 知乎</a></p>
+<blockquote>
+<p>同时同频（In-band）的无线全双工存在自干扰问题；解决方案收益不大且成本高（增加天线或增加隔离度）。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/165144850">deno fmt 从 prettier 切换到 dprint，性能提升 10+ 倍 - justjavac的文章 - 知乎</a></p>
+<blockquote>
+<p>Rust降维打击；wasm性能损耗不低。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E9%9A%8F%E4%BE%BF%E7%9C%8B%E7%9C%8B/" rel="tag"># 随便看看</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/06/28/2020-h1-summary/" rel="prev" title="2020年上半年总结">
+      <i class="fa fa-chevron-left"></i> 2020年上半年总结
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/07/30/apache-pulsar-versus-apache-kafka/" rel="next" title="[笔记] Apache Pulsar Versus Apache Kafka">
+      [笔记] Apache Pulsar Versus Apache Kafka <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9A%8F%E4%BE%BF%E7%9C%8B%E7%9C%8B"><span class="nav-number">1.</span> <span class="nav-text">随便看看</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%9B%B8%E5%85%B3"><span class="nav-number">2.</span> <span class="nav-text">计算机相关</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

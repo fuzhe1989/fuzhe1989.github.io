@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="注：本文所使用编译器均为gcc4.1.2，即只能使用C++98标准。 背景123456789101112131415161718struct Node &amp;#123;    int mRow;    int mCol;    int mValue;    Node(int row, int col, int value)        : mRow(row), mCol(col), mValue(v">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++：使用mixin获得比继承+组合更好的性能">
+<meta property="og:url" content="http://fuzhe1989.github.io/2018/07/22/cpp-use-mixin-to-get-better-performance/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="注：本文所使用编译器均为gcc4.1.2，即只能使用C++98标准。 背景123456789101112131415161718struct Node &amp;#123;    int mRow;    int mCol;    int mValue;    Node(int row, int col, int value)        : mRow(row), mCol(col), mValue(v">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-07-22T09:00:52.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.652Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2018/07/22/cpp-use-mixin-to-get-better-performance/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>C++：使用mixin获得比继承+组合更好的性能 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/07/22/cpp-use-mixin-to-get-better-performance/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++：使用mixin获得比继承+组合更好的性能
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-07-22 17:00:52" itemprop="dateCreated datePublished" datetime="2018-07-22T17:00:52+08:00">2018-07-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>注：本文所使用编译器均为gcc4.1.2，即只能使用C++98标准。</p>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Node</span> &#123;</span><br><span class="line">    <span class="type">int</span> mRow;</span><br><span class="line">    <span class="type">int</span> mCol;</span><br><span class="line">    <span class="type">int</span> mValue;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">Node</span>(<span class="type">int</span> row, <span class="type">int</span> col, <span class="type">int</span> value)</span><br><span class="line">        : <span class="built_in">mRow</span>(row), <span class="built_in">mCol</span>(col), <span class="built_in">mValue</span>(value)</span><br><span class="line">    &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Iterator</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Iterator</span>() &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> Node <span class="title">GetValue</span><span class="params">()</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们有一个接口类<code>Iterator</code>，它有三个方法，可以返回<code>Node</code>类型的值。现在我们要用这个接口来遍历一个矩阵。</p>
+<p>矩阵的类型是<code>vector&lt;vector&lt;int&gt;&gt;</code>，我们有几种不同的遍历需求：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="type">const</span> std::vector&lt;std::vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>这个方法返回一个最原始的<code>Iterator</code>，只是单纯遍历数据。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="type">const</span> std::vector&lt;std::vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>RawIterator</code>基础上，只返回奇数。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="type">const</span> std::vector&lt;std::vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix, <span class="type">const</span> std::vector&lt;<span class="type">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>OddIterator</code>基础上，遍历过程中，在每行末尾加上<code>appendix</code>中的元素。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="type">const</span> std::vector&lt;std::vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix, <span class="type">const</span> std::vector&lt;<span class="type">int</span>&gt;&amp; appendix)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>AppendPerRowIterator</code>基础上，返回的每个<code>Node</code>的value都乘2。</p>
+<h2 id="测试程序"><a href="#测试程序" class="headerlink" title="测试程序"></a>测试程序</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">srand</span>(<span class="built_in">time</span>(<span class="literal">NULL</span>));</span><br><span class="line">    vector&lt;vector&lt;<span class="type">int</span>&gt; &gt; matrix;</span><br><span class="line">    vector&lt;<span class="type">int</span>&gt; appendix;</span><br><span class="line">    <span class="built_in">PrepareMatrix</span>(matrix, <span class="number">1000</span>, <span class="number">10000</span>);</span><br><span class="line">    <span class="built_in">PrepareAppendix</span>(appendix, <span class="number">3</span>);</span><br><span class="line"></span><br><span class="line">    <span class="type">int64_t</span> t0 = <span class="built_in">Measure</span>(<span class="built_in">NewRawIterator</span>(matrix));</span><br><span class="line">    <span class="type">int64_t</span> t1 = <span class="built_in">Measure</span>(<span class="built_in">NewOddIterator</span>(matrix));</span><br><span class="line">    <span class="type">int64_t</span> t2 = <span class="built_in">Measure</span>(<span class="built_in">NewAppendPerRowIterator</span>(matrix, appendix));</span><br><span class="line">    <span class="type">int64_t</span> t3 = <span class="built_in">Measure</span>(<span class="built_in">NewDoubleIterator</span>(matrix, appendix));</span><br><span class="line"></span><br><span class="line">    cout &lt;&lt; <span class="string">&quot;Raw:&quot;</span> &lt;&lt; t0 &lt;&lt; endl</span><br><span class="line">         &lt;&lt; <span class="string">&quot;Odd:&quot;</span> &lt;&lt; t1 &lt;&lt; endl</span><br><span class="line">         &lt;&lt; <span class="string">&quot;Append:&quot;</span> &lt;&lt; t2 &lt;&lt; endl</span><br><span class="line">         &lt;&lt; <span class="string">&quot;Double:&quot;</span> &lt;&lt; t3 &lt;&lt; endl;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们会在一个1000*10000的矩阵上测试各个<code>Iterator</code>。</p>
+<h2 id="基于继承-组合的实现"><a href="#基于继承-组合的实现" class="headerlink" title="基于继承+组合的实现"></a>基于继承+组合的实现</h2><p>上面的需求看起来很适合用继承+组合来实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">RawIterator</span>: <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">OddIterator</span>: <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">OddIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">AppendPerRowIterator</span>: <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">AppendPerRowIterator</span>(Iterator* iter, <span class="type">const</span> vector&lt;<span class="type">int</span>&gt;&amp; appendix);</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">DoubleIterator</span>: <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">DoubleIterator</span><span class="params">(Iterator* iter)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们用了4个派生自<code>Iterator</code>的新类型来实现不同的需求，除了<code>RawIterator</code>外，其它3种类型都是在组合了已有的<code>Iterator</code>基础上实现新功能，因此可以任意顺序组合。</p>
+<p>几个New函数的实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">RawIterator</span>(matrix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    Iterator* rawIter = <span class="built_in">NewRawIterator</span>(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">OddIterator</span>(rawIter);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix, <span class="type">const</span> vector&lt;<span class="type">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* oddIter = <span class="built_in">NewOddIterator</span>(matrix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">AppendPerRowIterator</span>(oddIter, appendix);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix, <span class="type">const</span> vector&lt;<span class="type">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    Iterator* appendIter = <span class="built_in">NewAppendPerRowIterator</span>(matrix, appendix);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">DoubleIterator</span>(appendIter);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>测试结果为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:164311</span><br><span class="line">Odd:316020</span><br><span class="line">Append:436596</span><br><span class="line">Double:458733</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，每增加一层功能，调用延时就明显上涨了一截。有没有其它性能更好的方案了呢？</p>
+<h2 id="mixin"><a href="#mixin" class="headerlink" title="mixin"></a>mixin</h2><p>mixin是给一组基础类，每个都建模了一个抽象概念，且能直接组合成一个新的类，像乐高一样，满足需求。如果你新增了基础类，只要它是和其它基础类正交的，就可以扩展到这个组合类里。</p>
+<p>C++中的一种mixin方法是结合模板和继承，通过模板参数来组合基础类（见<a href="/2018/04/21/mixin/">通过mixin组合功能</a>）。</p>
+<p>在上面这个例子中，<code>RawIterator</code>是一个基础类，可以单独使用，而<code>OddIterator</code>、<code>AppendIterator</code>和<code>DoubleIterator</code>则是用来提供新的功能的，是mixin类，我们可以将这三个类型实现为模板类，以<code>OddIterator</code>为例：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">OddIterator</span>: <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">OddIterator</span>(?)</span><br><span class="line">        : <span class="built_in">T</span>(?) &#123;</span><br><span class="line">        <span class="built_in">MoveUntilOdd</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">Node <span class="title">GetValue</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::<span class="built_in">GetValue</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">IsValid</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> T::<span class="built_in">IsValid</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">MoveNext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        T::<span class="built_in">MoveNext</span>();</span><br><span class="line">        <span class="built_in">MoveUntilOdd</span>();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">MoveUntilOdd</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">while</span> (T::<span class="built_in">IsValid</span>() &amp;&amp; T::<span class="built_in">GetValue</span>().mValue % <span class="number">2</span> == <span class="number">0</span>) &#123;</span><br><span class="line">            T::<span class="built_in">MoveNext</span>();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，新的<code>OddIterator</code>是通过继承自<code>T</code>来给<code>T</code>增加功能的，这有什么好处？摘取上文中的一段：</p>
+<blockquote>
+<p>不需要堆分配。<br>没有运行期检查null。<br>不需要显式管理生命期。<br>没有多余的虚函数定义及其调用。<br>编译器有机会做更多优化。</p>
+</blockquote>
+<p>似乎一切都很美好，除了代码有些怪异外。但我们还有一个问题没有解决：怎么构造<code>T</code>？</p>
+<h2 id="一种mixin的通用构造方法"><a href="#一种mixin的通用构造方法" class="headerlink" title="一种mixin的通用构造方法"></a>一种mixin的通用构造方法</h2><p>这是一个很大很复杂的课题，这里我只提出一种似乎可行的方式（至少本文的例子是没问题的）。</p>
+<p>我们要求每个mixin类型，及需要与这个mixin类型组合的基础类型内部，都定义一个Context类型，且有一个只有一个Context类型参数的构造函数。例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">RawIterator</span>: <span class="keyword">public</span> Iterator &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">Context</span> &#123;</span><br><span class="line">        <span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; mMatrix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix)</span></span></span><br><span class="line"><span class="function">            : mMatrix(matrix) &#123;</span>&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">RawIterator</span><span class="params">(<span class="type">const</span> Context&amp; context)</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">OddIterator</span>: <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">Context</span> &#123;</span><br><span class="line">        <span class="type">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="type">const</span> <span class="keyword">typename</span> T::Context&amp; base)</span></span></span><br><span class="line"><span class="function">            : mBase(base) &#123;</span>&#125;</span><br><span class="line">    &#125;;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">OddIterator</span>(<span class="type">const</span> Context&amp; c)</span><br><span class="line">        : <span class="built_in">T</span>(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">AppendPerRowIterator</span>: <span class="keyword">public</span> T &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">Context</span> &#123;</span><br><span class="line">        <span class="type">const</span> <span class="keyword">typename</span> T::Context&amp; mBase;</span><br><span class="line">        <span class="type">const</span> vector&lt;<span class="type">int</span>&gt;&amp; mAppendix;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">explicit</span> <span class="title">Context</span><span class="params">(<span class="type">const</span> <span class="keyword">typename</span> T::Context&amp; base, <span class="type">const</span> vector&lt;<span class="type">int</span>&gt;&amp; appendix)</span></span></span><br><span class="line"><span class="function">            : mBase(base), mAppendix(appendix) &#123;</span>&#125;</span><br><span class="line">    &#125;;</span><br><span class="line">    <span class="built_in">AppendPerRowIterator</span>(<span class="type">const</span> Context&amp; c)</span><br><span class="line">       : <span class="built_in">T</span>(c.mBase)</span><br><span class="line">    <span class="comment">//...</span></span><br></pre></td></tr></table></figure>
+
+<p>通过这种方式，我们可以在不知道<code>T</code>的具体类型（也就不知道它到底有什么样的构造函数）的情况下，构造出组合类型。从而也获得了任意组合这些mixin顺序的能力。</p>
+<p>在C++11后，我们可以通过变长参数和继承构造函数的方式提供更优雅的mixin的通用构造方案，这是另外的话题，这里不展开了。</p>
+<p>在使用了上面的方法来构造mixin后，几个New函数的实现为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Iterator* <span class="title">NewRawIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="function">RawIterator::Context <span class="title">c</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">RawIterator</span>(c);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewOddIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line"></span><br><span class="line">    <span class="function">RawIterator::Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    <span class="function">OddIter::Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">OddIter</span>(c1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewAppendPerRowIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix, <span class="type">const</span> vector&lt;<span class="type">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line"></span><br><span class="line">    <span class="function">RawIterator::Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    <span class="function">OddIter::Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    <span class="function">AppendIter::Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">AppendIter</span>(c2);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">Iterator* <span class="title">NewDoubleIterator</span><span class="params">(<span class="type">const</span> vector&lt;vector&lt;<span class="type">int</span>&gt; &gt;&amp; matrix, <span class="type">const</span> vector&lt;<span class="type">int</span>&gt;&amp; appendix)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">typedef</span> OddIterator&lt;RawIterator&gt; OddIter;</span><br><span class="line">    <span class="keyword">typedef</span> AppendPerRowIterator&lt;OddIter&gt; AppendIter;</span><br><span class="line">    <span class="keyword">typedef</span> DoubleIterator&lt;AppendIter&gt; DoubleIter;</span><br><span class="line"></span><br><span class="line">    <span class="function">RawIterator::Context <span class="title">c0</span><span class="params">(matrix)</span></span>;</span><br><span class="line">    <span class="function">OddIter::Context <span class="title">c1</span><span class="params">(c0)</span></span>;</span><br><span class="line">    <span class="function">AppendIter::Context <span class="title">c2</span><span class="params">(c1, appendix)</span></span>;</span><br><span class="line">    <span class="function">DoubleIter::Context <span class="title">c3</span><span class="params">(c2)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">DoubleIter</span>(c3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看起来还是很笨拙，但至少我们成功地把它们构造出来了。</p>
+<h2 id="mixin的性能"><a href="#mixin的性能" class="headerlink" title="mixin的性能"></a>mixin的性能</h2><p>重新编译，运行，基于mixin的结果为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Raw:165505</span><br><span class="line">Odd:164377</span><br><span class="line">Append:187320</span><br><span class="line">Double:191260</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，在Raw结果不变的情况下（这是当然的），其它三种场景mixin方案的延时分别比继承+组合减少了48%、57%和58%，调用链越长，mixin方案的优势越大。</p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>本文提出了用mixin来解决功能组合的方案，且使用了Context类型来解决构造问题，相比常见的继承+组合的方案，mixin方案有着非常明显的性能优势。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/07/22/cpp-inline-member-function-in-cpp-file/" rel="prev" title="C++：在实现文件中内联小的成员函数">
+      <i class="fa fa-chevron-left"></i> C++：在实现文件中内联小的成员函数
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2019/04/07/three-optimization-tips-for-cpp/" rel="next" title="[笔记] Three Optimization Tips for C++">
+      [笔记] Three Optimization Tips for C++ <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B5%8B%E8%AF%95%E7%A8%8B%E5%BA%8F"><span class="nav-number">2.</span> <span class="nav-text">测试程序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8E%E7%BB%A7%E6%89%BF-%E7%BB%84%E5%90%88%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.</span> <span class="nav-text">基于继承+组合的实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#mixin"><span class="nav-number">4.</span> <span class="nav-text">mixin</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E7%A7%8Dmixin%E7%9A%84%E9%80%9A%E7%94%A8%E6%9E%84%E9%80%A0%E6%96%B9%E6%B3%95"><span class="nav-number">5.</span> <span class="nav-text">一种mixin的通用构造方法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#mixin%E7%9A%84%E6%80%A7%E8%83%BD"><span class="nav-number">6.</span> <span class="nav-text">mixin的性能</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E8%AE%BA"><span class="nav-number">7.</span> <span class="nav-text">结论</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

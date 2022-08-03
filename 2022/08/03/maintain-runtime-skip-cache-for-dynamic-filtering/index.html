@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="TL;DR AP 系统中缓存算子结果是一种很有效的针对重复查询的优化手段。但这种方法严重依赖于结果的不变性，因此并不适用于频繁更新的场景（如 TiFlash）。本文提出一种通过维护运行期的 skip cache，尽可能跳过无效 page 的优化方法，应该对这种场景有效。  有 paper 已经讲过这种优化的话求告知。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="一种通过 skip cache 加速重复查询的方法">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="TL;DR AP 系统中缓存算子结果是一种很有效的针对重复查询的优化手段。但这种方法严重依赖于结果的不变性，因此并不适用于频繁更新的场景（如 TiFlash）。本文提出一种通过维护运行期的 skip cache，尽可能跳过无效 page 的优化方法，应该对这种场景有效。  有 paper 已经讲过这种优化的话求告知。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-08-03T13:33:18.000Z">
+<meta property="article:modified_time" content="2022-08-03T13:33:41.315Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>一种通过 skip cache 加速重复查询的方法 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          一种通过 skip cache 加速重复查询的方法
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-08-03 21:33:18 / 修改时间：21:33:41" itemprop="dateCreated datePublished" datetime="2022-08-03T21:33:18+08:00">2022-08-03</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>TL;DR</strong></p>
+<p>AP 系统中缓存算子结果是一种很有效的针对重复查询的优化手段。但这种方法严重依赖于结果的不变性，因此并不适用于频繁更新的场景（如 TiFlash）。本文提出一种通过维护运行期的 skip cache，尽可能跳过无效 page 的优化方法，<strong>应该</strong>对这种场景有效。</p>
+<blockquote>
+<p>有 paper 已经讲过这种优化的话求告知。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>任何缓存结果的方法，其核心都是要寻找到某种不变的东西。传统的离线数仓系统，其数据更新频率极低，相同 query plan 通常扫过的数据集是不变的。如果 plan 中不存在非幂等的函数&#x2F;算子（通常是这样），则每个算子的结果也是不变的。这是缓存算子结果的基础。</p>
+<p>但在 TiFlash 中，我们需要考虑到用户可能频繁在更新数据，同时 query plan 也很难保证稳定。因此直接缓存算子结果可能并不合适。</p>
+<blockquote>
+<p>虽然但是，有机会还是得搞，见文末。</p>
+</blockquote>
+<p>materialize 这样的实时物化是另一种方案，但计算开销较大。而且人家属于另一个赛道了。我们还是从简单的优化入手。</p>
+<h2 id="从-skip-index-到-skip-cache"><a href="#从-skip-index-到-skip-cache" class="headerlink" title="从 skip index 到 skip cache"></a>从 skip index 到 skip cache</h2><p>Skip index 是 AP 系统非常关键的模块，它的作用是记录每个 page（或者叫 block）的一些 metadata（如 min&#x2F;max 等），在 TableScan 时提前过滤那些不可能包含所需数据的 page，从而节省大量 IO 与计算资源。</p>
+<blockquote>
+<p>为什么 AP 系统通常不使用 secondary index 来加速查询？</p>
+<ol>
+<li>维护 secondary index 的代价是非常高的。</li>
+<li>查询 secondary index 时通常会引入大量随机 I&#x2F;O（无论是读 index 还是回表时）。而 AP 系统可以通过 skip index 跳过大量无效的 page，而对剩余部分进行顺序扫描的效率是非常高的（I&#x2F;O 和 cache 友好）。</li>
+</ol>
+</blockquote>
+<p>skip index 的缺点是它通常只能包含静态数据，一旦遇到复杂一点的表达式就无能为力了（比如 <code>year(a) = 2022</code> 或者 <code>concat(a, b) like &#39;%PingCAP%&#39;</code>)。对于这种复合表达式的 filter，很多系统（如现阶段的 TiFlash）只能无脑扫全表了。</p>
+<p>一种很直接的想法就是，如果我能知道一个表达式是否命中了一个 page，就可以在下次遇到这个表达式时提前排除掉对应的 page，重新让 skip index 生效。显然这种信息是非常动态的，不适合持久化，只能放到内存中。</p>
+<p>方案一：在内存中缓存每个表达式扫描未命中的 page list。</p>
+<p>注意，这个方案中，page 指的是 stable file 中的 page。如前所述，我们要缓存结果，就要找到某种不变的东西。TiFlash 是按 delta 和 stable 来划分数据的，前者变化频繁，后者变化较少，显然我们只能针对 stable 来缓存。恰好，TiFlash 的 skip index 也是只存在于 stable 部分的。</p>
+<p>stable 只是变化不那么频繁，不代表它永远不变。方案一要保证不能跳过新生成的 page，就要记录未命中的 page list，将所有新 page 视为可能命中。这对方案的实现提出了要求：</p>
+<ol>
+<li>能识别哪些 page 是在缓存更新之后生成的。通常记录某种单调增的 version 即可。</li>
+<li>每个 page 要有稳定的唯一标识，即新 page 不能重用老 page 的标识。这个可以用 fileid+pageid 来实现。</li>
+</ol>
+<p>skip cache 可以用 LRU 或 LFU 等策略管理。</p>
+<h2 id="降低内存占用"><a href="#降低内存占用" class="headerlink" title="降低内存占用"></a>降低内存占用</h2><p>方案一的缺点是当 page 很多时，内存占用较高。我们需要有办法将 page list 占用的空间降下来。我们可以将 page list 替换为 bloomfilter，后者通过引入适量的 false positive 来降低空间占用。</p>
+<blockquote>
+<p>另一种类似的结构是 cuckoo filter。</p>
+</blockquote>
+<p>但换用 bloomfilter 之后，我们就要将方案一中记录未命中的 page list 改为记录命中的 page list 了，否则 false positive 会导致有 page 被错误地跳过。</p>
+<p>方案二：在内存中缓存每个表达式扫描命中的 page list 对应的 bloomfilter。</p>
+<p>同样地，方案二也要求显式处理新生成的 page。</p>
+<h2 id="在分布式-plan-中寻找不变量"><a href="#在分布式-plan-中寻找不变量" class="headerlink" title="在分布式 plan 中寻找不变量"></a>在分布式 plan 中寻找不变量</h2><p>上面的方案只是针对单个 TableScan 算子。接下来我想做点不成熟的探讨。</p>
+<p>我们知道分布式 plan 对各种结果 cache 都不太友好：</p>
+<ol>
+<li>数据可能更新，而 planner 很难及时知道这点。</li>
+<li>数据分布可能变化，同上。</li>
+<li>参与计算的节点可能变化。</li>
+</ol>
+<p>但总还是有些不变量存在的，我们要做的就是充分地将其挖掘出来。</p>
+<p>对于 TiFlash 而言：</p>
+<ol>
+<li>首先 planner 要能知道 query 是否存在缓存。如果做得好的话，可以针对 subplan 设置缓存。</li>
+<li>接下来，planner 是知道这次需要扫描的 region list 的，它需要知道从上次请求到当前 tso，这期间哪些 region 数据没有发生变化。</li>
+<li>接下来，针对这些没有变化过的 region，自底向上计算每个算子的输入是否可能发生变化。</li>
+<li>接下来，计算每个 task 命中缓存的收益，从而决定要不要生成相同的 task 且分发给相同的 node。</li>
+</ol>
+<p>即使如此，如果算子产生的数据过多的话，需要将其物化才能重复利用，开销一下子就上去了。</p>
+<p>从上述内容可以看出，想用上算子的缓存还是不太容易的。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/08/01/cpp-variadic-macro-tips/" rel="prev" title="C++ 变参宏的两个技巧">
+      <i class="fa fa-chevron-left"></i> C++ 变参宏的两个技巧
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%8E-skip-index-%E5%88%B0-skip-cache"><span class="nav-number">2.</span> <span class="nav-text">从 skip index 到 skip cache</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%8D%E4%BD%8E%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">降低内存占用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9C%A8%E5%88%86%E5%B8%83%E5%BC%8F-plan-%E4%B8%AD%E5%AF%BB%E6%89%BE%E4%B8%8D%E5%8F%98%E9%87%8F"><span class="nav-number">4.</span> <span class="nav-text">在分布式 plan 中寻找不变量</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

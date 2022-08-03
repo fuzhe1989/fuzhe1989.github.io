@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：The End of an Architectural Era (It’s Time for a Complete Rewrite)  TL;DR 本文针对新硬件带来的新的趋势，提出了一种全新的OLTP DBMS，H-Store，可以大幅度提高传统的DBMS的性能。 传统的DBMS主要还是沿用System R的架构：  面向磁盘的存储和索引结构。 多线程。 基于锁的并发控制。 基于log的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] The End of an Architectural Era (It&#39;s Time for a Complete Rewrite)">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：The End of an Architectural Era (It’s Time for a Complete Rewrite)  TL;DR 本文针对新硬件带来的新的趋势，提出了一种全新的OLTP DBMS，H-Store，可以大幅度提高传统的DBMS的性能。 传统的DBMS主要还是沿用System R的架构：  面向磁盘的存储和索引结构。 多线程。 基于锁的并发控制。 基于log的">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-10-14T08:56:10.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.660Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="探索研究">
+<meta property="article:tag" content="H-Store">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] The End of an Architectural Era (It's Time for a Complete Rewrite) | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] The End of an Architectural Era (It's Time for a Complete Rewrite)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-10-14 16:56:10" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://hstore.cs.brown.edu/papers/hstore-endofera.pdf">The End of an Architectural Era (It’s Time for a Complete Rewrite)</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文针对新硬件带来的新的趋势，提出了一种全新的OLTP DBMS，H-Store，可以大幅度提高传统的DBMS的性能。</p>
+<p>传统的DBMS主要还是沿用System R的架构：</p>
+<ul>
+<li>面向磁盘的存储和索引结构。</li>
+<li>多线程。</li>
+<li>基于锁的并发控制。</li>
+<li>基于log的恢复机制。</li>
+</ul>
+<p>本文观点是在这套架构上小修小补已经不够了，我们需要全新的设计。</p>
+<p>尤其是传统RDBMS想用一套系统满足全部需求的想法已经过时了。</p>
+<p>H-Store针对OLTP场景，打破了上面这种架构，主要是充分利用大内存和多节点，结合对OLTP场景的若干假设，省掉log和lock相关的很多机制，从而大幅度提升了性能。</p>
+<span id="more"></span>
+
+<h2 id="OLTP-Design-Considerations"><a href="#OLTP-Design-Considerations" class="headerlink" title="OLTP Design Considerations"></a>OLTP Design Considerations</h2><ol>
+<li>内存：随着内存容量上升，很大的OLTP数据库也可以整个放到内存中，而旧的设计是面向磁盘的，没办法充分利用内存的特点，新的设计需要将内存放到比磁盘更高优先级的位置。</li>
+<li>多线程和并发控制：假如所有数据都在内存中，则OLTP的事务通常都比较短，此时多线程在延时方面的优势就不明显了，使用单线程可以去掉并发控制、并发数据结构，整体架构更可靠，性能也更好。</li>
+<li>网格计算和停机升级：未来shared-nothing架构会是主流，多个节点只通过网络连接在一起；且用户不太可能接受停机升级，新的DBMS需要有能力不停机扩缩容和升级，比如在节点间复制数据的同时还不影响事务，这些能力不太可能加到已有系统上。</li>
+<li>高可用：新的系统需要用热备或p2p来达到高可用，这样的系统中log可以非常简化，只需要undo log而不需要redo log，且undo log也只需要在内存中而不需要持久化。</li>
+<li>不需要大量手动开关：新的系统要有self-everything（self-healing，self-maintaining，self-tuning）的能力。</li>
+</ol>
+<h2 id="Transaction-Processing-and-Environment-Assumptions"><a href="#Transaction-Processing-and-Environment-Assumptions" class="headerlink" title="Transaction, Processing and Environment Assumptions"></a>Transaction, Processing and Environment Assumptions</h2><p>为了实现这样的新系统，以下结论就很明显了：</p>
+<ul>
+<li>持久化的redo log明显是性能瓶颈，即使有group commit，也会给每个事务带来若干ms的开销。</li>
+<li>没有了redo log后，DBMS的输入输出接口——JDBC&#x2F;ODBC——就是瓶颈了。作者推荐将应用逻辑全都写为像存储过程一样内置在DBMS里的形式，而不要用传统的交互式的C&#x2F;S模式。</li>
+<li>如有可能，省略掉undo log。</li>
+<li>尽量削减传统的动态数据锁的开销，这是瓶颈之一。</li>
+<li>多线程锁的开销也不可小视，鉴于大内存容量和短事务的特性，我们可以单线程运行，从而以非常低的代价省掉这部分开销。</li>
+<li>尽量避免使用2PC。</li>
+</ul>
+<h3 id="Transaction-and-Schema-Characteristics"><a href="#Transaction-and-Schema-Characteristics" class="headerlink" title="Transaction and Schema Characteristics"></a>Transaction and Schema Characteristics</h3><p>H-Store要求只能用预定义好的Transaction类，每个类的SQL是固定的，可以有运行期参数，不能有显式的停顿，SQL中涉及到的表必须在注册Transaction类时已存在。</p>
+<p>作者注意到很多OLTP场景都有着明显的树型结构，root表与子表有着1:n的join关系，这样可以让子表与root表使用相同partition策略，就可以保证在一个节点上执行equi-join了。</p>
+<p>如果在此基础上，一个transaction类中的所有命令都可以在相同节点完成，我们称这个应用为constrained tree application（CTA）。CTA的价值在于它的执行不会受到其它节点的影响（除了因replication同步导致的）。</p>
+<p>如果CTA中所有transaction的所有命令，除了有root上的相等性判断外，还对一个或多个子表的primary key有相等性判断，则我们还可以在整棵树上做更细粒度的分区。</p>
+<p>OLTP应用很多都可以直接设计成CTA，或者分解为多个CTA。另一类技术是如何把非CTA应用也变成单节点的。作者这里提到两种方法：</p>
+<ol>
+<li>只读的表可以复制到各个节点上，如果去掉这种表之后应用变成了CTA，则加上复制后的只读表它仍然会是CTA。</li>
+<li>另一类应用是one-shot，其中的所有事务都可以并发执行而不需要跨节点的通信，且后面SQL也不会用到前面SQL的结果。这种事务就可以分解为若干个单节点的命令。</li>
+</ol>
+<p>应用经常可以通过垂直分区实现one-shot（不更新的列复制到每个节点），如TPC-C。</p>
+<p>一些应用是两阶段的（或可以转为两阶段），即先是只读阶段，再是只写阶段，如TPC-C。H-Store通过挖掘两阶段的应用从而消除undo-log。</p>
+<p>如果两阶段的应用还保证了只读阶段在所有的节点上运行最终得到同样的继续还是abort的决定，这种应用称为强两阶段应用。</p>
+<p>如果两个事务的任意单节点子计划交错执行都会得到相同的结果（假设都提交），则称这两个事务是可交换的。如果一个事务类与其它所有事务类（包括自己）都是可交换的，则称这样的事务类是sterile。</p>
+<h2 id="H-Store-Sketch"><a href="#H-Store-Sketch" class="headerlink" title="H-Store Sketch"></a>H-Store Sketch</h2><p>每个H-Store节点被分为若干个虚拟节点，每个虚拟节点对应一个cpu核，单线程执行预定义好的事务类。与C-Store类似，H-Store中没有redo log，undo log也只在需要时用到。</p>
+<p>H-Store会在定义事务类时应用基于开销的优化器将SQL转换为查询计划。这里假设了OLTP中很少有多路join（即使有，也通常满足树型要求）、group by、聚合。</p>
+<p>事务类的查询计划可以是：</p>
+<ul>
+<li>单节点的。</li>
+<li>one-shot的。</li>
+<li>普通的，节点间可能需要传递中间结果，后面SQL的参数可能依赖前面SQL的结果。此时H-Store使用Gamma风格的执行模型，最开始处理事务的节点作为协调者。</li>
+</ul>
+<p>对于普通事务，H-Store还会计算事务的深度，即节点间消息传递的次数。</p>
+<p>H-Store有工具自动化设计分区、replication位置、需要索引的字段。为了实现高可用，每个分区都需要有一个或多个伙伴，它们包含相同信息，但可以有不同的形式（如不同的排序）。</p>
+<p>自动化工具的目的是令尽可能多的事务能单节点运行。</p>
+<p>H-Store会保证所有replica的更新满足事务性质，因此读命令可以选择任一replica，而写命令需要发给所有replica。</p>
+<p>每个事务在执行时会收到一个时间戳，格式为<code>(site_id, local_unique_timestamp)</code>，这样给定<code>site_id</code>的顺序，时间戳就满足全序关系了。H-Store需要各个节点的本地时间尽量保持同步。</p>
+<p>H-Store可以利用以下信息来简化并发控制和提交协议：</p>
+<ul>
+<li>单节点&#x2F;one-shot：如果所有事务类都是单节点或one-shot的，则每个事务都可以直接发给各个replica执行。如果其中有非sterile的事务，节点在执行事务前需要等一小会（考虑网络延迟）以保证事务是按时间戳顺序执行的，从而保证各个replica上事务执行顺序相同。同样地，这样的事务类保证了所有repilca要么都commit，要么都abort，这样各个replica可以只看本地结果决定是commit还是abort。此时我们不需要redo log、并发控制、分布式提交。</li>
+<li>两阶段：（如果所有事务类都是两阶段的，）不需要有undo-log，结合上面这条，此时所有事务相关的机制都不需要了。</li>
+<li>sterile：如果所有事务类都是sterile，那么所有事务可以不做并发控制地正常执行，甚至不需要关心不同replica上事务执行的顺序。但如果事务涉及了多个节点，不能保证这些节点都commit或都abort，此时就需要使用2PC了。如果所有事务类都是强两阶段的，就可以省掉2PC。</li>
+<li>其它情况：此时一定要有某种并发控制手段。最常用的并发控制手段是动态锁，但H-Store基于以下原因反对动态锁：<ul>
+<li>事务持续时间短，乐观方法要好于动态锁之类的悲观方法。</li>
+<li>H-Store已经把事务分解为单节点的命令，每个命令没有阻塞地单线程运行，就更倾向于乐观方法了。</li>
+<li>作者假设H-Store可以一次看到全部事务类，可以利用这些全局信息来减小并发控制的开销。</li>
+<li>设计良好的系统中事务冲突和死锁都非常少，此时要求应用开发者来移除这些意外也是合理的（不要为了小概率事件牺牲整体性能）。</li>
+</ul>
+</li>
+</ul>
+<p>H-Store会针对每个不满足各种优化条件的事务类找出所有与它冲突的事务类，在执行时会找一个协调者，其它节点在执行时也会等一小段时间看是否有与之冲突的、时间戳更小的事务到达，之后：</p>
+<ul>
+<li>如果没有这样的冲突的、时间戳更小的事务，执行子计划。</li>
+<li>abort掉子计划并告知协调者。</li>
+</ul>
+<p>如果abort频率太高，H-Store会降级到其它策略，比如多等一会，或使用标准的乐观锁控制。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/%E6%8E%A2%E7%B4%A2%E7%A0%94%E7%A9%B6/" rel="tag"># 探索研究</a>
+              <a href="/tags/H-Store/" rel="tag"># H-Store</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/" rel="prev" title="[笔记] SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets">
+      <i class="fa fa-chevron-left"></i> [笔记] SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/" rel="next" title="[笔记] FlumeJava: Easy, Efficient Data-Parallel Pipelines">
+      [笔记] FlumeJava: Easy, Efficient Data-Parallel Pipelines <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#OLTP-Design-Considerations"><span class="nav-number">1.</span> <span class="nav-text">OLTP Design Considerations</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Transaction-Processing-and-Environment-Assumptions"><span class="nav-number">2.</span> <span class="nav-text">Transaction, Processing and Environment Assumptions</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Transaction-and-Schema-Characteristics"><span class="nav-number">2.1.</span> <span class="nav-text">Transaction and Schema Characteristics</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#H-Store-Sketch"><span class="nav-number">3.</span> <span class="nav-text">H-Store Sketch</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

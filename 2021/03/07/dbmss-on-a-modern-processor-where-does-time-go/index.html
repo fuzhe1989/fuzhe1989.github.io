@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：DBMSs On A Modern Processor: Where Does Time Go?  TL;DR 我们都知道数据库开销的大头是I&#x2F;O，但在现代机器架构下，CPU与内存的交互成本也不容忽视。这篇文章比较了四种商用数据库在三种典型场景下的性能分解，得出结论：  一半的执行时间实际是在停顿（stall）。 90%的停顿是因为L1指令cache miss与L2数据cache">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] DBMSs On A Modern Processor: Where Does Time Go?">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/03/07/dbmss-on-a-modern-processor-where-does-time-go/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：DBMSs On A Modern Processor: Where Does Time Go?  TL;DR 我们都知道数据库开销的大头是I&#x2F;O，但在现代机器架构下，CPU与内存的交互成本也不容忽视。这篇文章比较了四种商用数据库在三种典型场景下的性能分解，得出结论：  一半的执行时间实际是在停顿（stall）。 90%的停顿是因为L1指令cache miss与L2数据cache">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-07.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-08.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-09.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-10.png">
+<meta property="article:published_time" content="2021-03-07T15:00:00.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.653Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="探索研究">
+<meta property="article:tag" content="Performance">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-03/where-does-time-go-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/03/07/dbmss-on-a-modern-processor-where-does-time-go/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] DBMSs On A Modern Processor: Where Does Time Go? | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/07/dbmss-on-a-modern-processor-where-does-time-go/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] DBMSs On A Modern Processor: Where Does Time Go?
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-07 23:00:00" itemprop="dateCreated datePublished" datetime="2021-03-07T23:00:00+08:00">2021-03-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://infoscience.epfl.ch/record/133194/files/vldb99_dbms_eval.pdf">DBMSs On A Modern Processor: Where Does Time Go?</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>我们都知道数据库开销的大头是I&#x2F;O，但在现代机器架构下，CPU与内存的交互成本也不容忽视。这篇文章比较了四种商用数据库在三种典型场景下的性能分解，得出结论：</p>
+<ol>
+<li>一半的执行时间实际是在停顿（stall）。</li>
+<li>90%的停顿是因为L1指令cache miss与L2数据cache miss导致的，而L2指令cache miss与L1数据cache miss则不重要。</li>
+<li>20%的停顿是因为实现细节（如分支预测失败等）。</li>
+<li>内存访问延时对性能的影响大于内存带宽的影响。</li>
+<li>更快的CPU与缓存、内存的延时差距越来越大，以上因素会更加明显。</li>
+</ol>
+<blockquote>
+<p>这篇文章是1999年的，机器是PⅡ，在当前（2021年）的系统中本文的结论仍然有效，且可能有更大的影响。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="现代CPU执行模型"><a href="#现代CPU执行模型" class="headerlink" title="现代CPU执行模型"></a>现代CPU执行模型</h2><p><img src="/images/2021-03/where-does-time-go-01.png"></p>
+<p>上图是简略的PⅡ执行过程：</p>
+<ul>
+<li>FETCH&#x2F;DECODE模块将用户指令翻译为微码并放到池子里；</li>
+<li>DISPATCH&#x2F;EXECUTE模块根据指令依赖关系与资源可用性来调度可运行的指令，并缓存指令结果；</li>
+<li>RETIRE模块决定何时提交或丢弃指令结果。</li>
+</ul>
+<p>当有指令无法继续（停顿）时，CPU会尽量降低它的影响：</p>
+<ul>
+<li>cache miss时会将请求转发给下一层（L1-&gt;L2，L2-&gt;内存），之后cache可以继续服务其它请求。</li>
+<li>乱序执行：指令X停顿时，可以执行与它没有依赖关系的指令Y。</li>
+<li>分支预测：遇到分支时，CPU不会在那等分支结果，而是会预测一个分支开始执行，如果预测对了就提交指令结果，否则需要清空流水线、丢弃临时结果、重新从池子中取指令。因此分支预测失败同时会有计算与停顿的开销。</li>
+</ul>
+<p>以上方法会使得一些步骤的时间有重叠，因此处理时间T<sub>Q</sub> &#x3D; T<sub>C</sub> + T<sub>M</sub> + T<sub>B</sub> + T<sub>R</sub> - T<sub>OVL</sub>，其中T<sub>C</sub>是纯计算时间，T<sub>M</sub>是内存引起的停顿时间，T<sub>B</sub>是分支预测失败引起的停顿时间，T<sub>R</sub>是资源不可用引起的停顿时间，T<sub>OVL</sub>是各步骤的重叠时间。</p>
+<p><img src="/images/2021-03/where-does-time-go-02.png"></p>
+<p>上表是更细的分解，其中LxD代表数据cache，LxI代表指令cache，DTLB代表数据TLB，ITLB代表指令TLB。</p>
+<p>当L1D cache miss不太高时，T<sub>L1D</sub>是可以与其它步骤完全重叠的，此时CPU可以处理其它指令，等待L2D返回。L1D cache miss越多，隐藏它需要执行的其它指令数越多。当有足够多的请求同时访问内存时，L2D cache miss就可以相互重叠从而隐藏停顿。T<sub>DTLB</sub>也可以与其它指令的执行重叠在一起。</p>
+<p>相比之下指令cache的停顿则比较难隐藏，因为当没有指令可以执行时CPU只能等待。分支预测失败也会产生类似的瓶颈。指令预取可以缓解指令cache的停顿，但有时反而会增加分支预测失败的代价（为什么）。</p>
+<p>尽管与指令执行有关，T<sub>R</sub>还是要比T<sub>ITLB</sub>和指令cache miss更容易隐藏。程序的指令并行度越高，T<sub>DEP</sub>越容易隐藏；功能单元竞争越小，T<sub>FU</sub>越容易隐藏。</p>
+<h2 id="测试相关"><a href="#测试相关" class="headerlink" title="测试相关"></a>测试相关</h2><h3 id="Query"><a href="#Query" class="headerlink" title="Query"></a>Query</h3><p>表模型：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> R (a1 <span class="type">INTEGER</span> <span class="keyword">NOT</span> <span class="keyword">NULL</span>,</span><br><span class="line">                            a2 <span class="type">INTEGER</span> <span class="keyword">NOT</span> <span class="keyword">NULL</span>,</span><br><span class="line">                            a3 <span class="type">INTEGER</span> <span class="keyword">NOT</span> <span class="keyword">NULL</span>,</span><br><span class="line">                            <span class="operator">&lt;</span>rest <span class="keyword">of</span> fields<span class="operator">&gt;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>Query 1：Sequential range selection。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">AVG</span>(a3)</span><br><span class="line"><span class="keyword">FROM</span> R</span><br><span class="line"><span class="keyword">WHERE</span> a2 <span class="operator">&lt;</span> Hi <span class="keyword">and</span> a2 <span class="operator">&gt;</span> Lo</span><br></pre></td></tr></table></figure>
+
+<p>Query 2：Indexed range selection，与Q1的区别只在于a2上有non-clustered index。</p>
+<p>Query 3：Sequential join。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">AVG</span>(a3)</span><br><span class="line"><span class="keyword">FROM</span> R, S</span><br><span class="line"><span class="keyword">WHERE</span> R.a2 <span class="operator">=</span> S.a1</span><br></pre></td></tr></table></figure>
+
+<p>其中S与R结构相同，S中每条记录对于R中30条记录。</p>
+<h3 id="软硬件"><a href="#软硬件" class="headerlink" title="软硬件"></a>软硬件</h3><ul>
+<li>CPU：PⅡ Xeon 400MHz；</li>
+<li>内存：512MB；</li>
+<li>OS：Windows NT 4.0 SP4；</li>
+<li>DBMS：四个匿名的商业数据库A&#x2F;B&#x2F;C&#x2F;D。</li>
+<li>测试工具：Intel提供的emon，可以测量多达74种事件。</li>
+</ul>
+<p><img src="/images/2021-03/where-does-time-go-03.png"></p>
+<p><img src="/images/2021-03/where-does-time-go-04.png"></p>
+<h2 id="结果"><a href="#结果" class="headerlink" title="结果"></a>结果</h2><h3 id="执行时间分解"><a href="#执行时间分解" class="headerlink" title="执行时间分解"></a>执行时间分解</h3><p><img src="/images/2021-03/where-does-time-go-05.png"></p>
+<p>A的Q2结果无效，因为它执行时不走索引。</p>
+<p>可以看到所有系统的纯计算时间都少于50%，其中Q2的内存停顿影响最大（non-clustered index导致的cache miss）。除了内存停顿外，分支预测失败与资源不可用导致的停顿也对性能有着巨大的影响。观察A的表现，它的T<sub>M</sub>+T<sub>B</sub>往往好于其它系统，但T<sub>R</sub>则更高，说明优化完两种停顿后，瓶颈跑到了第三种停顿上。</p>
+<h3 id="内存停顿"><a href="#内存停顿" class="headerlink" title="内存停顿"></a>内存停顿</h3><p><img src="/images/2021-03/where-does-time-go-06.png"></p>
+<p>将内存停顿时间分解后，我们发现，L1D miss的影响非常小，且因为测试中没有去掉L1D miss被重叠的部分，它的实际影响要更小。进一步的分析发现DBMS访问内部结构的次数远多于访问用户数据，L1D足够装下这部分数据，因此L1D miss主要是在访问冷的用户数据，不是瓶颈。</p>
+<p>L2I miss和ITLB miss的影响也非常小，因为L1I与ITLB足够装下指令与相关的页表记录。</p>
+<p>L2D miss则造成了巨大的影响（除了B，它对此有优化），且当记录变大时（访问的数据比例变低）L2D miss也变多起来。L2D miss的影响如此之大是因为内存延时高达60-70个周期（现在可能达到100+），即使测试结果中没有去除并行的内存访问的相互重叠，T<sub>L2D</sub>也不会太低。</p>
+<p>随着cache与内存的速度差距越来越大，L2D miss的影响也会越来越大。cache没办法无限增加，更大的cache意味着更高的成本，往往还有更高的延时。</p>
+<blockquote>
+<p>有了L3 cache后，瓶颈会转移到L3 cache miss上。</p>
+</blockquote>
+<p>L1I也造成了巨大的影响，如前面所述，指令的cache miss会导致CPU无法工作。有些技术可以降低指令cache的停顿时间、提升指令cache的使用效率（参见CSAPP），但因为L1 cache大小有限（太大的L1 cache的延时会降低和拖慢CPU时钟）。DBMS可以将常用指令与不常用指令分开，如将错误处理的代码从正常代码逻辑中剥离出来到单独的位置。</p>
+<p>一个意想不到的发现是记录越大L1I miss越多。我们知道记录越大，L1D和L2D的miss越多，而因为指令与数据共享L2，L2I的miss也会随之增加。但为什么会影响到L1I？一种解释是有些CPU有一种机制，当L2 cache被替换时，对应的L1 cache也会被强制替换掉。但PⅡ Xeon没有这种机制。另一种解释是OS会定期中断DBMS，并将L1I替换为OS自己的指令，在DBMS恢复后再重新载入它自己的指令。记录越大，执行单个记录的时间越长，中断次数越多，L1I被替换次数越多。第三种解释是记录越大，跨page的记录比例越高，buffer pool相关代码的执行次数越多，这部分指令相对较冷，其它热指令被替换的次数越多。</p>
+<h3 id="分支预测失败"><a href="#分支预测失败" class="headerlink" title="分支预测失败"></a>分支预测失败</h3><p><img src="/images/2021-03/where-does-time-go-07.png"></p>
+<ol>
+<li>分支预测失败率与记录大小或选择率基本无关。</li>
+<li>更大的Branch Target Buffer（BTB）可以提升OLTP场景的分支预测成功率。</li>
+</ol>
+<h3 id="资源停顿"><a href="#资源停顿" class="headerlink" title="资源停顿"></a>资源停顿</h3><p><img src="/images/2021-03/where-does-time-go-08.png"></p>
+<p>资源不可用是因为：</p>
+<ol>
+<li>指令相互依赖，指令并行度低；</li>
+<li>大量指令同时争抢功能单元。</li>
+</ol>
+<p>X86下机器指令会被翻译为微指令再执行，因此编译器没有简单的手段来发现跨机器指令的依赖关系并在微指令层面上优化。</p>
+<h3 id="TPC-D与TPC-C"><a href="#TPC-D与TPC-C" class="headerlink" title="TPC-D与TPC-C"></a>TPC-D与TPC-C</h3><p><img src="/images/2021-03/where-does-time-go-09.png"></p>
+<p><img src="/images/2021-03/where-does-time-go-10.png"></p>
+<p>TPC-D的停顿主要由L1I引起，这方面的优化能很大程度上提升复杂query的性能。</p>
+<p>TPC-C的停顿主要由L2D与L2I引起，且资源停顿比其它几个场景都高。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/%E6%8E%A2%E7%B4%A2%E7%A0%94%E7%A9%B6/" rel="tag"># 探索研究</a>
+              <a href="/tags/Performance/" rel="tag"># Performance</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/18/amazon-aurora/" rel="prev" title="[笔记] Amazon Aurora SIGMOD'17 '18">
+      <i class="fa fa-chevron-left"></i> [笔记] Amazon Aurora SIGMOD'17 '18
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/12/an-integrated-approach-to-recovery-and-high-availability-in-an-updatable-distributed-data-warehouse/" rel="next" title="[笔记] An Integrated Approach to Recovery and High Availability in an Updatable, Distributed Data Warehouse">
+      [笔记] An Integrated Approach to Recovery and High Availability in an Updatable, Distributed Data Warehouse <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%8E%B0%E4%BB%A3CPU%E6%89%A7%E8%A1%8C%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.</span> <span class="nav-text">现代CPU执行模型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B5%8B%E8%AF%95%E7%9B%B8%E5%85%B3"><span class="nav-number">2.</span> <span class="nav-text">测试相关</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Query"><span class="nav-number">2.1.</span> <span class="nav-text">Query</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AF%E7%A1%AC%E4%BB%B6"><span class="nav-number">2.2.</span> <span class="nav-text">软硬件</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C"><span class="nav-number">3.</span> <span class="nav-text">结果</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E6%97%B6%E9%97%B4%E5%88%86%E8%A7%A3"><span class="nav-number">3.1.</span> <span class="nav-text">执行时间分解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E5%AD%98%E5%81%9C%E9%A1%BF"><span class="nav-number">3.2.</span> <span class="nav-text">内存停顿</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%86%E6%94%AF%E9%A2%84%E6%B5%8B%E5%A4%B1%E8%B4%A5"><span class="nav-number">3.3.</span> <span class="nav-text">分支预测失败</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B5%84%E6%BA%90%E5%81%9C%E9%A1%BF"><span class="nav-number">3.4.</span> <span class="nav-text">资源停顿</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#TPC-D%E4%B8%8ETPC-C"><span class="nav-number">3.5.</span> <span class="nav-text">TPC-D与TPC-C</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

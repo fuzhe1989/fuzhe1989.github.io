@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="C++里类有4种特殊的成员函数：  构造函数。 析构函数。 复制函数，包括复制构造函数和复制赋值函数。 移动函数，包括移动构造函数和移动赋值函数。  这些函数的特点是：有些时候，编译器会帮你生成这些函数；有些时候，编译器又会拒绝生成这些函数；还有些时候，编译器还会往你自己写的特殊函数中添加操作。鉴于这些特殊函数的重要性，我们有必要好好了解一下它们背后的故事。 本文介绍的是前两类，构造函数和析构函数">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++对象模型（五）构造与析构">
+<meta property="og:url" content="http://fuzhe1989.github.io/2018/03/23/cpp-object-model-ctor-dtor/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="C++里类有4种特殊的成员函数：  构造函数。 析构函数。 复制函数，包括复制构造函数和复制赋值函数。 移动函数，包括移动构造函数和移动赋值函数。  这些函数的特点是：有些时候，编译器会帮你生成这些函数；有些时候，编译器又会拒绝生成这些函数；还有些时候，编译器还会往你自己写的特殊函数中添加操作。鉴于这些特殊函数的重要性，我们有必要好好了解一下它们背后的故事。 本文介绍的是前两类，构造函数和析构函数">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-03-22T16:23:16.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.652Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2018/03/23/cpp-object-model-ctor-dtor/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>C++对象模型（五）构造与析构 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/23/cpp-object-model-ctor-dtor/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++对象模型（五）构造与析构
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-23 00:23:16" itemprop="dateCreated datePublished" datetime="2018-03-23T00:23:16+08:00">2018-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>C++里类有4种特殊的成员函数：</p>
+<ul>
+<li>构造函数。</li>
+<li>析构函数。</li>
+<li>复制函数，包括复制构造函数和复制赋值函数。</li>
+<li>移动函数，包括移动构造函数和移动赋值函数。</li>
+</ul>
+<p>这些函数的特点是：有些时候，编译器会帮你生成这些函数；有些时候，编译器又会拒绝生成这些函数；还有些时候，编译器还会往你自己写的特殊函数中添加操作。鉴于这些特殊函数的重要性，我们有必要好好了解一下它们背后的故事。</p>
+<p>本文介绍的是前两类，构造函数和析构函数。</p>
+<p>注1：本文环境为Ubuntu 16.04，gcc5.4.0，使用c++14标准。<br>注2：本文大量内容来自<a target="_blank" rel="noopener" href="https://book.douban.com/subject/10427315/">《深入探索C++对象模型》</a>。</p>
+<h1 id="构造函数"><a href="#构造函数" class="headerlink" title="构造函数"></a>构造函数</h1><h2 id="什么类没有构造函数"><a href="#什么类没有构造函数" class="headerlink" title="什么类没有构造函数"></a>什么类没有构造函数</h2><p>我们知道构造函数是一种非常重要的函数，也是C++诞生的一个主要原因。那么，第一个问题，每个类都有构造函数吗？</p>
+<p>对于下面这个平凡类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Trivial</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int64_t</span> y;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Trivial t;</span><br><span class="line">    t.x = <span class="number">1</span>;</span><br><span class="line">    t.y = <span class="number">2</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>main</code>函数对应的汇编指令为（未开任何优化）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">00000000004006b6 &lt;main&gt;:</span><br><span class="line">  4006b6:   55                      push   %rbp</span><br><span class="line">  4006b7:   48 89 e5                mov    %rsp,%rbp</span><br><span class="line">  4006ba:   48 c7 45 f0 01 00 00    movq   $0x1,-0x10(%rbp)</span><br><span class="line">  4006c1:   00</span><br><span class="line">  4006c2:   48 c7 45 f8 02 00 00    movq   $0x2,-0x8(%rbp)</span><br><span class="line">  4006c9:   00</span><br><span class="line">  4006ca:   b8 00 00 00 00          mov    $0x0,%eax</span><br><span class="line">  4006cf:   5d                      pop    %rbp</span><br><span class="line">  4006d0:   c3                      retq</span><br></pre></td></tr></table></figure>
+
+<p>没有<code>Trivial</code>的构造函数的影子。整个binary中也找不到<code>Trivial</code>的构造函数。</p>
+<p>事实上，平凡类就是没有构造函数的，或者说编译器会为它生成一个<strong>trivial</strong>的构造函数。而一个trivial的构造函数就类似于C中struct的初始化：什么都不做。因此编译器实际上不会为平凡类生成构造函数。而平凡类不允许有自定义的构造函数，结论就是平凡类就不可能有构造函数。</p>
+<p>然而有一种情况下，编译器还真会给平凡类生成一个构造函数，那就是显式声明一个<code>= default</code>的构造函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Trivial</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int64_t</span> y;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">Trivial</span>() = <span class="keyword">default</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">00000000004009e8 &lt;_ZN7TrivialC1Ev&gt;:</span><br><span class="line">  4009e8:   55                      push   %rbp</span><br><span class="line">  4009e9:   48 89 e5                mov    %rsp,%rbp</span><br><span class="line">  4009ec:   48 89 7d f8             mov    %rdi,-0x8(%rbp)</span><br><span class="line">  4009f0:   90                      nop</span><br><span class="line">  4009f1:   5d                      pop    %rbp</span><br><span class="line">  4009f2:   c3                      retq</span><br><span class="line">  4009f3:   66 2e 0f 1f 84 00 00    nopw   %cs:0x0(%rax,%rax,1)</span><br><span class="line">  4009fa:   00 00 00</span><br><span class="line">  4009fd:   0f 1f 00                nopl   (%rax)</span><br></pre></td></tr></table></figure>
+
+<p>虽然这个函数里明显什么事情都没做，但它确实存在了。</p>
+<p>当然，加上“-O2”你会发现，它又没了。</p>
+<p>实际上，所有没有自定义构造函数的，满足bitwise语义的类，都可能没有构造函数。这个范围会比平凡类大一些。</p>
+<h2 id="编译器生成默认构造函数的条件"><a href="#编译器生成默认构造函数的条件" class="headerlink" title="编译器生成默认构造函数的条件"></a>编译器生成默认构造函数的条件</h2><p>第二个问题，编译器什么时候会为一个类生成一个默认构造函数？</p>
+<p>编译器只会在<strong>必要</strong>的时候为一个类生成默认构造函数。所谓必要，指：</p>
+<ul>
+<li>这个类没有自定义的构造函数或声明默认构造函数为<code>= default</code>，且</li>
+<li>没有用<code>= delete</code>删除默认构造函数，且</li>
+<li>代码中调用到了这个类的默认构造函数。</li>
+</ul>
+<p>第一个条件很好理解，C++的编译器是充分相信程序员的，如果一个程序员写了随便一个构造函数，编译器会尊重Ta，不再为其生成默认构造函数。</p>
+<p>第二个条件是指，编译器不会在看到这个类的定义时就为其生成一个默认构造函数，而是会推迟这个生成时机，直到有代码真的调用了才生成。</p>
+<p>然而，即使满足上面的条件，如果类中默认构造函数没有声明为<code>= default</code>，且编译器判断这个类可以bitwise构造，编译器仍然不会真的生成一个默认构造函数。</p>
+<h2 id="bitwise与memberwise"><a href="#bitwise与memberwise" class="headerlink" title="bitwise与memberwise"></a>bitwise与memberwise</h2><p>当我们说到构造函数时，一个不得不提的概念是bitwise与memberwise。实际上这两个概念更多的是用来描述拷贝，但在构造上也有着类似的效果。</p>
+<p>一个类型，如果满足：</p>
+<ul>
+<li>是标量类型，或</li>
+<li>是自定义类型，且满足：<ul>
+<li>没有虚函数。</li>
+<li>没有虚基类。</li>
+<li>没有不符合bitwise语义的非静态成员变量。</li>
+<li>没有不符合bitwise语义的基类。</li>
+<li>没有自定义的构造函数。</li>
+</ul>
+</li>
+</ul>
+<p>那它就满足bitwise构造的条件，即它在构造时没有任何特殊的操作（除了给它分配内存外），它的默认构造函数就是trivial的，实际上编译器不会真的生成这个函数。</p>
+<p>而反过来，不满足这个条件的类，它就需要依次初始化每个成员，即是memberwise。</p>
+<p>trivial的构造函数要比自定义的构造函数低很多（什么都不做），但它伤害到了正确性，即类的成员是没有一个可预期的初始值的的。从这个角度讲，即使是满足上面条件的类，我们也不应放任编译器选择trivial的默认构造函数，而应该自己定义一个正确初始化每个成员值的默认构造函数。当然，如果你要定义一个POD类型的话，除外。</p>
+<h2 id="构造函数的内容"><a href="#构造函数的内容" class="headerlink" title="构造函数的内容"></a>构造函数的内容</h2><p>一个构造函数有哪些内容？比如，对于一个有着两个基类A和B的有虚函数的类型C，它的构造函数需要完成以下工作：</p>
+<ul>
+<li>初始化基类A。</li>
+<li>初始化基类B。</li>
+<li>确保虚表指针指向正确的位置。</li>
+<li>初始化每个成员。</li>
+<li>依次调用构造函数体中的语句。</li>
+</ul>
+<p>很显然，C要先完成A和B的构造，才能保证C自己的构造过程开始时，它已经“is a”A和B的对象。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">A</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> x;</span><br><span class="line">    <span class="built_in">A</span>() &#123;</span><br><span class="line">        x = <span class="number">5</span>;</span><br><span class="line">        <span class="built_in">F</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">A</span>() &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">B</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line">    <span class="built_in">B</span>() &#123;</span><br><span class="line">        y = <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">B</span>() &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">C</span>: <span class="keyword">public</span> A, <span class="keyword">public</span> B &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line">    <span class="built_in">C</span>(): <span class="built_in">z</span>(<span class="number">3</span>) &#123;&#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; z &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，在<code>A::A</code>中我们调用了一个虚函数<code>F</code>，假如整个过程发生在C的构造中，它调用的是哪个<code>F</code>？<code>A::F</code>还是<code>C::F</code>？</p>
+<p>我们知道，在C去构造它的A的子对象时，它自己的成员都还没有初始化，那么此时去调用<code>C::F</code>显然是不合理的。因此我们有一个结论：构造函数中虚函数没有动态绑定，只有静态绑定。</p>
+<p>《深入探索C++对象模型》中提到，当时的编译器在初始化基类子对象时，是通过将虚表指针指向基类的虚表，来实现一种伪的静态绑定。这么做的理由是不区别对待构造函数与其它函数。但这显然会伤害到效率。因此现代的编译器都会区别对待构造函数，真的静态绑定其中每个成员变量的调用。</p>
+<p>通常我们会显式的把基类的构造写到派生类的初始化列表中。但即使不这么做，编译器也会将基类子对象的构造插到派生类的每个构造函数的开头，当然这要求基类有一个默认构造函数，或编译器能为其生成一个默认构造函数。</p>
+<p>OK，在成功地构造完基类子对象后，C开始忙自己的构造了。</p>
+<p>首先，如果C有虚表，那么要把虚表设置到正确地位置上。</p>
+<p>之后开始按<strong>声明</strong>顺序依次构造C的每个非静态成员变量。</p>
+<p>这里的“声明”要加粗，是因为如果忽略这一点，我们很可能会得到一个编译器的警告。</p>
+<p>在这个阶段，每个非静态成员变量的初始值可能会来自三个地方：</p>
+<ul>
+<li>初始化列表中的表达式。</li>
+<li>成员初始化式（C++11新增）中的表达式。</li>
+<li>该成员的默认构造函数（如果非trivial）。</li>
+</ul>
+<p>其优先级依次下降。其中最后一项不涉及顺序，而前两项都可能会涉及到不同成员变量间的构造顺序。</p>
+<p>对于下面这个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int</span> x;</span><br><span class="line">    <span class="type">int</span> y = z + <span class="number">2</span>;</span><br><span class="line">    <span class="type">int</span> z;</span><br><span class="line">    <span class="built_in">S</span>(): <span class="built_in">z</span>(<span class="number">0</span>), <span class="built_in">x</span>(y + <span class="number">1</span>) &#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>当我们构造出一个<code>S</code>的对象时，会发现它的<code>x</code>和<code>y</code>两个成员的值是未初始化的！这就是因为，<code>x</code>依赖了它后面声明的<code>y</code>，而<code>y</code>依赖了它后面声明的<code>z</code>，导致当它们进行初始化时，依赖的值都还没有初始化，自然会得到一个错误的值。</p>
+<p>OK，初始化列表结束后，此时c已经是一个合法的，所有成员和函数都可用的C对象了。接下来要执行的就是构造函数体本身了。</p>
+<p>这里有一个值得注意的点。执行到构造函数体前，类的所有成员变量都已经初始化过了，如果我们在构造函数体中再对其进行赋值，大概率浪费了前面的初始化：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    std::string name;</span><br><span class="line">    <span class="built_in">S</span>(<span class="type">const</span> std::string&amp; s) &#123;</span><br><span class="line">        name = s;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，在整个构造过程中，<code>name</code>执行了一次默认构造函数，和一次赋值。而如果将这次赋值放到初始化列表中：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    std::string name;</span><br><span class="line">    <span class="built_in">S</span>(<span class="type">const</span> std::string&amp; s): <span class="built_in">name</span>(s) &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>name</code>就只执行了一次复制构造函数。对于很多类型来说，后者的好处还是很明显的。</p>
+<h2 id="单参数构造函数要声明为explicit"><a href="#单参数构造函数要声明为explicit" class="headerlink" title="单参数构造函数要声明为explicit"></a>单参数构造函数要声明为<code>explicit</code></h2><p>某种说法认为C++不是强类型语言，因为它允许类型间的隐式转换。C++中的隐式转换有一部分是因为要兼容C而背的包袱，导致整型的重载无比混乱。而另一部分隐式转换就是C++自己设计的问题了。</p>
+<p>在某些场景下，C++的隐式转换是很有用的，但在很可能多得多的场景下，如果滥用隐式转换，就会带来潜在的问题。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    std::vector&lt;std::string&gt; v;</span><br><span class="line">    <span class="built_in">S</span>(<span class="type">int</span> x): <span class="built_in">v</span>(x, <span class="string">&quot;aaa&quot;</span>) &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">const</span> S&amp; s)</span> </span>&#123;</span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;v.size:&quot;</span> &lt;&lt; s.v.<span class="built_in">size</span>() &lt;&lt; std::endl;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="built_in">Func</span>(<span class="number">100</span>); <span class="comment">// oops!</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，<code>Func</code>实际只接受<code>const S&amp;</code>类型的参数，但我们搞错了，传进去了100。我们预期的结果当然是编译器报错，找不到<code>Func(int)</code>，但实际呢？程序编译通过，成功运行，结果是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">v.size:100</span><br></pre></td></tr></table></figure>
+
+<p>发生了什么？隐式转换。编译器看到<code>Func(100)</code>时，它首先会去找<code>Func</code>，只找到了<code>Func(const S&amp;)</code>，没找到<code>Func(int)</code>。于是编译器会找有没有哪种隐式转换，允许将一个<code>int</code>转换为<code>S</code>，还真有，<code>S</code>正好有个构造函数是<code>S(int)</code>！于是编译器这里就执行了<code>S</code>的构造函数，构造出一个有着100个元素的对象。</p>
+<p>怎么避免上面的场景发生？我们就要想办法禁止<code>int</code>到<code>S</code>的隐式转换，而<code>explicit</code>就是这个作用。当它被用来修饰一个单参数的构造函数时，就会阻止编译器产生一种隐式转换的关系：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    std::vector&lt;std::string&gt; v;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">S</span><span class="params">(<span class="type">int</span> x)</span>: v(x, <span class="string">&quot;aaa&quot;</span>) &#123;</span>&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>然而当我们真的想将<code>int</code>转换为<code>S</code>时，该怎么办？两种方法：</p>
+<ul>
+<li>显式构造：<code>Func(S(100))</code>。</li>
+<li>static_cast：<code>Func(static_cast&lt;S&gt;(100))</code>。</li>
+</ul>
+<h2 id="全局变量的初始化不要依赖其它编译单元的全局变量"><a href="#全局变量的初始化不要依赖其它编译单元的全局变量" class="headerlink" title="全局变量的初始化不要依赖其它编译单元的全局变量"></a>全局变量的初始化不要依赖其它编译单元的全局变量</h2><p>这句话有两个前提：</p>
+<ul>
+<li>全局变量的初始化发生在<code>main</code>函数之前，串行进行。</li>
+<li>不同的实现文件（.cpp或.cc）属于不同的编译单元，而不同编译单元的全局变量的初始化顺序在链接时由链接器决定。</li>
+</ul>
+<p>这就导致了一个类似于上面构造函数初始化列表的顺序问题，且它没有一个确定的顺序。</p>
+<p>因此，如果一个全局变量在初始化时依赖了另一个编译单元的全局变量，很可能你会发现前者初始化时后者还没有初始化。</p>
+<p>这里的全局变量也包括类的静态成员变量。</p>
+<p>那么，如果真有这种全局变量的初始值依赖于其它变量，该怎么做呢：</p>
+<ul>
+<li><p>相同编译单元的全局变量的初始化顺序是确定的，可依赖的。</p>
+</li>
+<li><p>如果必须跨编译单元依赖，那么把被依赖的变量放到一个函数里作为static变量。标准规定了函数中的static变量其初始化是在第一次调用时（运行到此行时），这是确定的，可依赖的：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// a.cpp</span></span><br><span class="line"><span class="function">TypeA <span class="title">gX</span><span class="params">(SomeFunc())</span></span>;</span><br><span class="line"><span class="comment">// b.h</span></span><br><span class="line"><span class="function"><span class="type">const</span> TypeB&amp; <span class="title">SomeFunc</span><span class="params">()</span></span>;</span><br><span class="line"><span class="comment">// b.cpp</span></span><br><span class="line"><span class="function"><span class="type">const</span> TypeB&amp; <span class="title">SomeFunc</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">static</span> TypeB b;</span><br><span class="line">    <span class="keyword">return</span> b;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>  别担心这里构造static变量没加锁，C++11后标准中规定了这种构造是线程安全的。</p>
+</li>
+</ul>
+<h1 id="析构函数"><a href="#析构函数" class="headerlink" title="析构函数"></a>析构函数</h1><h2 id="编译器生成析构函数的条件"><a href="#编译器生成析构函数的条件" class="headerlink" title="编译器生成析构函数的条件"></a>编译器生成析构函数的条件</h2><p>与默认构造函数类似，编译器为一个类生成析构函数的条件为：</p>
+<ul>
+<li>这个类没有自定义的析构函数或声明析构函数为<code>= default</code>，且</li>
+<li>没有用<code>= delete</code>删除析构函数，且</li>
+<li>代码中调用到了这个类的析构函数。</li>
+</ul>
+<p>同样地，如果一个类符合bitwise析构的标准，编译器为它生成的析构函数就是trivial的，就是可以忽略的，此时这个类就没有析构函数了。</p>
+<h2 id="析构函数的内容"><a href="#析构函数的内容" class="headerlink" title="析构函数的内容"></a>析构函数的内容</h2><p>析构函数实际就是构造函数的逆过程。参考前面的类C，它的析构函数有以下内容：</p>
+<ul>
+<li>依次调用析构函数体中的语句。</li>
+<li>按<strong>声明</strong>逆序调用每个成员变量的析构函数。</li>
+<li>按<strong>声明</strong>逆序调用每个基类子对象的析构函数。</li>
+</ul>
+<p>同样地，析构函数中也会遇到虚函数的绑定问题。与构造函数类型，所有出现在析构函数中的虚函数，都是静态绑定，因为在析构基类子对象时，派生类自己的成员已经都析构掉了，此时再调用派生类改写的方法大概率会出问题。</p>
+<h2 id="有虚函数的类也需要一个虚析构函数的定义"><a href="#有虚函数的类也需要一个虚析构函数的定义" class="headerlink" title="有虚函数的类也需要一个虚析构函数的定义"></a>有虚函数的类也需要一个虚析构函数的定义</h2><p>这里有两个值得注意的点。</p>
+<p>第一个，一个类有虚函数，但析构函数不是虚函数，会有大问题的。我们为一个类增加虚函数时，一定是准备实现运行期多态的（否则声明虚函数干什么）。而我们知道运行期多态是要靠基类的指针和引用来触发的。对于下面的例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    ~<span class="built_in">Base</span>() &#123;</span><br><span class="line">        std::cout &lt;&lt; <span class="string">&quot;~Base&quot;</span> &lt;&lt; std::endl;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    ~<span class="built_in">Derived</span>() &#123;</span><br><span class="line">        std::cout &lt;&lt; <span class="string">&quot;~Derived&quot;</span> &lt;&lt; std::endl;</span><br><span class="line">    &#125;</span><br><span class="line">    std::string name;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Base* p = <span class="keyword">new</span> Derived;</span><br><span class="line">    <span class="keyword">delete</span> p;  <span class="comment">// oops!</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">~Base</span><br></pre></td></tr></table></figure>
+
+<p>没有调用真正类型的析构函数，是个大问题！尤其是，<code>Derived::name</code>也没有被析构，出现了内存泄漏！</p>
+<p>因此，第一个结论：有虚函数的类，一定要有虚的析构函数。</p>
+<p>第二个值得注意的点，纯虚基类，析构函数也要有定义，不能是纯虚函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() = <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它的问题在于，它的所有派生类在析构时都会调用到<code>Base</code>的析构函数，然而发现这个函数没有定义！编译会因此失败。</p>
+<p>因此，第二个结论：不能有纯虚的析构函数，也不能禁止生成析构函数（通过声明为<code>= delete</code>或声明为private却不给定义），一定要给析构函数一个定义（或等待编译器为你生成一个）。</p>
+<h2 id="变量的析构时间"><a href="#变量的析构时间" class="headerlink" title="变量的析构时间"></a>变量的析构时间</h2><p>标准规定了一个local变量的析构时间是在它出scope时，这个规则很简单，但有些特殊场景还是要单独说一下：</p>
+<ul>
+<li><p>全局变量、静态变量的构造时间是在<code>main</code>函数以前，而析构时间则是在<code>main</code>函数以后。同样地，不同编译单元间全局&#x2F;静态变量的析构函数也是不确定的。</p>
+</li>
+<li><p>临时变量的析构时间为代码中其所在的最外层表达式执行完成后，即：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">const</span> <span class="type">char</span>* s = <span class="built_in">getStringObject</span>().<span class="built_in">c_str</span>();</span><br><span class="line"><span class="comment">// temp obj destructs here and s becomes danling!</span></span><br></pre></td></tr></table></figure>
+
+<p>  这里<code>getStringObject()</code>会返回一个临时的<code>std::string</code>对象，这个对象的生命期会直到完成<code>s</code>的赋值后，下一行调用开始前。</p>
+</li>
+<li><p>但被赋值给const引用的临时变量，其生命期会与这个const引用保持一致，直到这个引用出scope才析构：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="type">const</span> std::string&amp; s = <span class="built_in">getStringObject</span>();</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125; <span class="comment">// temp obj destructs here</span></span><br></pre></td></tr></table></figure></li>
+<li><p>如果<code>goto</code>跳回到函数前面，则这段代码中定义的变量都会被析构：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">RETRY:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::vector&lt;<span class="type">int</span>&gt; v;</span><br><span class="line">    <span class="keyword">goto</span> RETRY; <span class="comment">// name and v will be destructed.</span></span><br></pre></td></tr></table></figure></li>
+<li><p>存在短路逻辑的表达式中，编译器需要插入一些代码才能确定临时对象的析构时间：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> ((s + t) || (u + v)) &#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>  这里面<code>s + t</code>会产生临时对象，但<code>u + v</code>只能说<strong>可能</strong>产生临时对象，因为如果表达式被短路，根本走不到后半截，就不会产生这个临时对象，那么这个临时对象也就不需要被析构。编译期怎么会知道这个表达式会不会被短路呢？因此编译器需要插入一些代码来产生不同分支。这也稍稍增加了些运行期的开销。</p>
+</li>
+</ul>
+<p>当一个函数有着很多出口时，想决定一个local变量的scope就变困难了，编译器需要在每个可能<code>return</code>的地方都加上一些用于析构已经存在的变量，这也会增大binary的体积。</p>
+<h2 id="不要手动调用local变量的析构函数"><a href="#不要手动调用local变量的析构函数" class="headerlink" title="不要手动调用local变量的析构函数"></a>不要手动调用local变量的析构函数</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int</span> j;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">f</span><span class="params">()</span></span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Base b;</span><br><span class="line">    b.<span class="built_in">f</span>();</span><br><span class="line">    b.~<span class="built_in">Base</span>();</span><br><span class="line">    <span class="keyword">new</span>(&amp;b) Derived;</span><br><span class="line">    b.<span class="built_in">f</span>();            <span class="comment">// which f?</span></span><br><span class="line">&#125; <span class="comment">// which dtor?</span></span><br></pre></td></tr></table></figure>
+
+<p>上面是一个很tricky的例子，我们手动调用了<code>b</code>的析构函数，又在其原地构造了一个派生类对象。此时再调用<code>f</code>，调用的会是哪个版本？出scope时，调用的是谁的析构函数？</p>
+<p>实际这都是未定义的问题，编译器很可能不会按我们的想法去实现。因此结论就是不要这么用。</p>
+<h1 id="异常场景"><a href="#异常场景" class="headerlink" title="异常场景"></a>异常场景</h1><p>当有了异常之后，构造函数和析构函数就更复杂了：</p>
+<ul>
+<li>构造函数抛了异常后，已经构造完的基类子对象和成员变量要析构，但未构造的成员不要析构，因此编译器需要插入大量代码。</li>
+<li>构造函数如果在进入函数体之前抛异常，此时对象本身还不完整（有成员未构造完），那么就不能执行析构函数。</li>
+<li>异常会导致函数栈unwind，期间每个还存活的对象都要析构，同样需要插入大量代码。</li>
+<li>异常还可能会被catch住，此时unwind停止，不再析构存活对象，又要做一些判断。</li>
+<li>当异常未被catch住时，如果unwind导致的析构抛了异常，同时存在两个异常会导致程序crash。</li>
+</ul>
+<p>因此异常是一种比较昂贵的特性，想实现好异常安全也不那么容易，比如STL容器为了保证修改时的异常安全，做了非常多的事情。</p>
+<p>但辩证的看，异常本身还是一种很有用的特性，至少我是支持使用异常的，只要知道上面这些开销，尽量避免错误的使用就好了。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/03/18/cpp-object-model-inheritance-and-polymorphism/" rel="prev" title="C++对象模型（四）继承与多态">
+      <i class="fa fa-chevron-left"></i> C++对象模型（四）继承与多态
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/03/25/cpp-object-model-copy-move/" rel="next" title="C++对象模型（六）复制与移动">
+      C++对象模型（六）复制与移动 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0"><span class="nav-number">1.</span> <span class="nav-text">构造函数</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E7%B1%BB%E6%B2%A1%E6%9C%89%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0"><span class="nav-number">1.1.</span> <span class="nav-text">什么类没有构造函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91%E5%99%A8%E7%94%9F%E6%88%90%E9%BB%98%E8%AE%A4%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0%E7%9A%84%E6%9D%A1%E4%BB%B6"><span class="nav-number">1.2.</span> <span class="nav-text">编译器生成默认构造函数的条件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#bitwise%E4%B8%8Ememberwise"><span class="nav-number">1.3.</span> <span class="nav-text">bitwise与memberwise</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0%E7%9A%84%E5%86%85%E5%AE%B9"><span class="nav-number">1.4.</span> <span class="nav-text">构造函数的内容</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%95%E5%8F%82%E6%95%B0%E6%9E%84%E9%80%A0%E5%87%BD%E6%95%B0%E8%A6%81%E5%A3%B0%E6%98%8E%E4%B8%BAexplicit"><span class="nav-number">1.5.</span> <span class="nav-text">单参数构造函数要声明为explicit</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96%E4%B8%8D%E8%A6%81%E4%BE%9D%E8%B5%96%E5%85%B6%E5%AE%83%E7%BC%96%E8%AF%91%E5%8D%95%E5%85%83%E7%9A%84%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F"><span class="nav-number">1.6.</span> <span class="nav-text">全局变量的初始化不要依赖其它编译单元的全局变量</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9E%90%E6%9E%84%E5%87%BD%E6%95%B0"><span class="nav-number">2.</span> <span class="nav-text">析构函数</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91%E5%99%A8%E7%94%9F%E6%88%90%E6%9E%90%E6%9E%84%E5%87%BD%E6%95%B0%E7%9A%84%E6%9D%A1%E4%BB%B6"><span class="nav-number">2.1.</span> <span class="nav-text">编译器生成析构函数的条件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%90%E6%9E%84%E5%87%BD%E6%95%B0%E7%9A%84%E5%86%85%E5%AE%B9"><span class="nav-number">2.2.</span> <span class="nav-text">析构函数的内容</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%89%E8%99%9A%E5%87%BD%E6%95%B0%E7%9A%84%E7%B1%BB%E4%B9%9F%E9%9C%80%E8%A6%81%E4%B8%80%E4%B8%AA%E8%99%9A%E6%9E%90%E6%9E%84%E5%87%BD%E6%95%B0%E7%9A%84%E5%AE%9A%E4%B9%89"><span class="nav-number">2.3.</span> <span class="nav-text">有虚函数的类也需要一个虚析构函数的定义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%98%E9%87%8F%E7%9A%84%E6%9E%90%E6%9E%84%E6%97%B6%E9%97%B4"><span class="nav-number">2.4.</span> <span class="nav-text">变量的析构时间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8D%E8%A6%81%E6%89%8B%E5%8A%A8%E8%B0%83%E7%94%A8local%E5%8F%98%E9%87%8F%E7%9A%84%E6%9E%90%E6%9E%84%E5%87%BD%E6%95%B0"><span class="nav-number">2.5.</span> <span class="nav-text">不要手动调用local变量的析构函数</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BC%82%E5%B8%B8%E5%9C%BA%E6%99%AF"><span class="nav-number">3.</span> <span class="nav-text">异常场景</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

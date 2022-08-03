@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？1234567891011121314151617template &lt;class T, class D &#x3D; default_delete&lt;T&gt;&gt;class unique_ptr &amp;#123;public:    ...    unique_ptr (pointer p,">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++：为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/05/19/cpp-different-role-of-deleter-in-unique-ptr-and-shared-ptr/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？1234567891011121314151617template &lt;class T, class D &#x3D; default_delete&lt;T&gt;&gt;class unique_ptr &amp;#123;public:    ...    unique_ptr (pointer p,">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-05-19T15:26:51.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.651Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/05/19/cpp-different-role-of-deleter-in-unique-ptr-and-shared-ptr/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>C++：为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？ | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/05/19/cpp-different-role-of-deleter-in-unique-ptr-and-shared-ptr/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++：为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-05-19 23:26:51" itemprop="dateCreated datePublished" datetime="2017-05-19T23:26:51+08:00">2017-05-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="为什么unique-ptr的Deleter是模板类型参数，而shared-ptr的Deleter不是？"><a href="#为什么unique-ptr的Deleter是模板类型参数，而shared-ptr的Deleter不是？" class="headerlink" title="为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？"></a>为什么<code>unique_ptr</code>的Deleter是模板类型参数，而<code>shared_ptr</code>的Deleter不是？</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">T</span>, <span class="keyword">class</span> <span class="title class_">D</span> = default_delete&lt;T&gt;&gt;</span><br><span class="line"><span class="keyword">class</span> unique_ptr &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="built_in">unique_ptr</span> (pointer p,</span><br><span class="line">        <span class="keyword">typename</span> conditional&lt;is_reference&lt;D&gt;::value,D,<span class="type">const</span> D&amp;&gt; del) <span class="keyword">noexcept</span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">T</span>&gt; </span><br><span class="line"><span class="keyword">class</span> <span class="title class_">shared_ptr</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">U</span>, <span class="keyword">class</span> <span class="title class_">D</span>&gt; </span><br><span class="line">    <span class="built_in">shared_ptr</span> (U* p, D del);</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>上面的代码中能看到<code>unique_ptr</code>的第二个模板类型参数是Deleter，而<code>shared_ptr</code>的Delete则只是构造函数参数的一部分，并不是<code>shared_ptr</code>的类型的一部分。</p>
+<p>为什么会有这个区别呢？</p>
+<p>答案是效率。<code>unique_ptr</code>的设计目标之一是尽可能的高效，如果用户不指定Deleter，就要像原生指针一样高效。</p>
+<p>Deleter作为对象的成员一般会有哪些额外开销？</p>
+<ol>
+<li>通常要存起来，多占用空间。</li>
+<li>调用时可能会有一次额外的跳转（相比<code>delete</code>或<code>delete[]</code>）。</li>
+</ol>
+<p><code>shared_ptr</code>总是要分配一个ControlBlock的，多加一个Deleter的空间开销也不大，第一条pass；<code>shared_ptr</code>在析构时要先原子减RefCount，如果WeakCount也为0还要再析构ControlBlock，那么调用Deleter析构持有的对象时多一次跳转也不算什么，第二条pass。</p>
+<p>既然<code>shared_ptr</code>并不担心Deleter带来的额外开销，同时把Deleter作为模板类型的一部分还会导致使用上变复杂，那么它只把Deleter作为构造函数的类型就是显然的事情了。</p>
+<p>而<code>unique_ptr</code>采用了“空基类”的技巧，将Deleter作为基类，在用户不指定Deleter时根本不占空间，第一条pass；用户不指定Deleter时默认的Deleter会是<code>default_delete</code>，它的<code>operator()</code>在类的定义内，会被inline掉，这样调用Deleter时也就没有额外的开销了，第二条pass。</p>
+<p>因此<code>unique_ptr</code>通过上面两个技巧，成功的消除了默认Deleter可能带来的额外开销，保证了与原生指针完全相同的性能。代价就是Deleter需要是模板类型的一部分。</p>
+<h3 id="相关文档"><a href="#相关文档" class="headerlink" title="相关文档"></a>相关文档</h3><ul>
+<li><a target="_blank" rel="noopener" href="http://stackoverflow.com/questions/21355037/why-does-unique-ptr-take-two-template-parameters-when-shared-ptr-only-takes-one">Why does unique_ptr take two template parameters when shared_ptr only takes one?</a></li>
+<li><a target="_blank" rel="noopener" href="http://stackoverflow.com/questions/6829576/why-does-unique-ptr-have-the-deleter-as-a-type-parameter-while-shared-ptr-doesn">Why does unique_ptr have the deleter as a type parameter while shared_ptr doesn’t?</a></li>
+</ul>
+<h2 id="unique-ptr是如何使用空基类技巧的"><a href="#unique-ptr是如何使用空基类技巧的" class="headerlink" title="unique_ptr是如何使用空基类技巧的"></a><code>unique_ptr</code>是如何使用空基类技巧的</h2><p>我们参考clang的实现来学习一下<code>unique_ptr</code>使用的技巧。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Tp</span>, <span class="keyword">class</span> <span class="title class_">_Dp</span> = default_delete&lt;_Tp&gt; &gt;</span><br><span class="line"><span class="keyword">class</span> unique_ptr</span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">typedef</span> _Tp element_type;</span><br><span class="line">    <span class="keyword">typedef</span> _Dp deleter_type;</span><br><span class="line">    <span class="keyword">typedef</span> <span class="keyword">typename</span> __pointer_type&lt;_Tp, deleter_type&gt;::type pointer;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    __compressed_pair&lt;pointer, deleter_type&gt; __ptr_;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>忽略掉<code>unique_ptr</code>中的各种成员函数，我们看到它只有一个成员变量<code>__ptr__</code>，类型是<code>__compressed_pair&lt;pointer, deleter_type&gt;</code>。我们看看它是什么，是怎么省掉了Deleter的空间的。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">__compressed_pair</span></span><br><span class="line">    : <span class="keyword">private</span> __libcpp_compressed_pair_imp&lt;_T1, _T2&gt; &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p><code>__compressed_pair</code>没有任何的成员变量，就说明它的秘密藏在了它的基类中，我们继续看。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>, <span class="type">unsigned</span> = __libcpp_compressed_pair_switch&lt;_T1, _T2&gt;::value&gt;</span><br><span class="line"><span class="keyword">class</span> __libcpp_compressed_pair_imp;</span><br></pre></td></tr></table></figure>
+
+<p><code>__libcpp_compressed_pair_imp</code>有三个模板类型参数，前两个是传入的<code>_T1</code>和<code>_T2</code>，第三个参数是一个无符号整数，它是什么？我们往下看，看到了它的若干个特化版本：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">__libcpp_compressed_pair_imp</span>&lt;_T1, _T2, <span class="number">0</span>&gt;</span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    _T1 __first_;</span><br><span class="line">    _T2 __second_;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">__libcpp_compressed_pair_imp</span>&lt;_T1, _T2, <span class="number">1</span>&gt;</span><br><span class="line">    : <span class="keyword">private</span> _T1</span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    _T2 __second_;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">__libcpp_compressed_pair_imp</span>&lt;_T1, _T2, <span class="number">2</span>&gt;</span><br><span class="line">    : <span class="keyword">private</span> _T2</span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    _T1 __first_;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">__libcpp_compressed_pair_imp</span>&lt;_T1, _T2, <span class="number">3</span>&gt;</span><br><span class="line">    : <span class="keyword">private</span> _T1,</span><br><span class="line">      <span class="keyword">private</span> _T2</span><br><span class="line">&#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>看起来第三个参数有4种取值，分别是：</p>
+<ul>
+<li>0: 没有基类，两个成员变量。</li>
+<li>1: 有一个基类<code>_T1</code>，和一个<code>_T2</code>类型的成员变量。</li>
+<li>2: 有一个基类<code>_T2</code>，和一个<code>_T1</code>类型的成员变量。</li>
+<li>3: 有两个基类<code>_T1</code>和<code>_T2</code>，没有成员变量。</li>
+</ul>
+<p><code>__compressed_pair</code>继承自<code>__libcpp_compressed_pair_imp&lt;_T1, _T2&gt;</code>，没有指定第三个参数的值，那么这个值应该来自<code>__libcpp_compressed_pair_switch&lt;_T1, _T2&gt;::value</code>。我们看一下<code>__libcpp_compressed_pair_switch</code>是什么：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>, <span class="type">bool</span> = is_same&lt;<span class="keyword">typename</span> remove_cv&lt;_T1&gt;::type,</span><br><span class="line">                                                     <span class="keyword">typename</span> remove_cv&lt;_T2&gt;::type&gt;::value,</span><br><span class="line">                                <span class="type">bool</span> = is_empty&lt;_T1&gt;::value</span><br><span class="line">                                       &amp;&amp; !__libcpp_is_final&lt;_T1&gt;::value,</span><br><span class="line">                                <span class="type">bool</span> = is_empty&lt;_T2&gt;::value</span><br><span class="line">                                       &amp;&amp; !__libcpp_is_final&lt;_T2&gt;::value</span><br><span class="line">         &gt;</span><br><span class="line"><span class="keyword">struct</span> __libcpp_compressed_pair_switch;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>, <span class="type">bool</span> IsSame&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">__libcpp_compressed_pair_switch</span>&lt;_T1, _T2, IsSame, <span class="literal">false</span>, <span class="literal">false</span>&gt; &#123;<span class="keyword">enum</span> &#123;value = <span class="number">0</span>&#125;;&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>, <span class="type">bool</span> IsSame&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">__libcpp_compressed_pair_switch</span>&lt;_T1, _T2, IsSame, <span class="literal">true</span>, <span class="literal">false</span>&gt;  &#123;<span class="keyword">enum</span> &#123;value = <span class="number">1</span>&#125;;&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>, <span class="type">bool</span> IsSame&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">__libcpp_compressed_pair_switch</span>&lt;_T1, _T2, IsSame, <span class="literal">false</span>, <span class="literal">true</span>&gt;  &#123;<span class="keyword">enum</span> &#123;value = <span class="number">2</span>&#125;;&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">__libcpp_compressed_pair_switch</span>&lt;_T1, _T2, <span class="literal">false</span>, <span class="literal">true</span>, <span class="literal">true</span>&gt;    &#123;<span class="keyword">enum</span> &#123;value = <span class="number">3</span>&#125;;&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_T1</span>, <span class="keyword">class</span> <span class="title class_">_T2</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">__libcpp_compressed_pair_switch</span>&lt;_T1, _T2, <span class="literal">true</span>, <span class="literal">true</span>, <span class="literal">true</span>&gt;     &#123;<span class="keyword">enum</span> &#123;value = <span class="number">1</span>&#125;;&#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>__libcpp_compressed_pair_switch</code>的三个bool模板参数的含义是：</p>
+<ol>
+<li><code>_T1</code>和<code>_T2</code>在去掉顶层的<code>const</code>和<code>volatile</code>后，是不是相同类型。</li>
+<li><code>_T1</code>是不是空类型。</li>
+<li><code>_T2</code>是不是空类型。</li>
+</ol>
+<p>满足以下条件的类型就是空类型：</p>
+<ol>
+<li>不是union；</li>
+<li>除了size为0的位域之外，没有非static的成员变量；</li>
+<li>没有虚函数；</li>
+<li>没有虚基类；</li>
+<li>没有非空的基类。</li>
+</ol>
+<p>可以看到，在<code>_T1</code>和<code>_T2</code>不同时，它们中的空类型就会被当作<code>__compressed_pair</code>的基类，就会利用到C++中的“空基类优化“。</p>
+<p>那么在<code>unique_ptr</code>中，<code>_T1</code>和<code>_T2</code>都是什么呢？看前面的代码，<code>_T1</code>就是<code>__pointer_type&lt;_Tp, deleter_type&gt;::type</code>，而<code>_T2</code>则是Deleter，在默认情况下是<code>default_delete&lt;_Tp&gt;</code>。</p>
+<p>我们先看<code>__pointer_type</code>是什么：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">namespace</span> __pointer_type_imp</span><br><span class="line">&#123;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Tp</span>, <span class="keyword">class</span> <span class="title class_">_Dp</span>, <span class="type">bool</span> = __has_pointer_type&lt;_Dp&gt;::value&gt;</span><br><span class="line"><span class="keyword">struct</span> __pointer_type</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">typedef</span> <span class="keyword">typename</span> _Dp::pointer type;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Tp</span>, <span class="keyword">class</span> <span class="title class_">_Dp</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">__pointer_type</span>&lt;_Tp, _Dp, <span class="literal">false</span>&gt;</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">typedef</span> _Tp* type;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">&#125;  <span class="comment">// __pointer_type_imp</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Tp</span>, <span class="keyword">class</span> <span class="title class_">_Dp</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">__pointer_type</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">typedef</span> <span class="keyword">typename</span> __pointer_type_imp::__pointer_type&lt;_Tp, <span class="keyword">typename</span> remove_reference&lt;_Dp&gt;::type&gt;::type type;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到<code>__pointer_type&lt;_Tp, deleter_type&gt;::type</code>就是<code>__pointer_type_imp::__pointer_type&lt;_Tp, typename remove_reference&lt;_Dp&gt;::type&gt;::type</code>。这里我们看到了<code>__has_pointer_type</code>，它是什么？</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">namespace</span> __has_pointer_type_imp</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Up</span>&gt; <span class="type">static</span> __two __test(...);</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Up</span>&gt; <span class="type">static</span> <span class="type">char</span> __test(<span class="keyword">typename</span> _Up::pointer* = <span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>简单来说<code>__has_pointer_type</code>就是：如果<code>_Up</code>有一个内部类型<code>pointer</code>，即<code>_Up::pointer</code>是一个类型，那么<code>__has_pointer_type</code>就返回<code>true</code>，例如<code>pointer_traits::pointer</code>，否则返回<code>false</code>。</p>
+<p>大多数场景下<code>_Dp</code>不会是<code>pointer_traits</code>，因此<code>__has_pointer_type</code>就是<code>false</code>，<code>__pointer_type&lt;_Tp, deleter_type&gt;::type</code>就是<code>_Tp*</code>，我们终于看到熟悉的原生指针了！</p>
+<p><code>_T1</code>是什么我们已经清楚了，就是<code>_Tp*</code>，它不会是空基类。那么<code>_T2</code>呢？我们看<code>default_delete&lt;_Tp&gt;</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Tp</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">default_delete</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Up</span>&gt;</span><br><span class="line">        <span class="built_in">default_delete</span>(<span class="type">const</span> default_delete&lt;_Up&gt;&amp;,</span><br><span class="line">             <span class="keyword">typename</span> enable_if&lt;is_convertible&lt;_Up*, _Tp*&gt;::value&gt;::type* = <span class="number">0</span>) _NOEXCEPT &#123;&#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">operator</span><span class="params">()</span> <span class="params">(_Tp* __ptr)</span> <span class="type">const</span> _NOEXCEPT</span></span><br><span class="line"><span class="function">        </span>&#123;</span><br><span class="line">            <span class="built_in">static_assert</span>(<span class="built_in">sizeof</span>(_Tp) &gt; <span class="number">0</span>, <span class="string">&quot;default_delete can not delete incomplete type&quot;</span>);</span><br><span class="line">            <span class="built_in">static_assert</span>(!is_void&lt;_Tp&gt;::value, <span class="string">&quot;default_delete can not delete incomplete type&quot;</span>);</span><br><span class="line">            <span class="keyword">delete</span> __ptr;</span><br><span class="line">        &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们看到<code>default_delete</code>符合上面说的空类型的几个要求，因此<code>_T2</code>就是空类型，也是<code>__compressed_pair</code>的基类，在”空基类优化“后，<code>_T2</code>就完全不占空间了，只占一个原生指针的空间。</p>
+<p>而且<code>default_delete::operator()</code>是定义在<code>default_delete</code>内部的，默认是inline的，它在调用上的开销也被省掉了！</p>
+<h3 id="遗留问题"><a href="#遗留问题" class="headerlink" title="遗留问题"></a>遗留问题</h3><ol>
+<li><code>__libcpp_compressed_pair_switch</code>在<code>_T1</code>和<code>_T2</code>类型相同，且都是空类型时，为什么只继承自<code>_T1</code>，而把<code>_T2</code>作为成员变量的类型？</li>
+<li><code>unique_ptr</code>与<code>pointer_traits</code>是如何交互的？</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/05/19/wisckey-separating-keys-from-values-in-ssd-conscious-storage/" rel="prev" title="[笔记] WiscKey: Separating Keys from Values in SSD-Conscious Storage">
+      <i class="fa fa-chevron-left"></i> [笔记] WiscKey: Separating Keys from Values in SSD-Conscious Storage
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/" rel="next" title="Effective Modern C++ 笔记 Chapter2 auto (Item 5-6)">
+      Effective Modern C++ 笔记 Chapter2 auto (Item 5-6) <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88unique-ptr%E7%9A%84Deleter%E6%98%AF%E6%A8%A1%E6%9D%BF%E7%B1%BB%E5%9E%8B%E5%8F%82%E6%95%B0%EF%BC%8C%E8%80%8Cshared-ptr%E7%9A%84Deleter%E4%B8%8D%E6%98%AF%EF%BC%9F"><span class="nav-number">1.</span> <span class="nav-text">为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是？</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E6%96%87%E6%A1%A3"><span class="nav-number">1.1.</span> <span class="nav-text">相关文档</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#unique-ptr%E6%98%AF%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8%E7%A9%BA%E5%9F%BA%E7%B1%BB%E6%8A%80%E5%B7%A7%E7%9A%84"><span class="nav-number">2.</span> <span class="nav-text">unique_ptr是如何使用空基类技巧的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%81%97%E7%95%99%E9%97%AE%E9%A2%98"><span class="nav-number">2.1.</span> <span class="nav-text">遗留问题</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

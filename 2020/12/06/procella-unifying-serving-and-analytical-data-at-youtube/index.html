@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Procella: Unifying serving and analytical data at YouTube  TL;DR Procella是一种可以适应不同查询需求的分析引擎，它的特点：  松耦合的schema要求，只要数据schema与table schema兼容，不需要完全一致，且文件本身的索引结构也可以惰性生成。 使用了新的列存格式Artus，内带索引结构，同时支持高性能的点">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Procella: Unifying serving and analytical data at YouTube">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Procella: Unifying serving and analytical data at YouTube  TL;DR Procella是一种可以适应不同查询需求的分析引擎，它的特点：  松耦合的schema要求，只要数据schema与table schema兼容，不需要完全一致，且文件本身的索引结构也可以惰性生成。 使用了新的列存格式Artus，内带索引结构，同时支持高性能的点">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/procella-01.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/procella-02.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/procella-04.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/procella-03.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/procella-05.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/procella-06.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/procella-07.jpg">
+<meta property="article:published_time" content="2020-12-06T08:01:20.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.659Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLAP">
+<meta property="article:tag" content="Columnar">
+<meta property="article:tag" content="Google">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-12/procella-01.jpg">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Procella: Unifying serving and analytical data at YouTube | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Procella: Unifying serving and analytical data at YouTube
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-06 16:01:20" itemprop="dateCreated datePublished" datetime="2020-12-06T16:01:20+08:00">2020-12-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/citation.cfm?id=3352063.3360438">Procella: Unifying serving and analytical data at YouTube</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Procella是一种可以适应不同查询需求的分析引擎，它的特点：</p>
+<ul>
+<li>松耦合的schema要求，只要数据schema与table schema兼容，不需要完全一致，且文件本身的索引结构也可以惰性生成。</li>
+<li>使用了新的列存格式Artus，内带索引结构，同时支持高性能的点查和扫描，且使用高性能的、不解压就可以操作的压缩算法。</li>
+<li>使用Lambda架构，实时节点与compaction节点分离，前者支持高性能读写，后者可以在后台做复杂的优化。</li>
+<li>多种优化，包括自适应的基于运行期抽样的query优化。</li>
+<li>广泛使用多种cache。</li>
+<li>完整的SQL支持。</li>
+</ul>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Procella可以同时满足在&#x2F;离线的读写请求，涵盖以下YouTube的需求：</p>
+<ul>
+<li>报表（reporting）与仪表盘（dashboard），需要支持准实时响应大数据量的复杂分析，以及读到足够新鲜的数据。</li>
+<li>内嵌统计（embeded statistics），如video的喜爱或观看数，需要支持实时响应模式简单但参数变化非常多的读写请求，请求量级可以达到每秒百万次。</li>
+<li>监控（monitoring），类似于dashboard，还需要有降精度、数据淘汰、近似函数、以及时序函数。</li>
+<li>临时分析（ad-hoc analysis），qps不大，能忍受分钟级延时，但查询复杂（且难以预测），数据量可能非常大。</li>
+</ul>
+<p>之前YouTube使用了不同系统分别满足以上需求，但遇到了下面这些问题：</p>
+<ul>
+<li>数据需要用不同的ETL流程导入不同的系统，导致了资源浪费、数据不一致或质量差、加载时间长、开发和维护代价高、业务响应时间慢等问题。</li>
+<li>不同系统有不同的API，需要用不同的工具（尤其有些系统不支持完整的SQL），学习成本高。</li>
+<li>部分系统在YouTube的数据量级下有性能或伸缩性上的问题。</li>
+</ul>
+<p>Procella实现了以下特性来解决上述问题：</p>
+<ul>
+<li>支持几乎完整的SQL标准，包括复杂的多阶段join、分析函数和set操作。</li>
+<li>通过计算（borg）与存储（colossus）分离实现了高伸缩性。</li>
+<li>高性能，同时提供高吞吐与低延时。</li>
+<li>通过lambda架构提供足够的数据新鲜度。</li>
+</ul>
+<h2 id="Architecture"><a href="#Architecture" class="headerlink" title="Architecture"></a>Architecture</h2><p>Procella基于了多种Google的infrastructure，这些系统的特性也影响了Procella的设计：</p>
+<ul>
+<li>存储用Colossus，文件写完后不可变，远程访问延时高。</li>
+<li>计算用Borg，运行大量小task比少量大task更有助于提高总的利用率（调度容易）；failover概率大，外加没有本地存储，更有理由拆小task了；单个task的性能难以预测。</li>
+</ul>
+<p><img src="/images/2020-12/procella-01.jpg"></p>
+<h3 id="Data"><a href="#Data" class="headerlink" title="Data"></a>Data</h3><p>Procella中数据按表组织，每张表保存为多个文件（或称为tablet、partition），主要使用一种叫Artus的列存格式，也支持Capacitor等格式。同一份数据可以被多个Procella实例服务。</p>
+<p>与很多现代分析引擎类似，Procella也没有使用传统的B树来构建索引，而是使用了更轻量的结构，如zone map、bitmap、bloom filter、partition、sorted keys。这些结构部分是由registration server在文件注册时从文件头获取的，部分是由data server在评估query时惰性生成。</p>
+<p>schema、table到file的映射、统计信息、zone map等数据主要存储在metadata store（BigTable和Spanner）中。</p>
+<p>DDL命令（CREATE、ALTER、DROP等）会发给registration server，再存储到metadata store中。用户可以指定各种选项，包括实时还是离线导入。对于实时导入的表，用户还可以指定过期淘汰规则、降精度和compact的方式。</p>
+<p>用户可以自己离线生成好数据，再用DDL命令把文件导入到表中。这个过程中RgS（就是registration server）会从文件头解析出table到file的映射和索引结构。如果文件头没有索引结构的话，Procella也能接受。</p>
+<p>RgS还负责检查文件的schema与table的schema是否兼容。如果不兼容的话还可能裁剪或compact schema。</p>
+<p>实时写入会发给ingestion server（IgS），如果数据schema与table schema不一致的话，IgS会做转换，再写进WAL中。同时IgS还会把数据发给对应的data server（根据data partition）。数据会先进data server的内存buffer中，再定期持久化下去（但只为了容错，不与全量数据合并）。IgS也可以同时把数据发给多个data server从而实现冗余服务。</p>
+<p>WAL会被背景compact成data file。</p>
+<p>两种路径并存可能导致最近几秒内数据是“脏”的，但随着compaction的进度会达到最终一致。如果为了一致性的考虑，query可以跳过buffer中的数据，但这样数据可见性就变差了。</p>
+<p>compaction server会定期compact和重分区掉WAL文件，并转换为PAX风格的列存文件。过程中compaction server也可以执行用户定义的SQL逻辑来做过滤、聚合、淘汰等操作。每轮compaction之后compaction server会更新metadata server。被替换掉的文件随后会被清理掉。</p>
+<h3 id="Query-Lifecycle"><a href="#Query-Lifecycle" class="headerlink" title="Query Lifecycle"></a>Query Lifecycle</h3><p>client的query会发给Root Server（RS）。RS负责解析、重写、生成逻辑plan、优化，最后得到执行plan。这个过程中它会用到Metadata Server（MDS）的数据去掉不需要的文件。RS会构建一棵执行树以满足满足复杂query的时序（如shuffle）、数据依赖（如broadcast join）、多变的join策略等需要，其中节点是query block（多个算子），边是数据流（聚合、远端执行、错峰执行等）。还可以向执行树中插入自定义的算子来做多种优化。RS完成整个过程后会把执行树和相关的统计信息、错误等发回给client。</p>
+<p>Data Server（DS）会从RS或其它DS处收到它要处理的query部分。执行时数据可以来自本地内存、Colossus文件、RDMA、或其它DS。Procella会激进地下推计算，将filter、projection、aggregation（包括TOP、UNIQUE、COUNT DISTINCT、QUANTILE等近似聚合）、join等都尽量推给最靠近相应数据的DS，允许DS使用各种编码原生的函数做计算以得到最优的性能。</p>
+<h2 id="Optimizations"><a href="#Optimizations" class="headerlink" title="Optimizations"></a>Optimizations</h2><h3 id="Caching"><a href="#Caching" class="headerlink" title="Caching"></a>Caching</h3><p>Procella使用了多种cache来缓解计算存储分离带来的延时上升：</p>
+<ul>
+<li>DS会缓存Colossus的文件的handle。</li>
+<li>DS使用了单独的LRU cache来缓存每个文件的头。</li>
+<li>DS使用单独的cache缓存列存数据。Artus的内存与磁盘使用相同格式，减小了cache的开销。另外DS还会缓存一些派生信息，如复杂算子的结果，或是bloom filter。</li>
+<li>MDS会使用本地的LRU cache缓存各种元数据。</li>
+<li>Procella实现了affinity调度，将对相同数据和元数据的操作尽量调度到相同的DS或MDS上，极大提升了cache命中率。且这种affinity是松耦合的，如果请求跑到了其它server上，只是命中不了cache，不会有任何错误。</li>
+</ul>
+<p>最终效果是在Procella的报表实例中，尽管内存只能装下2%的数据，但文件handle的命中率达到了99%，数据命中率达到了90%。</p>
+<h3 id="Data-format"><a href="#Data-format" class="headerlink" title="Data format"></a>Data format</h3><p>Procella一开始使用Capacitor作为列存格式，但这种格式不适合于点查和小范围的scan，因此Procella又开发了Artus格式，同时支持高性能的点查和scan。它的特性是：</p>
+<ul>
+<li>使用自定义编码而不是像LZW一样的通用压缩算法，可以不解压数据就直接seek。</li>
+<li>进行多轮自适应编码，先扫描一轮数据得到比较轻量的信息（如distinct值的数量、min&#x2F;max、有序性等），再选择适合的编码，如字典编码、RLE、delta等，从而得到2倍于ZSTD等通用算法的压缩率，同时仍然保留了不解压直接操作数据的能力。每种编码都有函数来预估它处理特定数据的压缩率和速度，Procella会根据用户的偏好来做选择。</li>
+<li>选择能对有序列做二分查找的编码，同时还能做O(1)的基于行号的seek。对于像RLE这样的变长编码，Procella维护了一个skip block，每B行记录一个值。</li>
+<li>使用了一种不同于ColumnIO（参见Parquet）的方式来表示嵌套和可重复的数据类型，即不记录RL和DL，而是将optional和repeated的中间字段也按列持久化下来，它们的值是元素数量（optional为0或1，repeated是非负值），parent不存在的字段则不会被记录下来。这样重建对象时就可以先读到parent的元素数量，再直接去子字段中读相应数量的记录即可。另一个好处是这样可以支持对子字段的O(1)的seek。</li>
+<li>直接暴露字典索引、RLE等编码信息给evaluation engine。</li>
+<li>在文件头和列头中记录丰富的元数据，如数据schema、排序、min&#x2F;max、编码信息、bloom filter等。</li>
+<li>支持倒排索引，目前主要是优化数组的<code>IN</code>操作。</li>
+</ul>
+<p>以下是Capacitor与Artus的比较。</p>
+<p><img src="/images/2020-12/procella-02.jpg"></p>
+<p><img src="/images/2020-12/procella-04.jpg"></p>
+<p><img src="/images/2020-12/procella-03.jpg"></p>
+<h3 id="Evaluation-Engine"><a href="#Evaluation-Engine" class="headerlink" title="Evaluation Engine"></a>Evaluation Engine</h3><p>许多现代的分析系统会在查询时使用LLVM将执行plan编译为native code来提高性能。但Procella同时要服务在线和离线请求，对于在线请求编译开销太大。Procella因此用其它方式实现了名为Superluminal的evaluation engine：</p>
+<ul>
+<li>重度使用C++的模板元编程从而在编译期生成代码。</li>
+<li>以block为单位处理数据以利用向量化计算和可感知cache的算法的优势。</li>
+<li>直接操作底层数据编码（而不是丧失了编码信息只能通过中间层来操作），并尽量保持这一特性。</li>
+<li>以一种全列存的方式处理结构化数据，不持久化中间结果。</li>
+<li>动态合并filter，并沿着执行plan一直下推到扫数据的节点。</li>
+</ul>
+<p>以下是Superluminal和开源的Supersonic运行TPC-H的对比：</p>
+<p><img src="/images/2020-12/procella-05.jpg"></p>
+<p><img src="/images/2020-12/procella-06.jpg"></p>
+<h3 id="Partitioning-amp-Indexing"><a href="#Partitioning-amp-Indexing" class="headerlink" title="Partitioning &amp; Indexing"></a>Partitioning &amp; Indexing</h3><p>Procella支持多级的分区和聚类。通常fact table是按date分区，再按多个维度聚类的。维表通常会按维度key分区排序。这种特点利于Procella快速裁剪掉不需要读的文件和做co-partition的join而不需要shuffle数据。</p>
+<p>MDS的内存中的元数据也使用了多种压缩算法，用有限的内存装下海量的元数据。MDS的裁剪对Procella的性能影响巨大，因此保证MDS的大多数操作只走内存是非常重要的。</p>
+<p><img src="/images/2020-12/procella-07.jpg"></p>
+<p>DS在处理query时会使用bloom filter、min&#x2F;max、倒排索引等文件元数据来最小化磁盘访问，这些元数据会异步缓存在LRU cache中。</p>
+<h3 id="Distributed-operations"><a href="#Distributed-operations" class="headerlink" title="Distributed operations"></a>Distributed operations</h3><p>Procella有多种join策略，既可以显式使用hint，也可以由优化器来选择：</p>
+<ul>
+<li>broadcast，当join一边的表特别小时使用。</li>
+<li>co-partitioned，当join key分别是两边的partition key时使用。</li>
+<li>shuffle，当两边都很大，没办法根据join key分区的时候，数据会按join key发给若干个中间server来shuffle。</li>
+<li>pipelined，当右边是个复杂的query，但很可能结果集很小时，先执行右边，再把结果发送给左边做类似broadcast join的操作。</li>
+<li>remote lookup。很多时候，维表（构建端）很大，但按join key分区，但fact table（探测端）却不是。此时探测端DS会向构建端DS发送RPC，获取这次join需要的key和value。为了减少RPC的开销，探测端要用上所有可能的filter，批量发送key，最大程度减少RPC的数量。构建端也会下推projection和filter以保证只传输必要的数据。得益于Artus的高性能点查，Procella可以高效地执行lookup join。</li>
+</ul>
+<p>Procella还应用了以下方法来缓解长尾请求对服务的影响：</p>
+<ul>
+<li>RS会在query执行期间维护DS延时的分位数，如果遇到了明显慢于中位数的DS，RS会选另一台DS发送一个backup请求。</li>
+<li>RS会控制发给DS的请求，以避免太多请求将DS压垮。</li>
+<li>RS会区分发往DS的请求的优先级，小query优先级更高。相应地，DS对高低优先级分别有一个线程池。</li>
+</ul>
+<p>Procella会为非常大型的聚合增加一层预聚合。</p>
+<h3 id="Query-Optimization"><a href="#Query-Optimization" class="headerlink" title="Query Optimization"></a>Query Optimization</h3><p>Procella中有一种virtual table，类似于materialized view。在query时Procella会自适应使用virtual table来实现最优化的查询：</p>
+<ul>
+<li>选择virtual table时不光使用size来判断，还会通过在table schema上匹配filter来看数据组织方式（分区、聚类等）是否合适。</li>
+<li>可以从多个virtual table中读数据，再使用<code>UNION ALL</code>拼起来。</li>
+<li>可以从不同virtual table中读不同时间段的数据，再使用<code>UNION ALL</code>拼起来。</li>
+<li>可以自动识别star模式的join，并为没有在fact table中反规范化的维表插入一个join。</li>
+</ul>
+<p>Procella的优化器同时使用了静态和自适应优化技术。在编译期使用基于规则的优化器，如filter下推、subplan去相关、常量折叠等。在执行期会对这次query用到的真实数据抽样得到统计信息，再基于统计信息来选择或调优算子。</p>
+<p>传统的收集统计信息的方式不仅更复杂，而且它有个问题是越靠近叶子节点统计越准确。相比之下Procella中随着数据流过query plan而更新统计信息的方式更简单，保证了整个plan有着相同的准确度。</p>
+<p>具体实现是在query plan中增加一种“collection sites”，基于这种信息来决定如何如何转换未执行的部分。目前Procella会在shuffle时收集信息，因为shuffle是一个天然的物化点。这些信息随后会被用于决定如何切分数据（包括了切分函数和reducer数量）。</p>
+<p>Procella在做聚合的时候会根据预估的行数决定需要多少个预聚合节点。在join的时候Procella会为每个partition统计它的key count、min&#x2F;max、可能还有bloom filter（如果key count不是特别大），这些统计信息通常就不抽样了，而是从全部数据中得到。</p>
+<p>基于这些信息Procella能做出以下join的优化：</p>
+<ul>
+<li>broadcast join，会用到RDMA。</li>
+<li>如果filter端可以构建出一个不太大的、假阳性率在10%左右的bloom filter，则可以用这个bloom filter来裁剪探测端。</li>
+<li>如果join的一端已经按join key分区了，则可以只shuffle另一端匹配这些区间（min&#x2F;max）的数据。</li>
+<li>如果没有其它优化可做了，则可以根据两边的表大小来自动选取分区数量再shuffle。</li>
+</ul>
+<p>在处理<code>ORDER BY</code>时，Procella会先用一个query来估计要排序的行数，确定分成多少个shard，再用一个query来估计分位数，来确定如何划分数据。</p>
+<p>以上自适应优化对大型query效果很好，但其开销对于小query来说太大了。此时用户可以传入hint而不开启自适应优化。</p>
+<p>另外目前自适应优化还不能应用到join顺序的选择上，这里可以继续使用传统的基于统计信息的优化。</p>
+<h3 id="Data-Ingestion"><a href="#Data-Ingestion" class="headerlink" title="Data Ingestion"></a>Data Ingestion</h3><p>Procella提供了离线数据生成工具，将用户的数据用MapReduce转换为最适合Procella处理的形式。</p>
+<h3 id="Serving-Embeded-Statistics"><a href="#Serving-Embeded-Statistics" class="headerlink" title="Serving Embeded Statistics"></a>Serving Embeded Statistics</h3><p>Procella需要支持特别高频的嵌入页面的计数器query，如<code>SELECT SUM(views) FROM Table WHERE video_id = N</code>，这种query扫过的数据量并不会太大，但要能以非常低的延时服务非常高的QPS，且这些值的更新频率也很高。Procella会以“stats serving”模式来运行这些实例，会启用以下优化：</p>
+<ul>
+<li>RgS会在新数据注册后立即通知DS加载数据，而不是惰性加载。</li>
+<li>MDS直接与RS编译在一起，省掉了RPC的开销。</li>
+<li>所有元数据都会被预加载到内存中并保持更新。</li>
+<li>激进地缓存query plan。</li>
+<li>RS会把相同key的请求合并到一起同时发给两个DS，从而避免延时长尾。</li>
+<li>监控RS和DS的错误率和延时，一旦有问题就替换。</li>
+<li>高开销的优化会被关掉。</li>
+</ul>
+<h2 id="Performance"><a href="#Performance" class="headerlink" title="Performance"></a>Performance</h2><p>（略）</p>
+<h2 id="Related-Work"><a href="#Related-Work" class="headerlink" title="Related Work"></a>Related Work</h2><h3 id="Google-Technologies"><a href="#Google-Technologies" class="headerlink" title="Google Technologies"></a>Google Technologies</h3><ul>
+<li>Dremel主要是stateless，没有这么广泛使用cache；Dremel全球使用一个实例，而Procella为不同用户使用不同实例（从而开启不同优化）；Dremel存储使用Capacitor，没有索引，而Artus有丰富的索引。</li>
+<li>Mesa场景与Procella不太一样，本身不支持SQL。</li>
+<li>F1 Query主打的是query federation，查询与存储引擎分离，主要靠挖掘不同引擎的特点来适应不同的场景。而Procella则是使用同一套存储引擎来服务不同场景，查询与存储耦合在一起。</li>
+<li>PowerDrill主要针对大数据量的简单查询来优化，如日志等。</li>
+<li>Spanner主打的是ACID的OLTP需求。</li>
+</ul>
+<h3 id="External-Technologies"><a href="#External-Technologies" class="headerlink" title="External Technologies"></a>External Technologies</h3><p>（只列一下产品）</p>
+<ul>
+<li>Ad-hoc analysis：<ul>
+<li>Presto以及对应的AWS Athena</li>
+<li>Spark SQL</li>
+<li>Snowflake</li>
+<li>Redshift</li>
+</ul>
+</li>
+<li>Real time reporting：<ul>
+<li>Druid</li>
+<li>Pinot</li>
+<li>ElasticSearch</li>
+<li>Amplitude</li>
+<li>Mixpanel</li>
+<li>Apache Kylin</li>
+</ul>
+</li>
+<li>Monitoring：<ul>
+<li>Stackdriver</li>
+<li>Cloudwatch</li>
+<li>Gorilla和Beringei</li>
+<li>InfluxDB</li>
+<li>OpenTSDB</li>
+</ul>
+</li>
+<li>Serving Statistics：<ul>
+<li>HBase</li>
+</ul>
+</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLAP/" rel="tag"># OLAP</a>
+              <a href="/tags/Columnar/" rel="tag"># Columnar</a>
+              <a href="/tags/Google/" rel="tag"># Google</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/12/05/separate-write-read-compaction-by-file-meta-service/" rel="prev" title="解耦NoSQL系统的写、读、Compaction">
+      <i class="fa fa-chevron-left"></i> 解耦NoSQL系统的写、读、Compaction
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/" rel="next" title="[笔记] Dremel: a decade of interactive SQL analysis at web scale">
+      [笔记] Dremel: a decade of interactive SQL analysis at web scale <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Architecture"><span class="nav-number">2.</span> <span class="nav-text">Architecture</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Data"><span class="nav-number">2.1.</span> <span class="nav-text">Data</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Query-Lifecycle"><span class="nav-number">2.2.</span> <span class="nav-text">Query Lifecycle</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Optimizations"><span class="nav-number">3.</span> <span class="nav-text">Optimizations</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Caching"><span class="nav-number">3.1.</span> <span class="nav-text">Caching</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Data-format"><span class="nav-number">3.2.</span> <span class="nav-text">Data format</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Evaluation-Engine"><span class="nav-number">3.3.</span> <span class="nav-text">Evaluation Engine</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Partitioning-amp-Indexing"><span class="nav-number">3.4.</span> <span class="nav-text">Partitioning &amp; Indexing</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Distributed-operations"><span class="nav-number">3.5.</span> <span class="nav-text">Distributed operations</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Query-Optimization"><span class="nav-number">3.6.</span> <span class="nav-text">Query Optimization</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Data-Ingestion"><span class="nav-number">3.7.</span> <span class="nav-text">Data Ingestion</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Serving-Embeded-Statistics"><span class="nav-number">3.8.</span> <span class="nav-text">Serving Embeded Statistics</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Performance"><span class="nav-number">4.</span> <span class="nav-text">Performance</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Related-Work"><span class="nav-number">5.</span> <span class="nav-text">Related Work</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Google-Technologies"><span class="nav-number">5.1.</span> <span class="nav-text">Google Technologies</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#External-Technologies"><span class="nav-number">5.2.</span> <span class="nav-text">External Technologies</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

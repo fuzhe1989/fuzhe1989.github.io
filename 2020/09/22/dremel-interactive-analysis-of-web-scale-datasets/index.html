@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Dremel: interactive analysis of web-scale datasets  TL;DR 这篇文章讲了两方面：  支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的Parquet）。 并行执行架构。  能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Dremel: interactive analysis of web-scale datasets">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Dremel: interactive analysis of web-scale datasets  TL;DR 这篇文章讲了两方面：  支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的Parquet）。 并行执行架构。  能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-09-22T10:46:25.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.653Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Columnar">
+<meta property="article:tag" content="Google">
+<meta property="article:tag" content="Dremel">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Dremel: interactive analysis of web-scale datasets | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Dremel: interactive analysis of web-scale datasets
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-22 18:46:25" itemprop="dateCreated datePublished" datetime="2020-09-22T18:46:25+08:00">2020-09-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub36632.pdf">Dremel: interactive analysis of web-scale datasets</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章讲了两方面：</p>
+<ul>
+<li>支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的<a target="_blank" rel="noopener" href="https://parquet.apache.org/">Parquet</a>）。</li>
+<li>并行执行架构。</li>
+</ul>
+<p>能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。</p>
+<span id="more"></span>
+
+<h2 id="列式存储"><a href="#列式存储" class="headerlink" title="列式存储"></a>列式存储</h2><h3 id="Repetion-Level和Definition-Level"><a href="#Repetion-Level和Definition-Level" class="headerlink" title="Repetion Level和Definition Level"></a>Repetion Level和Definition Level</h3><p>以下面这个proto为例。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">message Document &#123;</span><br><span class="line">    required int64 DocId;</span><br><span class="line">    optional group Links &#123;</span><br><span class="line">        repeated int64 Backward;</span><br><span class="line">        repeated int64 Forward;</span><br><span class="line">    &#125;</span><br><span class="line">    repeated group Name &#123;</span><br><span class="line">        repeated group Language &#123;</span><br><span class="line">            required string Code;</span><br><span class="line">            optional string Country;</span><br><span class="line">        &#125;</span><br><span class="line">        optional string Url;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Dremel会存储以下列：</p>
+<ul>
+<li><code>DocId</code></li>
+<li><code>Links.Backward</code></li>
+<li><code>Links.Forward</code></li>
+<li><code>Name.Language.Code</code></li>
+<li><code>Name.Language.Country</code></li>
+<li><code>Name.Url</code></li>
+</ul>
+<p>不同记录的相同列会存储在一起。</p>
+<p>问题是如何用这些列来还原这些记录呢？考虑到<code>optional</code>和<code>repeated</code>字段，我们需要能分辨：</p>
+<ul>
+<li>前后两个<code>Links.Forward</code>属于一条记录还是两条记录。</li>
+<li>前后两个<code>Name.Language.Country</code>属于一条记录的一个<code>Name</code>还是两个<code>Name</code>还是两条记录。</li>
+</ul>
+<p>光靠列值自身是没办法做到的。</p>
+<p>Dremel引入了两个概念：Definition Level（DL）和Repetition Level（RL）。</p>
+<p>DL指，一个路径上有多少个<code>optional</code>或<code>repeated</code>字段被定义了，如<code>DocId</code>的DL为0，<code>Links.Backward</code>的DL为1，<code>Name.Language.Country</code>的DL为3。</p>
+<p>RL指，一个值是在它的路径的第几个<code>repeated</code>字段上在重复。这里的重复的范围是一条记录内，每条记录的这列的第一个值的RL总是0。以<code>Name.Language.Country</code>为例：</p>
+<ul>
+<li>如果RL为0，表示它与上一个值是跨记录的。如果上一个值属于当前记录，则要新开始一个记录。</li>
+<li>如果RL为1，表示它与上一个值是跨<code>Name</code>的。</li>
+<li>如果RL为2，表示它与上一个值是跨<code>Name.Language</code>的。</li>
+</ul>
+<p>如果某一层级下，一个<code>optional</code>或<code>repeated</code>字段未定义，但有和它平级的其它字段定义了，为了避免混淆，我们要插入一个<code>NULL</code>。这个<code>NULL</code>也是有DL和RL的。</p>
+<p>实际存储中：</p>
+<ul>
+<li>不需要显式存储<code>NULL</code>，只要DL小于字段的深度，就是<code>NULL</code>。</li>
+<li>DL总为0的字段不存储DL。</li>
+<li>RL也只在需要时存储，如DL为0隐含RL为0，则RL也不需要保存。</li>
+<li>DL和RL按实际使用的位数保存。</li>
+</ul>
+<p>同一列非<code>NULL</code>的值的DL都是相同的，但<code>NULL</code>的DL值可能不同，由此我们可以知道这个<code>NULL</code>来自哪一层。</p>
+<h3 id="反序列化"><a href="#反序列化" class="headerlink" title="反序列化"></a>反序列化</h3><p>Dremel会根据查询条件构建一个有限状态机（FSM），每个查询需要的列是一个状态，根据RL转换状态。</p>
+<h2 id="查询"><a href="#查询" class="headerlink" title="查询"></a>查询</h2><p>Dremel有一个RootServer来接收client请求，读取对应表的元数据，再将查询下发给中间节点，直到叶子节点执行。叶子节点会去扫描保存为tablet的列存数据。Dremel允许client指定只扫描完一定比例的tablet就返回，如98%，经常可以显著降低延时。</p>
+<p>Dremel的一些算子（如Top-K或Count-Distinct）使用了近似算法。</p>
+<p>Dremel有QueryDispatcher来分配节点，它还可以检测慢节点并重新分配交给慢节点执行的查询。</p>
+<h2 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h2><p>本地磁盘：</p>
+<ul>
+<li>只需要读很少的列的时候，列存的读取性能高于行存一个数量级。</li>
+<li>组装记录和解析非常耗费性能，分别导致处理时间加倍。（和C-Store的延迟物化结论一样）</li>
+<li>通常在读取数十列以上时列存的处理时间和行存差不多了，但不同数据集差异非常大，且列存不一定需要组装记录。</li>
+</ul>
+<p>MR和Dremel：</p>
+<ul>
+<li>MR将行存换成列存，性能提升了接近一个数量级。</li>
+<li>将MR换成Dremel，性能提升了两个数量级。</li>
+</ul>
+<p>树状执行结构：</p>
+<ul>
+<li>大量聚合场景多层节点的优势非常明显（每一层做部分聚合，避免串行处理太多下游节点的响应）。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Columnar/" rel="tag"># Columnar</a>
+              <a href="/tags/Google/" rel="tag"># Google</a>
+              <a href="/tags/Dremel/" rel="tag"># Dremel</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/" rel="prev" title="[笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads">
+      <i class="fa fa-chevron-left"></i> [笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/09/23/cassandra-a-decentralized-structured-storage-system/" rel="next" title="[笔记] Cassandra: a decentralized structured storage system">
+      [笔记] Cassandra: a decentralized structured storage system <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%97%E5%BC%8F%E5%AD%98%E5%82%A8"><span class="nav-number">1.</span> <span class="nav-text">列式存储</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Repetion-Level%E5%92%8CDefinition-Level"><span class="nav-number">1.1.</span> <span class="nav-text">Repetion Level和Definition Level</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96"><span class="nav-number">1.2.</span> <span class="nav-text">反序列化</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.</span> <span class="nav-text">查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%A7%E8%83%BD"><span class="nav-number">3.</span> <span class="nav-text">性能</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

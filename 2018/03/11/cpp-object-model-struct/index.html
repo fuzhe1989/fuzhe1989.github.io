@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="运行环境：x86-64。 编译器：gcc4.8.5。 编译选项：-O2。 语言标准：以c++98为主，兼顾c++11&#x2F;14。  c++中的struct与c中的struct第一个问题：c++中的struct与c中的struct相同吗？ 答案是，有时相同，有时不同。 像c一样定义struct如果我们简单的按照c的方式定义一个struct，如c代码： 12345678910111213141">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++对象模型（二）struct&#x2F;class的内存布局">
+<meta property="og:url" content="http://fuzhe1989.github.io/2018/03/11/cpp-object-model-struct/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="运行环境：x86-64。 编译器：gcc4.8.5。 编译选项：-O2。 语言标准：以c++98为主，兼顾c++11&#x2F;14。  c++中的struct与c中的struct第一个问题：c++中的struct与c中的struct相同吗？ 答案是，有时相同，有时不同。 像c一样定义struct如果我们简单的按照c的方式定义一个struct，如c代码： 12345678910111213141">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-03-11T07:53:13.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.652Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2018/03/11/cpp-object-model-struct/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>C++对象模型（二）struct/class的内存布局 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/11/cpp-object-model-struct/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++对象模型（二）struct/class的内存布局
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-11 15:53:13" itemprop="dateCreated datePublished" datetime="2018-03-11T15:53:13+08:00">2018-03-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <ul>
+<li>运行环境：x86-64。</li>
+<li>编译器：gcc4.8.5。</li>
+<li>编译选项：-O2。</li>
+<li>语言标准：以c++98为主，兼顾c++11&#x2F;14。</li>
+</ul>
+<h1 id="c-中的struct与c中的struct"><a href="#c-中的struct与c中的struct" class="headerlink" title="c++中的struct与c中的struct"></a>c++中的struct与c中的struct</h1><p>第一个问题：c++中的struct与c中的struct相同吗？</p>
+<p>答案是，有时相同，有时不同。</p>
+<h2 id="像c一样定义struct"><a href="#像c一样定义struct" class="headerlink" title="像c一样定义struct"></a>像c一样定义struct</h2><p>如果我们简单的按照c的方式定义一个struct，如c代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125; S;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    S ss = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;;</span><br><span class="line">    S s = ss;</span><br><span class="line">    <span class="built_in">printf</span>(</span><br><span class="line">        <span class="string">&quot;size:%d &amp;a-&amp;s:%d, &amp;b-&amp;s:%d &amp;c-&amp;s:%d\n&quot;</span>,</span><br><span class="line">        <span class="keyword">sizeof</span>(s),</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.a - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.b - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.c - (<span class="type">char</span>*)&amp;s);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>和c++代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S ss = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;;</span><br><span class="line">    S s = ss;</span><br><span class="line">    <span class="built_in">printf</span>(</span><br><span class="line">        <span class="string">&quot;size:%d &amp;a-&amp;s:%d, &amp;b-&amp;s:%d &amp;c-&amp;s:%d\n&quot;</span>,</span><br><span class="line">        <span class="built_in">sizeof</span>(s),</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.a - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.b - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.c - (<span class="type">char</span>*)&amp;s);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>分别用gcc和g++编译上面两段代码，结果是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">size:24 &amp;a-&amp;s:0, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br><span class="line"></span><br><span class="line">size:24 &amp;a-&amp;s:0, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br></pre></td></tr></table></figure>
+
+<p>完全一样对不对？再看下汇编指令：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">400440:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">400444:   41 b8 10 00 00 00       mov    $0x10,%r8d</span><br><span class="line">40044a:   b9 08 00 00 00          mov    $0x8,%ecx</span><br><span class="line">40044f:   31 d2                   xor    %edx,%edx</span><br><span class="line">400451:   be 18 00 00 00          mov    $0x18,%esi</span><br><span class="line">400456:   bf f0 05 40 00          mov    $0x4005f0,%edi</span><br><span class="line">40045b:   31 c0                   xor    %eax,%eax</span><br><span class="line">40045d:   e8 ae ff ff ff          callq  400410 &lt;printf@plt&gt;</span><br><span class="line">400462:   31 c0                   xor    %eax,%eax</span><br><span class="line">400464:   48 83 c4 08             add    $0x8,%rsp</span><br></pre></td></tr></table></figure>
+
+<p>和</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">400504:   41 b8 10 00 00 00       mov    $0x10,%r8d</span><br><span class="line">40050a:   b9 08 00 00 00          mov    $0x8,%ecx</span><br><span class="line">40050f:   31 d2                   xor    %edx,%edx</span><br><span class="line">400511:   be 18 00 00 00          mov    $0x18,%esi</span><br><span class="line">400516:   bf b0 06 40 00          mov    $0x4006b0,%edi</span><br><span class="line">40051b:   31 c0                   xor    %eax,%eax</span><br><span class="line">40051d:   e8 ae ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">400522:   31 c0                   xor    %eax,%eax</span><br><span class="line">400524:   48 83 c4 08             add    $0x8,%rsp</span><br></pre></td></tr></table></figure>
+
+<p>是不是也完全一样？当我们在c++里像c一样定义struct时，编译器会给我们一个与c的struct完全相同的结构。</p>
+<h2 id="为struct添加静态成员"><a href="#为struct添加静态成员" class="headerlink" title="为struct添加静态成员"></a>为struct添加静态成员</h2><p>我们为<code>S</code>添加一个静态成员变量与静态成员函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line"></span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> d;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">static</span> <span class="type">void</span> <span class="title">Print</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>, d);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> S::d = <span class="number">0</span>;</span><br></pre></td></tr></table></figure>
+
+<p>仍然运行上面的<code>main</code>函数，结果就不贴了，我们会发现与c的struct仍然相同。这说明：</p>
+<ol>
+<li>静态成员变量不会影响struct布局。换句话说，静态成员变量不存在于对象内部。</li>
+<li>静态成员方法也不会影响struct布局，即也不存在于对象内部。</li>
+</ol>
+<h2 id="为struct添加非静态非虚成员函数"><a href="#为struct添加非静态非虚成员函数" class="headerlink" title="为struct添加非静态非虚成员函数"></a>为struct添加非静态非虚成员函数</h2><h3 id="为struct添加构造、析构、复制、移动函数"><a href="#为struct添加构造、析构、复制、移动函数" class="headerlink" title="为struct添加构造、析构、复制、移动函数"></a>为struct添加构造、析构、复制、移动函数</h3><p>假设我们向<code>S</code>中添加上述函数，上面的结论会有什么变化？</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">S</span>(<span class="type">int8_t</span> x, <span class="type">int64_t</span> y, <span class="type">int32_t</span> z) &#123;</span><br><span class="line">        a = x;</span><br><span class="line">        b = y;</span><br><span class="line">        c = z;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ~<span class="built_in">S</span>() &#123;</span><br><span class="line">        a = <span class="number">0</span>;</span><br><span class="line">        b = <span class="number">0</span>;</span><br><span class="line">        c = <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">S</span>(<span class="type">const</span> S&amp; s) &#123;</span><br><span class="line">        a = s.a;</span><br><span class="line">        b = s.b;</span><br><span class="line">        c = s.c;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">S</span>(S&amp;&amp; s) &#123;</span><br><span class="line">        a = s.a;</span><br><span class="line">        b = s.b;</span><br><span class="line">        c = s.c;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>运行结果没有任何变化，汇编指令也完全相同。这说明struct加上构造函数并没有改变它的布局，即：</p>
+<ul>
+<li>以上函数均不存在于对象内部。</li>
+<li>以上函数均未带来额外开销。</li>
+</ul>
+<p>但我们不能说这些函数对struct没有任何影响，后面会讲到，当我们添加了这些函数后：</p>
+<ul>
+<li>这个struct不再满足POD的定义，即不再有bitwise语义。</li>
+<li>如果上述函数未被定义为内联（inline）函数，则其会带来额外开销。</li>
+</ul>
+<h3 id="为struct添加普通非虚函数"><a href="#为struct添加普通非虚函数" class="headerlink" title="为struct添加普通非虚函数"></a>为struct添加普通非虚函数</h3><p>我们比较以下两种写法。写法一：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(S* s)</span> </span>&#123;</span><br><span class="line">    s-&gt;a += <span class="number">1</span>;</span><br><span class="line">    s-&gt;b -= <span class="number">1</span>;</span><br><span class="line">    s-&gt;c *= <span class="number">2</span>;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;a:%d b:%ld c:%d\n&quot;</span>, s-&gt;a, s-&gt;b, s-&gt;c);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>与写法二：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        a += <span class="number">1</span>;</span><br><span class="line">        b -= <span class="number">1</span>;</span><br><span class="line">        c *= <span class="number">2</span>;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;a:%d b:%ld c:%d\n&quot;</span>, a, b, c);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>对应的<code>main</code>函数为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S s = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;;</span><br><span class="line">    s.<span class="built_in">Func</span>(); <span class="comment">// or Func(&amp;s);</span></span><br><span class="line">    <span class="built_in">printf</span>(</span><br><span class="line">        <span class="string">&quot;size:%d &amp;a-&amp;s:%d, &amp;b-&amp;s:%d &amp;c-&amp;s:%d\n&quot;</span>,</span><br><span class="line">        <span class="built_in">sizeof</span>(s),</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.a - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.b - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.c - (<span class="type">char</span>*)&amp;s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>写法一的结果：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">a:2 b:1 c:6</span><br><span class="line">size:24 &amp;a-&amp;s:0, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br><span class="line"></span><br><span class="line">  400500:   48 83 ec 28             sub    $0x28,%rsp</span><br><span class="line">  400504:   48 89 e7                mov    %rsp,%rdi</span><br><span class="line">  400507:   c6 04 24 01             movb   $0x1,(%rsp)</span><br><span class="line">  40050b:   48 c7 44 24 08 02 00    movq   $0x2,0x8(%rsp)</span><br><span class="line">  400512:   00 00</span><br><span class="line">  400514:   c7 44 24 10 03 00 00    movl   $0x3,0x10(%rsp)</span><br><span class="line">  40051b:   00</span><br><span class="line">  40051c:   e8 1f 01 00 00          callq  400640 &lt;_Z4FuncP1S&gt;</span><br><span class="line">  400521:   41 b8 10 00 00 00       mov    $0x10,%r8d</span><br><span class="line">  400527:   b9 08 00 00 00          mov    $0x8,%ecx</span><br><span class="line">  40052c:   31 d2                   xor    %edx,%edx</span><br><span class="line">  40052e:   be 18 00 00 00          mov    $0x18,%esi</span><br><span class="line">  400533:   bf 18 07 40 00          mov    $0x400718,%edi</span><br><span class="line">  400538:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40053a:   e8 91 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40053f:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400541:   48 83 c4 28             add    $0x28,%rsp</span><br></pre></td></tr></table></figure>
+
+<p>写法二的结果：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">a:2 b:1 c:6</span><br><span class="line">size:24 &amp;a-&amp;s:0, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br><span class="line"></span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   b9 06 00 00 00          mov    $0x6,%ecx</span><br><span class="line">  400509:   ba 01 00 00 00          mov    $0x1,%edx</span><br><span class="line">  40050e:   be 02 00 00 00          mov    $0x2,%esi</span><br><span class="line">  400513:   bf c0 06 40 00          mov    $0x4006c0,%edi</span><br><span class="line">  400518:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40051a:   e8 b1 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40051f:   41 b8 10 00 00 00       mov    $0x10,%r8d</span><br><span class="line">  400525:   b9 08 00 00 00          mov    $0x8,%ecx</span><br><span class="line">  40052a:   31 d2                   xor    %edx,%edx</span><br><span class="line">  40052c:   be 18 00 00 00          mov    $0x18,%esi</span><br><span class="line">  400531:   bf d8 06 40 00          mov    $0x4006d8,%edi</span><br><span class="line">  400536:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400538:   e8 93 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40053d:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40053f:   48 83 c4 08             add    $0x8,%rsp</span><br></pre></td></tr></table></figure>
+
+<p>对比两种写法的结果，我们发现：</p>
+<ul>
+<li>成员布局上，两者相同，即普通的非虚成员函数不存在于对象中，不会占用空间。</li>
+<li>汇编指令上，第一种写法调用了<code>Func(S*)</code>，而第二种写法完全看不到<code>S::Func</code>，而是直接调用了<code>printf</code>。</li>
+</ul>
+<p>上面的第二条发现，实际上就是inline的效果。c++标准规定了定义在类（无论是class还是struct）定义中的函数都默认带有inline效果，因此它被编译器直接展开到调用处了。</p>
+<p>如果我们给<code>Func(S*)</code>前面加上<code>inline</code>，我们会得到与写法二完全相同的汇编指令（不贴了）。因此结论就是：</p>
+<ul>
+<li>普通的非虚成员函数不会占用对象空间，也不会带来额外开销，与对应的非成员函数完全相同。</li>
+<li><code>Func(S*)</code>等效于<code>S::Func()</code>。</li>
+</ul>
+<p>针对上面的第二点，实际上<code>S::Func()</code>会被编译器变成一个非成员函数，类似为<code>S_Func(S* const this)</code>，而<code>S::Func() const</code>则对应<code>S_Func(const S* const this)</code>。</p>
+<h2 id="为struct添加虚成员函数"><a href="#为struct添加虚成员函数" class="headerlink" title="为struct添加虚成员函数"></a>为struct添加虚成员函数</h2><p>我们将<code>S::Func</code>改为一个虚函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">Func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        a += <span class="number">1</span>;</span><br><span class="line">        b -= <span class="number">1</span>;</span><br><span class="line">        c *= <span class="number">2</span>;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;a:%d b:%ld c:%d\n&quot;</span>, a, b, c);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>对应的<code>main</code>函数不变，直接运行会报错：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">struct.cpp: In function ‘int main()’:</span><br><span class="line">struct.cpp:18:19: error: in C++98 ‘s’ must be initialized by constructor, not by ‘&#123;...&#125;’</span><br><span class="line">     S s = &#123;1, 2, 3&#125;;</span><br><span class="line">                   ^</span><br><span class="line">struct.cpp:18:19: error: could not convert ‘&#123;1, 2, 3&#125;’ from ‘&lt;brace-enclosed initializer list&gt;’ to ‘S’</span><br></pre></td></tr></table></figure>
+
+<p>似乎此时struct与c的struct已经不一样了。我们给它加上一个构造函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">S::<span class="built_in">S</span>(<span class="type">int8_t</span> x, <span class="type">int64_t</span> y, <span class="type">int32_t</span> z) &#123;</span><br><span class="line">    a = x;</span><br><span class="line">    b = y;</span><br><span class="line">    c = z;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>就可以编译过了。先运行前面的<code>main</code>函数（构造那行要改），结果是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:32 &amp;a-&amp;s:8, &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
+
+<p>我们发现：</p>
+<ul>
+<li>加入虚函数后，对象变大了，说明虚函数占用了一部分对象空间。</li>
+<li>对象变大了8字节（实际是虚表指针），且正好在对象的最前面，其它成员变量的位置依次向下8字节。</li>
+</ul>
+<p>这是第一个与c的struct布局不同的场景。我们知道虚函数是为了实现运行期多态的，那么就需要有信息来帮助程序在运行期根据对象的不同而选择不同的行为，这种信息就会带来运行期的额外开销。</p>
+<p>但调用虚函数真的就会有运行期开销吗？我们分别看一下直接通过对象来调用虚函数，与通过指针或引用调用虚函数的区别。</p>
+<p>我们添加三个Test函数，并在main函数中调用它：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Test1</span><span class="params">(S s)</span> </span>&#123;</span><br><span class="line">    s.<span class="built_in">Func</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Test2</span><span class="params">(S* s)</span> </span>&#123;</span><br><span class="line">    s-&gt;<span class="built_in">Func</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Test3</span><span class="params">(S&amp; s)</span> </span>&#123;</span><br><span class="line">    s.<span class="built_in">Func</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对应的汇编指令为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">0000000000400710 &lt;_Z5Test11S&gt;:</span><br><span class="line">  400710:   0f b6 47 08             movzbl 0x8(%rdi),%eax</span><br><span class="line">  400714:   8d 70 01                lea    0x1(%rax),%esi</span><br><span class="line">  400717:   48 8b 47 10             mov    0x10(%rdi),%rax</span><br><span class="line">  40071b:   40 88 77 08             mov    %sil,0x8(%rdi)</span><br><span class="line">  40071f:   40 0f be f6             movsbl %sil,%esi</span><br><span class="line">  400723:   48 8d 50 ff             lea    -0x1(%rax),%rdx</span><br><span class="line">  400727:   8b 47 18                mov    0x18(%rdi),%eax</span><br><span class="line">  40072a:   48 89 57 10             mov    %rdx,0x10(%rdi)</span><br><span class="line">  40072e:   8d 0c 00                lea    (%rax,%rax,1),%ecx</span><br><span class="line">  400731:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400733:   89 4f 18                mov    %ecx,0x18(%rdi)</span><br><span class="line">  400736:   bf 20 08 40 00          mov    $0x400820,%edi</span><br><span class="line">  40073b:   e9 20 fe ff ff          jmpq   400560 &lt;printf@plt&gt;</span><br><span class="line"></span><br><span class="line">0000000000400740 &lt;_Z5Test2P1S&gt;:</span><br><span class="line">  400740:   48 8b 07                mov    (%rdi),%rax</span><br><span class="line">  400743:   48 8b 00                mov    (%rax),%rax</span><br><span class="line">  400746:   ff e0                   jmpq   *%rax</span><br><span class="line">  400748:   0f 1f 84 00 00 00 00    nopl   0x0(%rax,%rax,1)</span><br><span class="line">  40074f:   00</span><br><span class="line"></span><br><span class="line">0000000000400750 &lt;_Z5Test3R1S&gt;:</span><br><span class="line">  400750:   48 8b 07                mov    (%rdi),%rax</span><br><span class="line">  400753:   48 8b 00                mov    (%rax),%rax</span><br><span class="line">  400756:   ff e0                   jmpq   *%rax</span><br><span class="line">  400758:   0f 1f 84 00 00 00 00    nopl   0x0(%rax,%rax,1)</span><br><span class="line">  40075f:   00</span><br></pre></td></tr></table></figure>
+
+<p>我们发现：</p>
+<ul>
+<li><code>Test1</code>中<code>Func</code>被展开了，看不到直接的<code>Func</code>调用，这点与调用一个非虚函数的行为相同。</li>
+<li><code>Test2</code>中通过间接跳转（jmpq）调用了<code>Func</code>，方法是先取出<code>s</code>（%rdi）的前8字节到%rax，再从%rax取出前8字节放到%rax，这就是<code>Func</code>的地址，之后就是一次间接跳转。</li>
+<li><code>Test3</code>与<code>Test2</code>完全相同。</li>
+</ul>
+<p>结论：</p>
+<ul>
+<li>通过一个对象调用虚函数时，编译器没有采用运行期多态，而是直接像调用一个非虚函数一样，没有运行期开销。</li>
+<li>通过指针调用虚函数时，有运行期开销，即需要一次间接跳转，此时虚函数无法展开。</li>
+<li>引用与指针此处无区别，引用就是一种语法糖。</li>
+</ul>
+<h2 id="为struct添加一个非虚继承的基类"><a href="#为struct添加一个非虚继承的基类" class="headerlink" title="为struct添加一个非虚继承的基类"></a>为struct添加一个非虚继承的基类</h2><h3 id="为struct添加一个无虚函数的非虚继承基类"><a href="#为struct添加一个无虚函数的非虚继承基类" class="headerlink" title="为struct添加一个无虚函数的非虚继承基类"></a>为struct添加一个无虚函数的非虚继承基类</h3><p>我们修改一下<code>S</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>运行前面的<code>main</code>函数，结果为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:24 &amp;a-&amp;s:4, &amp;b-&amp;s:8 &amp;c-&amp;s:16</span><br></pre></td></tr></table></figure>
+
+<p>此时<code>S</code>的布局可以认为是：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> ba;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>或</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    Base base;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>两者的区别在于，前者是基类的所有成员都可以被当作子类的成员，而后者是基类子对象就是子类的第一个成员。</p>
+<p>到底是哪种呢？当基类为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> ba;</span><br><span class="line">    <span class="type">int8_t</span> bb;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>时，如果按前者，<code>Base::bb</code>和<code>S::a</code>之间应该没有padding，即此时<code>S</code>的大小仍然是24；如果按后者，<code>Base</code>的alignment为8，此时<code>Base::bb</code>后面会有padding，<code>S</code>的大小应该是32。我们试一下，结果为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:32 &amp;a-&amp;s:8, &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
+
+<p>说明：基类子对象可以被当作子类对象的第一个成员，且保持自己的alignment和padding。</p>
+<h3 id="为struct添加第二个非虚基类"><a href="#为struct添加第二个非虚基类" class="headerlink" title="为struct添加第二个非虚基类"></a>为struct添加第二个非虚基类</h3><p>我们再加一个基类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> ba;</span><br><span class="line">    <span class="type">int8_t</span> bb;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Base2</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> ca;</span><br><span class="line">    <span class="type">int8_t</span> cb;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> Base, <span class="keyword">public</span> Base2 &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>根据上节的结论，我们可以认为<code>Base2</code>也是<code>S</code>的一个成员，且应排列在<code>Base</code>后面，<code>S</code>的大小应该是40。实验结果为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:40 &amp;a-&amp;s:16, &amp;b-&amp;s:24 &amp;c-&amp;s:32</span><br></pre></td></tr></table></figure>
+
+<p>证实了我们的猜测。</p>
+<h3 id="为struct添加空的基类"><a href="#为struct添加空的基类" class="headerlink" title="为struct添加空的基类"></a>为struct添加空的基类</h3><p>所谓空类型，指：</p>
+<ul>
+<li>没有任何非静态成员变量。</li>
+<li>没有任何虚函数。</li>
+<li>没有任何虚基类。</li>
+<li>其上没有基类，或只有空基类。</li>
+</ul>
+<p>当我们给<code>S</code>添加一个空类型的基类时，如：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="type">int64_t</span> b; <span class="comment">// 注意该场景中没有成员a</span></span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>根据之前的结论，<code>S</code>应该相当于：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    Base base;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;    </span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们知道，c++中任何类型的size都至少是1，这是为了避免不同变量对应相同的内存地址。那么<code>base</code>的size就是1，<code>S</code>的size就应该是24。实际上呢？</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">size:16 &amp;b-&amp;s:0 &amp;c-&amp;s:8</span><br></pre></td></tr></table></figure>
+
+<p>居然是16！这就是c++的空基类优化（Empty Base Optimization，EBO），当基类子对象为空时，其不必在子类对象中占据空间，且与子类对象共享相同的地址。这里是一个c的oop无法模拟的点。</p>
+<h2 id="为struct添加有虚函数的非虚继承基类"><a href="#为struct添加有虚函数的非虚继承基类" class="headerlink" title="为struct添加有虚函数的非虚继承基类"></a>为struct添加有虚函数的非虚继承基类</h2><h3 id="基类无成员变量"><a href="#基类无成员变量" class="headerlink" title="基类无成员变量"></a>基类无成员变量</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S s;</span><br><span class="line">    <span class="built_in">printf</span>(</span><br><span class="line">        <span class="string">&quot;Base:%d S:%d &amp;base-&amp;s:%d &amp;a-&amp;s:%d &amp;b-&amp;s:%d &amp;c-&amp;s:%d\n&quot;</span>,</span><br><span class="line">        <span class="built_in">sizeof</span>(Base),</span><br><span class="line">        <span class="built_in">sizeof</span>(S),</span><br><span class="line">        (<span class="type">char</span>*)<span class="built_in">static_cast</span>&lt;Base*&gt;(&amp;s) - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.a - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.b - (<span class="type">char</span>*)&amp;s,</span><br><span class="line">        (<span class="type">char</span>*)&amp;s.c - (<span class="type">char</span>*)&amp;s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>结果：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:8 S:32 &amp;base-&amp;s:0 &amp;a-&amp;s:8 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
+
+<p>结论：</p>
+<ul>
+<li>有虚函数的类型，其对象中需要有1个虚表指针来存放运行期信息，不再是空类型，作为基类也没办法应用EBO。</li>
+<li>子类对象中不会有2个虚表指针（基类子对象1个，子类对象1个），而是与基类共用1个虚表指针。</li>
+</ul>
+<h3 id="基类有成员变量"><a href="#基类有成员变量" class="headerlink" title="基类有成员变量"></a>基类有成员变量</h3><p>假设我们给基类添加一个成员变量：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() &#123;&#125;</span><br><span class="line">    <span class="type">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>根据前文规则，<code>Base</code>大小为16，其alignment为8，<code>S</code>的大小就会是40，且<code>Base::bb</code>与<code>S::a</code>之间有padding。但运行结果却是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:16 S:32 &amp;base-&amp;s:0 &amp;a-&amp;s:9 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
+
+<p>与我们的猜测不符，<code>Base::bb</code>与<code>S::a</code>之间没有padding。</p>
+<p>后面我们会说到c++有一种标准布局（Standard Layout），这种布局需要与c的struct布局兼容（外加空基类优化）。而当<code>Base</code>或<code>S</code>中加入虚函数后，它们就不再符合标准布局了，编译器就可以应用更紧凑的布局了。</p>
+<p>为什么标准布局需要与c的struct布局兼容？因为POD（Plain Old Data）类型首先需要是标准布局类型，而POD类型本身就是为了与c兼容而提出的概念。</p>
+<h2 id="为struct添加虚继承基类"><a href="#为struct添加虚继承基类" class="headerlink" title="为struct添加虚继承基类"></a>为struct添加虚继承基类</h2><p>注：大多数c++项目都禁止使用虚继承，因此下面的几个场景我们只给输出和大概的结论，不进行更多的探索和解释了。</p>
+<h3 id="基类为空类型"><a href="#基类为空类型" class="headerlink" title="基类为空类型"></a>基类为空类型</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:1 S:32 &amp;base-&amp;s:0 &amp;a-&amp;s:8 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
+
+<p>结论：</p>
+<ul>
+<li>虚基类会在子类中占用额外空间（1个指针），位置在子类最前面，此时无法应用EBO。</li>
+</ul>
+<h3 id="基类为非空无虚函数类型"><a href="#基类为非空无虚函数类型" class="headerlink" title="基类为非空无虚函数类型"></a>基类为非空无虚函数类型</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:1 S:32 &amp;base-&amp;s:28 &amp;a-&amp;s:8 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
+
+<p>结论：</p>
+<ul>
+<li>子类对象最前面仍然是1个指针。</li>
+<li>此时基类子对象位于子类最后。</li>
+</ul>
+<h3 id="基类为非空有虚函数类型"><a href="#基类为非空有虚函数类型" class="headerlink" title="基类为非空有虚函数类型"></a>基类为非空有虚函数类型</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() &#123;&#125;</span><br><span class="line">    <span class="type">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:16 S:48 &amp;base-&amp;s:32 &amp;a-&amp;s:8 &amp;b-&amp;s:16 &amp;c-&amp;s:24</span><br></pre></td></tr></table></figure>
+
+<p>结论：</p>
+<ul>
+<li>此时子类对象的前8字节不再是虚表指针，而是指向虚基类子对象的指针。</li>
+<li>基类子对象的前8字节是虚表指针，且其整体位于子类最后一个成员变量的后面。</li>
+</ul>
+<h3 id="无虚函数的菱形继承"><a href="#无虚函数的菱形继承" class="headerlink" title="无虚函数的菱形继承"></a>无虚函数的菱形继承</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">C</span>: <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="type">int32_t</span> ca;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">D</span>: <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="type">int32_t</span> da;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> C, <span class="keyword">public</span> D &#123;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:1 C:16 D:16 S:48 &amp;Base-&amp;S:44 &amp;C-&amp;S:0 &amp;D-&amp;S:16 &amp;b-&amp;s:32 &amp;c-&amp;s:40</span><br></pre></td></tr></table></figure>
+
+<p>结论：</p>
+<ul>
+<li>此时<code>C</code>的子对象与<code>S</code>对象共享一个虚基类指针，而<code>D</code>则自己使用一个虚基类指针。</li>
+<li><code>C</code>与<code>D</code>依次位于<code>S</code>的前端，而<code>Base</code>依然在最后端。</li>
+<li>调用来自虚基类的虚函数时，相比非虚基类的虚函数，要多一次间接跳转：先通过虚基类指针找到虚表指针，再通过虚表指针找到对应函数地址。</li>
+</ul>
+<h3 id="有虚函数的菱形继承"><a href="#有虚函数的菱形继承" class="headerlink" title="有虚函数的菱形继承"></a>有虚函数的菱形继承</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() &#123;&#125;</span><br><span class="line">    <span class="type">int8_t</span> ba;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">C</span>: <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="type">int32_t</span> ca;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">D</span>: <span class="keyword">public</span> <span class="keyword">virtual</span> Base &#123;</span><br><span class="line">    <span class="type">int32_t</span> da;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: <span class="keyword">public</span> C, <span class="keyword">public</span> D &#123;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base:16 C:32 D:32 S:64 &amp;Base-&amp;S:48 &amp;C-&amp;S:0 &amp;D-&amp;S:16 &amp;b-&amp;s:32 &amp;c-&amp;s:40</span><br></pre></td></tr></table></figure>
+
+<p>结论：</p>
+<ul>
+<li><code>C</code>和<code>D</code>依然位于<code>S</code>的前端，而<code>Base</code>位于后端。</li>
+<li><code>C</code>与<code>S</code>共享一个虚基类指针，<code>D</code>自己使用一个虚基类指针。</li>
+<li><code>C</code>与<code>D</code>与<code>S</code>与<code>Base</code>共享一个虚表指针。</li>
+</ul>
+<h1 id="struct与class"><a href="#struct与class" class="headerlink" title="struct与class"></a>struct与class</h1><p>第二个问题，c++中的struct和class有什么区别？</p>
+<p>答案是，除了默认访问权限不同（struct默认为public，而class默认为private）外，其它完全相同。</p>
+<p>上面的例子中，我们把每个struct都换成class，仍然能得到相同的结论。决定对象模型的不是用哪个关键字修饰它，而是它本身的性质，是否有基类，是否有虚函数，是否有虚基类。</p>
+<h2 id="然而struct不能用于修饰模板参数类型"><a href="#然而struct不能用于修饰模板参数类型" class="headerlink" title="然而struct不能用于修饰模板参数类型"></a>然而struct不能用于修饰模板参数类型</h2><p>但struct却不能用于下面这个场景：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">struct</span> <span class="title class_">X</span>&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">PrintSize</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>, <span class="built_in">sizeof</span>(X));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>当我们编译时，报错信息为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">struct.cpp:19:18: error: ‘struct X’ is not a valid type for a template non-type parameter</span><br><span class="line"> template &lt;struct X&gt;</span><br><span class="line">                  ^</span><br></pre></td></tr></table></figure>
+
+<p>而当我们把struct改成class或typename后，就可以编译成功了。</p>
+<h1 id="struct的零额外开销"><a href="#struct的零额外开销" class="headerlink" title="struct的零额外开销"></a>struct的零额外开销</h1><p>众所周知，c++的一个核心理念就是保证某个功能对不使用它的用户零额外开销。我们从几方面看一下struct是如何实现零额外开销的。</p>
+<h2 id="使用栈上的struct成员"><a href="#使用栈上的struct成员" class="headerlink" title="使用栈上的struct成员"></a>使用栈上的struct成员</h2><p>下面两段代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int64_t</span> <span class="title">Func</span><span class="params">(<span class="type">int8_t</span> x, <span class="type">int64_t</span> y, <span class="type">int32_t</span> z)</span> </span>&#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">    a = x;</span><br><span class="line">    b = y;</span><br><span class="line">    c = z;</span><br><span class="line">    <span class="keyword">return</span> a + b + c;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>和</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int8_t</span> a;</span><br><span class="line">    <span class="type">int64_t</span> b;</span><br><span class="line">    <span class="type">int32_t</span> c;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="type">int64_t</span> <span class="title">Func</span><span class="params">(<span class="type">int8_t</span> x, <span class="type">int64_t</span> y, <span class="type">int32_t</span> z)</span> </span>&#123;</span><br><span class="line">    S s;</span><br><span class="line">    s.a = x;</span><br><span class="line">    s.b = y;</span><br><span class="line">    s.c = z;</span><br><span class="line">    <span class="keyword">return</span> s.a + s.b + s.c;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它们对应的汇编指令为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">00000000004005b0 &lt;_Z4Funcali&gt;:</span><br><span class="line">  4005b0:   48 0f be ff             movsbq %dil,%rdi</span><br><span class="line">  4005b4:   48 63 d2                movslq %edx,%rdx</span><br><span class="line">  4005b7:   48 01 fe                add    %rdi,%rsi</span><br><span class="line">  4005ba:   48 8d 04 16             lea    (%rsi,%rdx,1),%rax</span><br><span class="line">  4005be:   c3                      retq</span><br><span class="line">  4005bf:   90                      nop</span><br></pre></td></tr></table></figure>
+
+<p>和</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">00000000004005b0 &lt;_Z4Funcali&gt;:</span><br><span class="line">  4005b0:   48 0f be ff             movsbq %dil,%rdi</span><br><span class="line">  4005b4:   48 63 d2                movslq %edx,%rdx</span><br><span class="line">  4005b7:   48 01 fe                add    %rdi,%rsi</span><br><span class="line">  4005ba:   48 8d 04 16             lea    (%rsi,%rdx,1),%rax</span><br><span class="line">  4005be:   c3                      retq</span><br><span class="line">  4005bf:   90                      nop</span><br></pre></td></tr></table></figure>
+
+<p>完全相同，说明使用栈上的struct成员，与使用栈上变量完全相同，零额外开销。</p>
+<h2 id="传递小struct"><a href="#传递小struct" class="headerlink" title="传递小struct"></a>传递小struct</h2><p>下面两段代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">int32_t</span> x, <span class="type">int32_t</span> y)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;x:%d y:%d\n&quot;</span>, x, y);</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">int32_t</span> x = <span class="number">1</span>;</span><br><span class="line">    <span class="type">int32_t</span> y = <span class="number">2</span>;</span><br><span class="line">    <span class="built_in">Func</span>(<span class="number">1</span>, <span class="number">2</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>与</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> x;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(S s)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;x:%d y:%d\n&quot;</span>, s.x, s.y);</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    S s;</span><br><span class="line">    s.x = <span class="number">1</span>;</span><br><span class="line">    s.y = <span class="number">2</span>;</span><br><span class="line">    <span class="built_in">Func</span>(s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对应的汇编指令为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">0000000000400500 &lt;main&gt;:</span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   ba 02 00 00 00          mov    $0x2,%edx</span><br><span class="line">  400509:   be 01 00 00 00          mov    $0x1,%esi</span><br><span class="line">  40050e:   bf b0 06 40 00          mov    $0x4006b0,%edi</span><br><span class="line">  400513:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400515:   e8 b6 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40051a:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40051c:   48 83 c4 08             add    $0x8,%rsp</span><br><span class="line">  400520:   c3                      retq</span><br><span class="line">  400521:   0f 1f 00                nopl   (%rax)</span><br></pre></td></tr></table></figure>
+
+<p>和</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">0000000000400500 &lt;main&gt;:</span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   ba 02 00 00 00          mov    $0x2,%edx</span><br><span class="line">  400509:   be 01 00 00 00          mov    $0x1,%esi</span><br><span class="line">  40050e:   bf c0 06 40 00          mov    $0x4006c0,%edi</span><br><span class="line">  400513:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400515:   e8 b6 ff ff ff          callq  4004d0 &lt;printf@plt&gt;</span><br><span class="line">  40051a:   31 c0                   xor    %eax,%eax</span><br><span class="line">  40051c:   48 83 c4 08             add    $0x8,%rsp</span><br><span class="line">  400520:   c3                      retq</span><br><span class="line">  400521:   0f 1f 00                nopl   (%rax)</span><br></pre></td></tr></table></figure>
+
+<p>注意此时两个<code>Func</code>函数都被inline掉了，因此我们可以直接对应<code>main</code>的汇编代码。可以看到它们完全相同，也符合上节的结论。</p>
+<p>当我们把inline关掉后，先看一下<code>main</code>（看参数是如何传递的）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">0000000000400500 &lt;main&gt;:</span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   be 02 00 00 00          mov    $0x2,%esi</span><br><span class="line">  400509:   bf 01 00 00 00          mov    $0x1,%edi</span><br><span class="line">  40050e:   e8 fd 00 00 00          callq  400610 &lt;_Z4Funcii&gt;</span><br></pre></td></tr></table></figure>
+
+<p>和</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">0000000000400500 &lt;main&gt;:</span><br><span class="line">  400500:   48 83 ec 08             sub    $0x8,%rsp</span><br><span class="line">  400504:   48 bf 01 00 00 00 02    movabs $0x200000001,%rdi</span><br><span class="line">  40050b:   00 00 00</span><br><span class="line">  40050e:   e8 fd 00 00 00          callq  400610 &lt;_Z4Func1S&gt;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到直接传递一个struct反倒少了一条指令！原因是此时<code>S</code>为8个字节，刚好可以放入一个寄存器中，因此可以一条指令传递过去。而如果分成两个<code>int32_t</code>，则编译器必须用两个寄存器传递，多了一条指令。</p>
+<p>再对比一下<code>Func</code>的汇编代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">0000000000400610 &lt;_Z4Funcii&gt;:</span><br><span class="line">  400610:   89 f2                   mov    %esi,%edx</span><br><span class="line">  400612:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400614:   89 fe                   mov    %edi,%esi</span><br><span class="line">  400616:   bf b0 06 40 00          mov    $0x4006b0,%edi</span><br><span class="line">  40061b:   e9 b0 fe ff ff          jmpq   4004d0 &lt;printf@plt&gt;</span><br></pre></td></tr></table></figure>
+
+<p>和</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">0000000000400610 &lt;_Z4FuncS&gt;:</span><br><span class="line">  400610:   48 89 fa                mov    %rdi,%rdx</span><br><span class="line">  400613:   89 fe                   mov    %edi,%esi</span><br><span class="line">  400615:   31 c0                   xor    %eax,%eax</span><br><span class="line">  400617:   48 c1 fa 20             sar    $0x20,%rdx</span><br><span class="line">  40061b:   bf c0 06 40 00          mov    $0x4006c0,%edi</span><br><span class="line">  400620:   e9 ab fe ff ff          jmpq   4004d0 &lt;printf@plt&gt;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到传递<code>S</code>的版本多了一条<code>sar $0x20,%rdx</code>，这是因为我们用一个寄存器传递了两个值，但在调用<code>printf</code>时还是要把它们分开，因此这里需要先把低4字节放到另一个寄存器里，再把%rdx的内容右移32位，从而得到高4字节的值。</p>
+<p>把<code>main</code>和<code>Func</code>加起来，两个版本的汇编指令数量仍然完全相同，区别在于前者传递时多一次赋值，后者运算时多一次右移，可以认为开销相同。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/03/07/cpp-object-model-alignment/" rel="prev" title="C++对象模型（一）Alignment">
+      <i class="fa fa-chevron-left"></i> C++对象模型（一）Alignment
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/03/15/cpp-object-model-pod/" rel="next" title="C++对象模型（三）POD">
+      C++对象模型（三）POD <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#c-%E4%B8%AD%E7%9A%84struct%E4%B8%8Ec%E4%B8%AD%E7%9A%84struct"><span class="nav-number">1.</span> <span class="nav-text">c++中的struct与c中的struct</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%83%8Fc%E4%B8%80%E6%A0%B7%E5%AE%9A%E4%B9%89struct"><span class="nav-number">1.1.</span> <span class="nav-text">像c一样定义struct</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E9%9D%99%E6%80%81%E6%88%90%E5%91%98"><span class="nav-number">1.2.</span> <span class="nav-text">为struct添加静态成员</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E9%9D%9E%E9%9D%99%E6%80%81%E9%9D%9E%E8%99%9A%E6%88%90%E5%91%98%E5%87%BD%E6%95%B0"><span class="nav-number">1.3.</span> <span class="nav-text">为struct添加非静态非虚成员函数</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E6%9E%84%E9%80%A0%E3%80%81%E6%9E%90%E6%9E%84%E3%80%81%E5%A4%8D%E5%88%B6%E3%80%81%E7%A7%BB%E5%8A%A8%E5%87%BD%E6%95%B0"><span class="nav-number">1.3.1.</span> <span class="nav-text">为struct添加构造、析构、复制、移动函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E6%99%AE%E9%80%9A%E9%9D%9E%E8%99%9A%E5%87%BD%E6%95%B0"><span class="nav-number">1.3.2.</span> <span class="nav-text">为struct添加普通非虚函数</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E8%99%9A%E6%88%90%E5%91%98%E5%87%BD%E6%95%B0"><span class="nav-number">1.4.</span> <span class="nav-text">为struct添加虚成员函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E4%B8%80%E4%B8%AA%E9%9D%9E%E8%99%9A%E7%BB%A7%E6%89%BF%E7%9A%84%E5%9F%BA%E7%B1%BB"><span class="nav-number">1.5.</span> <span class="nav-text">为struct添加一个非虚继承的基类</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E4%B8%80%E4%B8%AA%E6%97%A0%E8%99%9A%E5%87%BD%E6%95%B0%E7%9A%84%E9%9D%9E%E8%99%9A%E7%BB%A7%E6%89%BF%E5%9F%BA%E7%B1%BB"><span class="nav-number">1.5.1.</span> <span class="nav-text">为struct添加一个无虚函数的非虚继承基类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E7%AC%AC%E4%BA%8C%E4%B8%AA%E9%9D%9E%E8%99%9A%E5%9F%BA%E7%B1%BB"><span class="nav-number">1.5.2.</span> <span class="nav-text">为struct添加第二个非虚基类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E7%A9%BA%E7%9A%84%E5%9F%BA%E7%B1%BB"><span class="nav-number">1.5.3.</span> <span class="nav-text">为struct添加空的基类</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E6%9C%89%E8%99%9A%E5%87%BD%E6%95%B0%E7%9A%84%E9%9D%9E%E8%99%9A%E7%BB%A7%E6%89%BF%E5%9F%BA%E7%B1%BB"><span class="nav-number">1.6.</span> <span class="nav-text">为struct添加有虚函数的非虚继承基类</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E7%B1%BB%E6%97%A0%E6%88%90%E5%91%98%E5%8F%98%E9%87%8F"><span class="nav-number">1.6.1.</span> <span class="nav-text">基类无成员变量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E7%B1%BB%E6%9C%89%E6%88%90%E5%91%98%E5%8F%98%E9%87%8F"><span class="nav-number">1.6.2.</span> <span class="nav-text">基类有成员变量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E8%99%9A%E7%BB%A7%E6%89%BF%E5%9F%BA%E7%B1%BB"><span class="nav-number">1.7.</span> <span class="nav-text">为struct添加虚继承基类</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E7%B1%BB%E4%B8%BA%E7%A9%BA%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.7.1.</span> <span class="nav-text">基类为空类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E7%B1%BB%E4%B8%BA%E9%9D%9E%E7%A9%BA%E6%97%A0%E8%99%9A%E5%87%BD%E6%95%B0%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.7.2.</span> <span class="nav-text">基类为非空无虚函数类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E7%B1%BB%E4%B8%BA%E9%9D%9E%E7%A9%BA%E6%9C%89%E8%99%9A%E5%87%BD%E6%95%B0%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.7.3.</span> <span class="nav-text">基类为非空有虚函数类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%A0%E8%99%9A%E5%87%BD%E6%95%B0%E7%9A%84%E8%8F%B1%E5%BD%A2%E7%BB%A7%E6%89%BF"><span class="nav-number">1.7.4.</span> <span class="nav-text">无虚函数的菱形继承</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%89%E8%99%9A%E5%87%BD%E6%95%B0%E7%9A%84%E8%8F%B1%E5%BD%A2%E7%BB%A7%E6%89%BF"><span class="nav-number">1.7.5.</span> <span class="nav-text">有虚函数的菱形继承</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#struct%E4%B8%8Eclass"><span class="nav-number">2.</span> <span class="nav-text">struct与class</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%84%B6%E8%80%8Cstruct%E4%B8%8D%E8%83%BD%E7%94%A8%E4%BA%8E%E4%BF%AE%E9%A5%B0%E6%A8%A1%E6%9D%BF%E5%8F%82%E6%95%B0%E7%B1%BB%E5%9E%8B"><span class="nav-number">2.1.</span> <span class="nav-text">然而struct不能用于修饰模板参数类型</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#struct%E7%9A%84%E9%9B%B6%E9%A2%9D%E5%A4%96%E5%BC%80%E9%94%80"><span class="nav-number">3.</span> <span class="nav-text">struct的零额外开销</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E6%A0%88%E4%B8%8A%E7%9A%84struct%E6%88%90%E5%91%98"><span class="nav-number">3.1.</span> <span class="nav-text">使用栈上的struct成员</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BC%A0%E9%80%92%E5%B0%8Fstruct"><span class="nav-number">3.2.</span> <span class="nav-text">传递小struct</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

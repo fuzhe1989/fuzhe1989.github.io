@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Message Passing and the Actor Model 简介自有分布式计算以来，人们就已经讨论过消息传递编程模型了，因此消息传递可以用于表示许多事情。Wikipedia上消息传递的宽泛定义包括了远程过程调用（RPC）和消息传递接口（MPI）等。另外，实践中的消息传递系统也受到了像是pi-calculus和CSP这些流行的进程演算（process-calculus）的启发。例如">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[翻译]消息传递与actor模型">
+<meta property="og:url" content="http://fuzhe1989.github.io/2018/05/17/message-passing-and-the-actor-model/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Message Passing and the Actor Model 简介自有分布式计算以来，人们就已经讨论过消息传递编程模型了，因此消息传递可以用于表示许多事情。Wikipedia上消息传递的宽泛定义包括了远程过程调用（RPC）和消息传递接口（MPI）等。另外，实践中的消息传递系统也受到了像是pi-calculus和CSP这些流行的进程演算（process-calculus）的启发。例如">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/E_vat.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/E_account_spreadsheet_vats.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/supervision_tree.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/sentinel_nodes.png">
+<meta property="article:published_time" content="2018-05-17T15:35:06.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.657Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="异步">
+<meta property="article:tag" content="并发">
+<meta property="article:tag" content="编程">
+<meta property="article:tag" content="函数式编程">
+<meta property="article:tag" content="分布式">
+<meta property="article:tag" content="Actor">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://7xipsa.com1.z0.glb.clouddn.com/E_vat.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2018/05/17/message-passing-and-the-actor-model/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[翻译]消息传递与actor模型 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/05/17/message-passing-and-the-actor-model/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [翻译]消息传递与actor模型
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-05-17 23:35:06" itemprop="dateCreated datePublished" datetime="2018-05-17T23:35:06+08:00">2018-05-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>原文：<a target="_blank" rel="noopener" href="http://dist-prog-book.com/chapter/3/message-passing.html">Message Passing and the Actor Model</a></p>
+<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>自有分布式计算以来，人们就已经讨论过消息传递编程模型了，因此消息传递可以用于表示许多事情。Wikipedia上消息传递的宽泛定义包括了远程过程调用（RPC）和消息传递接口（MPI）等。另外，实践中的消息传递系统也受到了像是pi-calculus和CSP这些流行的进程演算（process-calculus）的启发。例如，Go的channel就是基于pi-calculus中消息通道作为一等公民的思想，而Clojure中的core.async库则是基于CSP。但今天人们谈起消息传递时，通常是指actor模型。作为一种通用的消息传递编程模型，它开端于20世纪70年代，并在今天用于构建大规模可伸缩系统。</p>
+<p>在消息传递编程模型领域，重要的不仅是考虑目前的研究现状，还包括历史上最初的关于消息传递和actor模型的论文，它们是更近期的论文描述的编程模型的源头。看看这些模型卡在了哪里，以及近期的论文都引用和指出了旧论文中的哪些不足，这些是很有启发性的。历史上有许多编程语言是围绕着消息传递设计的，特别是那些专注于actor模型和组织计算单元的语言。</p>
+<p>本章我会描述actor模型的四个主要变体：经典actor模型、基于进程的actor模型、通信事件循环模型、以及活动对象模型。我会试着强调体现了这些模型的历史上和现代的语言，以及程序员需要注意的编程哲学和取舍，从而理解并最好的利用这些模型。</p>
+<p>尽管actor模型早在20世纪70年代就开始了，正如许多近期发表的论文和系统显示，它仍在发展，并被纳入到今天的编程语言中。有些健壮的工业级actor系统正被用于赋能大规模可伸缩分布式系统，例如Akka被用于服务PayPal的十亿级的事务，Erlang被用于为WhatsApp的上亿用户发送消息，而Orleans被用于服务Halo4的数百万玩家。围绕着监控、错误处理、actor生命周期管理，有许多不同方式去构建一个工业级的actor框架，后面会详述。</p>
+<p>对于我们介绍的actor模型，一个重点就在这个问题中：“为什么要传递消息，特别是为什么要用actor模型？”考虑到有那么多分布式编程模型，有人可能会问，为什么这个模型在最初提出时这么重要？为什么它促进了当今广泛使用的高级语言、系统和库？我们将在这一章看到，actor模型的一些最明显的优点包括了actor状态的隔离、可伸缩性、以及简化程序员对系统的推理难度。</p>
+<span id="more"></span>
+
+<h1 id="原始actor模型"><a href="#原始actor模型" class="headerlink" title="原始actor模型"></a>原始actor模型</h1><p>actor模型最早被1973年的“A Universal Modular ACTOR Formalism for Artificial Intelligence”引入，作为人工智能研究中的一种计算方法。它的最初目标是用一种能安全地跨工作站并发分布的通信方式来建模并行计算。这篇文章几乎没有假设实现细节，而是定义了一种高级消息传递通信模型。Gul Agha随后发展了这种模型，他专注于将actor作为并发面向对象编程的基础。这项工作收录在“Actors: A Model of Concurrent Computation in Distributed Systems”中。</p>
+<p>actor被定义为计算中的独立单元，相互状态隔离。这些单元有两种核心性质：</p>
+<ul>
+<li>它们能相互异步发送消息，以及</li>
+<li>它们有一个信箱保存收到的消息，任何时间都可以收取消息并排队处理。</li>
+</ul>
+<p>消息形式为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">(request: &lt;message-to-target&gt;</span><br><span class="line"> reply-to: &lt;reference-to-messenger&gt;)</span><br></pre></td></tr></table></figure>
+
+<p>actor会用通过值或逻辑语句指定的模式或规则来串行匹配消息的<code>request</code>字段，来尝试处理信箱中的消息。一旦有模式被匹配到了，就会做相应的计算，并将结果隐式返回给消息中<code>reply-to</code>字段中的发送者的引用。这是一种continuation，其中continuation指发给另一个actor的消息。这些消息是单向的，且不保证消息一定会被响应。actor模型如此通用的原因是它对系统几乎没有限制。异步和不保证消息送达使它能建模真实的分布式系统。例如，如果保证消息送达，这种模型的通用性会大大降低，只能建模包含复杂的消息送达协议的系统。跟其它许多模型相比，这种原始actor模型能力有限，但已经有了通过分布计算能力以允许更大计算并行度的早期思想。</p>
+<p>有趣的是，原始actor模型的论文是基于硬件环境的。他们几乎将actor模型描述为另一种机器架构。这篇文章描述了“actor机器”和“硬件actor”概念作为actor模型的上下文，这与我们对现代actor模型的看法完全不同，因为它抽象了许多我们完全不想处理的硬件细节。这种概念让人想起了类似于Lisp机器的东西，尽管它是专门用于人工智能计算的actor模型的。</p>
+<h1 id="经典actor模型"><a href="#经典actor模型" class="headerlink" title="经典actor模型"></a>经典actor模型</h1><p>在Agha的“Concurrent Object-Oriented Programming”中经典actor模型被形式化为一个计算单元。它扩展了初始的actor模型，保持了在隔离的计算单元和状态单元之间通过消息来做异步通信的思想。经典actor模型包含以下基本操作：</p>
+<ul>
+<li><code>create</code>：用一种行为的描述和一组参数（包括其它actor）来创建一个actor。</li>
+<li><code>send</code>：向其它actor发送消息。</li>
+<li><code>become</code>：将一个actor的当前行为替换为另一种行为。</li>
+</ul>
+<p>与原始actor模型一样，经典actor模型也通过异步的消息传递来进行通信。这些actor都是相互独立的计算单元，可以用于构建更高级的并发编程抽象。每个actor有唯一的地址，有独立的信箱或消息队列。在经典actor模型中，状态变化均由<code>become</code>操作来聚合完成。每当actor处理一条消息时，它会计算出一个行为，来响应它期望处理的下一种消息类型。<code>become</code>操作的参数是一个有名字的continuation <code>b</code>，表示actor应该被更新为的行为，以及其它应该传递给<code>b</code>的状态。</p>
+<p>这种continuation模型很灵活。你可以创建一个纯函数式的actor，每个新行为都与初始行为相同，也不会有状态传递。一个例子是下面的<code>AddOne</code>，它会根据一种固定的行为来处理消息。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">(define AddOne</span><br><span class="line">  [add-one [n]</span><br><span class="line">    (return (+ n  1))])</span><br></pre></td></tr></table></figure>
+
+<p>这种模型也能创建一个有状态的actor，它可以改变行为，并传递一个表示状态的对象。这种状态可以是许多操作的结果，这就允许在一个比变量赋值更高的层面聚合状态的更改。一个例子是“Concurrent Object-Oriented Programming”中给出的<code>BankAccount</code>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">(define BankAccount</span><br><span class="line">  (mutable [balance]</span><br><span class="line">    [withdraw-from [amount]</span><br><span class="line">      (become BankAccount (- balance amount))</span><br><span class="line">      (return &#x27;withdrew amount)]</span><br><span class="line">    [deposit-to [amount]</span><br><span class="line">      (become BankAccount (+ balance amount))</span><br><span class="line">      (return &#x27;deposited amount)]</span><br><span class="line">    [balance-query</span><br><span class="line">      (return &#x27;balance-is balance)]))</span><br></pre></td></tr></table></figure>
+
+<p>将actor看作有状态的continuation就允许它随着时间灵活地调整其行为，来响应系统中其它actor的动作。将状态和行为更改限制在<code>become</code>操作中改变了人们分析系统时所处的层级，将程序员从对状态更改中的相互干扰的担忧中释放出来。在上面的例子中，程序员只需要关心，在通过<code>become</code>操作来响应定义良好的消息类型的顺序队列时，每个账户的balance是如何变化的。</p>
+<p>如果你稍微看一下，这种actor的定义有点像Alan Kay对面向对象编程的原始定义。这个定义描述了一个系统，其中每个对象有一种行为，持有内存，互相之间通过发送和接收消息来通信，消息中可能包含其它对象或只是动作的触发器。Kay的思想很接近于我们今天认为的actor模型，而不太像我们今天认为的面向对象编程。也就是说，Kay在这种描述中的重点是设计消息传递和通信，它们决定了对象如何交互。</p>
+<blockquote>
+<p>重要的是“消息传递”——这就是Smalltalk&#x2F;Squeak的核心所在（也是我们在Xerox PARC阶段从未完成的事情）。日语中有一个字，MA，意思是“介于两者之间的”，与之最接近的英语单词也许是“interstitial”。创造伟大且可成长的系统的关键更多的是在设计模块间如何通信的，而不是它们的内在属性和行为该是什么。</p>
+<p>Alan Kay</p>
+</blockquote>
+<h2 id="并发面向对象编程（1990）"><a href="#并发面向对象编程（1990）" class="headerlink" title="并发面向对象编程（1990）"></a>并发面向对象编程（1990）</h2><p>有人会说，actor模型在主流程序中的复兴开始于Gul Agha的工作。他的著作“A Model of Concurrent Computation in Distributed Systems”和随后的论文“Concurrent Object-Oriented Programming”中，提出用经典actor模型作为解决计算机领域两个趋势交叉问题的自然解决方案：分布式计算资源的增加和面向对象编程的普及。论文定义了并行的通用模式：并发流水线，分治，协作化解决问题。之后它专注于如何使用actor模型来以面向对象的风格解决这些问题，分布式的actor的对象会遇到的一些挑战，以及在通信和行为推理方面的策略与取舍。</p>
+<p>论文讨论了在这一领域正在实现解决方案的许多系统和语言，并开始从使用actor编程的程序员的角度指出其中的一些优点。论文中作为示例的一种核心语言是Rosette，但论文主要关注的是模型本身的潜力和收益。Agha声称使用对象的好处源于关注点的分离。</p>
+<blockquote>
+<p>通过将“做了什么”（抽象）与“怎么做的”（实现）的描述分离，对象概念提供了大规模编程中必要的模块性。事实证明，并发性是对象概念的自然结果。</p>
+<p>Gul Agha</p>
+</blockquote>
+<p>将关注点分成多个允许程序员更容易推理程序的行为，也允许程序员在程序中使用更灵活的抽象。</p>
+<blockquote>
+<p>值得注意的是，actor语言特别强调开发灵活的程序结构从而简化程序推理。</p>
+<p>Gul Agha</p>
+</blockquote>
+<p>这种灵活性被公认为是一种优势，并仍被现代actor系统所推崇。</p>
+<h2 id="Rosette"><a href="#Rosette" class="headerlink" title="Rosette"></a>Rosette</h2><p>Rosette既是使用actor实现并发面向对象编程的语言，也是管理这些actor使用和可访问的资源的实时系统。Agha在“Concurrent Object-Oriented Programming”中提到了Rosette，这篇论文中的示例代码就是用Rosette写的。Agha也是Rosette的论文的一名作者，因此很显然，Rosette就是经典actor模型的基础。它几乎定义了在并发面向对象编程这个语境下，经典actor模型该长成什么样子。</p>
+<p>Rosette背后的驱动力是为处理像搜索这样的问题提供策略，这些问题中程序员需要一种手段来控制资源该如何分配给子计算，从而优化组合爆炸时的性能。例如，在一个搜索问题中，你可能首先计算出一组希望进一步优化的初始结果。耗尽一切去优化每个结果的计算代价可能太高了，你希望基于一些指标挑出最好的一些结果并只处理这些。Rosette支持用并发来解决那些没有预先定义好的结构，而是依赖于一些启发方法来返回结果的计算密集型问题。Rosette用两种不同的方式使用actor。它们用不同的职责描述两个不同的层：</p>
+<ul>
+<li>接口层。这里实现资源监控和控制方面的机制。系统资源和硬件都被视为actor。</li>
+<li>系统环境。它由这样的actor组成：实际描述了并发应用的行为，并基于接口层实现了资源管理策略。</li>
+</ul>
+<p>Rosette语言有多种面向对象功能，其中许多我们在现代面向对象编程语言中都视为理所当然。它为可扩展和可重配置的系统实现了对象的动态创建和修改，支持继承，且对象按类组织。更有趣的特性是，在Rosette中并发是内置且声明式的，而不是像许多其它现代面向对象语言那样要显式使用。在Rosette中，并发性是程序结构和资源分配的内在属性。这与像Java这样的语言不同，在它们中所有的并发都是要非常明确表达出来的。“Java Concurrency in Practice”是讲Java并发模型讲的最好的书，尽管书里没讲到Java8引入的许多新的并发技术。声明式并发背后的驱动力来自分布式并发系统中的异构本质。不同的计算机和架构有着不同的并发特性，作者质疑强迫程序员根据特定的机器来调整其它机器的并发性会使重构程序变得困难。使用actor作为对并发和资源分布的更灵活且更自然的抽象，这种思想很重要，在许多actor系统中都能看到它的某种形式。</p>
+<p>Rosette中的actor被组织为三种类型，描述了系统中actor的不同方面：</p>
+<ul>
+<li>抽象类（Abstract class）指定了request、response、以及系统中可观察的action。这背后的思想是暴露出系统的更高级行为，但将实际的actor实现限制在系统的资源限制中。</li>
+<li>表现类（Representation class）指定了抽象类的实现中的资源管理特性。</li>
+<li>行为类（Behavior class）指定了给定抽象类和表现类后，actor的实际实现。</li>
+</ul>
+<p>这些类描绘了一个具体的面向对象抽象，以组织处理系统中实际约束的那些actor。它朝着“不仅仅处理信息流和系统行为，也处理底层的硬件和资源”的方向走了一步。Rosette的模型像是对每个生产环境的actor系统都不可避免要解决的那些问题的一种直接表达。</p>
+<h2 id="Akka"><a href="#Akka" class="headerlink" title="Akka"></a>Akka</h2><p>Akka努力将工业级的actor模型带到并不显式支持actor的JVM中。Akka最初是由Scala Actors发展而来，并将actor模型带给了JVM。它与Scala Actors有一些显著的变化，使得Akka值得一提，尤其是Akka还在活跃发展中而Scala Actors则不是了。一些重要变化的细节参见“On the Integration of the Actor Model in Mainstream Technologies: The Scala Perspective. ”。</p>
+<p>Akka与Scala Actors类似，但actor处理消息的语义不同。它提供了Java和Scala绑定的编程接口。Akka的<code>receive</code>操作定义了一个全局的消息处理器，它不会阻塞接收不匹配的消息，而是仅在有匹配的消息可处理时才被触发。它也不会把没有可匹配的模式的消息留在actor的信箱中，而是直接丢掉，并向系统推送一个事件。Akka的接口也提供了强封装，避免直接暴露actor的引用。它有一种受限的<code>ActorRef</code>接口，只提供了向真正的actor发送或转发消息的方法。此外，Akka还做了检查，保证在一个actor被创建之后，不会有对它的直接访问。某种程序上这解决了Scala Actors中的问题，即可以调用actor的公开方法，这打破了许多程序员期望从消息传递中得到的保证。这套系统并不完美，但大多数场景下它限制了程序员只能用一套受限的接口向actor发送消息。</p>
+<p>Akka的运行时也提供了相比Scala Actors更好的性能。它使用了一个单独的continuation闭包来处理一个actor的许多或全部消息，也提供了方法来修改这个全局的continuation。在JVM上这套机制能实现得更高效，而对比Scala Actors的continuation模型使用了控制流异常，会产生额外的开销。另外，Akka运行时还使用了非阻塞的消息插入和任务调度操作以提高性能。</p>
+<p>Akka是经典actor模型已为生产做好了准备的结果。它正在活跃发展，且确实被用于构建可伸缩系统了。Akka的生产用途稍后会详细描述。Akka成功到被移植到其它语言&#x2F;运行时中。Akka.NET项目用C#和F#将Akka编程模型引入了.NET和Mono。Akka.js也已基于Scala.js，将Akka移植到了JavaScript上。</p>
+<h1 id="基于进程的actor"><a href="#基于进程的actor" class="headerlink" title="基于进程的actor"></a>基于进程的actor</h1><p>基于进程的actor模型本质上就是用进程来建模actor。这种观点大体上与经典actor模型类似，但两种模型在actor的生命期和行为管理上的语义有区别。第一种显式实现了这个模型的语言是Erlang，他们甚至在回顾中说，他们关于计算的观点与Agha的经典actor模型大体相似。</p>
+<p>基于进程的actor被定义为从开始运行到结束的计算过程，而不像经典actor模型中将actor定义为行为和行为之间转换逻辑的状态机。基于进程的actor在递归时也可能会有类似的行为转换的状态机，但在其上的编程感受却与使用<code>become</code>操作截然不同。</p>
+<p>这些actor使用<code>receive</code>原语来指定它在某个给定状态&#x2F;时间点能接收的消息。<code>receive</code>语句有一些定义可接受的消息的概念，通常基于模式，条件，或类型。如果一条消息被匹配到了，就会执行相应的代码，否则actor会阻塞，直到它收到一条能处理的消息。它的<code>receive</code>的语义与之前描述的Akka的<code>receive</code>不同。Akka的<code>receive</code>只在actor收到知道怎么处理的消息时被触发。取决于语言实现，<code>receive</code>可能会显式指定消息类型，或对消息的值做某种模式匹配。</p>
+<p>有明确定义的生命期和使用<code>receive</code>来匹配消息的进程，体现这些核心概念的一个例子是Erlang写的一个简单的counter进程。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">counter(N) -&gt;</span><br><span class="line">  receive</span><br><span class="line">    tick -&gt;</span><br><span class="line">      counter(N+1);</span><br><span class="line">    &#123;From, read&#125; -&gt;</span><br><span class="line">      From ! &#123;self(), N&#125;,</span><br><span class="line">      counter(N)</span><br><span class="line">  end.</span><br></pre></td></tr></table></figure>
+
+<p>这个例子展示了用<code>receive</code>匹配两种不同消息的用法，<code>tick</code>会增加counter的值，而<code>&#123;From, read&#125;</code>中<code>From</code>是一个进程标识，<code>read</code>是一句话。为了回应使用类似于<code>CounterId ! tick</code>来向其发送<code>tick</code>消息的其它进程，counter进程使用一个累加的值来调用自己，这有点像<code>become</code>，但它使用了递归和一个参数值，而不是一个有名字的行为continuation和一些状态。如果counter收到了<code>&#123;From, read&#125;</code>形式的消息，它就会向来源处发送一个带有自身进程id和值的消息，再用相同值递归调用自己。</p>
+<h2 id="Erlang"><a href="#Erlang" class="headerlink" title="Erlang"></a>Erlang</h2><p>Erlang的基于进程的actor的实现获得了基于进程的actor模型的真谛。Erlang是第一个基于进程的actor模型。爱立信最开始发展这种模型是为了构建大型高可靠性高容错性的电信交换系统。Erlang的开发始于1985年，但它的编程模型今天还在用。Erlang模型的动机围绕着四个高容错程序需要的关键属性：</p>
+<ul>
+<li>进程隔离。</li>
+<li>进程间纯粹的消息传递。</li>
+<li>发现远程进程的错误。</li>
+<li>有能力决定哪类错误会导致进程崩溃。</li>
+</ul>
+<p>Erlang的研究者一开始就相信共享内存会阻碍容错性，他们将在进程间传递不可变的数据作为避免共享内存的解法。有种担忧是拷贝和传递数据开销会很大，但Erlang开发者将容错性视为比性能更重要的东西。这种模型是与其它actor系统和研究独立发展出来的，尤其是它的开始时间要比Agha的经典actor模型形式发表时间更早，但它最终得到了与Agha的经典actor模型非常相似的结论。</p>
+<p>Erlang的actor跑在轻量的相互隔离的进程上。它们看不到其它actor的内部，只能传递纯粹的不可变的消息。这里没有空悬指针或对象间的数据引用，真正地贯彻了在actor间传递不可变的分离的数据的思想，而不像许多早期的经典actor模型的实现一样，可以自由传递actor和数据的引用。</p>
+<p>Erlang实现了一个阻塞的<code>receive</code>操作作为处理信箱中消息的方法。它们对消息元组的值做匹配，从而描述给定actor能接收的消息类型。</p>
+<p>Erlang还试图将失败也加到编程模型中，因为分布式系统的一个核心假设就是机器和网络连接总是要失败的。Erlang通过两种原语，提供了进程之间相互监视的能力：</p>
+<ul>
+<li><code>monitor</code>：单向的无侵入的通知进程的失败&#x2F;关闭。</li>
+<li><code>link</code>：双向的通知进程的失败&#x2F;关闭，允许协同终止。</li>
+</ul>
+<p>这些原语可以用于构建复杂的监管体系，能将失败隔离处理，而不会令失败影响整个系统。监管体系几乎是actor世界中唯一存在的容错方案。几乎每个用于构建分布式系统的actor系统都用了类似的方法，看起来还奏效。Erlang的用于构建可靠容错的电信交换系统的哲学看起来可以广泛应用到分布式系统的容错问题中。</p>
+<p>下面是用Erlang写的一个进程的<code>monitor</code>例子：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">on_exit(Pid, F) -&gt;</span><br><span class="line">  spawn(fun() -&gt; monitor(Pid, F) end).</span><br><span class="line"></span><br><span class="line">monitor(Pid, F) -&gt;</span><br><span class="line">  process_flag(trap_exit, true),</span><br><span class="line">  link(Pid),</span><br><span class="line">  receive</span><br><span class="line">    &#123;&#x27;EXIT&#x27;, Pid, Why&#125; -&gt;</span><br><span class="line">      F(Why)</span><br><span class="line">end.</span><br></pre></td></tr></table></figure>
+
+<p>这里我们定义了两个进程：<code>on_exit</code>，简单地启动了一个<code>monitor</code>进程，在指定的进程id退出时去执行指定的函数，<code>monitor</code>使用<code>link</code>来接收给定进程id是否存在的消息，并用它退出的原因来调用前面给的函数。你可以想象将许多<code>monitor</code>和<code>link</code>串起来构建进程，它们相互监视失败，并根据失败行为执行恢复操作。</p>
+<p>值得注意的是，Erlang是通过Erlang虚拟机（BEAM）做到这些的，每个虚拟机是一个单独的OS进程，和与核数相同的OS线程数量。这些OS进程管理许多轻量的Erlang进程。Erlang虚拟机为Erlang进程实现了所有的并发性、监控、垃圾回收，几乎就在扮演操作系统本身。这与本单讲到的其它actor系统都不一样。</p>
+<h2 id="Scala-Actors"><a href="#Scala-Actors" class="headerlink" title="Scala Actors"></a>Scala Actors</h2><p>Scala Actors是将Erlang模型移植到新平台并增强的一个例子。Scala Actors将Erlang风格的轻量消息传递并发性带到了JAVM上，并将其集成到了重量级的线程&#x2F;进程并发模型中。在Scala Actors的最初论文“an impedance mismatch between message-passing concurrency and virtual machines such as the JVM”中做了很好的说明。虚拟机通常会将线程映射到重量级的进程上，但这种轻量进程抽象减轻了程序员的负担，引出了更自然的抽象。作者声称“目前为止收集到的用户经验表明这个库令在基于JVM的系统上写并发程序相比之前的技术更容易理解”。</p>
+<p>这个模型的实现依赖于高效的actor到线程的多路复用。这种技术最初用在Scala的actor中，稍后被Akka采用。这种集成允许Actors调用能阻塞底层线程的方法时不使actor阻塞。这点很重要，考虑一个事件驱动的系统中，处理器运行在线程池中，事件处理器不能冒着饿死线程池的风险而阻塞线程。结果就是Scala Actors增强了Erlang的模型，为JVM引入了一种新的轻量级并发原语。在Erlang的元组值匹配的基础上，Scala的模式匹配允许对消息做更高级的模式匹配，进一步增强了Erlang模型。Scala Actors中actor都是<code>Any =&gt; Unit</code>类型，意味着它们本质上是没有类型的。它们可以接收任意类型，再在可能有副作用的前提下做匹配。这种行为可能会有问题，像是Cloud Haskell和Akka这样的系统就是针对这点做增强。Akka尤其直接借鉴了Scala Actors的工作，现在已经成为了Scala程序员的标准actor框架。</p>
+<h2 id="Cloud-Haskell"><a href="#Cloud-Haskell" class="headerlink" title="Cloud Haskell"></a>Cloud Haskell</h2><p>Cloud Haskell是Haskell的一个扩展，它本质上是在Haskell上实现了一个增强版本的Erlang的计算的消息传递模型。它利用Haskell的函数式编程模型中的纯粹性、类型、monad上的优点增强了Erlang模型。Cloud Haskell允许使用纯函数做远程计算，意味着这些函数是幂等的，可以在出错时重启或换到其它地方运行，而不用担心副作用或回滚。单纯这点与Erlang差别不太大，后者会在隔离的内存环境中操作不可变的数据。</p>
+<p>Cloud Haskell相比Erlang最大的提升之一就是引入了有类型的通道来发送消息。这就保证了actor能处理的消息类型，而Erlang则做不到这点。在Erlang中，你有的只是基于值匹配去动态匹配，并祈祷错误类型的消息不要绕过你的系统。Cloud Haskell进程也能用多个有类型的通道在actor之间传递消息，而Erlang的actor之间只有一个无类型的通道。Haskell的monadic type使程序员能用可保证纯函数与IO不会混在一起的方式写代码。这就令推理系统的副作用变得容易了。Cloud Haskell在actor之间共享内存，这对有些应用是很有用的。听起来它可能会引发问题，但共享内存结构被类型系统藏了起来。最后，Cloud Haskell允许序列化函数闭包，意味着高阶函数可以在跨actor分布。这也意味着只要一个函数和它的环境是可序列化的，它们就可以被扔到远程执行，再无缝地在其它地方继续运行。这些对Erlang的增强令Cloud Haskell成为基于进程的actor模型中重要的一员。Cloud Haskell目前由Cloud Haskell Platform开发并维护，旨在提供使用Cloud Haskell构建和管理生产actor系统所需要的通用功能。</p>
+<h1 id="通信事件循环（Communicating-event-loops）"><a href="#通信事件循环（Communicating-event-loops）" class="headerlink" title="通信事件循环（Communicating event-loops）"></a>通信事件循环（Communicating event-loops）</h1><p>通信事件循环模型最早由E语言引入，旨在改变基于actor的系统中通信的粒度级别。之前描述的actor系统将通信组织在actor级别，而通信事件模型则将actor之间的通信放到了这些actor中对象的操作的上下文中。整个消息仍然引用更高层级的actor，但这些消息指向actor状态中更细粒度的操作。</p>
+<h2 id="E语言"><a href="#E语言" class="headerlink" title="E语言"></a>E语言</h2><p>E语言实现了一种接近于命令式面向对象编程的模型。在一个类似于actor的称为“vat”的计算节点中包含许多对象。vat中不仅包含对象，也包含一个用于所有内部对象的信箱，以及作用在这些对象上的方法的调用栈。有一个共享的消息队列和事件循环扮演跨actor的计算之间的抽象屏障。一个vat中，对象的实际引用被用于定位跨actor和在不同抽象层面操作的通信和计算。</p>
+<p>这马上就引起了其它担忧。在不同于actor-global层面分发引用时，怎么保证能得到actor模型提供的隔离的好处？毕竟，在多个地方引用一个actor内部的对象听起来就像是在重新制造共享内存的问题。这是用两种不同模式的执行方式解答的：立即和最终调用。</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/E_vat.png"></p>
+<p>这张图显示了一个E vat，包含了一个对象堆以及一个控制这些对象的方法执行的线程。这里的栈和队列表示了E中操作对象的两种不同的执行模式用到的消息。栈用于立即执行，而队列用于最终执行。立即调用被首先调用，新的立即调用会被加到栈顶。最终调用则随后从队列中取出执行。这些不同的消息传递模式在下面的vat之间的通信中被高亮显示。</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/E_account_spreadsheet_vats.png"></p>
+<p>这张图里我们能看到作用在vat内对象上的本地调用被立即栈处理。之后当有调用要跨vat时，它会被最终队列处理，并在未来某个时间投递给vat中适当的对象。</p>
+<p>E的引用状态定义了许多我们期望从actor那里得到的关于计算的隔离保证：</p>
+<ul>
+<li><code>Near reference</code>：它只会在相同vat的两个对象间使用，它既暴露了同步的立即调用，也暴露了异步的最终发送。</li>
+<li><code>Eventual reference</code>：这是跨vat边界的引用，只会暴露异步的最终发送，不会暴露同步的立即调用。</li>
+</ul>
+<p>两种引用的语义差别意味着只有相同vat中的对象之间能同步访问。一个<code>Eventual reference</code>最多能把消息异步发送到队列中，等待未来某个时间被处理。这意味着在一个vat的执行过程中，可以在vat内部对象的通信和跨vat的通信之间定义一定程度的时间隔离。</p>
+<p>下面的示例代码与前面的图有关，展示了两种不同语义的引用类型。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">def makeStatusHolder(var myStatus) &#123;</span><br><span class="line">  def myListeners := [].diverge()</span><br><span class="line"></span><br><span class="line">  def statusHolder &#123;</span><br><span class="line">    to addListener(newListener) &#123;</span><br><span class="line">      myListeners.push(newListener)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    to getStatus() &#123; return myStatus &#125;</span><br><span class="line"></span><br><span class="line">    to setStatus(newStatus) &#123;</span><br><span class="line">      myStatus := newStatus</span><br><span class="line">      for listener in myListeners &#123;</span><br><span class="line">        listener &lt;- statusChanged(newStatus)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  return statusHolder</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面创建一个<code>statusHolder</code>对象，并通过<code>to</code>定义了方法。像<code>statusHolder.setStatus(123)</code>这样的来自其它vat内部对象的方法调用会产生一个消息并被同步投递给这个对象。其它对象可以通过调用<code>statusHolder.addListener()</code>或<code>statusHolder &lt;- addListener()</code>来注册一个事件监听器，前者注册的是同步监听器，后者注册的是异步监听器。当<code>statusHolder</code>的值变化时，它们会被最终通知到。这是通过最终发送操作符<code>&lt;-</code>完成的。</p>
+<p>这种引用模型的动机来自希望在比传统的actor更细的粒度上工作。最简单的例子是你想要保证系统中其它actor能读到一个值，但不能写。用其它actor模型的话你会怎么做？你可能想创建一个只读的actor，不暴露一个写的消息类型，或为同时支持读写的actor创建只读的代理。在E中因为你可以分发对象的引用，你可以只将引用分发给读操作，而不用担心其它actor有写它的能力。这种更细粒度的引用令推理状态保证更容易了，因为你不再暴露指向整个actor的引用，而是actor的细粒度能力。细粒度引用也允许actor有部分失败和恢复。actor中的不同对象可以失败和重启，且不影响整个actor的健康。这很像Erlang中的监管体系，甚至意味着发给一个失败的对象的消息可以加到处理队列中，直到对象恢复后处理。这是其它actor系统没办法做到的，但却是E中对象级引用的自然结果。</p>
+<h2 id="AmbientTalk-x2F-2"><a href="#AmbientTalk-x2F-2" class="headerlink" title="AmbientTalk&#x2F;2"></a>AmbientTalk&#x2F;2</h2><p>AmbientTalk&#x2F;2是通信事件循环actor模型的现代复兴，它作为一门分布式编程语言，重点是开发移动端p2p应用。这个想法最初是在AmbientTalk&#x2F;1中实现的，其中actor被建模为了类似于ABCL&#x2F;1中的主动对象，但AmbientTalk&#x2F;2的actor更像E的vat。它的作者觉得不允许actor中的被动对象被其它actor引用这点限制了他们，因此他们选择用更丰富粒度的方法，允许被动对象间的远程交互和移动。</p>
+<p>AmbientTalk&#x2F;2中的actor被表示成了事件循环。消息队列就是事件队列，消息就是事件，异步消息发送就是事件通知，对象方法就是事件处理器。事件循环串行处理队列中的消息以避免竞态。actor中的本地对象由actor持有，也只有它能直接执行这些对象的方法。与E类似，actor中的对象能同步或异步通信。仍然与E类似，对象在actor外面的引用只能用于异步通信。对象可以额外声明自己可序列化，意味着它们可以被复制并发送给其它actor，再当作本地对象使用。发生这种事情时，在原始对象与其拷贝间不存在维护关系。</p>
+<p>AmbientTalk&#x2F;2使用事件循环模型以强制使用三种基本的并发控制属性：</p>
+<ul>
+<li>串行执行：事件队列中的事件是串行处理的，因此单个事件的处理对其它事件而言是原子的。</li>
+<li>非阻塞通信：一个事件循环不会挂起计算去等待其它事件循环，相反所有通信都严格按异步事件通知来进行。</li>
+<li>独占的状态访问：事件处理器（对象方法）和它们相关的状态从属于单个事件循环，事件循环可以访问对象的可变状态。其它事件循环的以身试法只能通过传递请求修改的事件通知来间接完成。</li>
+</ul>
+<p>所有这些解耦和计算隔离的最终结果就是它天然适应移动ad hoc网络。在这个领域，连接不稳定，范围有限，容易失败。去掉基于时间或同步的耦合很适合这个领域，而通信事件循环actor模型也适合于开发这些系统。AmbientTalk&#x2F;2在通信事件循环模型之上还提供了额外的功能，例如服务发现。这些特性允许被创建彼此接近的actor的ad hoc网络可以广播它们的存在并广告可用于通信的公共服务。</p>
+<p>AmbientTalk&#x2F;2最著名的就是作为通信事件循环actor模型在现代应用场景中的重新构想。这再次说明了actor模型的更广泛优势和其对解决分布式系统问题的适用性。</p>
+<h1 id="主动对象（Active-Objects）"><a href="#主动对象（Active-Objects）" class="headerlink" title="主动对象（Active Objects）"></a>主动对象（Active Objects）</h1><p>主动对象actor模型区分了两种不同的对象类型：主动对象和被动对象。每个主动对象有一个入口，定义了它懂的一组固定的消息。被动对象是在actor中实际被发送的对象，会被复制以保证隔离。这允许将actor通信相关的数据和actor状态行为相关的数据之间的关注点分开。主动对象模型最早由ABCL&#x2F;1语言描述，其中将对象定义为具有状态和三种模式：</p>
+<ul>
+<li>休眠的：初始状态，没有计算，只是等待消息来激活actor的行为。</li>
+<li>活动的：该状态下，当actor收到满足其预定义的模式和限制的消息时，会触发计算。</li>
+<li>等待的：执行被阻塞的状态，此时actor是活跃的，但会等待直到收到某些类型或模式的消息后才继续计算。</li>
+</ul>
+<h2 id="ABCL-x2F-1语言"><a href="#ABCL-x2F-1语言" class="headerlink" title="ABCL&#x2F;1语言"></a>ABCL&#x2F;1语言</h2><p>ABCL&#x2F;1语言实现了上面说的主动对象模型，它描述了一个作为对象集合的系统，通过并发传递消息来进行对象间的互动。ABCL&#x2F;1的一个有趣的地方是它的显式多模式消息传递的思想。其它actor模型通常具有围绕着值、类型、或它们处理的消息模式的优先级的概念，通常通过它们的<code>receive</code>操作中的顺序来定义，但ABCL&#x2F;1实现了两种不同模式有着不同语义的消息传递。它们在<code>ordinary</code>模式下有标准的排队消息，但更有趣的是它们有<code>express</code>模式的带有优先级的消息。当有对象收到一条<code>express</code>消息时，它会停掉其它正在做的<code>ordinary</code>消息的处理，并立即处理<code>express</code>消息。这允许actor在活动时接受高优先级的消息，也允许监控和打断actor。</p>
+<p>The language also offers different models of synchronization around message-passing between actors. Three different message-passing models are given that enable different use cases:<br>语言本身也围绕着actor间的消息传递提供了不同的同步模型。有三种用于不同场景的消息传递模型：</p>
+<ul>
+<li><code>past</code>：请求另一个actor完成一项任务，同时开始计算而不等任务完成。</li>
+<li><code>now</code>：等待消息被接收和收到回应。这扮演了actor之间基本的同步屏障。</li>
+<li><code>future</code>：类似于典型的future，继续计算，直到需要远程结果，之后阻塞直到收到远程结果。</li>
+</ul>
+<p>值得注意的是，所有这些模式都可以被表示为<code>past</code>风格的消息传递，只要消息的类型和响应结果的actor是已知的。</p>
+<p>这里的关键差别在于这些不同风格的actor如何管理它们的生命期。在主动对象风格中，生命期是对actor的消息或请求的结果，但在其它风格中，我们看到了更明显的生命期的概念和actor的创建和销毁。</p>
+<h2 id="Orleans"><a href="#Orleans" class="headerlink" title="Orleans"></a>Orleans</h2><p>Orleans采用了生命期独立于消息或请求的actor的概念，并将这种概念放到了云应用的环境中。Orleans通过被当作计算和行为的孤立单元且可为了伸缩性而有多个实例的actor（被称为“grain”）来实现的这点。这些actor也有持久化的能力，意味着它们有存储在持久存储介质中的持久状态，因此它们可以用于管理像用户数据这样的东西。</p>
+<p>Orleans有不同于其它actor系统的身份概念。在其它系统中actor可能指一种行为，而actor的实例可能指actor的身份，像是个人用户。在Orleans中actor表示持久的身份，而实际的实例事实上是这种身份的拷贝。</p>
+<p>程序员基本上会假设只有一个实体来处理一个actor收到的请求，但Orleans运行时中实际允许多个实例以进行扩展。这些实例会被调用以回应来自程序员的类似于RPC的调用，这些调用会立即返回一个异步的promise。</p>
+<p>在Orleans中，声明一个actor就像是定义其它实现了特定接口的类。这里的一个简单的例子是一个可以加入游戏的<code>PlayerGrain</code>。Orleans的actor（grain）接口的所有方法都必须返回<code>Task&lt;T&gt;</code>，因为它们都是异步的。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">public interface IPlayerGrain : IGrainWithGuidKey</span><br><span class="line">&#123;</span><br><span class="line">  Task&lt;IGameGrain&gt; GetCurrentGame();</span><br><span class="line">  Task JoinGame(IGameGrain game);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">public class PlayerGrain : Grain, IPlayerGrain</span><br><span class="line">&#123;</span><br><span class="line">  private IGameGrain currentGame</span><br><span class="line"></span><br><span class="line">  public Task&lt;IGameGrain&gt; GetCurrentGame()</span><br><span class="line">  &#123;</span><br><span class="line">     return Task.FromResult(currentGame);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  public Task JoinGame(IGameGrain game)</span><br><span class="line">  &#123;</span><br><span class="line">     currentGame = game;</span><br><span class="line">     Console.WriteLine(&quot;Player &#123;0&#125; joined game &#123;1&#125;&quot;, this.GetPrimaryKey(), game.GetPrimaryKey());</span><br><span class="line">     return TaskDone.Done;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>与其它任何异步调用一样，调用一个actor的方法也是通过C#中的<code>await</code>关键字完成的。它既可以在客户端完成，也可以在另一个actor（grain）内部完成。两个场景中的调用看起来几乎一样，唯一的区别是客户端使用<code>GrainClient.GrainFactory</code>而actor直接使用<code>GrainFactory</code>。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">IPlayerGrain player = GrainClient.GrainFactory.GetGrain&lt;IPlayerGrain&gt;(playerId);</span><br><span class="line">Task joinGameTask = player.JoinGame(currentGame);</span><br><span class="line">await joinGameTask;</span><br></pre></td></tr></table></figure>
+
+<p>这里一个游戏的客户端拿到了特定玩家的引用，令这个玩家加入了当前游戏。这段代码看起来和某个开发者写过的其它的异步C#代码差不多，但它确实是一个actor系统，其中运行时抽象掉了许多细节。运行时管理所有actor的生命期，以响应来自客户端和系统中其它actor的请求，以及将actor的状态持久化到长期存储介质上。</p>
+<p>一个actor的多个实例可以同时运行和修改actor的状态。那么问题来了，怎么做到的？当要基于一个状态做点事情时，看到像是透明般地访问和修改相同状态的多份孤立拷贝而不引起问题，这不符合直觉。</p>
+<p>Orleans通过提供协调修改冲突的机制解决了这个问题。如果一个actor的多个实例修改了持久状态，它们需要通过某种有意义的方式协调成一致的状态。默认方式是“最后写入获胜”策略，但Orleans也暴露了创建细粒度协调策略的能力，以及许多公共的可协调数据结构。如果应用需要一个合适的协调算法，开发者可以使用Orleans实现一个。这些协调机制都是基于Orleans的事务的概念。</p>
+<p>Orleans中的事务是一种对参与计算的actor的不同实例进行因果推理的方式。因为在这个模型中，计算是为了响应单个外部请求而发生的，所以给定一个actor，其通过关联的actor进行的计算链总是包含每个actor的单个实例。这种实例的因果链就被当作一个事务。在做协调的时候Orleans使用这些事务加上当前实例的状态来协调到一个一致状态。</p>
+<p>所有这些都说明Orleans的以程序员为中心的贡献是它将运行和管理actor生命期上的关注点与数据如何在你的分布式系统中流动的关注点分开了。它用一种容错的方式做到了这点，对许多编程任务，你很可能不需要担心伸缩和协调数据以回应请求。它通过一个编程模型提供了actor模型的好处，该模型试图抽象掉在生产中使用actor时不必担心的细节。</p>
+<h1 id="为什么是actor模型"><a href="#为什么是actor模型" class="headerlink" title="为什么是actor模型"></a>为什么是actor模型</h1><p>actor编程模型通过以下方式为分布式系统的程序员提供了收益：允许更简单的行为推理；提供轻量级并发原语并能自然地扩展到许多机器上；允许系统组件间的松耦合，允许不中断服务的情况下做更改。actor能让程序员更容易推理它们的行为，因为actor之间根本上是隔离的。在写一个actor时，程序员只需要关心actor的行为和它收发的消息。这降低了程序员推理整个系统的需要。相反程序员只需要关注有限的东西，意味着他们能独立地确保行为正确性，而不需要担心发生他们不期望的相互作用。actor只提供了一种通信手段（消息传递），意味着程序员不用那么担心数据被并发修改了。数据只限于单个actor中的数据和已发送的消息，而不是整个系统中所有可访问的数据。</p>
+<p>actor是轻量的，意味着程序员通常不需要担心创建了多少个actor。相比其它并发单元，如线程或进程，程序员就要非常注意它们的数量，因为它们的创建开销很大，且能很快触到机器资源和性能的限制。</p>
+<blockquote>
+<p>没有一个轻量的进程抽象，使用者经常被迫以事件驱动方式编写部分的并发应用，从而使控制流变得晦涩，增加了程序员的负担。</p>
+<p>Philipp Haller</p>
+</blockquote>
+<p>不像线程或进程，actor也可以很容易地运行到其它机器上，因为它们是彻底隔离的。传统上这难以通过线程或进程实现，因为它们不能跨网络到其它机器上运行。消息可以跨网络传递，因此只要actor能发送和接收消息，它就不需要关心自己在哪运行。因为这个特性，actor伸缩性更好，也意味着它们天然是可分布到多台机器上的，从而满足系统的负载或可用性方面的需求。</p>
+<p>最后，因为actor是松耦合的，只依赖于与其它actor交互的一组输入和输出消息，就可以修改和升级它们的行为而不改变整个系统。例如，某个actor可以升级到一个更高效的算法，而只要它能处理的输入输出不变，系统中的其它部分就不用变。这种隔离性就与RPC、future、promise这样的并发编程方法形成了对比。这些模型强调在计算节点间更紧密的耦合，一个进程可以直接调用另一个进程的方法且能期望得到确定的结果。这意味着调用者和被调用者（调用的接收者）需要知道运行的代码，因此你失去了升级一个而不影响另一个的能力。这已成为了实践中的问题，因为它意味着随着你的分布式系统的复杂性提高，越来越多的组件相互链接到了一起。</p>
+<blockquote>
+<p>值得注意的是，actor语言尤其强调开发灵活的程序结构，从而简化程序推理。</p>
+<p>Gul Agha</p>
+</blockquote>
+<p>上面的紧耦合模型并不可取，因为分布式系统的一个关键特性就是可用性，越多的组件链接在一起，系统在做变更或升级时需要下线或停机的部分就越多。因其低成本和松耦合的特性，actor要优于其它的并发编程原语，如线程或RPC。actor也对程序员友好，减轻了程序员推理分布式系统的负担。</p>
+<h1 id="现代生产中的用法"><a href="#现代生产中的用法" class="headerlink" title="现代生产中的用法"></a>现代生产中的用法</h1><p>在审视分布式系统的编程模型时，重要是不要只盯着学术界，还要看看这种模型有哪些系统已经用于生产了。这能让我们了解actor系统中哪些功能真的有用，以及这些系统中存在的趋势。</p>
+<p>“On the Integration of the Actor Model in Mainstream Technologies: The Scala Perspective”为我们对主流平台上工业强度的actor实现的需求提供了一些见解。这些需求最早是在Scala Actors将actor模型引入主流软件工程时提出的，也包括了Akka在部署和提升它的工业级actor时的经验教训。</p>
+<ul>
+<li>基于库的实现：在真实场景中哪种并发抽象会获胜并不是显而易见的，不同的并发模型也许会用于解决不同的问题，因此将一种并发模型实现为库就引入了使用中的灵活性。</li>
+<li>高级领域特定语言：为了与专攻并发的语言竞争，就需要一门领域特定语言或类似的东西，否则你的抽象就会在惯用法和表达力上有欠缺。</li>
+<li>事件驱动的实现：actor需要轻量，意味着它们不能映射为一整个虚拟机线程或进程。对于大多数平台来说这就意味着要使用事件驱动模型。</li>
+<li>高性能：大多数使用actor的工业级应用都对性能高度敏感，高性能也允许更优雅的伸缩。</li>
+<li>灵活的远程actor：许多应用能受益于远程actor，它们可以透明地通过网络通信。部署机制上的灵活性也很重要。</li>
+</ul>
+<p>这些属性为我们分析一个actor系统能否在生产中取得成功打下了良好的基础。这些属性对于actor系统在生产中取得成功很重要，但还不足够。</p>
+<h2 id="错误处理"><a href="#错误处理" class="headerlink" title="错误处理"></a>错误处理</h2><p>人们在生产中使用actor系统的最重要的概念和原因之一，是它们支持错误处理与恢复。这种支持的根本是之前提到的actor之间互相监督的能力，以及让监督者接到失败的通知。“Designing Reactive Systems: The Role of Actors in Distributed Architecture”详细描述了当监督者收到它监督的某个actor失败时它能采用的四种常见恢复步骤。</p>
+<ul>
+<li>忽略错误并让actor继续运行。</li>
+<li>重启actor并重置其状态。</li>
+<li>彻底停掉这个actor。</li>
+<li>将问题上报给自身的监督者。</li>
+</ul>
+<p>基于这种策略，系统中所有actor都会有监督者，组成了一棵庞大的监督树。树的顶部是actor系统本身，可能配置了默认的恢复策略，如简单地重启actor。有意思的是这就解放了下面的actor，不需要自己处理错误了。这种哲学就转为了“actor总会失败”，我们需要其它显式的actor和方法来处理单个actor业务逻辑之外的失败。</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/supervision_tree.png"></p>
+<center>actor监督体系</center>
+
+<p>另一种可以自然地抛弃监督体系的容错方法是actor可以分布在一个集群内的不同机器（结点）上。</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/sentinel_nodes.png"></p>
+<center>跨集群结点的actor监督</center>
+
+<p>关键的actor可以被跨结点监视，意味着可以在集群内跨结点发现错误。这允许集群内其它actor很容易地对系统整体状态作出反应，而不只是本地机器的状态。这对分布式系统的很多问题都很重要，如负载均衡、数据&#x2F;请求分区。它也允许错误在集群内其它机器上进行某种形式的恢复，如actor自动迁移到其它结点上，或重启失败的机器&#x2F;结点。</p>
+<p>围绕着错误处理的灵活性是在生产系统使用actor的一个关键优势。监督意味着工作actor可以专注于业务逻辑，而错误处理actor可以专注于管理和恢复这些actor。actor也可以关注整个集群，并知晓整个分布式系统的状态。</p>
+<h2 id="actor作为框架"><a href="#actor作为框架" class="headerlink" title="actor作为框架"></a>actor作为框架</h2><p>在生产中的actor系统中，一个通用的趋势是可扩展的环境和工具。Akka，Erlang，和Orleans是可见于真实生产环境的主要actor系统，其原因是它们本质上扮演着一种框架，并帮你处理许多actor的常见问题。它们提供了对管理和监控actor的部署，以及处理像容错和负载均衡这样的每个分布式的actor系统都需要应对的模式或模块的支持。这允许程序员专注于他们自己领域的问题，而不是在监控、部署、组合方面的通用问题。</p>
+<p>Akka和Erlang提供了可组合的模块来将不同功能加到你的系统中。Akka提供了大量用于配置和监控由actor构建的分布式系统的模块和扩展。它们提供了许多工具来满足常见的使用和部署场景，这些都已被详细列出并形成文档。例如Akka包括处理下列常见问题的模块：</p>
+<ul>
+<li>通过监督体系提供容错性。</li>
+<li>跨actor的负载均衡路由。</li>
+<li>持久化，从而跨错误和重启保存和恢复actor状态。</li>
+<li>针对actor的测试框架。</li>
+<li>用于跨物理机器组合和分发actor的集群管理工具。</li>
+</ul>
+<p>另外它们还提供了对Akka扩展的支持，这是种能向Akka中加入你自己的功能的机制。Akka扩展非常强大，一些Akka的核心功能，如Typed Actor或Serialization都是用Akka扩展实现的。</p>
+<p>Erlang提供了开放电信平台（OTP），它是由一组被设计为帮助构建应用的模块和标准组成的框架。OTP从Erlang拿出了通用模式和组件，并将它们以库的形式提供出去，允许在开发新系统时重用代码和最佳实践。OTP库的一些例子是：</p>
+<ul>
+<li>一个实时分布式数据库。</li>
+<li>一个关系型数据库的接口。</li>
+<li>一个监控机器资源使用的框架。</li>
+<li>对与其它通信协议（如SSH）的交互支持。</li>
+<li>一个测试框架。</li>
+</ul>
+<p>Cloud Haskell也提供了类似于Erlang的OTP的东西，称为Cloud Haskell Platform。</p>
+<p>Orleans则不同，因为它是基于更命令式的风格和运行时构建的。它帮你在分布和伸缩actor方面做了很多工作，但它仍然是一个处理了很多分布式方面通用问题的框架，因此程序员才可以专注于构建他们系统本身的逻辑。Orleans会接管跨机器的actor分布，以及在负载增加时创建新的actor实例。另外，Orleans也会处理跨actor实例的一致性和actor数据的持久化问题。这些其它工业级的actor框架通过模块或扩展来解决的常见问题。</p>
+<h2 id="模块-VS-托管运行时方法"><a href="#模块-VS-托管运行时方法" class="headerlink" title="模块 VS 托管运行时方法"></a>模块 VS 托管运行时方法</h2><p>根据我的研究，有两种流行的方法来实现用于构建生产actor系统的框架。它们都是与actor系统元数据组织有关的高级哲学，是简单看一下基础的actor编程和执行模型时不会直接考虑到的设计哲学。可以将它们简单描述为“模块方法”和“托管运行时方法”。一种高级的类比是，模块方法类似于手动管理内在，而托管运行时方法则类似于垃圾回收。在模块方法中，你关心actor的生命周期和物理分配，而在托管运行时方法中你更关心自动实例化的actor之间的协调行为和持久状态的流程。</p>
+<p>Akka和Erlang都用模块方法来构建actor系统，意味着你用它们构建系统时，它们是你要构建的系统中的一小部分。你会显式处理actor的生命期和实例化，如何跨物理分布actor，以及如何均衡actor。其中有些问题可以用库来解决，但某种程序上你是在自己定义所有这些与actor有关的组织工作的行为。JVM或Erlang虚拟机不会帮你做这些。</p>
+<p>Orleans走了另一条被称我称为“托管运行时方法”的路。它提供了云端的运行时，试图将许多管理actor的细节抽象化，而不只是提供用于构建你自己抽象的小组件。它做到了这种程度，你不再需要直接管理actor的生命期，它们所处的机器，它们如何复制和伸缩的。相反你用更命令式的风格用actor编程。你不会显式实例化actor，相反你可以假设运行时会在回应请求时自动做掉这件事。你会去写处理类似于领域特定的实例间数据协调问题的策略，但你通常会将伸缩和分布actor实例的任务留给运行时。</p>
+<p>两种方法都在工业界取得了成功。Erlang有著名的电信交换的用例，且取得了成功。Akka有一个完整的页面，详细介绍了它在大型公司中的使用情况。Orleans已经被用作微软的大型游戏和应用的后台，服务于数百万服务。看起来模块方法更流行，但这里只有一个托管运行时方法的例子。在JVM或Erlang虚拟机上没有类似于Orleans的东西，因此事实上它在分布式编程社区中的暴光度不太高。</p>
+<h2 id="对比CSP"><a href="#对比CSP" class="headerlink" title="对比CSP"></a>对比CSP</h2><p>另一个备受关注的流行的消息传递模型是顺序通信处理（CSP）。CSP背后的基本思想是通过通道（channel）传递消息来完成进程间的并发通信。可能CSP最流行的现代实现是Go的channel。许多关于actor的界面级的讨论都简单地将actor视为传递消息的轻量级并发原语。这种缩放视角下CSP风格的channel和actor就类似了，但它忽略了许多细微差别，CSP实际上不能被视为一种actor框架。它们的核心差异在于CSP实现了一些进程间的同步通信，而actor模型完全解耦了发送者和接收者之间的通信。actor更独立，意味着更容易将actor运行在一个分布式环境中而不需要改变它们的语义。另外，actor模型中接收者的错误不会影响到发送者。在分布式系统中actor是更松耦合的抽象，而CSP强调紧耦合作为进程间通信的一种方式。将两者混为一谈就忽略上面这些差异，即actor与CSP处于完全不同的抽象层面上。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%BC%82%E6%AD%A5/" rel="tag"># 异步</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+              <a href="/tags/%E7%BC%96%E7%A8%8B/" rel="tag"># 编程</a>
+              <a href="/tags/%E5%87%BD%E6%95%B0%E5%BC%8F%E7%BC%96%E7%A8%8B/" rel="tag"># 函数式编程</a>
+              <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F/" rel="tag"># 分布式</a>
+              <a href="/tags/Actor/" rel="tag"># Actor</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/04/28/real-world-concurrency/" rel="prev" title="[翻译] 并发的实践经验">
+      <i class="fa fa-chevron-left"></i> [翻译] 并发的实践经验
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/07/22/cpp-inline-member-function-in-cpp-file/" rel="next" title="C++：在实现文件中内联小的成员函数">
+      C++：在实现文件中内联小的成员函数 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">简介</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8E%9F%E5%A7%8Bactor%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">原始actor模型</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BB%8F%E5%85%B8actor%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.</span> <span class="nav-text">经典actor模型</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B9%B6%E5%8F%91%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1%E7%BC%96%E7%A8%8B%EF%BC%881990%EF%BC%89"><span class="nav-number">3.1.</span> <span class="nav-text">并发面向对象编程（1990）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Rosette"><span class="nav-number">3.2.</span> <span class="nav-text">Rosette</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Akka"><span class="nav-number">3.3.</span> <span class="nav-text">Akka</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8E%E8%BF%9B%E7%A8%8B%E7%9A%84actor"><span class="nav-number">4.</span> <span class="nav-text">基于进程的actor</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Erlang"><span class="nav-number">4.1.</span> <span class="nav-text">Erlang</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Scala-Actors"><span class="nav-number">4.2.</span> <span class="nav-text">Scala Actors</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Cloud-Haskell"><span class="nav-number">4.3.</span> <span class="nav-text">Cloud Haskell</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%80%9A%E4%BF%A1%E4%BA%8B%E4%BB%B6%E5%BE%AA%E7%8E%AF%EF%BC%88Communicating-event-loops%EF%BC%89"><span class="nav-number">5.</span> <span class="nav-text">通信事件循环（Communicating event-loops）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#E%E8%AF%AD%E8%A8%80"><span class="nav-number">5.1.</span> <span class="nav-text">E语言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AmbientTalk-x2F-2"><span class="nav-number">5.2.</span> <span class="nav-text">AmbientTalk&#x2F;2</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%BB%E5%8A%A8%E5%AF%B9%E8%B1%A1%EF%BC%88Active-Objects%EF%BC%89"><span class="nav-number">6.</span> <span class="nav-text">主动对象（Active Objects）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#ABCL-x2F-1%E8%AF%AD%E8%A8%80"><span class="nav-number">6.1.</span> <span class="nav-text">ABCL&#x2F;1语言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Orleans"><span class="nav-number">6.2.</span> <span class="nav-text">Orleans</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%98%AFactor%E6%A8%A1%E5%9E%8B"><span class="nav-number">7.</span> <span class="nav-text">为什么是actor模型</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%8E%B0%E4%BB%A3%E7%94%9F%E4%BA%A7%E4%B8%AD%E7%9A%84%E7%94%A8%E6%B3%95"><span class="nav-number">8.</span> <span class="nav-text">现代生产中的用法</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86"><span class="nav-number">8.1.</span> <span class="nav-text">错误处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#actor%E4%BD%9C%E4%B8%BA%E6%A1%86%E6%9E%B6"><span class="nav-number">8.2.</span> <span class="nav-text">actor作为框架</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E5%9D%97-VS-%E6%89%98%E7%AE%A1%E8%BF%90%E8%A1%8C%E6%97%B6%E6%96%B9%E6%B3%95"><span class="nav-number">8.3.</span> <span class="nav-text">模块 VS 托管运行时方法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E6%AF%94CSP"><span class="nav-number">8.4.</span> <span class="nav-text">对比CSP</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

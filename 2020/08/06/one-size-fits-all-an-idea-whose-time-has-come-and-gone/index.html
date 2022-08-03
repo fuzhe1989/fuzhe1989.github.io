@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.  TL;DR 本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。 论证过程：  过去若干年中DBMS厂家追求“One si">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.  TL;DR 本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。 论证过程：  过去若干年中DBMS厂家追求“One si">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-08-06T08:14:43.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.658Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-06 16:14:43" itemprop="dateCreated datePublished" datetime="2020-08-06T16:14:43+08:00">2020-08-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.68.9136&rep=rep1&type=pdf">Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。</p>
+<p>论证过程：</p>
+<ol>
+<li>过去若干年中DBMS厂家追求“One size fits all”，原因有若干。</li>
+<li>传统DBMS主要针对OLTP，处理模型为outbound，针对性优化短事务，重点在于ACID，这些特点并不适用于OLAP。</li>
+<li>随着streaming processing兴起，它需要完全不同的优化方向。</li>
+<li>未来使用DBMS的应用类型会越来越多，会有更多针对特定领域的DB engine出现。</li>
+</ol>
+<p>感想：</p>
+<ol>
+<li>任何优化都是有代价的，选择针对一个方向优化，就会在另一个方向平庸。甚至提供不同优化的开关也是有代价的，只要允许选择，代价就会存在。</li>
+<li>不同应用需要不同程度的一致性，但一套系统在架构设计时就要锚定某种一致性，它运行在其它一致性级别时只是稍有优化，而不会达到很理想的水平。</li>
+<li>如何控制DB与应用逻辑的耦合度，过高的耦合度会带来安全性、维护性上的问题，而过低的耦合度又会带来性能开销。存储过程，以及各种各样的UDF就是其中的粘合剂。</li>
+</ol>
+<span id="more"></span>
+
+<h2 id="Abstract"><a href="#Abstract" class="headerlink" title="Abstract"></a>Abstract</h2><p>过去25年的DBMS发展可以总结为“One size fits all”：用一套DBMS架构支持不同需求和特点的数据应用。</p>
+<p>但这句话已经过时了，未来会有一组独立的db engine和统一的前端解析层。</p>
+<p>后面主要讨论流计算和数据仓库两个方向。</p>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>一开始的RDBMS主要针对“buniness data processing”，特点是：</p>
+<ul>
+<li>OLTP</li>
+<li>按行存储</li>
+<li>索引使用B-tree</li>
+<li>使用基于开销（cost-based）的优化器</li>
+<li>提供ACID</li>
+</ul>
+<p>1980年代的主流DBMS开始陷入“One size fits all”，想用一个系统提供所有DB服务，因为多个系统会导致以下问题：</p>
+<ul>
+<li>维护开销</li>
+<li>兼容性，应用需要适配的系统变多了</li>
+<li>销售问题，销售人员不知道该卖哪套产品给哪类客户</li>
+<li>市场问题，多个系统需要精准定位</li>
+</ul>
+<p>本文观点是这种思想已经过时了。</p>
+<h2 id="Data-warehousing"><a href="#Data-warehousing" class="headerlink" title="Data warehousing"></a>Data warehousing</h2><p>1990年代，企业需要将多个不同DB的数据导入一个data warehouse作分析。这些系统都是在线系统，直接在上面跑分析会拉长对其它用户的响应时间，而且分析往往想要历史趋势，需要关联不同系统的数据，这些都没办法被一个OLTP系统满足。</p>
+<p>几乎每个企业都会创建一个大的data warehouse，定期导入来自不同DB的数据。尽管这些系统要么超出预算，要么只满足了一部分需求，但还是物有所值的。</p>
+<p>Data warehouse与OLTP非常不同：前者面向ad-hoc查询优化（更复杂），后者面向更新优化。</p>
+<p>Data warehouse的标准实现方式（星型）：</p>
+<ul>
+<li>一个fact table保存每条记录的who、what、when、where</li>
+<li>若干个dimension table，保存fact table中记录要引用的各维度数据，fact table中使用foreign key来引用这些数据</li>
+</ul>
+<p>Data warehouse被认为更适合用bit-map作为索引，而OLTP则更适合使用B-tree。</p>
+<p>Data warehouse还经常使用materialized view作为一种优化手段，而OLTP则不然。</p>
+<p>很多DB提供商会同时提供data warehouse和OLTP系统，两者共用一套前端解析。这样能更好地实现那些只对其中一个系统有用的功能。例如OLTP系统习惯用2B来表示一个州（如CA），而data warehouse可以只用6b，从而减少bit-map大小。这样的需求是一套系统满足不了的。</p>
+<p>但在stream processing领域，一套前端解析也不够，不同系统需要从前端开始分开。</p>
+<h2 id="Stream-processing"><a href="#Stream-processing" class="headerlink" title="Stream processing"></a>Stream processing</h2><h3 id="Emerging-sensor-based-applications"><a href="#Emerging-sensor-based-applications" class="headerlink" title="Emerging sensor-based applications"></a>Emerging sensor-based applications</h3><p>这里讨论的stream processing似乎主要指实时处理大量传感器产生的数据，比如：</p>
+<ol>
+<li>军队需要能监控士兵、枪械、舰艇的状态，需要能查询历史数据，有aggregation。</li>
+<li>智能交通、地图类应用等。</li>
+</ol>
+<p>传统的DB没办法满足这些需求，需要专门的stream processing engine。</p>
+<h3 id="An-existing-applicaton-financial-feed-processing"><a href="#An-existing-applicaton-financial-feed-processing" class="headerlink" title="An existing applicaton: financial-feed processing"></a>An existing applicaton: financial-feed processing</h3><p>financial-feed指市场动态、特定新闻、完成的交易、投标、询价等实时数据的投递。</p>
+<p>例子：一家公司需要订阅多个finalcial feed，如果有某个feed延迟了就提醒交易员。他们不满足于自己实现的系统的性能，需要一个专门的stream processing engine。</p>
+<h2 id="Performance-discussion"><a href="#Performance-discussion" class="headerlink" title="Performance discussion"></a>Performance discussion</h2><p>StreamBase是能满足这个需求的stream processing engine，它可以在一台2005年的普通家用机上每秒处理160K条消息，而对应的DBMS系统只能处理900条。</p>
+<blockquote>
+<p>但这个产品已经死了。</p>
+</blockquote>
+<h3 id="“Inbound”-versus-“outbound”-processing"><a href="#“Inbound”-versus-“outbound”-processing" class="headerlink" title="“Inbound” versus “outbound” processing"></a>“Inbound” versus “outbound” processing</h3><p>传统DBMS的核心是不丢数据，它的处理模型称为“process-after-store”：</p>
+<ul>
+<li>插入数据</li>
+<li>构建索引并提交事务</li>
+<li>回复用户</li>
+</ul>
+<p>实时应用中，必须在处理前存储，显著增加了延时和处理每条消息的开销。可以用下面的处理模型来避开存储带来的瓶颈：</p>
+<ul>
+<li>处理过程中数据顺着网络和内存走</li>
+<li>读写存储都是可选的，且很多时间可以异步进行</li>
+</ul>
+<p>这种处理模型称为“inbound”，而传统DBMS的处理模型称为“outbound”。DBMS的trigger可以做一点inbound处理，但：</p>
+<ul>
+<li>trigger是事后补充的，有很多限制</li>
+<li>trigger的安全性没办法保证（如避免死循环）</li>
+<li>trigger不支持materialized view</li>
+<li>很多系统的trigger的性能都不好</li>
+</ul>
+<p>outbound系统使用pull模式，engine把数据从存储介质中拉出来，而inbound则是push模式，数据被上游模块主动推给下游模块。</p>
+<p>outbound系统存储数据，在其上执行查询；inbound系统存储查询，将数据流过这些查询。</p>
+<h3 id="The-correct-primitives"><a href="#The-correct-primitives" class="headerlink" title="The correct primitives"></a>The correct primitives</h3><p>SQL支持复杂的聚合，大概长这个样子：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">AVG</span>(salary)</span><br><span class="line"><span class="keyword">FROM</span> employee</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> department</span><br></pre></td></tr></table></figure>
+
+<p>最后一行被处理完之后会输出聚合结果。但这个特点不适合stream processing，后者没有所谓的结束。</p>
+<p>相对地，stream processing系统增加了time window概念，window有很多种，前一节的例子很适合用sliding window。</p>
+<p>StreamBase支持在带有两个参数的window上执行聚合：</p>
+<ul>
+<li>timeout：可以不等late data直接关闭window</li>
+<li>slack：直到满足条件再关闭window</li>
+</ul>
+<p>SQL也可以支持window，但这对存储没意义（因此outbound系统不太可能支持）。</p>
+<h3 id="Seamless-integration-of-DBMS-processing-and-application-logic"><a href="#Seamless-integration-of-DBMS-processing-and-application-logic" class="headerlink" title="Seamless integration of DBMS processing and application logic"></a>Seamless integration of DBMS processing and application logic</h3><p>传统的DBMS是client-server架构，应用代码与DBMS在不同的地址空间，交互会带来开销。但在StreamBase中，三类功能可以自由组合在一起：</p>
+<ul>
+<li>DBMS处理（filter、aggregation）</li>
+<li>模块间消息传递</li>
+<li>应用逻辑</li>
+</ul>
+<p>这种DBMS逻辑与程序功能的无缝结合在多年前已经出现在Rigel和Pascal-R中了。商业DBMS的存储过程只相当于非常受限的编程系统。Object-relational DB提供了比存储过程更强大的功能，但仍然不够灵活。</p>
+<p>stream processing engine也需要存储，如：</p>
+<ul>
+<li>引用数据</li>
+<li>转换表</li>
+<li>历史数据</li>
+</ul>
+<p>StreamBase嵌入了BerkeleyDB存储数据，访问成本远低于访问另一个DB server。</p>
+<p>传统DBMS基于安全性的考虑，必须要提供隔离机制。因此一个DBMS为了更好地支持实时应用，可能需要同时支持嵌入和非嵌入模型。这也在鼓励放弃“one size fits all”原则。</p>
+<p>回到我们的feed例子，这里数据都是来源于其它系统，stream processing和DBMS代码都是同一批人写的，就更没有理由继续支持传统DBMS了。</p>
+<h3 id="High-availability"><a href="#High-availability" class="headerlink" title="High availability"></a>High availability</h3><p>传统DBMS使用了基于log恢复状态的方案来实现高可用，这种方案在stream processing中有几个问题：</p>
+<ul>
+<li>恢复时间长，恢复期间没办法服务。</li>
+<li>为了避免丢数据，需要想办法缓存输入的数据流。</li>
+<li>只能恢复表数据，没办法恢复operator状态。如果要求所有operator都将自己状态保存到DB中，又会带来开销。</li>
+</ul>
+<p>一种替代方案是使用串联（Tandem-style）风格的模块对：遇到crash时，应用切换到热备份机器上，这样只需要很短时间就可以继续服务了。因此StreamBase关掉了BerkeleyDB的log。</p>
+<blockquote>
+<p>这里对比的是单机DB，不需要联想到分布式协议上。基本思想可能是用本地双写替代log。</p>
+</blockquote>
+<p>很多stream processing engine能接受恢复出不完整的数据。比如监控类应用，如果能接受处理时丢一些数据点，也就能接受恢复时丢一些数据点。而报警类应用能接受重复消息，但不能接受丢消息。</p>
+<h3 id="Synchronization"><a href="#Synchronization" class="headerlink" title="Synchronization"></a>Synchronization</h3><p>传统的DBMS使用ACID来隔离不同请求，在streaming系统中，没有多用户，因此可以只用简单的临界区就实现请求间的隔离，而不需要全功能的事务。</p>
+<h2 id="One-size-fits-all"><a href="#One-size-fits-all" class="headerlink" title="One size fits all?"></a>One size fits all?</h2><p>前面的例子表明StreamBase，这种与传统DBMS非常不同的系统，在处理实时数据上有多么巨大的优势。在其它领域我们也可以有这种专门的系统。</p>
+<h3 id="Data-warehouse"><a href="#Data-warehouse" class="headerlink" title="Data warehouse"></a>Data warehouse</h3><p>传统的OLTP DBMS是基于行的，行与行连续，面向写优化。Data warehouse需要面向读优化，因此列存储模式更高效。</p>
+<h3 id="Sensor-networks"><a href="#Sensor-networks" class="headerlink" title="Sensor networks"></a>Sensor networks</h3><p>传统DBMS在处理大量传感器产生的数据时不够高效，需要有更灵活、轻量的DB系统。</p>
+<blockquote>
+<p>NoSQL</p>
+</blockquote>
+<h3 id="Text-search"><a href="#Text-search" class="headerlink" title="Text search"></a>Text search</h3><p>需要：</p>
+<ul>
+<li>能处理大量append-only的写入</li>
+<li>能处理大量的ad-hoc读</li>
+<li>机器数多，容易出现错误，对可用性要求高</li>
+</ul>
+<blockquote>
+<p>ElasticSearch，Solr</p>
+</blockquote>
+<h3 id="Scientific-databases"><a href="#Scientific-databases" class="headerlink" title="Scientific databases"></a>Scientific databases</h3><blockquote>
+<p>类似于sensor networks</p>
+</blockquote>
+<h3 id="XML-databases"><a href="#XML-databases" class="headerlink" title="XML databases"></a>XML databases</h3><blockquote>
+<p>略</p>
+</blockquote>
+<h2 id="A-Comment-on-Factoring"><a href="#A-Comment-on-Factoring" class="headerlink" title="A Comment on Factoring"></a>A Comment on Factoring</h2><p>多数基于stream的应用需要三类服务：</p>
+<ul>
+<li>消息传输</li>
+<li>状态存储</li>
+<li>应用逻辑执行</li>
+</ul>
+<p>如果基于传统DBMS，一条消息需要6次网络传输。为了避免这些开销，stream processing engine需要能在一个进程内提供这三种能力。</p>
+<p>这就引出一个问题，当前基于模块（应用server、DBMS、ETL、消息总线、文件系统、web server等）来构建系统的作法是否是最优的。</p>
+<h2 id="Concluding-Remarks"><a href="#Concluding-Remarks" class="headerlink" title="Concluding Remarks"></a>Concluding Remarks</h2><p>未来会有许多领域特定的具有不同能力的db engine。未来的DBMS市场会非常有趣。未来会有大量新的，与“business data processing”模式非常不同的应用，看起来没有一套系统可以同时支持这些应用，“one size fits all”不太可能继续下去了。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/07/30/apache-pulsar-versus-apache-kafka/" rel="prev" title="[笔记] Apache Pulsar Versus Apache Kafka">
+      <i class="fa fa-chevron-left"></i> [笔记] Apache Pulsar Versus Apache Kafka
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/08/13/c-store-a-column-oriented-dbms/" rel="next" title="[笔记] C-store: a column-oriented DBMS">
+      [笔记] C-store: a column-oriented DBMS <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Abstract"><span class="nav-number">1.</span> <span class="nav-text">Abstract</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">2.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Data-warehousing"><span class="nav-number">3.</span> <span class="nav-text">Data warehousing</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Stream-processing"><span class="nav-number">4.</span> <span class="nav-text">Stream processing</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Emerging-sensor-based-applications"><span class="nav-number">4.1.</span> <span class="nav-text">Emerging sensor-based applications</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#An-existing-applicaton-financial-feed-processing"><span class="nav-number">4.2.</span> <span class="nav-text">An existing applicaton: financial-feed processing</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Performance-discussion"><span class="nav-number">5.</span> <span class="nav-text">Performance discussion</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E2%80%9CInbound%E2%80%9D-versus-%E2%80%9Coutbound%E2%80%9D-processing"><span class="nav-number">5.1.</span> <span class="nav-text">“Inbound” versus “outbound” processing</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#The-correct-primitives"><span class="nav-number">5.2.</span> <span class="nav-text">The correct primitives</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Seamless-integration-of-DBMS-processing-and-application-logic"><span class="nav-number">5.3.</span> <span class="nav-text">Seamless integration of DBMS processing and application logic</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#High-availability"><span class="nav-number">5.4.</span> <span class="nav-text">High availability</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Synchronization"><span class="nav-number">5.5.</span> <span class="nav-text">Synchronization</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#One-size-fits-all"><span class="nav-number">6.</span> <span class="nav-text">One size fits all?</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Data-warehouse"><span class="nav-number">6.1.</span> <span class="nav-text">Data warehouse</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Sensor-networks"><span class="nav-number">6.2.</span> <span class="nav-text">Sensor networks</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Text-search"><span class="nav-number">6.3.</span> <span class="nav-text">Text search</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Scientific-databases"><span class="nav-number">6.4.</span> <span class="nav-text">Scientific databases</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#XML-databases"><span class="nav-number">6.5.</span> <span class="nav-text">XML databases</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#A-Comment-on-Factoring"><span class="nav-number">7.</span> <span class="nav-text">A Comment on Factoring</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Concluding-Remarks"><span class="nav-number">8.</span> <span class="nav-text">Concluding Remarks</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

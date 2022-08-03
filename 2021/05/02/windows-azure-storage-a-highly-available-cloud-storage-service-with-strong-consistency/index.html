@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency 年代：2011  Windows Azure Storage（WAS）是Azure的存储层，它的特色在于基于同一套架构提供了对象存储（Blob）、结构化存储（Table）和队列服务（Queue）。 这三种服务共享了一">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency 年代：2011  Windows Azure Storage（WAS）是Azure的存储层，它的特色在于基于同一套架构提供了对象存储（Blob）、结构化存储（Table）和队列服务（Queue）。 这三种服务共享了一">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/was-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/was-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/was-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/was-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/was-05.png">
+<meta property="article:published_time" content="2021-05-02T15:18:12.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.661Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Storage">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-05/was-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-05-02 23:18:12" itemprop="dateCreated datePublished" datetime="2021-05-02T23:18:12+08:00">2021-05-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2043556.2043571">Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency</a></p>
+<p>年代：2011</p>
+</blockquote>
+<p>Windows Azure Storage（WAS）是Azure的存储层，它的特色在于基于同一套架构提供了对象存储（Blob）、结构化存储（Table）和队列服务（Queue）。</p>
+<p>这三种服务共享了一个提供了强一致、global namespace、多地容灾、支持多租户的存储层。</p>
+<blockquote>
+<p>个人猜测这种设计（同时推出三种服务）更多出于组织架构的考虑，而不是技术层面上有非这么做的理由。</p>
+<p>以及这篇文章作者中有多名后来加入阿里云存储的大佬，所以可以从这里面看到一些后来阿里云存储产品发展的影子。</p>
+</blockquote>
+<span id="more"></span>
+
+<p>三种服务都使用了同一套global namespace，格式为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http(s)://AccountName.&lt;service&gt;.core.windows.net/PartitionName/ObjectName</span><br></pre></td></tr></table></figure>
+
+<p>其中：</p>
+<ul>
+<li>AccountName会作为DNS解析的一部分，来确定这个account对应的primary data center（如果需要跨地域就需要使用多个account）。</li>
+<li>PartitionName是跨对象事务的边界。</li>
+<li>ObjectName是可选的，Blob就没有。</li>
+</ul>
+<p>Table的每行的primary key由PartitionName和ObjectName组成。Queue的PartitionName用来标识队列，而ObjectName则用来标识消息。</p>
+<p>WAS的底座是Windows Azure Fabric Controller，负责分配和管理资源，WAS会从它那里获取网络拓扑、集群物理布局、存储节点的硬件信息等。</p>
+<p>一套WAS环境由若干套storage stamp和一套location service组成：</p>
+<p><img src="/images/2021-05/was-01.png"></p>
+<p>每套storage stamp是一个小集群，典型的大小是10-20个rack，每个rack有18个节点。第一代storage stamp容量是2PB，下一代会提升到30PB。storage stamp的目标是达到70%的使用率，包括了容量、计算、带宽。</p>
+<p>location service负责管理account到storage stamp的映射与迁移（一个account只能有一个primary storage stamp）。</p>
+<p>storage stamp内部分为三层：</p>
+<ul>
+<li>stream层提供类似于GFS的能力。数据组织为extent（类比chunk），extent再组织为stream（类比file）。这一层是三种服务共享的。</li>
+<li>partition层提供三种服务特有的能力。它负责提供应用层抽象、namespace、事务与强一致的能力、数据的组织、cache。partition和stream的server是部署在一起的，这样最小化通信成本。</li>
+<li>front-end（FE）负责处理请求。它会缓存partition map从而快速转发请求。另外它还可以直接访问和缓存stream层的数据。</li>
+</ul>
+<p>storage stamp提供了两种replication：</p>
+<ul>
+<li>stamp内部，在stream层提供同步的replication，提供数据的强一致性。</li>
+<li>stamp之间，在partition层提供异步的replication，提供数据的多地容灾能力。</li>
+</ul>
+<p>区分两种replication还有一个好处是stream层不需要感知global namespace，只需要维护stamp内的meta，这样metadata就不会那么多，更容易全部缓存到内存中。</p>
+<p>在stream层数据组织为三层：</p>
+<ul>
+<li>block是读写的最小单元，但不同block可以有不同大小。每个block有自己的checksum，每次读都会校验。另外所有block定期还会被后台校验checksum。</li>
+<li>extent是stream层replication的单元，它由一系列block组成。每个extent最终会长到1GB大小，partition层可以控制将大量小对象存储到一个extent，甚至一个block中。</li>
+<li>stream类似于一个大文件，但它不拥有extent，只是保存了若干个有序的extent引用。将已有的extent组织起来就可以得到新的stream。</li>
+</ul>
+<p><img src="/images/2021-05/was-02.png"></p>
+<p>注意stream层是append-only的，每个stream只有最后一个extent可以被写入，其它extent都是不可变的（immutable，被seal了）。（猜测未seal的extent不可被多个stream共享）</p>
+<p>stamp内部有两类组件：stream manager（SM）和extent node（EN），前者是master，后者是data node。</p>
+<p><img src="/images/2021-05/was-03.png"></p>
+<p>（大概讲SM怎么与EN通信来管理extent，类似于GFS，略过）</p>
+<p>extent支持原子append多个block，但因为重试原因可能数据会被写入多次，client要有能力处理这种情况。</p>
+<p>client会控制extent的大小，如果超过阈值则发送seal指令。被seal的extent不可再被写入，stream层会对sealed extent做一些优化，如使用erasure coding等。</p>
+<p>stream层提供的强一致保证：</p>
+<ul>
+<li>一旦写入成功的消息告知了client，后续所有replica上这次写入的数据都可见（read committed）。</li>
+<li>一旦extent被seal了，后续所有已经seal的replica的读保证看到相同内容（immutable）。</li>
+</ul>
+<p>每个extent有一个primary EN和若干个secondary EN，未被seal的extent的EN是不会变的，因此它们之间不需要有lease等同步协议。extent的写入只能由primary EN处理，但可以读取任意secondary EN（即使未seal）。primary会将所有写入排好序，确定每笔写入的offset，再发给所有secondary EN。所有replica都写成功了之后primary才会告知client。</p>
+<p>client在写入过程中会本地缓存extent的meta，不需要与SM通信（直到需要分配新extent）。如果某次写入失败了，client可以要求SM来seal这个extent，然后立即开始写新extent，而不需要关心旧extent末尾是否有数据不一致。</p>
+<p>seal过程中SM会与每个replica EN通信，并使用可用的EN中<strong>最小的</strong>commit length。这样能保证所有告知过client的数据都不会丢，但有可能会有数据还没来得及告知client。这是client需要自己处理的一种情况。（是不是可以让client缓存一个commit length，seal时告知SM）</p>
+<p>client在读多副本的extent时可以设置一个deadline，这样一旦当前EN无法在deadline之前读到数据，client还有机会读另一个EN。而在读erasure coded数据时，client也可以设置deadline，超过deadline后向所有fragment发送读请求，并使用最先返回的N个fragment重新计算缺少的数据。</p>
+<p>WAS还实现了自己的I&#x2F;O调度器，如果某个spindle（这个怎么翻译？）已经调度的I&#x2F;O请求预计超过100ms，或有单个I&#x2F;O已经排队超过200ms，调度器就不再向这个spindle发送新的I&#x2F;O请求。这样牺牲了一些延时，但达到了更好的公平性。</p>
+<p>为了进一步加速I&#x2F;O，EN会使用单独的一块盘（HDD或SSD）作为journal drive，写入这台EN的数据会同时append到journal drive上，以及正常写extent，哪笔写先完成都可以返回。写入journal drive的数据还会缓存在内存中，直到数据写extent成功（阿里云的pangu使用了类似的方案）。journal drive方案的优点：</p>
+<ul>
+<li>将大量随机写转换为了顺序写。除了写journal drive天然是顺序的，这种设计还使得写extent时可以使用更倾向batch的I&#x2F;O调度策略，进一步提高了磁盘带宽的利用率。</li>
+<li>关键路径上读写请求分离，前者读数据盘（或cache），后者写journal drive。</li>
+</ul>
+<p>使用了journal drive可以极大降低I&#x2F;O的延时波动率（对在线业务意义重大）。</p>
+<p>（Partition层的设计类似于BigTable，略过部分信息）</p>
+<p>Partition层数据保存在了不同的Object Table（OT）中，每个OT分为若干个RangePartition。OT包括：</p>
+<ul>
+<li>Account Table</li>
+<li>Blob Table</li>
+<li>Entity Table</li>
+<li>Message Table</li>
+<li>Schema Table</li>
+<li>Partition Map Table</li>
+</ul>
+<p>Partition层的架构：</p>
+<ul>
+<li>Partition Manager（PM）：类似于BigTable的Master，管理所有RangePartition。</li>
+<li>Partition Server（PS）：类似于BigTable的Tablet Server，加载RangePartition，处理请求。</li>
+<li>Lock Service：类似于Chubby。</li>
+</ul>
+<p><img src="/images/2021-05/was-04.png"></p>
+<p><img src="/images/2021-05/was-05.png"></p>
+<p>Blob Table有个类似于后面Wisckey[<a href="/2017/05/19/wisckey-separating-keys-from-values-in-ssd-conscious-storage">1</a>]的优化，就是大块数据进commit log，但不进入row data（不进cache、不参与常规compaction等），相反row data中只记录数据的位置（extent+offset），并且在checkpoint的时候直接用commit log的extent拼装成data stream。</p>
+<p>RangePartition的分裂（Split）过程：</p>
+<ul>
+<li>PM向PS发请求，要求将B分裂为C和D。</li>
+<li>PS生成B的checkpoint，然后B停止服务（此时是不是可以不停读）。</li>
+<li>PS使用B的所有stream的extent组装成C和D的stream。</li>
+<li>C和D开始服务（client还不知道C和D，此时应该不会有请求发过来）。</li>
+<li>PS告知PM分裂结果，PM更新Partition Map Table，之后将其中一个新Partition移到另一台PS上（分散压力）。</li>
+</ul>
+<p>合并（Merge）过程类似：</p>
+<ul>
+<li>PM将C和D移动到相同PS上，之后告知PS将C和D合并为E。</li>
+<li>PS生成C和D的checkpoint，之后C和D停止服务。</li>
+<li>PS使用C和D的stream的extent组装为E的stream，每个stream中C的extent在D之前。</li>
+<li>PS生成E的metadata stream，其中包括了新的stream的名字、key range、C和D的commit log的start和end位置、新的data stream的root index。（这里commit log的meta管理有点复杂，如果连续分裂怎么办？Tablestore是先停止服务再生成checkpoint，就不需要分别记录C和D的log meta，但停止服务时间会比较长；WAS这种方案停止服务时间短，但meta管理复杂）</li>
+<li>E开始服务。</li>
+<li>PS告知PM合并结果。</li>
+</ul>
+<p>最后是一些经验教训的总结：</p>
+<ul>
+<li>计算存储分离。好处是弹性、隔离性，但对网络架构有要求，需要网络拓扑更平坦、点对点的双向带宽更高等。</li>
+<li>Range vs Hash。WAS使用Range的一个原因是它更容易实现性能上的隔离（天然具有局部性），另外客户如果需要hash，总是可以基于Range自己实现，而反过来则不然。</li>
+<li>流控（Throttling）与隔离（Isolation）。WAS使用了SimpleHold算法[<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/633025.633056">2</a>]来记录请求最多的N个AccountName和PartitionName。当需要流控时，PS会使用这个信息来选择性拒绝请求，大概原则是请求越多，被拒绝概率越大（保护小用户）。而WAS会汇总整个系统的信息来判断哪些account有问题（异常访问），如果LoadBalance解决不了就更高层面上控制这种用户的流量。</li>
+<li>自动负载均衡（LoadBalancing）：WAS一开始使用单维度“load”（延时*请求速率）来均衡，但无法应对复杂场景。现在的均衡算法是每N秒收集所有Partition的信息，然后基于每个维度排序，找出需要分裂的Partition。之后PM再将PS按各维度排序，找出负载过重的PS，将其中一部分Partition移到相对空闲的PS上（整体思路与Tablestore的LoadBalance差不多，更系统化一些，但Tablestore的LoadBalance策略更多，更灵活）。</li>
+<li>每个Partition使用自己的log file。这点与BigTable的整个Tablet Server共享log file区别比较大。单独log file在load&#x2F;unload上更快，且隔离性更好，而共享log file更节省I&#x2F;O（综合来看单独log file更好一些，尤其是随着存储性能的提升、计算存储分离架构的流行，共享log file的优势越来越小，劣势越来越大了）。</li>
+<li>Journal drive。它的意义是降低I&#x2F;O波动。BigTable使用了另一种方案，用2个log来规避长I&#x2F;O，但导致了更多的网络流量与更高的管理成本。</li>
+<li>Append-only。（与log as database理念差不多）</li>
+<li>End-to-end checksum。</li>
+<li>Upgrade。重点是在每一层将节点分为若干个upgrade domain，再使用rolling upgrade来控制upgrade的影响。</li>
+<li>基于相同Stack的多种数据抽象。就是指Blob、Table、Queue（其实还应该有Block）。</li>
+<li>使用预定义的Object Table，而不允许应用定义自己的Table。意义在于更容易维护（真的有意义吗）。</li>
+<li>限制每个Bucket大小为100TB。这个是教训，WAS计划增大单个storage stamp。</li>
+<li>CAP。WAS认为自己在实践层面上同时实现了C和A（高可用、强一致），具体策略上是通过切换新extent来规避掉不可访问的节点（实践上有意义，但也不能说是同时实现了C和A）。另外[<a target="_blank" rel="noopener" href="https://static.usenix.org/events/osdi04/tech/full_papers/renesse/renesse.pdf">3</a>]表示使用chain replication就可以同时实现高可用和强一致。</li>
+<li>高性能的debug log。这点很重要。</li>
+<li>压力点测试。WAS可以单独测试多个预定义的压力点（如checkpoint、split、merge、gc等）。（除此之外现在还需要考虑chaos test）。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Storage/" rel="tag"># Storage</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/28/hyper-a-hybrid-oltp-olap-main-memory-database-system-based-on-virtual-memory-snapshots/" rel="prev" title="[笔记] Hyper: A Hybrid OLTP&OLAP Main Memory Database System Based on Virtual Memory Snapshots">
+      <i class="fa fa-chevron-left"></i> [笔记] Hyper: A Hybrid OLTP&OLAP Main Memory Database System Based on Virtual Memory Snapshots
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/05/06/wound-wait-and-wait-die/" rel="next" title="How DBMS handle dead locks: wound-wait and wait-die">
+      How DBMS handle dead locks: wound-wait and wait-die <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics Omid三部曲：  Omid: Lock-free transactional support for distributed data stores Omid, Reloaded: Scalable and Highly">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics Omid三部曲：  Omid: Lock-free transactional support for distributed data stores Omid, Reloaded: Scalable and Highly">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/omid-18-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/omid-18-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/omid-18-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/omid-18-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/omid-18-05.png">
+<meta property="article:published_time" content="2021-04-21T04:31:17.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.660Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLTP">
+<meta property="article:tag" content="Snapshot Isolation">
+<meta property="article:tag" content="2PC">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-04/omid-18-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-21 12:31:17" itemprop="dateCreated datePublished" datetime="2021-04-21T12:31:17+08:00">2021-04-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3229863.3229868">Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</a></p>
+<p>Omid三部曲：</p>
+<ol>
+<li><a href="/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores">Omid: Lock-free transactional support for distributed data stores</a></li>
+<li><a href="/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing">Omid, Reloaded: Scalable and Highly-Available Transaction Processing</a></li>
+<li>Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</li>
+</ol>
+</blockquote>
+<p>这是Omid的第三篇（2018年），主要改进是提出了两种降低延时的新协议，从而满足新的实时事务的需求（作为Phoenix的后端）。</p>
+<p>两种新协议分别是：</p>
+<ul>
+<li>Omid Low Latency（Omid LL），将Omid中写CT的工作由TM转交给client，从而分散了负载，降低了延时。</li>
+<li>Omid Fast Path（Omid FP），处理单key事务时绕开TM，从而达到原生HBase操作的延时（代价是隔离级别从snapshot isolation（SI）降低到了generalized snapshot isolation（GSI）[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1541186/">1</a>]）。</li>
+</ul>
+<p>Omid再改进就要考虑分散冲突检测了。</p>
+<p>Omid LL中TM有两个角色，一个是TSO，通常不会是瓶颈；另一个是全局冲突检测。我们知道Omid中冲突检测是per bucket进行的，每个bucket独立判断。假如bucket足够小，小到只有一个key，就相当于每个key独立判断一下冲不冲突。此时TM的必要性就不存在了，client可以直接与data server通信判断。</p>
+<p>此时Omid就变成了Percolator的变种，即将commit meta放到了单独的commit table中，而不是与数据在一起。</p>
+<span id="more"></span>
+
+<h2 id="Omid-LL"><a href="#Omid-LL" class="headerlink" title="Omid LL"></a>Omid LL</h2><p>Omid 14中TM在内存中维护事务meta，还需要与client保持meta replication，负担比较重，成为了全局吞吐的瓶颈。</p>
+<p>Omid 17因此增加了commit table（CT），将事务meta信息下放到表中，这样client不需要meta replication，直接查询表就可以得到事务信息。但Omid 17中的CT只由TM更新，又成为了新的全局瓶颈。</p>
+<p>Omid LL的主要改进就是由client来写CT，从而极大降低了TM的负载，后者主要工作只剩下TSO和冲突检测。</p>
+<p><img src="/images/2021-04/omid-18-01.png"></p>
+<p>Omid LL中TM的Commit只会返回一个timestamp：</p>
+<p><img src="/images/2021-04/omid-18-02.png"></p>
+<p>主要工作都转交给了client：</p>
+<p><img src="/images/2021-04/omid-18-03.png"></p>
+<p>注意READ中有几个race condition需要考虑：</p>
+<ul>
+<li>如果rec中的commit为空，对应的事务可能pending，也可能在post-writing，client需要通过一次get or abort来判断。</li>
+<li>如果CT中没有对应事务，client需要再读一次rec，如果发现又有commit了，就说明刚刚对应事务已经完成了post-writing和清理CT，client需要把自己插入CT的abort再删掉（如果没删掉也没关系，后面清理任务会做的）。</li>
+</ul>
+<p>在COMMIT的post-writing阶段，Omid 17需要读出修改过的每一行再执行清理或写入commit，Omid LL则改成了blind write。这里没有正确性问题，因为每个事务的write set只有一个writer，client实际拥有所有需要的信息，不需要每行再读一次。</p>
+<h2 id="Omid-FP"><a href="#Omid-FP" class="headerlink" title="Omid FP"></a>Omid FP</h2><p>Omid FP提供了几个针对单key的事务API，将事务的BEGIN和COMMIT并入后续的一次读写操作中，从而降低延时。</p>
+<p>几个API为：</p>
+<ul>
+<li><code>brc(key)</code>：BEGIN，读key，COMMIT。</li>
+<li><code>bwc(key, val)</code>：BEGIN，写key，ts大于已有版本，COMMIT。</li>
+<li><code>br(key)</code>：BEGIN，读key，返回value和对应版本，不COMMIT。</li>
+<li><code>wc(ver, key, val)</code>：检测key没有大于ver的写入，写key，ts大于已有版本，COMMIT。</li>
+</ul>
+<p>注意<code>br</code>和<code>wc</code>要配套使用。</p>
+<p>Omid FP的实现分为两部分，分别由client和HBase server（通过coprocessor）提供：</p>
+<p><img src="/images/2021-04/omid-18-04.png"></p>
+<p>可以看到<code>brc</code>和<code>br</code>实际就是HBase的<code>get</code>。</p>
+<p><code>bwc</code>需要看key的当前版本是否已经提交了，如果遇到了未提交的版本就直接abort。这里为了降低延时，没有像client的READ一样尝试abort掉对应的事务。</p>
+<p><code>bwc</code>和<code>wc</code>需要产生一个新的version，需要保证以下性质</p>
+<ol>
+<li>新version大于所有旧version，但小于未来TM产生的version。</li>
+<li>能检测出与普通事务的冲突。</li>
+</ol>
+<p>这就与TM作为全局TSO冲突了。为此Omid FP引入了HLC，TM的timestamp作为physical ts，在<code>putVersion</code>中只增加logical ts。如果非常罕见地logical ts满了，这个FP的事务会被abort掉，client可以使用普通路径重试。</p>
+<p>如果普通事务早于FP事务写入，前面提到了FP事务会abort。但如果FP事务在某个普通事务的读和提交之间完成了：</p>
+<p><img src="/images/2021-04/omid-18-05.png"></p>
+<p>因为FP事务不在CT中记录，旧的检测机制失效了。为了能让T1提交时检测出冲突，Omid FP做了以下改动：</p>
+<ul>
+<li>每个key对应一个maxVersion，保证不小于这个key的任何已提交版本。</li>
+<li><code>putVersion</code>提升maxVersion。</li>
+<li>普通事务的读会提升maxVersion到不小于事务ts。</li>
+<li>普通事务的写会检查maxVersion不大于事务ts。</li>
+</ul>
+<p>这个改动增加了普通路径的开销。为了降低内存使用，Omid FP在每个HBase的region server上维护了一个local version clock（LVC），即整个server的maxVersion。这个优化增加了false abortion，但降低了维护代价。</p>
+<p>LVC不会持久化，每个region server在第一次请求处理中会访问TM获得physical ts。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLTP/" rel="tag"># OLTP</a>
+              <a href="/tags/Snapshot-Isolation/" rel="tag"># Snapshot Isolation</a>
+              <a href="/tags/2PC/" rel="tag"># 2PC</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/20/clickhouse-code-strong-type-def/" rel="prev" title="ClickHouse基础库学习：StrongTypedef">
+      <i class="fa fa-chevron-left"></i> ClickHouse基础库学习：StrongTypedef
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/04/22/deuteronomy-transaction-support-for-cloud-data/" rel="next" title="[笔记] Deuteronomy: Transaction Support for Cloud Data">
+      [笔记] Deuteronomy: Transaction Support for Cloud Data <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Omid-LL"><span class="nav-number">1.</span> <span class="nav-text">Omid LL</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Omid-FP"><span class="nav-number">2.</span> <span class="nav-text">Omid FP</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

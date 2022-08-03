@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：A comparison of approaches to large-scale data analysis  TL;DR 本文的背景是随着MapReduce的兴起，越来越多的人抛弃了传统的DBMS，直接使用MapReduce来做数据分析。本文对比了MapReduce（Hadoop）、Vertica（列存的并行DBMS）、DBMS-X（某个商用的行存的并行DBMS）的性能，指出并行RDB">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] A comparison of approaches to large-scale data analysis">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：A comparison of approaches to large-scale data analysis  TL;DR 本文的背景是随着MapReduce的兴起，越来越多的人抛弃了传统的DBMS，直接使用MapReduce来做数据分析。本文对比了MapReduce（Hadoop）、Vertica（列存的并行DBMS）、DBMS-X（某个商用的行存的并行DBMS）的性能，指出并行RDB">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-09-17T13:40:22.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.650Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="MapReduce">
+<meta property="article:tag" content="探索研究">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] A comparison of approaches to large-scale data analysis | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/17/a-comparison-of-approaches-to-large-scale-data-analysis/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] A comparison of approaches to large-scale data analysis
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-17 21:40:22" itemprop="dateCreated datePublished" datetime="2020-09-17T21:40:22+08:00">2020-09-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://people.eecs.berkeley.edu/~kubitron/cs262/handouts/papers/p165-pavlo.pdf">A comparison of approaches to large-scale data analysis</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文的背景是随着MapReduce的兴起，越来越多的人抛弃了传统的DBMS，直接使用MapReduce来做数据分析。本文对比了MapReduce（Hadoop）、Vertica（列存的并行DBMS）、DBMS-X（某个商用的行存的并行DBMS）的性能，指出并行RDBMS仍然有它的优势，不会被MapReduce取代。</p>
+<p>并行DBMS的优势：</p>
+<ul>
+<li>速度远快于MapReduce（热数据、有组织、强大的优化器）。</li>
+<li>更少的代码（SQL的表达能力优势）。</li>
+</ul>
+<p>劣势：</p>
+<ul>
+<li>冷数据的加载时间长。</li>
+<li>容错能力弱（任意子query失败都会导致 整个query失败）。</li>
+<li>灵活性差，难以处理非关系型数据。</li>
+</ul>
+<p>但本文指出，并行DBMS可以用更少的节点完成同样的任务，因此它不一定需要MapReduce那么强的容错能力。</p>
+<span id="more"></span>
+
+<h2 id="并行DBMS"><a href="#并行DBMS" class="headerlink" title="并行DBMS"></a>并行DBMS</h2><p>并行DBMS可以并行处理的两个关键点：</p>
+<ol>
+<li>大多数表分片由多个节点服务。</li>
+<li>SQL优化器可以生成跨节点的查询计划。</li>
+</ol>
+<p>如果filter涉及了partition key，或者两个表join的key恰好是各自的partition key，则查询计划涉及的节点数会大大减少。</p>
+<p>join中的一张非常小的表可以冗余分布在多个节点上。如果join双方都比较大，则可以将其中一张表的数据hash后加载到另一张表涉及的节点上。</p>
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><ul>
+<li>schema：MapReduce看似不需要schema，很多人认为这是它的优点。但当MapReduce的输出会被多个应用共享时，它仍然需要一个schema，这个schema要放到一个大家都能看得到的地方，与数据分离。而且不同于DBMS，每个应用要自己操心如何管理维护schema。</li>
+<li>index：简单的MapReduce任务不需要index，但在需要的时候，每个开发者都要自己写一遍。</li>
+<li>编程模型：SQL模型比MR更高级，不需要开发者手写很低级的逻辑，因此MR社区又在MR模型之上引入了一些更高级的模型。</li>
+<li>数据分发：大规模DB的经验是将计算发送到数据端，而不是反过来。并行DBMS可以利用已有的统计数据，生成最优化的查询计划，最小化需要传输的数据量。而MR需要手写来实现。</li>
+<li>执行策略：MR的一大隐患是Map和Reduce任务间的数据流是M*N的，一旦任务数非常多的时候，会生成非常多的小文件。并行DBMS不会物化split文件，且用push而不是pull模式来传输数据。</li>
+<li>灵活性：MR显然是更灵活的，但DBMS通过UDF、存储过程、自定义聚合函数等特性也弥补了不少的差距。</li>
+<li>容错性：MR可以重试出错的子任务，而通常并行DBMS在某个子query失败时会令整个query失败。</li>
+</ul>
+<h2 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h2><p>文章关注了两个阶段的性能：数据加载、执行。</p>
+<p>无论是哪类任务，数据加载阶段MapReduce有着非常明显的优势，符合预期。</p>
+<p>执行阶段，两种DBMS都明显比MapReduce快。</p>
+<p>Hadoop在启动阶段耗费了10-25秒，严重影响了小数据集场景的性能。随着任务数增多，调度器的延时也在增加。</p>
+<p>Grep任务中，MR一半的时间花在了合并各个reducer的输出上了。当数据量增大时，Vertica相比DBMS-X的优势体现出来了，这主要归功于Vertica激进的压缩策略。</p>
+<p>Selection任务中，两种DBMS仍然明显快于MR，除了上述因素，新的差异在于DBMS有index，而MR没有。Vertica在这个场景中性能超过了DBMS-X一个数量级。但Vertica在节点增多后性能下降得非常厉害，原因是大量节点间的通信打爆了整个系统。这可能是因为Vertica使用了可靠的通信协议，带来了额外的开销。</p>
+<p>Aggregation任务中，两种DBMS仍然明显快于MR。Vertica在group非常多时性能相比DBMS-X没有优势，但在group较少时需要传输的数据量变少，它在扫描上的性能优势就体现出来了。</p>
+<p>Join任务中，两种DBMS的性能比MR好上两个数量级，有两方面原因：</p>
+<ol>
+<li>MR需要扫描所有数据，而DBMS可以利用index只读部分数据。另外MR读出数据还要再解析，而DBMS在加载时已经做完了这部分工作。</li>
+<li>DBMS可以利用join key就是join双方的partition key的特点，直接在各个节点本地join。</li>
+</ol>
+<p>UDF聚合任务中，三种系统的性能终于差不多了。DBMS需要per row调用UDF，UDF还会访问DB以外的文件，这显著增加了开销。</p>
+<h2 id="其它讨论"><a href="#其它讨论" class="headerlink" title="其它讨论"></a>其它讨论</h2><ul>
+<li>DBMS明显比MR更难部署。</li>
+<li>相比于DBMS，Hadoop的任务都是冷启动的，但这不是MR模型本身要求的。例如，如果允许重用JVM的话上述测试结果可以提升10%-15%。</li>
+<li>HDFS支持块级别和记录级别的压缩，但测试结果显示压缩没有提升，甚至可能降低了性能。Vertica的压缩很激进，当I&#x2F;O为瓶颈时用一部分CPU换取I&#x2F;O是值得的，也有比较好的效果。</li>
+<li>Hadoop相比DBMS更耗费CPU，原因是它需要解析和反序列化数据。</li>
+<li>DBMS在生成查询计划后，就只在必要时传输数据了，也不需要传输控制消息，这两点都可以明显降低开销。</li>
+<li>MR的上手难度非常低，但对于长期的任务，它的隐式成本就会体现出来（MR模型的表达能力、schema的管理等）。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/MapReduce/" rel="tag"># MapReduce</a>
+              <a href="/tags/%E6%8E%A2%E7%B4%A2%E7%A0%94%E7%A9%B6/" rel="tag"># 探索研究</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/09/15/the-google-file-system/" rel="prev" title="[笔记] The Google File System">
+      <i class="fa fa-chevron-left"></i> [笔记] The Google File System
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/09/21/hadoopdb-an-architectural-hybrid-of-mapreduce-and-dbms-technologies-for-analytical-workloads/" rel="next" title="[笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads">
+      [笔记] HadoopDB: An Architectural Hybrid of MapReduce and DBMS Technologies for Analytical Workloads <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B9%B6%E8%A1%8CDBMS"><span class="nav-number">1.</span> <span class="nav-text">并行DBMS</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84"><span class="nav-number">2.</span> <span class="nav-text">架构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%A7%E8%83%BD"><span class="nav-number">3.</span> <span class="nav-text">性能</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E5%AE%83%E8%AE%A8%E8%AE%BA"><span class="nav-number">4.</span> <span class="nav-text">其它讨论</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

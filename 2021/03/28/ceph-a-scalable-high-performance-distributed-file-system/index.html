@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Ceph: A Scalable, High-Performance Distributed File System  这篇文章介绍了Ceph，一种分布式文件系统。它的最大特点是数据层与元数据分离所带来的高弹性。不像其它分布式文件系统（如GFS）master通过本地表记录数据分布，在Ceph中数据是由一种伪随机函数CRUSH来确定分布在哪个对象存储设备（OSD）上的。OSD本身是高度自治的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Ceph: A Scalable, High-Performance Distributed File System">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Ceph: A Scalable, High-Performance Distributed File System  这篇文章介绍了Ceph，一种分布式文件系统。它的最大特点是数据层与元数据分离所带来的高弹性。不像其它分布式文件系统（如GFS）master通过本地表记录数据分布，在Ceph中数据是由一种伪随机函数CRUSH来确定分布在哪个对象存储设备（OSD）上的。OSD本身是高度自治的">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/ceph-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/ceph-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/ceph-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/ceph-04.png">
+<meta property="article:published_time" content="2021-03-28T05:03:20.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.651Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="开源系统">
+<meta property="article:tag" content="Storage">
+<meta property="article:tag" content="FileSystem">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-03/ceph-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Ceph: A Scalable, High-Performance Distributed File System | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Ceph: A Scalable, High-Performance Distributed File System
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-28 13:03:20" itemprop="dateCreated datePublished" datetime="2021-03-28T13:03:20+08:00">2021-03-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/events/osdi06/tech/full_papers/weil/weil_html">Ceph: A Scalable, High-Performance Distributed File System</a></p>
+</blockquote>
+<p>这篇文章介绍了Ceph，一种分布式文件系统。它的最大特点是数据层与元数据分离所带来的高弹性。不像其它分布式文件系统（如GFS）master通过本地表记录数据分布，在Ceph中数据是由一种伪随机函数CRUSH来确定分布在哪个对象存储设备（OSD）上的。OSD本身是高度自治的单元，负责replication、错误检测、恢复。这种设计具备了非常高的弹性与灵活性。</p>
+<p>（通篇看下来感觉Ceph是挺适合云上部署的，另外明显感觉到分布式系统、存储、数据库三个领域需要融合，至少在2006年）</p>
+<span id="more"></span>
+
+<h2 id="System-Overview"><a href="#System-Overview" class="headerlink" title="System Overview"></a>System Overview</h2><p><img src="/images/2021-03/ceph-01.png"></p>
+<p>Ceph系统有三个主要组件：</p>
+<ul>
+<li>client，负责提供类POSIX接口（相比POSIX功能上有一定扩展，且有更宽松的一致性语义，以更好地满足应用需求和提供更好的性能）。</li>
+<li>OSD集群，保存所有数据与元数据。</li>
+<li>MDS（Metadata Server）集群，管理namespace（文件名与目录）。</li>
+</ul>
+<p>整套架构的关注点是扩展性、性能、可靠性。其中扩展性需要考虑存储量和吞吐在内的多维度。性能需要考虑单个client、单个目录、单个文件，包括很多极端场景，比如数十万个client同时读&#x2F;写一个文件，或同时在一个目录下创建文件。</p>
+<p>其它很多分布式文件系统的切入点是在file层以下，如block&#x2F;chunk，整个文件实际由若干个block&#x2F;chunk这样的小对象组成，但这种设计对元数据的管理有比较高的要求，即元数据层制约了整个系统的扩展性。而Ceph则是在文件层切入，MDS只负责管理元数据的操作，如open、rename等。每个文件条带化之后存储在多个OSD上，通过CRUSH来计算如何分布。这样其它工具也可以自己计算文件所在，不需要询问MDS。</p>
+<p>另外Ceph还支持在不同MDS之间自动均衡目录树，称为Dynamic Subtree Partitioning，从而进一步缓解单个MDS的压力（但据说坑很多？）。</p>
+<p>Ceph中数据迁移、replication、错误检测、恢复等功能都下放到了OSD集群中，OSD集群整体提供一个单一的逻辑对象视图。这种设计能充分利用OSD的资源，实现线性扩展。</p>
+<p>（种种设计都在为MDS减负，说明POSIX接口或传统的单体文件系统的元数据管理压力实在太大，不适合原封不动地迁移到分布式架构中）。</p>
+<h2 id="Client-Operation"><a href="#Client-Operation" class="headerlink" title="Client Operation"></a>Client Operation</h2><p>Ceph中client运行在各个宿主机的用户态，可以直接链接到程序中，也可以经FUSE挂载。每个client有自己的文件和buffer cache、独立的内核page。</p>
+<p>当client需要open一个文件时，收到请求的MDS会遍历文件系统，将文件名转换为inode，同时可能会返回capability或security key等。Ceph中文件都是条带（stripe）化的，每个文件对应一组条带对象，对象名就是inode number + stripe number。通过CRUSH可以知道每个条带对象对应的OSD。Ceph中允许某个条带对象或字节范围不存在，即文件中可以有空洞。</p>
+<p>当client需要读文件的时候，就拿着MDS返回的capability去对应的OSD上读条带对象；需要写文件的时候直接写OSD上的条带对象。在close的时候client需要交还capability，并将新的文件大小告知MDS（同一条带对象并发写的语义是什么？）。</p>
+<p>POSIX语义要求：写后立即能读到；写操作是原子的（并发写的结果是按某种特定顺序的覆盖，听起来像是linearizability）。当MDS发现文件被多个client并发读写的时候，它就会收回所有client的buffer capability，强制client执行同步的读写操作。这样单个OSD的并发操作的顺序完全由OSD自己决定，极大简化了设计。当写跨多个对象时，client就需要显式在OSD上加锁了（owner挂了怎么办？）。</p>
+<p>在科学计算中并发读写同一个文件是常见的场景，此时就需要放松一致性以获得更好的性能。Ceph提供了POSIX的扩展，比如<code>O_LAZY</code>表示宽松的一致性。另外应用可以自己管理一致性，如保证不同client写文件的不同区域，这样每个client都可以使用cache了。client还可以显式调用<code>lazyio_propagate</code>保证自己的写反映到文件上，<code>lazyio_synchronize</code>保证后续读反映最新的写内容（类似于<code>atomic_release</code>和<code>atomic_require</code>）。</p>
+<p>client与MDS的所有namespace相关操作（<code>readdir</code>&#x2F;<code>stat</code>&#x2F;<code>unlink</code>&#x2F;<code>chmod</code>等）都是同步的，不提供显式的加锁，以及callback（对HPC场景无用&#x2F;开销大）。</p>
+<p>为了降低这些同步namespace操作的延时，Ceph针对常见场景做了优化。比如<code>readdir</code>随后对每个文件调用<code>stat</code>（<code>ls -l</code>），在Ceph中<code>readdir</code>就会加载整个目录的inode，这样随后的<code>stat</code>就会直接返回刚刚加载的内容，牺牲了一致性（假设之间有更新），但保证了性能。这种行为也被纳入了<code>readdirplus</code>扩展。</p>
+<p>Ceph不像其它一些系统那样（如早期的NFS）会长时间（如30秒）缓存元数据，这样对一致性的冲击太大。相反Ceph会选择扩展那些会损害性能的接口。如对并发写的文件的<code>stat</code>会使MDS收回所有写的capability，询问每个对象的长度，取最大值，再重新授予capability，保证获得正确的文件大小和修改时间。不需要这种保证的应用可以调用<code>statlite</code>。</p>
+<h2 id="Dynamically-Distributed-Metadata"><a href="#Dynamically-Distributed-Metadata" class="headerlink" title="Dynamically Distributed Metadata"></a>Dynamically Distributed Metadata</h2><p>有<a target="_blank" rel="noopener" href="https://static.usenix.org/event/usenix2000/general/full_papers/roselli.2/roselli.pdf">研究发现</a>，文件系统的workload中元数据操作最多能占到一半，且都在关键路径上，因此MDS集群的性能至关重要（回答了前面的疑问）。同时元数据又不像数据那样容易线性扩展。</p>
+<p>Ceph中文件和目录的元数据都很小，几乎只包含目录项（文件名）和inode（80B）。与传统文件系统不同的是，Ceph中不需要记录block分配表（编码到条带对象名字中，使用CRUSH定位）。这些设计都能缓解MDS的压力，允许它管理海量的文件和目录（大部分缓存在内存中）。</p>
+<p>每个MDS有自己的journal，以streaming的方式存储到OSD上。这些journal后续会合并到MDS的长期存储中（也由OSD负责）。长期存储针对读优化，如inode直接嵌入目录中，这样一次读操作就可以把整个目录的inode拿到。每个目录的内容会分布到相同的OSD上。每个MDS都有自己的inode范围，另外有一个全局的anchor table保存对应多个hardlink的inode——尽量优化单个link的场景。</p>
+<p>Ceph的一个创新是MDS之间基于目录树的负载均衡，称为Dynamic Subtree Partitioning。</p>
+<p><img src="/images/2021-03/ceph-02.png"></p>
+<p>MDS会统计每个inode对应的操作数并以指数时间衰减，一个操作会增加从root到对应inode的整个链路的计数。这样MDS之间就可以方便地迁移目录树了。长期存储是共享的，不需要迁移。迁移过程中新MDS会把数据都写进journal，之后新增修改会写进新旧两个MDS的journal，直到迁移完成（移动内存数据）。</p>
+<p>迁移过程中inode的内容会分为三组：</p>
+<ul>
+<li>security（owner&#x2F;mode）</li>
+<li>file（size&#x2F;mtime）</li>
+<li>不可变（inode number&#x2F;ctime&#x2F;layout）</li>
+</ul>
+<p>前两组在迁移过程中可能会变，需要加锁。但security基本不变，相反file则很可能有修改，因此需要不同的加锁策略。</p>
+<p>针对特别热的目录，Ceph可以有特殊处理：</p>
+<ul>
+<li>读特别热的目录可以分散到多个节点上。</li>
+<li>写特别热的目录可以按filename hash后分散到多个节点上。</li>
+</ul>
+<p>这些内容都可以由MDS返回给client。</p>
+<h2 id="Distributed-Object-Storage"><a href="#Distributed-Object-Storage" class="headerlink" title="Distributed Object Storage"></a>Distributed Object Storage</h2><p>从client和MDS的角度看Ceph的整个OSD集群是一个整体，所有replication、数据迁移、容错恢复等机制都下放到了这套名为Reliable Atuonomic Distributed Object Store（RADOS）的数据存储层（Ceph挺能发明词的……）。</p>
+<p><img src="/images/2021-03/ceph-03.png"></p>
+<p>Ceph首先将对象根据hash分成若干个placement group（PG），随后再通过CRUSH将PG分配给OSD，PG与OSD的数量比例大概是100:1。CRUSH只需要知道pg和OSD map。这种设计的好处是：</p>
+<ul>
+<li>client和工具可以自己计算PG所在的OSD，不需要通过MDS。</li>
+<li>保证了整个集群存储负载的均衡。</li>
+<li>OSD map更新频率非常低，每次更新只会影响到非常少量的PG（类比一致性hash）。</li>
+</ul>
+<p>CRUSH在执行时会根据placement rule，比如一个PG要对应3个OSD等。OSD map中每个OSD也会有权重、位置、错误状态等。OSD map中有个epoch number，每次更新时增加。</p>
+<p>RADOS使用了primary-copy的一个变种来做replication。replication的单位是PG。client在写PG时会先将数据发给第一个正常工作的OSD，OSD会为被写的对象和PG分配新version，随后转发写请求给其它参与replication的OSD。当所有replica都执行完修改回复primary后，primary再执行修改并回复client。读请求则均由primary处理（可以用Paxos&#x2F;Raft）。</p>
+<p>值得注意的是，上面所说的执行修改只发生在内存，后续client可以单独查询这些修改是否提交成功，如下图。RADOS分离了同步与safety，目的是同时服务需要低延时和高安全性的应用。client因此在收到请求成功之后，仍然要本地缓存写过的数据，直到知道提交成功。</p>
+<p><img src="/images/2021-03/ceph-04.png"></p>
+<p>RADOS中每个OSD会监控与它共享PG的其它OSD，相互会ping那些长时间（因没有请求而）没有响应的远端OSD。短时间无响应的OSD会被标记为down，它的primary也会让给其它OSD。长时间标记为down的OSD会被标记为out，其它OSD会接管它的PG。</p>
+<p>另有一个小集群负责收集这些错误信息并过滤掉暂时的异常，以及管理OSD map，因此需要高可用。OSD map的变化会先发给受影响的OSD，随后在相互间的响应中传播开（类似于<a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store">Dynamo</a>的gossip协议和<a href="/2020/09/23/cassandra-a-decentralized-structured-storage-system">Cassandra</a>的ϕ，但感觉机制有点简单）。</p>
+<p>（恢复机制略过，感觉RADOS不如直接换成Dynamo等去中心化的kv存储，或者PG之间直接用Paxos&#x2F;Raft协议管理）</p>
+<p>OSD的本地文件系统称为Extent and B-tree based Object File System（EBOFS，又一个新词），不用ext3的原因是后者不适合对象的workload。EBOFS是纯用户态的文件系统，直接操纵裸的块设备，支持同步与提交的分离、多个对象的原子写等特性。</p>
+<p>（Ceph是否可以用中心化的对象存储替换RADOS？似乎也没有很明显的障碍，毕竟这些系统的控制平面也往往与关键路径解耦了）</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/%E5%BC%80%E6%BA%90%E7%B3%BB%E7%BB%9F/" rel="tag"># 开源系统</a>
+              <a href="/tags/Storage/" rel="tag"># Storage</a>
+              <a href="/tags/FileSystem/" rel="tag"># FileSystem</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/25/weaving-relations-for-cache-performance/" rel="prev" title="[笔记] Weaving Relations for Cache Performance">
+      <i class="fa fa-chevron-left"></i> [笔记] Weaving Relations for Cache Performance
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/30/a-critique-of-snapshot-isolation/" rel="next" title="[笔记] A Critique of Snapshot Isolation">
+      [笔记] A Critique of Snapshot Isolation <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#System-Overview"><span class="nav-number">1.</span> <span class="nav-text">System Overview</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Client-Operation"><span class="nav-number">2.</span> <span class="nav-text">Client Operation</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Dynamically-Distributed-Metadata"><span class="nav-number">3.</span> <span class="nav-text">Dynamically Distributed Metadata</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Distributed-Object-Storage"><span class="nav-number">4.</span> <span class="nav-text">Distributed Object Storage</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="前言大体来讲，我们每个人头上都不会只有一项工作，很可能在某阶段，头上会有N项工作。我们当然希望这些工作能按部就班的、一项一项的顺序完成。但现实是残酷的，总有些工作会depend其它人，而不得不暂停下来；也总有些工作每天都有人催，需要尽快完成。所以，结论就是每个人都需要高并发工作，也需要知道怎么实现高并发工作。 有种观点是，编程中的所有概念都是人类活动的延续，反映了人类自己的思维方式与组织架构。这句">
+<meta property="og:type" content="article">
+<meta property="og:title" content="高并发工作">
+<meta property="og:url" content="http://fuzhe1989.github.io/2018/03/05/high-concurrency-work/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="前言大体来讲，我们每个人头上都不会只有一项工作，很可能在某阶段，头上会有N项工作。我们当然希望这些工作能按部就班的、一项一项的顺序完成。但现实是残酷的，总有些工作会depend其它人，而不得不暂停下来；也总有些工作每天都有人催，需要尽快完成。所以，结论就是每个人都需要高并发工作，也需要知道怎么实现高并发工作。 有种观点是，编程中的所有概念都是人类活动的延续，反映了人类自己的思维方式与组织架构。这句">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-03-05T05:56:37.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.656Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="程序人生">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2018/03/05/high-concurrency-work/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>高并发工作 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/05/high-concurrency-work/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          高并发工作
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-05 13:56:37" itemprop="dateCreated datePublished" datetime="2018-03-05T13:56:37+08:00">2018-03-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>大体来讲，我们每个人头上都不会只有一项工作，很可能在某阶段，头上会有N项工作。我们当然希望这些工作能按部就班的、一项一项的顺序完成。但现实是残酷的，总有些工作会depend其它人，而不得不暂停下来；也总有些工作每天都有人催，需要尽快完成。所以，结论就是每个人都需要高并发工作，也需要知道怎么实现高并发工作。</p>
+<p>有种观点是，编程中的所有概念都是人类活动的延续，反映了人类自己的思维方式与组织架构。这句话反过来说也不无道理，即人类的思维方式与组织架构，往往可以从编程中找到对应的概念。</p>
+<p>某种程度上，实现高并发工作的方法与实现高并发编程是类似的。本文就参照高并发编程的一些要素，来分析一下如何达到高并发工作。</p>
+<span id="more"></span>
+
+<h1 id="目标导向"><a href="#目标导向" class="headerlink" title="目标导向"></a>目标导向</h1><p>当说到高并发编程时，首先就要讲清楚，高并发的目的是高吞吐，还是低延时。很多时候这两个目标是冲突的：高吞吐往往意味着要异步化，而异步化往往意味着不能及时拿到结果，也就意味着不能实现低的延时。</p>
+<p>同样，高并发工作也需要先明确目标，是要尽量提高工作的吞吐（即单位时间完成更多的工作），还是降低工作的延时（尤其是老板们关注的工作）。</p>
+<h2 id="高吞吐"><a href="#高吞吐" class="headerlink" title="高吞吐"></a>高吞吐</h2><p>高吞吐的重点是异步化和不要等，即：当任务depend别人时，给他发消息，之后切到其它任务，直到他回复。</p>
+<p>然而现实中只是这样往往达不到真正的高吞吐：</p>
+<ul>
+<li>人是复杂的，你不催他，甚至不催他老大，或直接当面看着他干活，他不一定会理你，你永远等不到回复。</li>
+<li>有时不当面讲或者打电话，你需要花很久才能理解他，或者让他理解你，时间都浪费了。</li>
+<li>即使上面说的问题都没遇到，也可能出现老板觉得你的工作没有体现出优先级，不给你分配任务，或者直接开了你的情况，不给你高吞吐的机会。</li>
+</ul>
+<p>如果把每个人都比拟为一个程序的模块，我们往往不得不与这样的模块打交道：</p>
+<ul>
+<li>可能丢消息，需要不停重试，有时还需要发工单寻求人工帮助。</li>
+<li>接口设计不合理，一个请求需要多次交互。</li>
+<li>即使消息保证不丢，接口上也只需要一次交互即可，我们仍然可能遇到一个响应很慢的模块，导致整个任务超时。</li>
+</ul>
+<p>可是真遇到这种模块又能怎么样呢？</p>
+<ul>
+<li>要么，我们可以换个类似功能的其它模块，对应换个接口人。</li>
+<li>要么，投诉给维护者，让他改。</li>
+<li>更多情况下，我们没办法换用其它模块，也不一定能得到维护者的响应，只好自己多做准备，多查询状态，或者去调用那些开销大但保证响应速度的接口。</li>
+</ul>
+<p>总之彻底的高吞吐导向是有问题的，对于高优先级的任务还是要考虑低延时的。</p>
+<h2 id="低延时"><a href="#低延时" class="headerlink" title="低延时"></a>低延时</h2><p>一般想达到低延时的重点是要同步，要等，即：当任务depend别人时，给他打电话，每天催，还不行就催他老板，或者老板的老板，还不行就坐到他旁边看着他干活。</p>
+<p>但这样的结果就是：</p>
+<ul>
+<li>每当depend别人时，整体吞吐就大幅度下降：你的时间都花在催人上了，哪有时间干其它活。</li>
+<li>给人一种很push，很tough的印象，别人会不愿意与你合作。</li>
+<li>因为吞吐低，从而做的事情少，从而催人以外的能力不容易提高。某些人甚至达到了“催人以外能力为零”。</li>
+</ul>
+<p>当然上面这些也不见得是坏事，因为：</p>
+<ul>
+<li>老板很开心，吩咐下去的任务每天都有进展，满足他的成就感。</li>
+<li>容易表现出一种很忙的样子，比如大半夜还在公司，还给别人打电话。</li>
+<li>易于把责任推给别人，不是我不做，是他不做。</li>
+</ul>
+<p>从单个任务的角度，你保证了它的延时；但从执行单元（即你这个人）的角度，你浪费了宝贵的时间在同步等待上，影响了吞吐。</p>
+<p>当然，如果不是要求绝对的低延时，而是指定deadline，那么通过定期非阻塞轮询的方法，还是能在不怎么影响吞吐的情况下达到相对低延时的。</p>
+<p>总之追求低延时要适度，根据自己和合作伙伴的实际情况、任务的优先级来。</p>
+<h1 id="高并发的要素"><a href="#高并发的要素" class="headerlink" title="高并发的要素"></a>高并发的要素</h1><p>首先说明：</p>
+<ul>
+<li>本文的目标是高优先级任务相对低延时，低优先级任务高吞吐。</li>
+<li>本文主要针对开发工作，或许对其它工作也有一定帮助，或许没有。</li>
+</ul>
+<h2 id="提高单线程能力"><a href="#提高单线程能力" class="headerlink" title="提高单线程能力"></a>提高单线程能力</h2><p>实现高并发，最简单、也是最直接的方法就是，提高能力，让自己处理单个任务变快。比如：</p>
+<ul>
+<li>提高架构设计能力。</li>
+<li>提高编码能力。</li>
+<li>提高语言表达能力、文档能力，讨论的时候节省时间。</li>
+<li>提高防御能力，比如更多的防御性编程，更多的测试，越早暴露问题，整体上花的时间越少。</li>
+</ul>
+<p>然而光是单线程能力强还不够，一个任务所需时间只要不是足够短，总有被其它任务打断的时候，此时就需要考虑后面的要素。</p>
+<h2 id="保证上下文完整，便于切换"><a href="#保证上下文完整，便于切换" class="headerlink" title="保证上下文完整，便于切换"></a>保证上下文完整，便于切换</h2><p>当一个任务被打断时，我们最先要想到的就是，过一会怎么恢复？比如你正在coding或线上变更或写一份文档，此时马总喊你开会，你该做些什么，来保证两个小时后你能尽快切换回原来这个任务？</p>
+<p>答案就是把必要的信息记下来，形成一个完整的上下文。</p>
+<p>有些人记忆力比较好，光靠脑子就可以回忆起每件事的进度。这就好像我们把上下文记在寄存器里，快，但容量有限，且易丢失。</p>
+<p>更多的人会选择把进度记在纸上，或者本地文档中。就好像我们把上下文记在内存或磁盘中。这样可能显得有些繁琐，需要时不时的记些东西。但它的好处是容量比较大，更容易保持上下文完整，后续总结时也比较方便。它的另一个好处，是比较易于把进度分享给其它人：记在纸上的话，拿给其它人看；记在文档中，直接发给其它人就可以了。</p>
+<p>如果考虑到与人分享的话，另一个可能更棒的选择就是把进度记录在一个在线平台上，比如用gitlab来记录代码和文档，用任务系统来记录任务（似乎也可以记录文档）。</p>
+<p>而做好记录，也有助于下面要素的实现。</p>
+<h2 id="读写分离，获取状态无阻塞"><a href="#读写分离，获取状态无阻塞" class="headerlink" title="读写分离，获取状态无阻塞"></a>读写分离，获取状态无阻塞</h2><p>再完整的上下文，当发生任务切换时仍然是有成本的：</p>
+<ul>
+<li>需要花时间找回上下文（如打开文档、打开任务链接、打开与某人的IM聊天记录等）。</li>
+<li>对于外部的可变的状态，需要依次确认其当前状态（如代码是否有新的commit、接口人是否休假或离职、公司是否有新政策等）。</li>
+<li>在真正做事情之前，还要把上下文映射到大脑中，才能重新建立思路。</li>
+</ul>
+<p>所以，切换越少，开销越低，性能越好。</p>
+<p>但是，只要有与人合作的项目，合作方就有需求定期获取你的状态。常规的状态获取比如IM上问，或者电话，或者直接当面问，对你来说也是一次任务切换，就可能会有上面的各种成本。如果你做好了记录，比如每小时都把进度更新到任务上，或者每改完一个函数&#x2F;类都单独commit到dev branch上，甚至把想法也写上去，那么合作方在很多时候完全不需要问你，他直接看这些记录就好了。</p>
+<p>换句话说，你要令自己的状态随时可被外界读取，同时这种读取要对你的工作透明，即读写分离。</p>
+<p>一种比较理想的状态就是你专注于自己的事情一整天，每当有一点进展时就随手记在对应的任务里，一天过去了，没有人找你，没有人打断你，但晚上的日报里还清晰地展示了你当前的工作进度（可能有一两个小时的误差，但不重要）。如果长期处于这种状态，你的效率能不高吗？</p>
+<h2 id="拆分任务"><a href="#拆分任务" class="headerlink" title="拆分任务"></a>拆分任务</h2><p>一般来说，越长的任务，涉及的元素越多，上下文越复杂，越容易被打断。上下文复杂，说明切换成本高；容易被打断，说明切换次数多。这两点加起来简单就是高并发工作的噩梦。</p>
+<p>这个时候，主动把长（大）的任务拆为多个相对独立的短（小）任务，可能效果更好。因为：</p>
+<ul>
+<li>每个小任务涉及的元素比较少，切换成本低，切换次数也更少。</li>
+<li>小任务更易观察到进展，给人更多的成就感，也给合作方&#x2F;老板更多的信心。</li>
+<li>拆分过程本身也是对大任务的梳理，如果一个大任务拆不开，很可能表明你还没想清楚。</li>
+<li>需求总是会变的，船小好调头，大任务做到一半的时候，如果需求变了就很难调整了。（而此时小任务可能已经做完好几个了，没损失。）</li>
+<li>拆成小任务后，我们对其中的切换是有心理预期的，而相比大任务，很多切换是无预期，突然的。有心理预期的任务切换就可以提前记录，大脑提前准备，切换成本更低。</li>
+</ul>
+<p>另一方面，即使对于相对完整的、中间不depend别人的长任务，也可以考虑拆分为多个短任务。举个例子，你要开发一个新功能，需要写文档、写功能代码、写测试代码、交给其他同学review。一种做法是都完成之后再提交review，这样就产生了一个相对较长的任务。过程中你很happy，无切换地完成了10000字的文档和20000行代码的review，然后你把文档和review发给其他reviewer，你们都傻眼了。reviewer表示卧槽怎么突然来了这么一大坨东西，这周计划里没这项啊，而且都不知道从哪看起，看了后面忘前面。你表示为啥reviewer一直在问我东西，不会自己看文档吗？为啥一个review给他一周了他还没看完，他不看完我要干等着吗？</p>
+<p>但如果你主动把任务拆开，一块一块的写，一块一块的review，先review文档和设计，再review测试代码（TDD），再review功能代码，整个过程就可控得多了。这种就是任务流水线化。</p>
+<h2 id="保持适当的时间片长度"><a href="#保持适当的时间片长度" class="headerlink" title="保持适当的时间片长度"></a>保持适当的时间片长度</h2><p>我们定义每个任务单次连续处理时间最短为它的一个时间片。当你处于高并发工作状态时，往往意味着你在频繁切换手头正在做的任务，这时你就要小心了，你给每个任务分配的时间片是否足够长。如果分配的时间片过短，这次任务切换带来的收益可能还没有任务切换本身的开销大，这就得不偿失了。</p>
+<p>而过长的时间片也不一定好。正如上节所说，任务过长反倒可能影响进度，而单次处理时间过长有着同样的问题。一种工作方法推荐每半小时到一小时主动中断一次，这样的周期令大脑兴奋，但又不会因长时间兴奋而疲惫。另外，我们连续工作一小时后，经常也会遇到一些暂时没解法的问题，此时主动切换一下，有助于大脑换个角度思考，可能更容易想出问题的解法。最后，前面也提到了，我们有计划的切换任务，能有效减少切换成本，也有助于形成自己的工作节奏。</p>
+<h2 id="减少使用同步交流工具"><a href="#减少使用同步交流工具" class="headerlink" title="减少使用同步交流工具"></a>减少使用同步交流工具</h2><p>需要对方实时响应的交流工具就是同步交流工具，最典型的就是电话和当面讲。</p>
+<p>而不需要对方实时响应的交流工具就是异步交流工具，最典型的就是邮件。IM也可以算是异步交流工具，如果你设置了消息免打扰的话。</p>
+<p>同步交流工具的优点：</p>
+<ul>
+<li>低延时。</li>
+<li>对于邮件或文档里讲不清楚的问题，电话可能会讲的更清楚，传递更多信息量。</li>
+</ul>
+<p>同步交流工具的缺点：</p>
+<ul>
+<li>极大影响吞吐。</li>
+<li>很少给人思考的时间，容易事后发现交流过程中传递了错误的信息。而邮件等工具则让人有思考的时间，可以反复推敲后再回应。</li>
+</ul>
+<p>同步交流工具必不可少，但从高并发角度来讲不适合过多使用。</p>
+<h2 id="将外部请求队列化"><a href="#将外部请求队列化" class="headerlink" title="将外部请求队列化"></a>将外部请求队列化</h2><p>即使我们记录了很完整的上下文，努力降低切换成本，最后还是会发现，我们没办法同时保持太多未完成的任务。可以将我们的并发处理能力量化为N，即我们最多可以保持N个任务的上下文（当然执行单元还是1），此时如果外界再有任务过来，就要考虑将这些任务放在一个队列里，而不要随意切换到新任务上。</p>
+<p>简单来说，就是：</p>
+<ul>
+<li>首先，要给自己评估一个N，即最多同时只能开始N个任务。</li>
+<li>当又有外部请求，即又加了一个任务时：<ul>
+<li>如果这个任务不那么紧急，就加到队列里，不要立刻做。</li>
+<li>如果这个任务紧急，你又觉得自己没办法同时处理N+1个任务，要么丢掉一个已经开始的低优先级任务，要么将一个低优先级任务交给其它执行单元（同事），要么拒绝这个新任务。</li>
+</ul>
+</li>
+</ul>
+<p>然而队列里的任务也不是随便的，就那么放在队列里就OK的。我们要给这个任务，以及这个任务的需求方一个承诺（Promise），或者说deadline。之后我们可以定期在中断时遍历这些任务的状态，把接近或超过deadline的任务的优先级提高，然后看一下要不要应用上面的规则。</p>
+<p>毕竟绝大多数任务是只要deadline，而不是非得同步做的。通过这种方式，我们将同步任务转化为了异步任务，从而避免了过多的不必要的切换。</p>
+<p>最后还是要强调，我们给需求方承诺（Promise），意味着需求方也得到了一个预期（Future），如果我们没有及时处理这个任务，我们自己就成了前面所说的“坏模块”。越多的人觉得你是“坏模块”，换掉这个模块的需求越强，收益越大，可能性也就越大。</p>
+<h2 id="定期轮询你的下游"><a href="#定期轮询你的下游" class="headerlink" title="定期轮询你的下游"></a>定期轮询你的下游</h2><p>即使不考虑我们设定的时间片，生理上我们每天都会有几次固定的中断时间（吃饭、下班、睡觉）。在这种中断的时候，你不妨主动问一下你的合作方，你交给他们的任务怎么样了。</p>
+<p>人还是很复杂的，总有丢消息、超时的时候，通过定期的轮询，你可以尽量减少这些意外对你带来的损失。对于你是聚合者的任务（如项目负责人、日报或周报负责人等），轮询本身就是你的工作的一部分。</p>
+<p>我们要注意的是，如何减小轮询对你，对你的合作方的影响。如前面所说，同步请求对每个人都有着巨大的开销，所以，如何把轮询异步化就很重要了。这里我们又要讲到Future和Promise了。</p>
+<ul>
+<li>如果你的合作方承诺定期主动在任务上更新状态，即他采用了“读写分离”法，则你获得了“定期看他的记录即可”的Future，那么你的轮询对他而言不存在，对你而言只是简单的文档浏览，开销还是很低的。</li>
+<li>如果你的合作方不承诺及时更新状态，你就需要主动同步联系他，此时你需要承诺这种联系发生的周期和时间，这样他获得一个定期被打断的预期，可以降低切换成本，也不会在被打断时对你这个人产生太多怨气。</li>
+</ul>
+<p>更多情况下，合作方没办法保证在任务上及时更新状态，你也不想定期去主动问他进度，你希望的是他承诺一个时间，完成后通知你。这就是“设置回调”。</p>
+<h2 id="设置回调"><a href="#设置回调" class="headerlink" title="设置回调"></a>设置回调</h2><p>对于大多数任务，我们没有太紧迫的需求，只是希望对方完成后能有个通知，此时我们就要设置回调，即与合作方讲清楚任务完成后该记在哪，通知谁。</p>
+<p>这里的“记在哪，通知谁”就是要设置回调的目标，是：</p>
+<ul>
+<li>文档或任务或bug记录。</li>
+<li>邮件或IM或电话通知你。</li>
+<li>邮件或IM或电话通知其它人。</li>
+</ul>
+<p>其中目标一本身就是异步的，理想情况下它是最好的选择，后续如果有其它人需要接手任务，也应该是由任务系统来通知，而不是你或者任务的上个owner。但在任务系统或工作流不完善的时候，就需要任务的上个owner通知下个owner，而不通过你。如果你完全不需要关注任务的后续进展，这种方法是很好的，也避免影响到你。但现实中往往会发生任务交接过程中就被丢掉的情况，意味着这种工作流可能不适合你或你的团队。此时为了保证任务能完成，可能把回调指向自己是最好的方案。</p>
+<p>回调发生的时间点往往不由你控制，也就意味着你正在处理的任务很可能被打断，发生被动切换。为了降低被动切换的影响，你需要尽量让回调的处理批量化。</p>
+<h2 id="选择主动中断点，批量处理回调"><a href="#选择主动中断点，批量处理回调" class="headerlink" title="选择主动中断点，批量处理回调"></a>选择主动中断点，批量处理回调</h2><p>前面提到，我们一天中总有一些主动的中断点，如果把对回调的处理选在这些时间，就能有效的降低处理回调的开销。显然，我们是在异步处理回调，且很可能是批量处理。</p>
+<p>想要批量处理回调，重点就是选择适当的回调方式，即你在设置回调时，要和合作方讲清楚，用你指定的方式通知你：</p>
+<ul>
+<li>最好的方式就是通过任务系统来通知，你每天定点看几次任务系统的通知，其它时间完全不看，就不会受非预期的回调的影响了。</li>
+<li>其次是通过邮件，你也可以很方便的选择不看。</li>
+<li>再次是IM系统，这样往往会产生一个未读消息，比较讨厌。如果关掉IM呢，又可能会错过高优先级的、需要同步处理的消息。</li>
+<li>再次是通过电话，往往意味着一次同步请求。</li>
+<li>最差就是当面讲，不光时间同步，空间上也要同步。当然有些情况下当面讲反倒可能节省时间，因为它传递了最多的信息量。但我仍然不推荐当面讲，对吞吐的影响实在太大了。</li>
+</ul>
+<h2 id="不要偷偷修改行为"><a href="#不要偷偷修改行为" class="headerlink" title="不要偷偷修改行为"></a>不要偷偷修改行为</h2><p>这点与高并发没什么直接关系，但它也会严重影响我们的并发性。对代码来说，注释&#x2F;文档与行为不一致是非常讨厌的，意味着你无法预期一个操作的行为。而对任务处理来说，不按规定&#x2F;承诺办事是最可怕的，意味着上面说的所有方法都是无效的，合作方的每次状态更新都不可信，你都需要亲自再检查一遍。这种行为害人害己，当团队里有这样的人时，及时清理掉才是最该做的。</p>
+<h2 id="不要过早优化"><a href="#不要过早优化" class="headerlink" title="不要过早优化"></a>不要过早优化</h2><p>编程领域的一句至理名言是“不要过早优化”，一种理解是不要提前做优化而影响代码的可读性、可维护性，而是要在拿到充分的性能数据，有数据支撑后，再针对关键路径做优化。同样，我们也不要为了实现高并发工作，而提前打乱自己或团队的工作节奏，同样应该先有数据支撑。</p>
+<h1 id="理想的高并发工作"><a href="#理想的高并发工作" class="headerlink" title="理想的高并发工作"></a>理想的高并发工作</h1><p>理想的高并发工作方式因人，因团队而异。对很多人来说，有一个强大的任务系统，有一群接受异步通信的需求方（意味着你不会被意外打断），有一群能给出可信承诺的合作方（包括需求方）的话，完全可以合理的按自己的工作节奏来处理任务。这之后就是如何提高自己的内功和能力的事情了。</p>
+<p>上面这些点，说起来容易，做起来难。然而事情总是要一件一件去做的。先设定好大目标，再确定一条简略的路径，总是没错的。我对自己设定的路径是：</p>
+<ul>
+<li>做好记录，尤其是对于可能有其他人关心的状态，通过任务系统的各种机制来记录。</li>
+<li>万事先承诺，无论是承诺别人，还是要别人的承诺，总之过夜的事情都要有承诺。</li>
+<li>更多的使用异步交流工具，更少的使用同步交流工具。</li>
+<li>拆分好任务，尤其是depend其他人的任务。</li>
+<li>推己及人，自己不愿意被打断，就不要随意打断其他人，比如无论什么优先级的事情都直接电话。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%A8%8B%E5%BA%8F%E4%BA%BA%E7%94%9F/" rel="tag"># 程序人生</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/01/30/future-promise/" rel="prev" title="Future与Promise">
+      <i class="fa fa-chevron-left"></i> Future与Promise
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/03/07/cpp-object-model-alignment/" rel="next" title="C++对象模型（一）Alignment">
+      C++对象模型（一）Alignment <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%89%8D%E8%A8%80"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%9B%AE%E6%A0%87%E5%AF%BC%E5%90%91"><span class="nav-number">2.</span> <span class="nav-text">目标导向</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%AB%98%E5%90%9E%E5%90%90"><span class="nav-number">2.1.</span> <span class="nav-text">高吞吐</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%8E%E5%BB%B6%E6%97%B6"><span class="nav-number">2.2.</span> <span class="nav-text">低延时</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%AB%98%E5%B9%B6%E5%8F%91%E7%9A%84%E8%A6%81%E7%B4%A0"><span class="nav-number">3.</span> <span class="nav-text">高并发的要素</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8F%90%E9%AB%98%E5%8D%95%E7%BA%BF%E7%A8%8B%E8%83%BD%E5%8A%9B"><span class="nav-number">3.1.</span> <span class="nav-text">提高单线程能力</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BF%9D%E8%AF%81%E4%B8%8A%E4%B8%8B%E6%96%87%E5%AE%8C%E6%95%B4%EF%BC%8C%E4%BE%BF%E4%BA%8E%E5%88%87%E6%8D%A2"><span class="nav-number">3.2.</span> <span class="nav-text">保证上下文完整，便于切换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB%EF%BC%8C%E8%8E%B7%E5%8F%96%E7%8A%B6%E6%80%81%E6%97%A0%E9%98%BB%E5%A1%9E"><span class="nav-number">3.3.</span> <span class="nav-text">读写分离，获取状态无阻塞</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8B%86%E5%88%86%E4%BB%BB%E5%8A%A1"><span class="nav-number">3.4.</span> <span class="nav-text">拆分任务</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BF%9D%E6%8C%81%E9%80%82%E5%BD%93%E7%9A%84%E6%97%B6%E9%97%B4%E7%89%87%E9%95%BF%E5%BA%A6"><span class="nav-number">3.5.</span> <span class="nav-text">保持适当的时间片长度</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%87%8F%E5%B0%91%E4%BD%BF%E7%94%A8%E5%90%8C%E6%AD%A5%E4%BA%A4%E6%B5%81%E5%B7%A5%E5%85%B7"><span class="nav-number">3.6.</span> <span class="nav-text">减少使用同步交流工具</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86%E5%A4%96%E9%83%A8%E8%AF%B7%E6%B1%82%E9%98%9F%E5%88%97%E5%8C%96"><span class="nav-number">3.7.</span> <span class="nav-text">将外部请求队列化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E6%9C%9F%E8%BD%AE%E8%AF%A2%E4%BD%A0%E7%9A%84%E4%B8%8B%E6%B8%B8"><span class="nav-number">3.8.</span> <span class="nav-text">定期轮询你的下游</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E5%9B%9E%E8%B0%83"><span class="nav-number">3.9.</span> <span class="nav-text">设置回调</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%80%89%E6%8B%A9%E4%B8%BB%E5%8A%A8%E4%B8%AD%E6%96%AD%E7%82%B9%EF%BC%8C%E6%89%B9%E9%87%8F%E5%A4%84%E7%90%86%E5%9B%9E%E8%B0%83"><span class="nav-number">3.10.</span> <span class="nav-text">选择主动中断点，批量处理回调</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8D%E8%A6%81%E5%81%B7%E5%81%B7%E4%BF%AE%E6%94%B9%E8%A1%8C%E4%B8%BA"><span class="nav-number">3.11.</span> <span class="nav-text">不要偷偷修改行为</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8D%E8%A6%81%E8%BF%87%E6%97%A9%E4%BC%98%E5%8C%96"><span class="nav-number">3.12.</span> <span class="nav-text">不要过早优化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%90%86%E6%83%B3%E7%9A%84%E9%AB%98%E5%B9%B6%E5%8F%91%E5%B7%A5%E4%BD%9C"><span class="nav-number">4.</span> <span class="nav-text">理想的高并发工作</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

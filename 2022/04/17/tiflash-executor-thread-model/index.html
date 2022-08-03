@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="TL;DR TiFlash 是 MPP + 列存的 HTAP 引擎，这篇主要介绍它的执行器的线程模型。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TiFlash 执行器线程模型">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/04/17/tiflash-executor-thread-model/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="TL;DR TiFlash 是 MPP + 列存的 HTAP 引擎，这篇主要介绍它的执行器的线程模型。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-04/tiflash-executor-thread-model-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-04/tiflash-executor-thread-model-01.png">
+<meta property="article:published_time" content="2022-04-17T15:45:38.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.660Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-04/tiflash-executor-thread-model-02.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/04/17/tiflash-executor-thread-model/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>TiFlash 执行器线程模型 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/04/17/tiflash-executor-thread-model/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          TiFlash 执行器线程模型
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-04-17 23:45:38" itemprop="dateCreated datePublished" datetime="2022-04-17T23:45:38+08:00">2022-04-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>TL;DR</strong></p>
+<p><a target="_blank" rel="noopener" href="https://github.com/pingcap/tiflash">TiFlash</a> 是 MPP + 列存的 HTAP 引擎，这篇主要介绍它的执行器的线程模型。</p>
+<span id="more"></span>
+
+<p>TiFlash 的执行器目前使用了一种比较粗犷的多线程模型（继承自较早版本的 ClickHouse）：</p>
+<ul>
+<li>每个任务（MPPTask）会独立地创建一组线程，任务间不会共享线程。</li>
+<li>算子间使用 push 模型。</li>
+<li>通过特定算子控制不同阶段的并发：<ul>
+<li><code>UnionBlockInputStream</code></li>
+<li><code>SharedQueryBlockInputStream</code></li>
+<li><code>ParallelAggregatingBlockInputStream</code></li>
+<li><code>CreatingSetsBlockInputStream</code></li>
+</ul>
+</li>
+<li><code>Exchange</code> 会单独创建线程与 gRPC 交互。</li>
+</ul>
+<p>本文使用的 sql：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> t1.a, <span class="built_in">sum</span>(t2.c)</span><br><span class="line"><span class="keyword">FROM</span> t1, t2</span><br><span class="line"><span class="keyword">WHERE</span> t1.a <span class="operator">=</span> t2.b <span class="keyword">AND</span> t1.a <span class="operator">&lt;</span> <span class="number">10</span></span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> t1.a</span><br><span class="line"><span class="keyword">HAVING</span> <span class="built_in">sum</span>(t2.c) <span class="operator">&gt;</span> <span class="number">1000</span></span><br></pre></td></tr></table></figure>
+
+<h1 id="背景知识"><a href="#背景知识" class="headerlink" title="背景知识"></a>背景知识</h1><h2 id="MPP"><a href="#MPP" class="headerlink" title="MPP"></a>MPP</h2><blockquote>
+<p>MPP 不是本文重点，点到为止。</p>
+</blockquote>
+<p>下图为两节点上的 MPP plan 结构，可以看到它分为两个 stage，各有 2 个 MPP task：</p>
+<p><img src="/images/2022-04/tiflash-executor-thread-model-02.png" alt="图1"></p>
+<p>TiFlash 的 MPP 的入口在 TiDB。</p>
+<p>TiDB optimizer 会根据规则与 cost 决定为这条 query 生成 MPP plan。每个 MPP plan 会被切分为多个 stage，每个 stage 则会实例化为若干个 MPP task。不同的 MPP task 之间通过 Exchange 算子进行通信。TiDB 与 root stage（上图中的 stage 2）之间也通过 Exchange 进行通信。</p>
+<p>Exchange 算子是由 receiver 端主动建立连接，之后 sender 端会源源不断地将数据推送到 receiver 端。</p>
+<h2 id="算子"><a href="#算子" class="headerlink" title="算子"></a>算子</h2><p>下图为 stage 2 的 MPP task 内部执行树（并发为 3）：</p>
+<p><img src="/images/2022-04/tiflash-executor-thread-model-01.png" alt="图2"></p>
+<p>TiFlash 使用了类似于 volcano 的 pull 模型，执行流是由一个个 IBlockInputStream（下文简称 InputStream）组成的，可以认为它们就是 TiFlash 的算子。每个 InputStream） 支持以下基本接口：</p>
+<ul>
+<li>readPrefix：类似于 open。</li>
+<li>read：类似于 next。</li>
+<li>readSuffix：类似于 close。</li>
+</ul>
+<p>大多数 InputStream 都只能被一个线程访问。为了能利用上多核，我们需要在执行流中显式插入几种特定的 InputStream 以实现并发：</p>
+<ul>
+<li><code>UnionBlockInputStream</code>：实现 1:N 的并发，将 N 个 InputStream 的输出合并为一个流。</li>
+<li><code>SharedQueryBlockInputStream</code>：实现 N:1 的并发，将 1 个 InputStream 的输出分为 N 个流使用。</li>
+<li><code>ParallelAggregatingBlockInputStream</code>：两阶段聚合，partial 阶段分别在 N 个线程构建 HashTable，merge 阶段则单线程或并发将 N 个 HashTable 合并起来，对外输出一个流。</li>
+<li><code>CreatingSetsBlockInputStream</code>：接受一个数据 InputStream 和代表 JoinBuild 的若干个 Subquery，并发启动这些 Subquery，并等待它们执行结束之后再开始启动数据 InputStream。</li>
+</ul>
+<p>上图中：</p>
+<ul>
+<li>每个小长方形代表一个 InputStream。</li>
+<li>每个虚线框代表一个线程。</li>
+<li>实线代表数据流向。</li>
+<li>虚线代表控制流。</li>
+</ul>
+<p>（图中省略了 RPC 相关的线程）</p>
+<p>可以通过 <a target="_blank" rel="noopener" href="https://github.com/pingcap/tiflash/blob/bd50b0efc629a30959c9fe908849084a891077b3/dbms/src/Flash/Coprocessor/InterpreterDAG.cpp#L58">InterpreterDAG::execute</a> 进一步了解 TiFlash 构建执行树的细节。</p>
+<h1 id="正文"><a href="#正文" class="headerlink" title="正文"></a>正文</h1><h2 id="为什么要用多线程模型"><a href="#为什么要用多线程模型" class="headerlink" title="为什么要用多线程模型"></a>为什么要用多线程模型</h2><p>TiFlash 的类 volcano 执行过程中会存在大量阻塞。</p>
+<blockquote>
+<p>例子：<a target="_blank" rel="noopener" href="https://github.com/pingcap/tiflash/blob/bd50b0efc629a30959c9fe908849084a891077b3/dbms/src/DataStreams/FilterBlockInputStream.cpp#L91">FilterBlockInputStream::readImpl</a></p>
+</blockquote>
+<p>如果我们使用线程池，就会遇到以下问题：</p>
+<ul>
+<li><p>阻塞的算子会占用线程资源，整体资源利用率上不去。</p>
+</li>
+<li><p>线程资源无法令一个 task 的所有 job 同时运行，有死锁风险。</p>
+<p>  有两类死锁风险：</p>
+<ul>
+<li>一个 task 内部。假设一台机器有 40 个线程，我们有 40 个 JoinBuild job 和 40 个 JoinProbe job，则显然这些 job 没办法一次运行完成。假如不幸发生了，我们没有保证这些 job 按依赖顺序调度（比如简单地令所有算子同时运行），则可能出现以下场景：40 个 JoinProbe job 占据了所有线程，等待着 JoinBuild 完成，但后者永远无法得到可用线程。</li>
+<li>多个 task 之间。假设有两台机器，A 服务 task1 和 task2，B 服务 task3 和 task 4。task1 阻塞在向 task3 发送数据，因此导致 task2 无法执行；task4 阻塞在向 task2 发送数据，因此导致 task3 无法执行。由此 4 个 task 都无法执行。</li>
+</ul>
+</li>
+</ul>
+<p>而简单地令每个 task 各自创建线程，就避开了死锁和资源利用率的问题。但这种模式也有问题：</p>
+<ul>
+<li>并发过高时，线程太多，最终会到达 OS 的限制。</li>
+<li>这种频繁创建销毁线程的模式会带来额外的性能损耗（见下节）。另外对于大量依赖 thread-local 的基础库（如 jemalloc）不太友好。</li>
+</ul>
+<h2 id="你知道-TiFlash-有多努力吗"><a href="#你知道-TiFlash-有多努力吗" class="headerlink" title="你知道 TiFlash 有多努力吗"></a>你知道 TiFlash 有多努力吗</h2><p>TiFlash 在 6.0 版本中引入了三个 feature 以改善线程模型：</p>
+<ul>
+<li>弹性线程池，在 task 间复用线程以避免创建销毁线程的开销。注意它不同于常见的固定大小的线程池，弹性线程池在负载满时一定会额外分配线程，以避免死锁。当然代价是弹性线程池仍然无法控制住线程数的上限。这项功能后面会有专门的文章介绍，这里只简单说下效果：在高并发短查询场景中，线程创建销毁的开销会成为明显瓶颈，导致平均 CPU 利用率只能维持在 50% 左右，而在打开弹性线程池之后，CPU 利用率可以基本稳定在接近 100%。</li>
+<li>Async gRPC，将 TiFlash 中用于 RPC 的线程数控制在接近常数个。其中 server 端实现得比较好，已经将 RPC 线程数控制在常数个了，但 client 端还差一些，目前只能控制为与 task 数量成正比，后续还可以进一步改进。</li>
+<li><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/495745028">基于 min tso 的 local task 调度</a>，在每台机器上根据 query 的 tso 按顺序进行调度，从而控制总体线程数，同时避免死锁。</li>
+</ul>
+<p>这三项功能可以很大程度上改善 TiFlash 在高并发场景中的性能和稳定性。</p>
+<h2 id="如何让-TiFlash-用上线程池"><a href="#如何让-TiFlash-用上线程池" class="headerlink" title="如何让 TiFlash 用上线程池"></a>如何让 TiFlash 用上线程池</h2><p>为了能让 TiFlash 用上线程池，一种方案是将它的 pull 模型改为 push 模型。不再一启动就创建全部算子，而是将整个 task 划分为若干个 pipeline，每个 pipeline 只在有数据时触发 job 提交到线程池中。这样每个 job 都是纯计算的，不存在阻塞。</p>
+<p>这种方案我印象中是在 morsel driven 之后逐渐普及开的，目前最新的 ClickHouse、StarRocks、DuckDB 等系统也都使用了类似的方式。</p>
+<blockquote>
+<p><a target="_blank" rel="noopener" href="https://bohutang.me/2020/06/11/clickhouse-and-friends-processor/">ClickHouse和他的朋友们（4）Pipeline处理器和调度器</a></p>
+</blockquote>
+<p>对于 TiFlash 而言，这就需要重构整个执行模型，风险还是比较高的。</p>
+<p>另一种方案则可以在不改变执行模型的情况下使用固定大小的线程池：用协程。</p>
+<p>在 push 模型中每个 pipeline 都需要做状态判断，把等待数据的阻塞转换为异步操作。常见的转换方法可以用 callback，也可以依赖于上下游算子轮询。通常我们可以假设一个 query 执行过程中算子是不变的，因此每个算子的上下游都是固定的，这样轮询状态也是可以接受的。</p>
+<p>而使用协程就相当于自动将阻塞操作给异步化了：被阻塞的协程自动挂起，等待被唤醒，物理线程则调度执行下个可运行的协程。这样我们可以保留 pull 模型，继续使用同步代码，但不需要担心阻塞问题。</p>
+<p>我们知道协程可以分为有栈协程（stackful coroutine）和无栈协程（stackless coroutine），通常认为前者因为需要为协程分配栈，内存开销大，另外协程间的切换成本也略高于后者。但在 OLAP 这个特定领域，尤其是在结合向量化之后，通常不会有大量协程，也不会有大量切换。此时有栈协程的编程简单、侵入性低的优势就体现出来了。</p>
+<blockquote>
+<p>参见 <a target="_blank" rel="noopener" href="https://www.zhihu.com/question/65647171/answer/2175274060">async&#x2F;await异步模型是否优于stackful coroutine模型？ - 付哲的回答</a></p>
+</blockquote>
+<p>我在去年 10 月尝试向 TiFlash 中引入 boost::fiber（一个有栈协程库），大概也只用了两个晚上就得到了一个基本可用的版本（需要禁掉部分依赖于 thread-local 的特性）。</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/fuzhe1989/tiflash/tree/fuzhe/fiber_tiflash">这里是前段时间基于 6.0 重新 patch 的基于 boost::fiber 的 TiFlash</a>，可能还有点小问题。可以看到我只做了几项改动：</p>
+<ol>
+<li>将 C++ 标准库的 <code>std::mutex</code>、<code>std::condition_variable</code> 等同步原语替换为 boost::fiber 对应的类型。</li>
+<li>在特定位置（实际就是每个线程的 entry function）显式插入 <code>yield</code>，以避免一个协程消耗过多 CPU 时间片。</li>
+<li>在 TableScan 上面插入一个 <code>IOAdapterBlockInputStream</code>，这样 TableScan 仍然在 OS 线程中执行，但与上游算子之间通过 <code>boost::fibers::buffered_channel</code> 通信。</li>
+</ol>
+<p>使用 boost::fiber 的好处很明显，是用了非常小的改动换来了实际控制住了线程数（如果有时间将 IO 也异步化，那么 TableScan 也可以在协程中执行）。它的缺点是：</p>
+<ol>
+<li>需要仔细 review 各种同步原语的使用，尤其是三方库中隐式使用的。如果不小心在协程中使用了会导致 OS 线程阻塞的函数，则整个系统的执行效率会大受影响，甚至还有死锁的风险。这点在之前阿里云 pangu 的异步化改造过程中曾经多次出现过，造成了非常坏的后果。</li>
+<li>相比之前直接使用 OS 线程，使用 boost::fiber 之后 debug 难度极剧增加：没办法通过 pstack&#x2F;gdb 看线程栈了。这样一旦出现了逻辑死锁，某个协程永远无法执行，我们很难在系统之外找到这个协程。但这也是所有异步化系统的通病，通常要么深度改造协程库，允许注入一些业务逻辑的标识；要么业务方自己引入一些 tracing 机制。</li>
+</ol>
+<p>当然因为种种原因，这个分支在去年 10 月开发测试完成后，并没有再进一步。鉴于我即将离开 TiFlash，协程这条路应该在相当长一段时间不会出现在 TiFlash 的主干代码中。如果有朋友对我上面的分支感兴趣，欢迎评论、私信交流。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/03/05/one-creed-intention-semantic/" rel="prev" title="纲领、意图、语义：从接口设计到公司治理">
+      <i class="fa fa-chevron-left"></i> 纲领、意图、语义：从接口设计到公司治理
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/" rel="next" title="基于 fs 抽象实现 cloud native kv engine">
+      基于 fs 抽象实现 cloud native kv engine <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%83%8C%E6%99%AF%E7%9F%A5%E8%AF%86"><span class="nav-number">1.</span> <span class="nav-text">背景知识</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#MPP"><span class="nav-number">1.1.</span> <span class="nav-text">MPP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%97%E5%AD%90"><span class="nav-number">1.2.</span> <span class="nav-text">算子</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%AD%A3%E6%96%87"><span class="nav-number">2.</span> <span class="nav-text">正文</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8%E5%A4%9A%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.1.</span> <span class="nav-text">为什么要用多线程模型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%A0%E7%9F%A5%E9%81%93-TiFlash-%E6%9C%89%E5%A4%9A%E5%8A%AA%E5%8A%9B%E5%90%97"><span class="nav-number">2.2.</span> <span class="nav-text">你知道 TiFlash 有多努力吗</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E8%AE%A9-TiFlash-%E7%94%A8%E4%B8%8A%E7%BA%BF%E7%A8%8B%E6%B1%A0"><span class="nav-number">2.3.</span> <span class="nav-text">如何让 TiFlash 用上线程池</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

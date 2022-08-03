@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data Ceph笔记：  Ceph Dynamic Metadata Management CRUSH: Data Placement   TL;DR CRUSH是一种确定性的hash算法，用来计算数据（对象）的存储位置。 Ceph中CRUSH的价值在于M">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/04/26/crush-controlled-scalable-decentralized-placement-of-replicated-data/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data Ceph笔记：  Ceph Dynamic Metadata Management CRUSH: Data Placement   TL;DR CRUSH是一种确定性的hash算法，用来计算数据（对象）的存储位置。 Ceph中CRUSH的价值在于M">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/crush-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/crush-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/crush-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/crush-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/crush-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/crush-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-04/crush-07.png">
+<meta property="article:published_time" content="2021-04-26T10:07:45.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.653Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="ConsistentHash">
+<meta property="article:tag" content="Ceph">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-04/crush-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/04/26/crush-controlled-scalable-decentralized-placement-of-replicated-data/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/26/crush-controlled-scalable-decentralized-placement-of-replicated-data/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-26 18:07:45" itemprop="dateCreated datePublished" datetime="2021-04-26T18:07:45+08:00">2021-04-26</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/4090205/">CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data</a></p>
+<p>Ceph笔记：</p>
+<ul>
+<li><a href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system">Ceph</a></li>
+<li><a href="/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems">Dynamic Metadata Management</a></li>
+<li>CRUSH: Data Placement</li>
+</ul>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>CRUSH是一种确定性的hash算法，用来计算数据（对象）的存储位置。</p>
+<p>Ceph中CRUSH的价值在于MDS和client都通过CRUSH来计算对象位置，这样client可以直接与OSD（Object Storage Device）通信，MDS也不需要维护对象与OSD之间的映射了。</p>
+<p>另一方面，相比其它hash算法，CRUSH有以下优势：</p>
+<ol>
+<li>相比平坦的hash，CRUSH支持层级结构和权重，可以实现复杂的分布策略。</li>
+<li>在有节点变动时，CRUSH可以最小化数据的迁移（根据分布策略），而简单的hash则会导致大量数据迁移。</li>
+<li>对failed和overloaded的设备有特殊处理。</li>
+</ol>
+<span id="more"></span>
+
+<p>CRUSH的策略受到两个变量的控制，一个是cluster map，其中支持多个层级，如root、row、cabinet、disk；另一个是placement rules，控制replica的数量和相应的限制。</p>
+<p>CRUSH的输入是一个整数x（比如对象名字的hash值），输出是n个设备的列表。</p>
+<p>cluster map中叶子节点称为device，可以有权重，其它内部节点称为bucket，权重是底下所有叶子权重之和。在选择设备时，CRUSH会根据hash一层层递归计算bucket，最终确定需要哪些device。注意：bucket本身有类型（如uniform、list、tree、straw），不同类型的bucket有不同的选择算法。</p>
+<p>placement rules里面可以根据物理位置、电源供应、网络拓扑等条件将对象的不同replica分散开，从而降低不可用的风险。每个rule包含一系列操作，如下图。</p>
+<p><img src="/images/2021-04/crush-01.png"></p>
+<p><img src="/images/2021-04/crush-02.png"></p>
+<p>其中<code>take</code>表示选择一个节点加到当前列表中，<code>select</code>会在列表中每个节点上应用，选择n个符合条件的节点出来。</p>
+<p>一个rule中有多个<code>take</code>和<code>emit</code>可以从不同的存储池中选择不同设备。</p>
+<p>在选择过程中，CRUSH会考虑三种异常：</p>
+<ol>
+<li>failed和overloaded（在cluster map中标记），此时CRUSH会在当前层级重试（见下面算法的11行）。</li>
+<li>冲突（设备已被选中），此时CRUSH会在下一层重试（见下面算法的14行）。</li>
+</ol>
+<p>同层重试时，有两种策略：</p>
+<ol>
+<li>first n，下图中r’ &#x3D; r + f，b挂了则选择后面的g、h等。这种适合于primary copy这种不同设备存储相同replica的情况。</li>
+<li>r’ &#x3D; r + f<sub>r</sub>n，b挂了则选择第2 + 1*6个设备h。这种适合于parity、erasure coding等不同设备存储不同内容的情况。</li>
+</ol>
+<p><img src="/images/2021-04/crush-03.png"></p>
+<p><img src="/images/2021-04/crush-04.png"></p>
+<p>failed和overloaded两种设备都会留在cluster map中，只是有不同的标记。failed设备上的已有对象会被迁移到其它正常设备上，预期迁移比例为W<sub>failed</sub>&#x2F;W。overloaded设备只是不再接受新对象，已有对象不需要迁移。</p>
+<p>当有设备加入或移除时，需要迁移的数据量也与权重有关：权重被降低的子树会有数据迁移到权重被升高的子树上。</p>
+<p><img src="/images/2021-04/crush-05.png"></p>
+<p>数据迁移量的下界是φ&#x2F;W，而上界是hφ&#x2F;W，其中h是树的高度，但达到上界的概率非常小：需要每层数据都映射到一个权重非常小的设备上。</p>
+<p>最后是不同的bucket type。</p>
+<p>CRUSH支持4种bucket，分别有不同的选择算法:</p>
+<ol>
+<li><p>uniform</p>
+<p> 所有设备权重相同。公式为：c(r, x) &#x3D; (hash(x) + rp) % m。其中p是某个大于bucket大小m的质数。</p>
+<p> 优点是选择的时间复杂度为O(1)，缺点是一旦有设备变动，几乎所有数据都需要迁移。适合设备不怎么变动的场景。</p>
+</li>
+<li><p>list</p>
+<p> 有点像链表，支持权重，选择时比较head的权重与剩余权重和来决定选择head还是继续。</p>
+<p> 优点是当新设备加入时迁移量最优（与权重比例相同），缺点是当移除非head节点时会引起大量数据迁移（越接近tail越多）。适合设备几乎不移除的场景。</p>
+</li>
+<li><p>tree</p>
+<p> 根据左右子树的权重和选择插入路径。为了避免树扩张或收缩过程中节点的label发生变化，tree bucket使用了一种路径标记的方式（左子树1，右子树0）来生成label。</p>
+<p> <img src="/images/2021-04/crush-06.png"></p>
+</li>
+<li><p>straw</p>
+<p> 这种似乎用得比较多？根据item和节点的权重，每个节点生成一个hash值，然后选择其中最大的那个。</p>
+<p> c(r, x) &#x3D; max<sub>i</sub>(f(w<sub>i</sub>)hash(x, r, i))</p>
+</li>
+</ol>
+<p><img src="/images/2021-04/crush-07.png"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/ConsistentHash/" rel="tag"># ConsistentHash</a>
+              <a href="/tags/Ceph/" rel="tag"># Ceph</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems/" rel="prev" title="[笔记] Dynamic Metadata Management for Petabyte-scale File Systems">
+      <i class="fa fa-chevron-left"></i> [笔记] Dynamic Metadata Management for Petabyte-scale File Systems
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/04/28/hyper-a-hybrid-oltp-olap-main-memory-database-system-based-on-virtual-memory-snapshots/" rel="next" title="[笔记] Hyper: A Hybrid OLTP&OLAP Main Memory Database System Based on Virtual Memory Snapshots">
+      [笔记] Hyper: A Hybrid OLTP&OLAP Main Memory Database System Based on Virtual Memory Snapshots <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Large-scale incremental processing using distributed transactions and notifications  TL;DR Percolator是Google用于构建增量web索引的数据系统。它的价值在于提出了一种基于NoSQL（BigTable）的两阶段提交（2PC）实现。 Percolator的2PC实现有以下特点：  部分去中">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Large-scale incremental processing using distributed transactions and notifications (Percolator)">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Large-scale incremental processing using distributed transactions and notifications  TL;DR Percolator是Google用于构建增量web索引的数据系统。它的价值在于提出了一种基于NoSQL（BigTable）的两阶段提交（2PC）实现。 Percolator的2PC实现有以下特点：  部分去中">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/percolator-01.png">
+<meta property="article:published_time" content="2020-12-11T14:21:40.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.657Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLTP">
+<meta property="article:tag" content="2PC">
+<meta property="article:tag" content="Google">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-12/percolator-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Large-scale incremental processing using distributed transactions and notifications (Percolator) | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Large-scale incremental processing using distributed transactions and notifications (Percolator)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-11 22:21:40" itemprop="dateCreated datePublished" datetime="2020-12-11T22:21:40+08:00">2020-12-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/event/osdi10/tech/full_papers/Peng.pdf">Large-scale incremental processing using distributed transactions and notifications</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Percolator是Google用于构建增量web索引的数据系统。它的价值在于提出了一种基于NoSQL（BigTable）的两阶段提交（2PC）实现。</p>
+<p>Percolator的2PC实现有以下特点：</p>
+<ol>
+<li>部分去中心化：依赖中心化的Timestamp Oracle（TSO），但不依赖集中式的锁管理节点。</li>
+<li>乐观锁：不能阻塞，检测到冲突需要abort。</li>
+<li>Snapshot Isolation：读比较旧的ts时不会被写block；但为了避免违反SI，读比较新的ts时可能会被写block。</li>
+<li>惰性清理：client失败导致的状态不一致不会立即被清理（没有中心节点）。client之间有种协作关系，如果发起事务的client挂了，根据事务进度，其它client既可能帮它abort，也可能帮它commit。</li>
+</ol>
+<p>以上很多特点都是源于Percolator没有中心节点，也导致了它的2PC延时偏高（尤其是失败时），但优点是能适应巨大的规模。这也是Google系产品的一个特点，可以不那么快，但一定要支持巨大的规模。</p>
+<p>Google系产品的第二个特点是很积极地使用已有产品来构建新系统，这里Percolator选择了基于BigTable来做，就体现了这一点。</p>
+<p>这篇文章实际讲了Percolator的两块内容，一个是2PC，另一个是observer，一种可级联的触发器，但后者似乎没有太多关注。</p>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Google的web索引构建的规模非常巨大，MapReduce一开始就是为此设计的，Google使用了若干个MR任务定期计算全量的web索引。但这个系统没办法快速响应增量修改，新网页被收录的时间要以天为单位。</p>
+<p>面对这个需求，Google有两个选择，一个是使用DBMS，一个是使用NoSQL。前者的问题是规模上不去（Google当时还在用分库分表的MySQL），后者可以支持这么大的规模，但问题是不支持分布式事务。</p>
+<p>最终Google选择了用BigTable来构建Percolator，在此基础上实现了支持ACID的分布式事务、Snapshot Isolation（SI）、以及一种触发器机制（observer）。</p>
+<h2 id="Design"><a href="#Design" class="headerlink" title="Design"></a>Design</h2><p>Percolator的架构上与2PC相关的有：</p>
+<ul>
+<li>1个TSO，提供全局单调增的timestamp。</li>
+<li>若干个client。</li>
+<li>一套BigTable。</li>
+</ul>
+<p>另外为了实现触发器，Percolator还单独有worker进程和一个轻量的锁服务。</p>
+<h3 id="Transactions"><a href="#Transactions" class="headerlink" title="Transactions"></a>Transactions</h3><p>Percolator的数据模型是二维的，行×列确定一个cell。一个事务可以包含若干个cell，支持跨表、行。</p>
+<p>Percolator没有引入中心节点，而是将所有与2PC相关的元数据都保存在了对应的BigTable行中。</p>
+<p>具体来说，Percolator每行对应BigTable中一行，每列对应BigTable中5列，每次修改都使用BigTable的单行事务。</p>
+<p>对于列c，它会对应BigTable中以下5列：</p>
+<ul>
+<li><code>c:lock</code>，未提交的事务会在其中记录primary的位置，commit或abort后被清除。</li>
+<li><code>c:write</code>，保存最大的已提交版本。</li>
+<li><code>c:data</code>，保存多版本的数据，可能包含未提交的数据。</li>
+<li><code>c:notify</code>，给触发器用的提示。</li>
+<li><code>c:ack_O</code>，触发器运行记录。</li>
+</ul>
+<p>这里关注前3列。</p>
+<p>每个事务都有一个primary，是这个事务中任意一个cell，它的write列会用于标识整个事务是否可abort，或必须commit。其它所有参与的cell都称为secondary。</p>
+<p>Percolator使用BigTable的版本来做MVCC并实现了SI。每个事务对应一个时间范围<code>[startTS, commitTS]</code>，读操作对应<code>[0, startTS]</code>。SI会阻止以下几种情况（参考图3）：</p>
+<ol>
+<li>写写冲突：两个时间范围有重叠的事务同时修改一个cell，只会有一个成功。</li>
+<li>写读冲突：同一个cell上的读操作与未提交的写冲突。</li>
+</ol>
+<p>但SI没办法避免write skew。</p>
+<p>以下是一个使用Percolator的例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">UpdateDocument</span><span class="params">(Document doc)</span> </span>&#123;</span><br><span class="line">    <span class="function">Transaction <span class="title">t</span><span class="params">(&amp;cluster)</span></span>;</span><br><span class="line">    t.<span class="built_in">Set</span>(doc.<span class="built_in">url</span>(), <span class="string">&quot;contents&quot;</span>, <span class="string">&quot;document&quot;</span>, doc.<span class="built_in">contents</span>());</span><br><span class="line">    <span class="type">int</span> hash = <span class="built_in">Hash</span>(doc.<span class="built_in">contents</span>());</span><br><span class="line"></span><br><span class="line">    <span class="comment">// dups table maps hash → canonical URL</span></span><br><span class="line">    string canonical;</span><br><span class="line">    <span class="keyword">if</span> (!t.<span class="built_in">Get</span>(hash, <span class="string">&quot;canonical-url&quot;</span>, <span class="string">&quot;dups&quot;</span>, &amp;canonical)) &#123;</span><br><span class="line">        <span class="comment">// No canonical yet; write myself in</span></span><br><span class="line">        t.<span class="built_in">Set</span>(hash, <span class="string">&quot;canonical-url&quot;</span>, <span class="string">&quot;dups&quot;</span>, doc.<span class="built_in">url</span>());</span><br><span class="line">    &#125; <span class="comment">// else this document already exists, ignore new copy</span></span><br><span class="line">    <span class="keyword">return</span> t.<span class="built_in">Commit</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="/images/2020-12/percolator-01.png" alt="Example usage of the Percolator API"></p>
+<p>Percolator的<code>Get()</code>会检测要读的cell的lock列的<code>[0, startTS]</code>有没有数据，如果有，说明当前snapshot有未提交的事务，<strong>可能</strong>修改当前snapshot的状态。为了保证SI，<code>Get()</code>需要退避重试，等待当前snapshot状态确定了（没有未提交事务）才能读出数据。如果当前没有冲突，<code>Get()</code>会根据write列在当前snapshot的最后一次提交版本，返回data列对应的数据。</p>
+<p>具体实现为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">Get</span><span class="params">(Row row, Column c, string* value)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">        bigtable::Txn T = bigtable::<span class="built_in">StartRowTransaction</span>(row);</span><br><span class="line">        <span class="comment">// Check for locks that signal concurrent writes.</span></span><br><span class="line">        <span class="keyword">if</span> (T.<span class="built_in">Read</span>(row, c+<span class="string">&quot;lock&quot;</span>, [<span class="number">0</span>, start_ts])) &#123;</span><br><span class="line">            <span class="comment">// There is a pending lock; try to clean it and wait</span></span><br><span class="line">            <span class="built_in">BackoffAndMaybeCleanupLock</span>(row, c);</span><br><span class="line">            <span class="keyword">continue</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// Find the latest write below our start timestamp.</span></span><br><span class="line">        latest write = T.<span class="built_in">Read</span>(row, c+<span class="string">&quot;write&quot;</span>, [<span class="number">0</span>, start_ts]);</span><br><span class="line">        <span class="keyword">if</span> (!latest write.<span class="built_in">found</span>()) <span class="keyword">return</span> <span class="literal">false</span>; <span class="comment">// no data</span></span><br><span class="line">        <span class="type">int</span> data_ts = latest write.start <span class="built_in">timestamp</span>();</span><br><span class="line">        *value = T.<span class="built_in">Read</span>(row, c+<span class="string">&quot;data&quot;</span>, [data_ts, data_ts]);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Percolator的写分为两阶段，第一阶段是<code>Prewrite()</code>，对要写的每行，它先会检测是否有与之冲突的写（大于它的startTS的已提交事务或活跃的未提交事务）。如果没有，则将数据写入data列，primary信息写入lock列，版本都使用startTS。</p>
+<p>具体实现为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Prewrite tries to lock cell w, returning false in case of conflict.</span></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">Prewrite</span><span class="params">(Write w, Write primary)</span> </span>&#123;</span><br><span class="line">    Column c = w.col;</span><br><span class="line">    bigtable::Txn T = bigtable::<span class="built_in">StartRowTransaction</span>(w.row);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Abort on writes after our start timestamp . . .</span></span><br><span class="line">    <span class="keyword">if</span> (T.<span class="built_in">Read</span>(w.row, c+<span class="string">&quot;write&quot;</span>, [start ts , ∞])) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    <span class="comment">// . . . or locks at any timestamp.</span></span><br><span class="line">    <span class="keyword">if</span> (T.<span class="built_in">Read</span>(w.row, c+<span class="string">&quot;lock&quot;</span>, [<span class="number">0</span>, ∞])) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">    T.<span class="built_in">Write</span>(w.row, c+<span class="string">&quot;data&quot;</span>, start ts , w.value);</span><br><span class="line">    T.<span class="built_in">Write</span>(w.row, c+<span class="string">&quot;lock&quot;</span>, start ts ,</span><br><span class="line">        &#123;primary.row, primary.col&#125;); <span class="comment">// The primary’s location.</span></span><br><span class="line">    <span class="keyword">return</span> T.<span class="built_in">Commit</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>第二阶段是<code>Commit()</code>，它会再次检查所有行是否有与之冲突的写（复用<code>Prewrite()</code>）。然后先提交primary，更新write列并删除lock列对应内容。注意lock列可能被其它client清理掉，此时当前事务只能abort（不需要做其它清理）。提交primary成功后依次提交每个secondary，也是更新write列并删除lock列对应内容。</p>
+<p>当primary提交成功后，整个事务就提交成功了，即使client在提交secondary过程中挂了，其它client也会后续协助这个事务将其完成。如果primary提交失败，其它client会协助做完所有清理。</p>
+<p>具体实现为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">Commit</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Write primary = writes [<span class="number">0</span>];</span><br><span class="line">    <span class="function">vector&lt;Write&gt; <span class="title">secondaries</span><span class="params">(writes .begin()+<span class="number">1</span>, writes .end())</span></span>;</span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">Prewrite</span>(primary, primary)) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    <span class="keyword">for</span> (Write w : secondaries)</span><br><span class="line">        <span class="keyword">if</span> (!<span class="built_in">Prewrite</span>(w, primary)) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> commit ts = oracle .<span class="built_in">GetTimestamp</span>();</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Commit primary first.</span></span><br><span class="line">    Write p = primary;</span><br><span class="line">    bigtable::Txn T = bigtable::<span class="built_in">StartRowTransaction</span>(p.row);</span><br><span class="line">    <span class="keyword">if</span> (!T.<span class="built_in">Read</span>(p.row, p.col+<span class="string">&quot;lock&quot;</span>, [start ts , start ts ]))</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>; <span class="comment">// aborted while working</span></span><br><span class="line">    T.<span class="built_in">Write</span>(p.row, p.col+<span class="string">&quot;write&quot;</span>, commit ts,</span><br><span class="line">        start ts ); <span class="comment">// Pointer to data written at start ts .</span></span><br><span class="line">    T.<span class="built_in">Erase</span>(p.row, p.col+<span class="string">&quot;lock&quot;</span>, commit ts);</span><br><span class="line">    <span class="keyword">if</span> (!T.<span class="built_in">Commit</span>()) <span class="keyword">return</span> <span class="literal">false</span>; <span class="comment">// commit point</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// Second phase: write out write records for secondary cells.</span></span><br><span class="line">    <span class="keyword">for</span> (Write w : secondaries) &#123;</span><br><span class="line">        bigtable::<span class="built_in">Write</span>(w.row, w.col+<span class="string">&quot;write&quot;</span>, commit ts, start ts );</span><br><span class="line">        bigtable::<span class="built_in">Erase</span>(w.row, w.col+<span class="string">&quot;lock&quot;</span>, commit ts);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>primary是Percolator实现的精髓，它将多行的原子操作（事务提交成功与否）转化为了单行的原子操作（primary提交成功与否）。</p>
+<p>所有的事务实现本质上都体现了这种downscale的思想，将某个原子操作降级为对更小scope（或临界区）的原子操作：</p>
+<ul>
+<li>分布式事务可以利用中心节点，降级为中心节点状态的单机事务；</li>
+<li>单机事务可以降级为某个<code>mutex</code>的原子操作；</li>
+<li><code>mutex</code>的原子操作可以降级为一次CAS操作。</li>
+</ul>
+</blockquote>
+<p>考虑到client挂掉的情况，当其它client看到一个已经开始了很久的事务时，会开始做清理。清理的第一步是确认事务状态：</p>
+<ul>
+<li>如果对应的primary cell的write列已经有这个事务的记录时，说明这个事务已经提交成功了，接下来依次提交各个secondary。</li>
+<li>否则说明事务未提交成功，应该rollback。</li>
+</ul>
+<p>rollback过程：</p>
+<ul>
+<li>尝试清除primary cell的lock列与data列，如果失败则说明可能有其它client在并行，就结束rollback。</li>
+<li>依次清除各个secondary。</li>
+</ul>
+<p>为了避免自己在做的事务被其它client给rollback掉，client可以将自己的状态记在Chubby中，并定期更新自己的wall time，这样只有它真正挂了，或很久没有工作时，它的事务才会被rollback掉。</p>
+<h3 id="Timestamps"><a href="#Timestamps" class="headerlink" title="Timestamps"></a>Timestamps</h3><p>TSO是Percolator中唯一的单点服务，它的性能要足够好才能不成为整个系统的瓶颈。Percolator的解法是batch：</p>
+<ul>
+<li>TSO每次持久化都提前分配好一段时间的timestamp，减少持久化次数，后续分配只走内存。</li>
+<li>client在申请timestamp时会批量申请多个timestamp，供后续若干个事务使用。</li>
+</ul>
+<p>优化之后的TSO单机可以每秒分配两百万个timestamp。</p>
+<h3 id="Notifications"><a href="#Notifications" class="headerlink" title="Notifications"></a>Notifications</h3><p>略</p>
+<h3 id="Discussion"><a href="#Discussion" class="headerlink" title="Discussion"></a>Discussion</h3><p>Percolator的性能瓶颈之一就是单个事务访问BigTable次数过多（初始版本差不多50次RPC）。Percolator的优化包括：</p>
+<ol>
+<li>帮助BigTable实现了read-modify-write的单行事务（通过conditional update实现）。</li>
+<li>client在开始事务前会等待几秒（Percolator的目标场景对延时不那么敏感），将发往相同BigTable tablet的请求聚合成一个batch操作。理论上这个优化会增加冲突的概率，但Percolator场景中冲突本来就很少，因此影响不大。</li>
+<li>每个读请求也会等待几秒以增加聚合的概率。</li>
+<li>每次读个别列的时候，把整行都预读出来，因为大概率后面就会读这行的其它列。</li>
+</ol>
+<blockquote>
+<p>Percolator的目标场景：</p>
+<ol>
+<li>巨大的规模；</li>
+<li>冲突概率很小；</li>
+<li>更重视整体吞吐，而不是单次请求的延时（因为是离线任务）。</li>
+</ol>
+<p>近年有很多NewSQL系统使用了Percolator作为其事务模型，但从Percolator本来针对的场景来看，它只适用于冲突很小的情况，对于冲突很多的OLTP场景，它的rollback开销会非常大。后面开发的Spanner就采用了不同的2PC实现方式。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLTP/" rel="tag"># OLTP</a>
+              <a href="/tags/2PC/" rel="tag"># 2PC</a>
+              <a href="/tags/Google/" rel="tag"># Google</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/" rel="prev" title="[笔记] Dremel: a decade of interactive SQL analysis at web scale">
+      <i class="fa fa-chevron-left"></i> [笔记] Dremel: a decade of interactive SQL analysis at web scale
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/12/14/spanner-googles-globally-distributed-database/" rel="next" title="[笔记] Spanner: Google's Globally-Distributed Database">
+      [笔记] Spanner: Google's Globally-Distributed Database <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Design"><span class="nav-number">2.</span> <span class="nav-text">Design</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Transactions"><span class="nav-number">2.1.</span> <span class="nav-text">Transactions</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Timestamps"><span class="nav-number">2.2.</span> <span class="nav-text">Timestamps</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Notifications"><span class="nav-number">2.3.</span> <span class="nav-text">Notifications</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Discussion"><span class="nav-number">2.4.</span> <span class="nav-text">Discussion</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

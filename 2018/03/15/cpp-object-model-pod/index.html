@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="注：本节不讨论union。 Scalar Type第一个概念，Scalar Type，即标量类型。 所谓标量，就是一个数字，而标量类型，就是可以表示为一个数字的类型。 C++的标量类型为：  各种整数&#x2F;浮点类型，如int8_t、uint32_t、char、float等，可满足std::is_arithmetic&lt;T&gt;为true。 枚举类型，可满足std::is_enum&amp;lt">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++对象模型（三）POD">
+<meta property="og:url" content="http://fuzhe1989.github.io/2018/03/15/cpp-object-model-pod/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="注：本节不讨论union。 Scalar Type第一个概念，Scalar Type，即标量类型。 所谓标量，就是一个数字，而标量类型，就是可以表示为一个数字的类型。 C++的标量类型为：  各种整数&#x2F;浮点类型，如int8_t、uint32_t、char、float等，可满足std::is_arithmetic&lt;T&gt;为true。 枚举类型，可满足std::is_enum&amp;lt">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2018-03-15T10:37:59.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.652Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2018/03/15/cpp-object-model-pod/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>C++对象模型（三）POD | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/15/cpp-object-model-pod/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++对象模型（三）POD
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-15 18:37:59" itemprop="dateCreated datePublished" datetime="2018-03-15T18:37:59+08:00">2018-03-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>注：本节不讨论<code>union</code>。</p>
+<h1 id="Scalar-Type"><a href="#Scalar-Type" class="headerlink" title="Scalar Type"></a>Scalar Type</h1><p>第一个概念，Scalar Type，即标量类型。</p>
+<p>所谓标量，就是一个数字，而标量类型，就是可以表示为一个数字的类型。</p>
+<p>C++的标量类型为：</p>
+<ul>
+<li>各种整数&#x2F;浮点类型，如<code>int8_t</code>、<code>uint32_t</code>、<code>char</code>、<code>float</code>等，可满足<code>std::is_arithmetic&lt;T&gt;</code>为true。</li>
+<li>枚举类型，可满足<code>std::is_enum&lt;T&gt;</code>为true。</li>
+<li>各种指针类型，包括<code>std::nullptr_t</code>，可满足<code>std::is_pointer&lt;T&gt;</code>或<code>std::is_member_pointer&lt;T&gt;</code>为true。</li>
+</ul>
+<p>以上类型都属于标量类型，都可满足<code>std::is_scalar&lt;T&gt;::value</code>为true。</p>
+<h1 id="Aggregate-Type"><a href="#Aggregate-Type" class="headerlink" title="Aggregate Type"></a>Aggregate Type</h1><p>第二个概念，Aggregate Type，即聚合类型。</p>
+<p>所谓聚合类型，就是可以使用<code>= &#123;v1, v2, v3&#125;</code>这样语法（注意不是C++11的<code>std::initializer_list</code>特性）进行初始化或赋值的类型，对应C的数组和struct。</p>
+<p>C++的聚合类型为：</p>
+<ul>
+<li>所有数组类型。</li>
+<li>满足以下条件的类（包括<code>class</code>、<code>struct</code>）：<ul>
+<li>所有非静态成员变量的访问权限都是<code>public</code>。</li>
+<li>没有用户自定义的构造函数（但允许使用<code>= default</code>来显式使用编译器合成的构造函数，或使用<code>= delete</code>来显式禁止某种构造函数）。</li>
+<li>没有基类（C++17后允许有<code>public</code>的非虚基类）。</li>
+<li>没有虚函数。</li>
+<li>成员变量没有默认初始化式（不在构造函数里那种）（C++11新增，但似乎C++14又去掉了此限制）。</li>
+</ul>
+</li>
+</ul>
+<p>根据上面的定义，聚合类型还有下面的几个特点：</p>
+<ul>
+<li>不要求其所有非静态成员变量均为聚合类型。</li>
+<li>对静态成员没有任何限制。</li>
+<li>只对构造函数有限制，对析构函数、赋值函数等无限制。</li>
+<li>非聚合类型的数组也是聚合类型。</li>
+</ul>
+<p>当我们写</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Type a[m] = &#123;b0, b1, ..., bn-1&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>时：</p>
+<ul>
+<li>若m &#x3D;&#x3D; n，则会发生b0到a[0]、b1到a[1]等等n次复制初始化。</li>
+<li>若m &lt; n，则报错。</li>
+<li>若m &gt; n，则a[0]-a[n-1]发生复制初始化，而a[n]-a[m-1]则发生默认初始化。</li>
+<li>若m为空，则a的长度会被设定为n，同样发生n次复制初始化。</li>
+</ul>
+<p>对于下面的聚合类型</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    TypeA a;</span><br><span class="line">    TypeB b;</span><br><span class="line">    TypeC c;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>当我们写</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">S s = &#123;a<span class="number">&#x27;</span>, b<span class="number">&#x27;</span>, c<span class="number">&#x27;</span>&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>时：</p>
+<ul>
+<li>若<code>&#123;&#125;</code>内元素数量与<code>S</code>中非静态成员变量数量相等，会按a’-&gt;a、b’-&gt;b、c’-&gt;c的方式进行复制初始化。</li>
+<li>若<code>&#123;&#125;</code>内元素数量更多，则报错。</li>
+<li>若<code>S</code>中非静态成员变量数量更多，则后面的成员发生默认初始化。</li>
+</ul>
+<p>在初始化时：</p>
+<ul>
+<li>若发生复制初始化，则会调用相应类型的复制构造函数或赋值函数。</li>
+<li>若列表中某项为表达式，则复制&#x2F;赋值时允许发生隐式转换（C++11开始要求不能是narrow转换）。</li>
+<li>若列表中某项本身也是个<code>&#123;&#125;</code>列表，则要求对应的数组元素&#x2F;非静态成员变量也是聚合类型，尝试递归聚合赋值。</li>
+<li>标量类型的默认初始化会将其初始化为0、0.0、false等。</li>
+<li>引用类型的默认初始化会报错。</li>
+</ul>
+<p>在对聚合类型（非数组）做列表赋值时，我们还可以指定成员的名字，如：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">A</span> &#123;</span><br><span class="line">    <span class="type">int</span> x;</span><br><span class="line">    <span class="type">int</span> y;</span><br><span class="line">    <span class="type">int</span> z;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">A a = &#123;.x = <span class="number">1</span>, .z = <span class="number">2</span>&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>它有以下特点：</p>
+<ul>
+<li>列表中名字顺序必须符合成员顺序，即<code>&#123;.z = 2, .x = 1&#125;</code>是不行的。（注意，<a target="_blank" rel="noopener" href="http://en.cppreference.com/w/c/language/struct_initialization">C允许乱序，还允许其它多种初始化方式</a>，但C++不允许）</li>
+<li>列表中元素数量可以少于成员数量，未在列表中出现的成员发生默认初始化，即上例中<code>a.y</code>为0。</li>
+</ul>
+<h1 id="Trivial-Type"><a href="#Trivial-Type" class="headerlink" title="Trivial Type"></a>Trivial Type</h1><p>第三个概念，Trivial Type，即平凡类型。</p>
+<p>所谓平凡类型，可以认为是有bitwise语义的类型，即可以直接按字节复制的类型。C中的所有类型都是Trivial Type。</p>
+<p>Trivial Type有两个标准：</p>
+<ul>
+<li>能trivial静态构造，即要有一个trivial的默认构造函数。</li>
+<li>能trivial拷贝，即满足Trivial Copyable标准。</li>
+</ul>
+<p>Trivial Copyable类型即是满足<code>std::is_trivially_copyable&lt;T&gt;::value</code>为true的类型，它要求：</p>
+<ul>
+<li>所有复制构造、赋值函数要么是trivial的，要么是deleted。</li>
+<li>所有移动构造、赋值函数要么是trivial的，要么是deleted。</li>
+<li>至少有一个非deleted复制或移动的构造或赋值函数。</li>
+<li>析构函数为trivial，且非deleted。</li>
+</ul>
+<p>构造函数、析构函数、复制构造&#x2F;赋值函数、移动构造&#x2F;赋值函数的trivial是指：</p>
+<ul>
+<li>满足bitwise语义。</li>
+<li>要么是编译器隐式合成的版本。</li>
+<li>要么通过<code>= default</code>显式使用编译器的合成版本。</li>
+</ul>
+<p>以上条件也就意味着一个Trivial Type：</p>
+<ul>
+<li>不能有虚函数（会导致构造函数等失去bitwise语义）。</li>
+<li>不能有虚基类（同上）。</li>
+<li>如果有基类，基类也要是Trivial Type。</li>
+<li>不能有自定义的构造、析构、复制、移动函数。</li>
+<li>不能有非Trivial Type类型的非静态成员变量。</li>
+</ul>
+<p>标量类型、Trivial Type的数组也是Trivial Type。</p>
+<p>Trivial Type是用来区分那些可以像C一样通过<code>memset</code>、<code>memcpy</code>等函数直接构造和复制的类型，C++11中增加了<code>std::is_trivial</code>模板来判断一个类型是否是trivial的。</p>
+<p>注意，Trivial Type还有以下特点：</p>
+<ul>
+<li>不限制成员变量的访问限制，即<code>public</code>、<code>protected</code>、<code>private</code>都可以。</li>
+<li>只要求默认构造函数是trivial的，对其它构造函数没有要求。</li>
+</ul>
+<h1 id="Standard-Layout-Type"><a href="#Standard-Layout-Type" class="headerlink" title="Standard Layout Type"></a>Standard Layout Type</h1><p>第四个概念，Standard Layout Type，即标准布局类型。</p>
+<p>标准布局的目的是定义一种与C兼容的内存布局，满足标准布局的类型即为标准布局类型，Standard Layout Type。</p>
+<p>关于不同C++类型的内存布局，可以见上一篇文章<a href="/2018/03/11/cpp-object-model-struct/">C++对象模型（二）struct&#x2F;class的内存布局</a>。</p>
+<p>C++的Standard Layout Type要求：</p>
+<ul>
+<li><p>所有非静态成员变量有着相同的访问权限。</p>
+</li>
+<li><p>没有虚函数或虚基类。</p>
+</li>
+<li><p>没有引用类型的非静态成员变量。</p>
+</li>
+<li><p>所有基类和非静态成员变量本身也是Standard Layout Type。</p>
+</li>
+<li><p>该类型与其所有基类中，最多只能有一个类型有非静态成员变量（其它类型都需要是空类型），即所有非静态成员变量都在一个类型中。</p>
+</li>
+<li><p>第一个非静态成员变量（包括继承自基类的成员）其类型不能与任一空基类相同（影响空基类优化）。</p>
+</li>
+<li><p>该类型的继承树中同一类型不能出现多次。</p>
+<p>  例子：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Q</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span>: Q &#123;&#125;；</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">T</span>: Q &#123;&#125;;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">U</span>: S, T &#123;&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>  <code>U</code>的继承树中<code>Q</code>出现了两次，则<code>Q</code>、<code>S</code>、<code>T</code>都是Standard Layout Type，但<code>U</code>不是。</p>
+</li>
+</ul>
+<p>相同访问权限的原因：标准只规定了同一个section内成员的顺序，未规定不同section之间的顺序，因此若非静态成员变量分布在不同section下，无法给出一个确定的布局。</p>
+<p>所有非静态成员变量都在一个类型中的原因：标准未规定基类子对象的位置，因此不同基类、或基类与子类的非静态成员变量间的顺序是未定义的。</p>
+<p>没有虚函数或虚基类的原因：虚函数和虚基类会影响类的内存布局，但标准未规定其实现方式，因此有虚函数或虚基类的类型无法给出一个确定的布局。</p>
+<p>第一个非静态成员变量不能与空基类类型相同的原因：标准规定同时存在的两个变量不能有相同地址，若应用空基类优化，则第一个非静态成员变量的地址与对象地址相同，也与所有空基类地址相同，若其中有相同类型，则导致该地址同时对应了多个变量。</p>
+<p>C++11新增了<code>std::is_standard_layout</code>来判断一个类型是不是Standard Layout Type。</p>
+<h2 id="标准布局"><a href="#标准布局" class="headerlink" title="标准布局"></a>标准布局</h2><p>C++的标准布局实际就是C中struct的布局，对于一个标准布局类的对象：</p>
+<ul>
+<li>其本身的地址与其所有基类子对象的地址相同，即基类子对象的地址无偏移。</li>
+<li>其各个非静态成员变量的位置按声明顺序从对象地址开始由低到高排列。</li>
+<li>其第一个非静态成员变量的地址与对象地址相同。</li>
+<li>其各个非静态成员变量的地址均满足对齐要求。</li>
+</ul>
+<h1 id="POD-Type"><a href="#POD-Type" class="headerlink" title="POD Type"></a>POD Type</h1><p>最后一个概念，POD Type，即Plain Old Data Type，即可导出，可跨语言使用的类型（通常也意味着与C二进制兼容）。</p>
+<p>一个POD类型为：</p>
+<ul>
+<li>标量类型。</li>
+<li>满足以下条件的自定义类型：<ul>
+<li>C++11之前：<ul>
+<li>聚合类型。</li>
+<li>没有非POD类型的非静态成员变量。</li>
+<li>没有引用类型的非静态成员变量。</li>
+<li>没有自定义的构造函数或析构函数。</li>
+</ul>
+</li>
+<li>C++11之后：<ul>
+<li>是平凡类。</li>
+<li>是标准布局类。</li>
+<li>没有非POD类型的非静态成员变量。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>POD类型的数组。</li>
+</ul>
+<p>可以看到POD的标准在C++11前后发生了很大的变化。C++11里放宽了对POD的限制，且根据这些限制的目的，提出了平凡类和标准布局类这两个更清晰的概念。在C++20后POD这个概念本身都会被去掉，而是在不同场合直接使用平凡类、标准布局类等概念。</p>
+<p>一个类型可以只是平凡类或只是标准布局类：</p>
+<ul>
+<li>如果是平凡类，则意味着它可以直接通过<code>memcpy</code>、<code>memset</code>等函数来操作。</li>
+<li>如果是标准布局类，则意味着它的布局是确定的，可以与其它语言交互。</li>
+</ul>
+<p>可以用<code>is_pod</code>来判断一个类型是不是POD类型。</p>
+<h1 id="POD的用途"><a href="#POD的用途" class="headerlink" title="POD的用途"></a>POD的用途</h1><p>平凡类的用途：</p>
+<ul>
+<li>平凡类的对象可以与字节流之间安全转换，即：<ul>
+<li>若要将对象转为字节流，直接取其地址即可。</li>
+<li>若要将字节流转为对象，直接将该地址cast为对象指针即可。</li>
+<li>直接通过复制字节的方式复制对象。</li>
+</ul>
+</li>
+<li>安全的静态初始化。<ul>
+<li>C++11的<code>thread_local</code>变量可以是非平凡类型，但在某些编译器下会有比较大的性能开销。gcc扩展的<code>__thread</code>只能使用POD类型。</li>
+</ul>
+</li>
+</ul>
+<p>标准布局类的用途：</p>
+<ul>
+<li>跨进程、跨语言使用。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/03/11/cpp-object-model-struct/" rel="prev" title="C++对象模型（二）struct/class的内存布局">
+      <i class="fa fa-chevron-left"></i> C++对象模型（二）struct/class的内存布局
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/03/17/redis-on-the-respberry-pi/" rel="next" title="[翻译] Redis on the Raspberry Pi: adventures in unaligned lands">
+      [翻译] Redis on the Raspberry Pi: adventures in unaligned lands <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Scalar-Type"><span class="nav-number">1.</span> <span class="nav-text">Scalar Type</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Aggregate-Type"><span class="nav-number">2.</span> <span class="nav-text">Aggregate Type</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Trivial-Type"><span class="nav-number">3.</span> <span class="nav-text">Trivial Type</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Standard-Layout-Type"><span class="nav-number">4.</span> <span class="nav-text">Standard Layout Type</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%87%E5%87%86%E5%B8%83%E5%B1%80"><span class="nav-number">4.1.</span> <span class="nav-text">标准布局</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#POD-Type"><span class="nav-number">5.</span> <span class="nav-text">POD Type</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#POD%E7%9A%84%E7%94%A8%E9%80%94"><span class="nav-number">6.</span> <span class="nav-text">POD的用途</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="TL;DR NoSQL系统中的一个常见问题就是写、读、compaction三类操作的资源争抢导致服务质量受到影响。这里脑洞一个方案，通过单独的FileMeta Service来管理文件的元数据与生命期，从而解耦前面三类操作，实现资源的隔离，提升服务质量。 进一步地，分离三类操作后，我们甚至可以针对不同操作使用不同的分区策略，从而进一步解耦三类操作，释放出更高的能力。  idea来源于我在阿里云Ta">
+<meta property="og:type" content="article">
+<meta property="og:title" content="解耦NoSQL系统的写、读、Compaction">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/12/05/separate-write-read-compaction-by-file-meta-service/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="TL;DR NoSQL系统中的一个常见问题就是写、读、compaction三类操作的资源争抢导致服务质量受到影响。这里脑洞一个方案，通过单独的FileMeta Service来管理文件的元数据与生命期，从而解耦前面三类操作，实现资源的隔离，提升服务质量。 进一步地，分离三类操作后，我们甚至可以针对不同操作使用不同的分区策略，从而进一步解耦三类操作，释放出更高的能力。  idea来源于我在阿里云Ta">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-12-05T05:50:58.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.659Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="NoSQL">
+<meta property="article:tag" content="脑洞">
+<meta property="article:tag" content="Raft">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/12/05/separate-write-read-compaction-by-file-meta-service/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>解耦NoSQL系统的写、读、Compaction | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/05/separate-write-read-compaction-by-file-meta-service/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          解耦NoSQL系统的写、读、Compaction
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-05 13:50:58" itemprop="dateCreated datePublished" datetime="2020-12-05T13:50:58+08:00">2020-12-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>TL;DR</strong></p>
+<p>NoSQL系统中的一个常见问题就是写、读、compaction三类操作的资源争抢导致服务质量受到影响。这里脑洞一个方案，通过单独的FileMeta Service来管理文件的元数据与生命期，从而解耦前面三类操作，实现资源的隔离，提升服务质量。</p>
+<p>进一步地，分离三类操作后，我们甚至可以针对不同操作使用不同的分区策略，从而进一步解耦三类操作，释放出更高的能力。</p>
+<blockquote>
+<p>idea来源于我在阿里云Tablestore时的一次讨论，参考了Google的Procella和F1-lightning的实现方式。</p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><blockquote>
+<p>TODO：补架构图</p>
+</blockquote>
+<p>系统中数据按表组织，每张表按key range分为若干个逻辑partition。每个逻辑partition实际对应三种物理partition：</p>
+<ul>
+<li>1个primary partition，服务写请求和要求完整数据的读请求，管理WAL。</li>
+<li>N个read-only partition，服务snapshot读请求。</li>
+<li>1个compaction partition，定期compact数据文件。</li>
+</ul>
+<p>系统中有三类角色：</p>
+<ul>
+<li>1个Master，服务DDL请求（CREATE、DROP、ALTER），负责调度物理partition。</li>
+<li>M个FileMeta Server，管理所有逻辑partition的数据文件的元数据和生命期。</li>
+<li>N个Data Server，加载三类物理partition，服务用户的读写请求。</li>
+</ul>
+<p>整个系统采用计算存储分离架构，所有节点都是计算节点。数据本身保存在分布式文件系统中（如Pangu、HDFS等DFS），文件一旦写完之后就不可更改。</p>
+<h2 id="设计"><a href="#设计" class="headerlink" title="设计"></a>设计</h2><h3 id="FileMeta-Service"><a href="#FileMeta-Service" class="headerlink" title="FileMeta Service"></a>FileMeta Service</h3><p>FileMeta Service负责管理整个系统中所有的数据文件（不包括Master的）。FileMeta Service是整个系统的核心，要能比Data Server有更高的可用性。这里我们假设它是一个极高可用的黑盒服务。</p>
+<p>它保存的数据格式为<code>&lt;table_id, part_id, file_id&gt; -&gt; file_meta</code>。可以用非常简单的KeyValue Store来作为它的底层存储。</p>
+<p>其中file meta的结构中需要包含以下信息：</p>
+<ul>
+<li>is_link_file，是否是链接文件。</li>
+<li>ref_count，被引用了多少次（初始是1），只对非链接文件有作用。</li>
+<li>path，对应文件系统中的路径。</li>
+</ul>
+<p>链接文件是在分区的分裂合并过程中产生的，即分裂与合并操作的目标分区中的文件都是源分区的链接文件。所有链接文件都会指向非链接文件，即如果原本链接文件B指向非链接文件A，此时创建C到B的链接会产生一个C到A的链接。</p>
+<p>链接文件因为不对应真实文件，在清理时只需要删除meta即可。非链接文件会在其ref_count变为0后异步清理掉。</p>
+<p>FileMeta Service可以由一个或多个Server组成，只要按table_id进行sharding，满足同一张表内的文件操作保证是原子操作即可，另外最好能保证所有file meta都常驻内存。</p>
+<p>FileMeta Server需要支持以下针对单个分区的操作：</p>
+<ul>
+<li>追加新文件，参数为新增文件列表，只由primary partition调用。</li>
+<li>变更文件列表，参数为新增文件列表与删除文件列表，只由compaction partition调用。</li>
+<li>获取文件列表，三类partition都会调用。primary partition可以通过这个列表得知整个partition的checkpoint。</li>
+</ul>
+<p>每个分区需要串行处理这三种操作。分区间可以并行。</p>
+<p>每个分区可以有一个version语义，每次文件列表变化都会产生一个新version，这样获取文件列表操作还可以返回一个diff（可选）。</p>
+<p>另外还需要支持以下针对多个分区的操作：</p>
+<ul>
+<li>分裂一个分区，参数为一个源分区和若干个目标分区，操作结果是源分区对应的所有file meta会被链接到每个目标分区。</li>
+<li>合并若干个连续的分区，参数为若干个源分区和一个目标分区，操作结果是所有源分区对应的file meta会被链接到目标分区。</li>
+<li>删除链接文件，参数为一个链接文件，操作结果是该链接文件被删除，其指向的非链接文件的ref_count减1。这项操作只由前面的变更文件列表操作间接触发。</li>
+</ul>
+<p>每张表需要串行处理这两种操作。表之间可以并行。</p>
+<h3 id="Primary-Partition"><a href="#Primary-Partition" class="headerlink" title="Primary Partition"></a>Primary Partition</h3><p>Primary partition就是正常的一个LSM引擎，有完整的文件列表，可以服务所有读写请求。</p>
+<p>Primary partition在加载时会从FileMeta Service中获得当前partition的完整文件列表，通过文件列表得知WAL的checkpoint。</p>
+<p>数据进入primary partition后先写WAL，再写memory table，之后定期（如1分钟）flush到DFS上。primary partition会调用FileMeta Service的接口将新产生的文件添加进去，与此同时primary partition就可以使用这个文件来服务读请求了。如果添加失败的话primary partition会反复重试，直到成功。这个过程不会阻碍primary partition服务写请求和产生新文件，只是后续产生的新文件对read-only partition和compaction partition不可见。</p>
+<p>如果在追加成功之前primary partition发生了failover，因为WAL的checkpoint并没有提升，数据也不会有丢失的风险。但如果长时间追加没有成功，此时primary partition可以考虑停写或主动failover，以避免影响数据可见性。</p>
+<p>如果在flush过程中primary partition发生了failover，只会留下临时文件，可以考虑由primary partition自己回收这些临时文件，也可以由FileMeta Service异步回收。</p>
+<p>每次追加成功后primary partition会向每个read-only partition和compaction partition发送一个notification。这里有两种实现方式：</p>
+<ul>
+<li>将这两类partition视为listener，像Raft一样记录每个listener的lastIndex，保证不漏掉通知，如果通知失败会定期重试。优点是可以增量通知，不需要另两类partition经常去访问FileMeta Service，缺点是有一定复杂性。</li>
+<li>单纯的通知，失败了不重试，依赖于另两类partition定期从FileMeta Service那里更新文件列表。优点是简单，缺点是增加了FileMeta Service的负担（但本来也不大），且数据可见延迟会受到影响。</li>
+</ul>
+<p>primary partition还会接收到compaction partition的文件列表变化的通知。</p>
+<p>Primary partition的读请求处理与正常的NoSQL系统相同，就不介绍了。</p>
+<h3 id="Read-only-Partition"><a href="#Read-only-Partition" class="headerlink" title="Read-only Partition"></a>Read-only Partition</h3><p>Read-only partition不管理WAL，也不写数据，是一个单纯的面向一组不可变文件的查询引擎。</p>
+<p>Read-only partition在加载时也会去获得完整文件列表。之后文件列表有两种更新方式：</p>
+<ul>
+<li>接收到primary partition或compaction partition的通知时更新，根据实现方式不同可以直接从通知中获得增量内容，或是接着访问FileMeta Service。</li>
+<li>定期（如5分钟）从FileMeta Service处拉取文件列表，可以增量也可以全量。</li>
+</ul>
+<p>Read-only partition接收的读请求会带有一个timestamp，此时有几种可能：</p>
+<ul>
+<li>timestamp不大于当前文件列表的timestamp，可以直接服务。</li>
+<li>timestamp大于当前文件列表的timestamp，可以直接拒绝服务，也可以触发一次文件列表的拉取（但要控制好频率）。</li>
+</ul>
+<p>文件列表更新失败不会影响read-only partition的服务，但如果长时间没有更新，read-only partition可以将自己标记为stale或主动failover。primary partition可能需要保证即使没有写入也要定期更新FileMeta Server中记录的文件列表的version，帮助read-only partition更好地确认自身状态。</p>
+<p>Read-only partition是stateless的，可以任意伸缩或failover。</p>
+<h3 id="Compaction-Partition"><a href="#Compaction-Partition" class="headerlink" title="Compaction Partition"></a>Compaction Partition</h3><p>Compaction partition会接到primary partition的通知，也会在每一轮compaction成功后调用FileMeta Service的接口变更文件列表，并通知另两类partition。</p>
+<p>Compaction partition可以单线程或多线程做compaction，对于特别复杂的长时间的compaction，可以考虑交给一个单独的worker pool来做（类似F1 Query或ADB等系统），此时compaction partition只负责异步跟踪状态。</p>
+<p>独立出compaction partition的好处是可以分摊热点分区的压力，也可以放心做非常复杂的编码、压缩、构建索引结构等操作，而不用担心影响读写服务。</p>
+<p>Compaction在扫描文件时不需要将文件内容载入cache，但可以考虑将compaction partition与一个read-only partition放到同一台data server上，这样有机会借用read-only partition的cache来加速compaction。</p>
+<p>Compaction过程中如果发生了failover只会留下一些临时文件，不会影响数据安全性。清理方式与flush相同。</p>
+<p>Compaction策略和文件存储格式与此方案无关，就不介绍了。</p>
+<h3 id="Split-and-Merge"><a href="#Split-and-Merge" class="headerlink" title="Split and Merge"></a>Split and Merge</h3><p>这个架构下分区的分裂合并大部分只需要操作元数据，加上非常短的服务暂停（可以做成毫秒级）。分裂和合并过程都由master负责协调。</p>
+<p>分裂过程：</p>
+<ul>
+<li>计算分裂点：<ul>
+<li>可以由外部进程从FileMeta Service那里获得文件列表后离线计算得到基于全量数据的分裂点。</li>
+<li>或由primary partition处得到基于增量数据的分裂点。</li>
+</ul>
+</li>
+<li>Master产生若干个新的part_id，调用FileMeta Service的分裂接口。</li>
+<li>触发primary partition flush，停写后再次触发flush。</li>
+<li>再次调用FileMeta Service的分裂接口。</li>
+<li>Master持久化新partition的meta，之后卸载旧partition，调度新partition。</li>
+</ul>
+<p>这个设计中旧partition的WAL不会对新partition可见，因此需要一次停写后flush来保证所有数据都持久化下去。如果我们在某个地方记录这种关系的话可以将WAL也设计为可链接的方式，从而不需要停写后flush，而是由新partition自己读旧partition的WAL回放数据，这样服务暂停时间更短。</p>
+<p>进一步地，分裂产生的新partition可以直接调度到旧partition所在的data server，实现内存数据交接，这样甚至可以无缝分裂。</p>
+<p>合并过程与分裂过程类似，主要考虑点在于要不要让新partition回放多个旧partition的WAL。</p>
+<p>合并分裂操作在Master持久化新meta后就不可逆了。如果在此之前失败，则只会在FileMeta Service中留下垃圾，可以后续异步清理掉。</p>
+<h2 id="延伸讨论"><a href="#延伸讨论" class="headerlink" title="延伸讨论"></a>延伸讨论</h2><h3 id="分区策略"><a href="#分区策略" class="headerlink" title="分区策略"></a>分区策略</h3><p>我们假设分区策略一定是基于key range的，那么可以让三种partition有不同的key range吗？</p>
+<p>考虑两个primary partition分别服务<code>[A, B)</code>和<code>[B, C)</code>，read-only partition服务<code>[A, C)</code>，compaction partition可以服务以上任意key range。这样需要修改前面的两处设计：</p>
+<ul>
+<li>通知机制。</li>
+<li>FileMeta Service的存储和文件的ref_count需要区分不同类型的partition。</li>
+</ul>
+<p>这么做的好处是可以非常灵活地适应不同的workload：如果写压力大则分裂写；如果读压力大则分裂读；根据compaction策略可以让compaction partition随着其中一种partition变化。</p>
+<p>理论上我们是可以实现三种partition按M:N:K的方式对应，但这样会使整个设计非常复杂，通知和文件列表都要考虑到所有有交集的情况。而如果保证三种partition是1:N或N:1（compaction取1或N都行），则整张表的结构是树型的，并不会很复杂，只要位于N的一方带着自己的key range去过滤文件列表就可以了。</p>
+<h3 id="Read-only-partition可以服务current读"><a href="#Read-only-partition可以服务current读" class="headerlink" title="Read-only partition可以服务current读"></a>Read-only partition可以服务current读</h3><p>如果要让read-only partition可以服务current读，实际上意味着要把它从listener变成follower，接收数据，参与投票，但不需要写WAL和flush。</p>
+<p>数据进入follower partition后会同时维护在内存中的FIFO buffer和memory table中，每当它收到文件列表更改的通知时，将已经checkpoint过的数据从buffer中淘汰掉，再重新构建memory table。当leader挂掉发生选举时，新leader会先获取文件列表，将FIFO buffer转为memory table，再重放WAL。</p>
+<p>当follower接收到current读请求或大于其当前timestamp的snapshot读请求时，它会向leader发送一个readCurrent请求，leader会将它缺少的数据返回回来。</p>
+<p>这种设计需要引入部分Raft算法，不算太复杂，但也会对读写性能有一定影响。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/NoSQL/" rel="tag"># NoSQL</a>
+              <a href="/tags/%E8%84%91%E6%B4%9E/" rel="tag"># 脑洞</a>
+              <a href="/tags/Raft/" rel="tag"># Raft</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/11/30/f1-lightning-htap-as-a-service/" rel="prev" title="[笔记] F1 Lightning: HTAP as a Service">
+      <i class="fa fa-chevron-left"></i> [笔记] F1 Lightning: HTAP as a Service
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/" rel="next" title="[笔记] Procella: Unifying serving and analytical data at YouTube">
+      [笔记] Procella: Unifying serving and analytical data at YouTube <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">架构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%BE%E8%AE%A1"><span class="nav-number">2.</span> <span class="nav-text">设计</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#FileMeta-Service"><span class="nav-number">2.1.</span> <span class="nav-text">FileMeta Service</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Primary-Partition"><span class="nav-number">2.2.</span> <span class="nav-text">Primary Partition</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Read-only-Partition"><span class="nav-number">2.3.</span> <span class="nav-text">Read-only Partition</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Compaction-Partition"><span class="nav-number">2.4.</span> <span class="nav-text">Compaction Partition</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Split-and-Merge"><span class="nav-number">2.5.</span> <span class="nav-text">Split and Merge</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BB%B6%E4%BC%B8%E8%AE%A8%E8%AE%BA"><span class="nav-number">3.</span> <span class="nav-text">延伸讨论</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%86%E5%8C%BA%E7%AD%96%E7%95%A5"><span class="nav-number">3.1.</span> <span class="nav-text">分区策略</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Read-only-partition%E5%8F%AF%E4%BB%A5%E6%9C%8D%E5%8A%A1current%E8%AF%BB"><span class="nav-number">3.2.</span> <span class="nav-text">Read-only partition可以服务current读</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

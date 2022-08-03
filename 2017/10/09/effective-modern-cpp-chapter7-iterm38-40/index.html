@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="Item38: 知道线程句柄析构时的各种行为上节介绍了可join的std::thread对应一个可运行的底层线程，而未推迟的future也可能对应一个OS线程。这里把它们都称为OS线程的句柄。 很有趣的是，std::thread和future在析构的行为上非常不同。析构一个可join的std::thread会导致程序终止，而析构一个future有时像是做了隐式的join，有时像是做了隐式的deta">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Effective Modern C++ 笔记 Chapter 7: 并发API (Item38-40)">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="Item38: 知道线程句柄析构时的各种行为上节介绍了可join的std::thread对应一个可运行的底层线程，而未推迟的future也可能对应一个OS线程。这里把它们都称为OS线程的句柄。 很有趣的是，std::thread和future在析构的行为上非常不同。析构一个可join的std::thread会导致程序终止，而析构一个future有时像是做了隐式的join，有时像是做了隐式的deta">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-10-09T14:50:11.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.655Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="Effective Modern C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>Effective Modern C++ 笔记 Chapter 7: 并发API (Item38-40) | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Effective Modern C++ 笔记 Chapter 7: 并发API (Item38-40)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-10-09 22:50:11" itemprop="dateCreated datePublished" datetime="2017-10-09T22:50:11+08:00">2017-10-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Item38-知道线程句柄析构时的各种行为"><a href="#Item38-知道线程句柄析构时的各种行为" class="headerlink" title="Item38: 知道线程句柄析构时的各种行为"></a>Item38: 知道线程句柄析构时的各种行为</h2><p>上节介绍了可join的<code>std::thread</code>对应一个可运行的底层线程，而未推迟的future也可能对应一个OS线程。这里把它们都称为OS线程的句柄。</p>
+<p>很有趣的是，<code>std::thread</code>和future在析构的行为上非常不同。析构一个可join的<code>std::thread</code>会导致程序终止，而析构一个future有时像是做了隐式的<code>join</code>，有时像是做了隐式的<code>detach</code>，有时两者都不是。总之它不会导致程序终止。</p>
+<p>我们首先从这样一个发现开始：future就是执行者将结果返回给调用者的一个管道。执行者（通常是异步执行）将计算结果写到管道中（例如<code>std::promise</code>对象），调用者再通过future拿到结果。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">----------                                          ----------</span><br><span class="line">| Caller | &lt;--- future ------------ std::promise ---| Callee |</span><br><span class="line">----------                                          ----------</span><br></pre></td></tr></table></figure>
+
+<p>但结果保存在哪了？执行者可能在调用者调用<code>get</code>之前就结束了，所以结果一定不会在执行者对应的<code>std::promise</code>对象中，它会在执行者结束时析构掉。</p>
+<p>结果也不可能在future对象中，因为<code>std::future</code>有可能用来创建<code>std::shared_future</code>，然后被复制很多遍。如果结果在future中，那么结果也会被复制很多遍。我们知道有些结果类型是不能复制的，因此不可能在future对象中。</p>
+<p>那么答案就是结果保存在<code>std::promise</code>和future之外，且需要是可共享状态。C++标准中没有规定结果的类型，编译器可以自行实现。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">----------                ------------------                    ----------</span><br><span class="line">| Caller | &lt;--- future ---| Result(Shared) |--- std::promise ---| Callee |</span><br><span class="line">----------                ------------------                    ----------</span><br></pre></td></tr></table></figure>
+
+<p>与future关联的这个共享状态就决定了future的析构行为，尤其：</p>
+<ul>
+<li>对于通过<code>std::async</code>启动的未推迟的task，最后一个与之关联的future在析构时会阻塞，直到这个task完成。本质上，这个析构就是对task所在的线程调用了一次join。</li>
+<li>其它future的析构都只是简单的析构这个对象。这些析构就是对底层线程调用了detach。对于被推迟的task，当它关联的最后一个future析构后，这个task就永远不会被执行了。</li>
+</ul>
+<p>简单来说就是有一种正常行为和一个例外。正常行为就是future的析构只析构future对象，它既不会join也不会detach。而当以下条件都满足时，应用例外规则：</p>
+<ul>
+<li>future关联着由<code>std::async</code>创建的共享状态。</li>
+<li>task的启动策略是<code>std::launch::async</code>，包括调用<code>std::async</code>时显式指定该策略，也包括调用者使用了默认策略，而系统选择了该策略。</li>
+<li>它是最后一个关联共享状态的future。</li>
+</ul>
+<p>以上条件都满足时，future的析构会对底层线程调用join。</p>
+<p>为什么对于由<code>std::async</code>启动的未推迟的task会有这个例外？就我（Scott Meyers）所知，C++标准委员会想避免隐式detach引起的问题（见Item37），但又不想像对待可join的<code>std::thread</code>那样使用“程序终止”这么激进的策略，所以最终他们妥协了，决定隐式使用join。这个决定并不是毫无争议，一直有声音想在C++14中将这个行为废弃掉，但最终它还是保留了下来。</p>
+<p>future的API上没办法知道它是不是关联一个共享状态，因此没办法知道随便一个future的析构会不会阻塞。这导致了一些有趣的潜在状况：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;std::future&lt;<span class="type">void</span>&gt;&gt; futs; <span class="comment">// 析构时可能阻塞</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;                       <span class="comment">// 析构时可能阻塞</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    std::shared_future&lt;<span class="type">double</span>&gt; fut;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>当然，如果你知道某个future肯定不满足例外条件，你就能确定它的析构不会阻塞。例如，当我们使用<code>std::packaged_task</code>时，它返回的future就不与<code>std::async</code>创建的共享状态相关联，因此我们可以确定这样的future的析构是不会阻塞的。</p>
+<blockquote>
+<p><code>std::packaged_task</code>与<code>std::function</code>类似，都是对某个callable的对象的包装。区别在于<code>std::packaged_task</code>会返回一个future。我们可以用<code>std::packaged_task</code>创建一个<code>std::thread</code>来运行callable对象，结果通过future得到。</p>
+</blockquote>
+<p>当然<code>std::packaged_task</code>也可以通过<code>std::async</code>来运行，但这样就没有理由用<code>std::packaged_task</code>了，直接用<code>std::async</code>更方便。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="function">std::packaged_task&lt;<span class="title">int</span><span class="params">()</span>&gt; <span class="title">pt</span><span class="params">(calcValue)</span></span>;</span><br><span class="line">    <span class="keyword">auto</span> fut = pt.<span class="built_in">get_future</span>();</span><br><span class="line">    <span class="function">std::thread <span class="title">t</span><span class="params">(std::move(pt))</span></span>;</span><br><span class="line">    ...                                        <span class="comment">// see below</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>“…”中对<code>t</code>可能的三种操作：</p>
+<ul>
+<li>没有对<code>t</code>作任何操作。这样结束时<code>t</code>还是可join的，导致程序终止。</li>
+<li>对<code>t</code>调用了join。这样<code>fut</code>析构时就不需要阻塞了。</li>
+<li>对<code>t</code>调用了detach。这样<code>fut</code>析构时也不需要调用detach了。</li>
+</ul>
+<p>结论就是，对于由<code>std::packaged_task</code>得到的future，你不需要怎么关心它的析构行为。</p>
+<h2 id="Item39-考虑用一个void-future来进行只运行一次的事件通信"><a href="#Item39-考虑用一个void-future来进行只运行一次的事件通信" class="headerlink" title="Item39: 考虑用一个void future来进行只运行一次的事件通信"></a>Item39: 考虑用一个void future来进行只运行一次的事件通信</h2><p>当需要进行事件通信时，一种显然的方式就是通过条件变量：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::condition_variable cv;</span><br><span class="line">std::mutex m;</span><br></pre></td></tr></table></figure>
+
+<p>通知方的代码很简单：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line">cv.<span class="built_in">notify_one</span>();</span><br></pre></td></tr></table></figure>
+
+<p>接收方的代码就有点复杂了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">std::unique_lock&lt;std::mutex&gt; <span class="title">lk</span><span class="params">(m)</span></span>;</span><br><span class="line">    cv.<span class="built_in">wait</span>(lk);</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>上面的代码并不正确。首先，这种方法的味道（code smell）不好，就表示可能藏bug。这里的第一个问题在于，是否有必要使用<code>std::mutex</code>。<code>std::mutex</code>是用来保护共享状态的，但很有可能通知方和接收方并没有共享什么东西，那么这个<code>std::mutex</code>就只是为了条件变量才构造的，逻辑上并不需要它。</p>
+<p>即使用到了<code>std::mutex</code>，仍然有两个问题：</p>
+<ul>
+<li>条件变量不能保存通知状态，因此如果通知方在接收方开始<code>wait</code>前就调用了<code>notify_one</code>，接收方就会hang在那。</li>
+<li>条件变量的<code>wait</code>有可能在条件并不满足（未通知）时结束（假醒），因此需要有办法知道我们等待的条件是否真的满足了。接收方自己当然没办法知道这个事情（否则它就不需要条件变量了）。</li>
+</ul>
+<p>以上两个问题的一种解法是使用一个共享状态，而不是条件变量：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::atmoic&lt;<span class="type">bool</span>&gt; <span class="title">flag</span><span class="params">(<span class="literal">false</span>)</span></span>;</span><br><span class="line"><span class="comment">// 通知方</span></span><br><span class="line">...</span><br><span class="line">flag = <span class="literal">true</span>;</span><br><span class="line"><span class="comment">// 接收方</span></span><br><span class="line">...</span><br><span class="line"><span class="keyword">while</span> (!flag) &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这种方法的好处是不需要mutex，能保存通知状态，不需要处理假醒。但它的问题在于接收方在阻塞时需要不停的查询状态，CPU开销很大。</p>
+<p>可以把共享状态与条件变量结合起来使用：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">std::condition_variable cv;</span><br><span class="line">std::mutex m;</span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">flag</span><span class="params">(<span class="literal">false</span>)</span></span>;                   <span class="comment">// not std::atomic</span></span><br><span class="line"><span class="comment">// 通知方</span></span><br><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">g</span><span class="params">(m)</span></span>;</span><br><span class="line">    flag = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line">cv.<span class="built_in">notify_one</span>();</span><br><span class="line"><span class="comment">// 接收方</span></span><br><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">std::unique_lock&lt;std::mutex&gt; <span class="title">lk</span><span class="params">(m)</span></span>;</span><br><span class="line">    cv.<span class="built_in">wait</span>(lk, [] &#123; <span class="keyword">return</span> flag; &#125;); <span class="comment">// use lambda to avoid spurious wakeups</span></span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>这种方法避免了我们讲到的几个问题，但它的设计不好：很多共享变量；两套机制来做同一件事；逻辑暴露在外，容易写错。简单来说就是这种方法不够干净。</p>
+<p>一种更干净的方法是接收方等待一个future，而通知方通过给这个future赋值来进行通知。Item38提到了<code>std::promise</code>代表了一个通信通道的发送端，而future则代表了接收端。这样的通道可以用于任何需要通信的场合。</p>
+<p>方案很简单，通知方要持有一个<code>std::promise</code>对象，而接收方持有对应的future。通知方通过调用<code>std::promise</code>的<code>set_value</code>来写入一条消息，接收方通过future的<code>wait</code>来等待消息。</p>
+<p>无论是<code>std::promise</code>、<code>std::future</code>还是<code>std::shared_future</code>都是模板类型，需要一个类型参数，也就是消息的类型。但我们只关心通知本身，不需要消息有类型，最合适的就是<code>void</code>。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">std::promise&lt;<span class="type">void</span>&gt; p;</span><br><span class="line"><span class="comment">// 通知方</span></span><br><span class="line">...</span><br><span class="line">p.<span class="built_in">set_value</span>();</span><br><span class="line"><span class="comment">// 接收方</span></span><br><span class="line">...</span><br><span class="line">p.<span class="built_in">get_future</span>().<span class="built_in">wait</span>();</span><br></pre></td></tr></table></figure>
+
+<p>没有mutex，没有条件变量，没有共享状态，没有假醒，是不是很完美？不完全是。Item38提到<code>std::promise</code>背后实际上有一个共享状态，就意味着它的构造包含着一次内存分配和释放的开销。</p>
+<p>而且，<code>std::promise</code>只能<strong>赋值一次</strong>。重复对<code>std::promise</code>的赋值是没有意义的，接收方感知不到。因此这条通信通道只能使用一次，这是与前述方案最大的区别。条件变量和共享状态总是可以重复利用的。</p>
+<p>“只有一次”的通信有时候也是很有用的。举个例子，有时候我们想创建一个被暂停的线程，需要等待一个事件后才开始工作，就可以用<code>std::promise</code>来实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">std::promise&lt;<span class="type">void</span>&gt; p;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">react</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">detect</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="function">std::thread <span class="title">t</span><span class="params">([] &#123;</span></span></span><br><span class="line"><span class="params"><span class="function">        p.get_future().wait();</span></span></span><br><span class="line"><span class="params"><span class="function">        react();</span></span></span><br><span class="line"><span class="params"><span class="function">    &#125;)</span></span>;</span><br><span class="line">    ...</span><br><span class="line">    p.<span class="built_in">set_value</span>();</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里我们创建了一个暂停的线程，它会等待<code>p</code>被赋值后才执行<code>react</code>。需要一个暂停线程的地方很多，比如我们想避免线程创建的成本，比如想在线程真正工作前设置一下优先级什么的（<code>std::thread</code>没有这种接口，但我们可以通过<code>native_handle</code>获得OS线程的句柄来做这样的事情）。</p>
+<p>Item37中提到用<code>ThreadRAII</code>类来代替直接的<code>std::thread</code>会更好，我们改写一下：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">std::promise&lt;<span class="type">void</span>&gt; p;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">react</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">detect</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="function">ThreadRAII <span class="title">tr</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">        std::thread([] &#123;</span></span></span><br><span class="line"><span class="params"><span class="function">            p.get_future().wait();</span></span></span><br><span class="line"><span class="params"><span class="function">            react();</span></span></span><br><span class="line"><span class="params"><span class="function">        &#125;),</span></span></span><br><span class="line"><span class="params"><span class="function">        ThreadRAII::DtorAction::join</span></span></span><br><span class="line"><span class="params"><span class="function">    )</span></span>;</span><br><span class="line">    ...                              <span class="comment">// 注意这里</span></span><br><span class="line">    p.<span class="built_in">set_value</span>();</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面的代码有个问题：第一个“…”处如果抛了异常，<code>p</code>还没有赋值，因此<code>tr</code>还在阻塞中，因此它是可join的，因此<code>tr</code>析构会导致程序终止。</p>
+<p>这个问题有很多解法，这里就不赘述了。最后说一下如何把上面的通信过程由一对一改成一对多，即一个通知方唤醒多个接收方：把<code>std::future</code>换成<code>std::shared_future</code>即可。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">std::promise&lt;<span class="type">void</span>&gt; p;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">react</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">detect</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> sf = p.<span class="built_in">get_future</span>().<span class="built_in">share</span>();   <span class="comment">// std::shard_future</span></span><br><span class="line">    std::vector&lt;std::thread&gt; vt;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; threadForRun; ++i) &#123;</span><br><span class="line">        vt.<span class="built_in">emplace_back</span>(</span><br><span class="line">            std::<span class="built_in">thread</span>([sf] &#123;          <span class="comment">// 必须值捕获</span></span><br><span class="line">                sf.<span class="built_in">wait</span>();</span><br><span class="line">                <span class="built_in">react</span>();</span><br><span class="line">            &#125;)</span><br><span class="line">        );</span><br><span class="line">    &#125;</span><br><span class="line">    ...                              </span><br><span class="line">    p.<span class="built_in">set_value</span>();</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">auto</span>&amp; t: vt) &#123;</span><br><span class="line">        t.<span class="built_in">join</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意各个线程持有的<code>std::shared_future</code>必须是值，不能是引用。</p>
+<h2 id="Item40-使用std-atomic应对并发，而用volatile访问特殊内存"><a href="#Item40-使用std-atomic应对并发，而用volatile访问特殊内存" class="headerlink" title="Item40: 使用std::atomic应对并发，而用volatile访问特殊内存"></a>Item40: 使用<code>std::atomic</code>应对并发，而用<code>volatile</code>访问特殊内存</h2><p>本节内容不重复了，大家都比较熟悉。简单列一下结论：</p>
+<ol>
+<li><code>std::atomic</code>是真正的原子操作，用于并发，但不能用于访问特殊内存（如硬件资源）。</li>
+<li><code>volatile</code>在某些语言中可以用于并发，但在C++中不能用于并发，它不保证原子的读写，也不保证指令的先后顺序。它的用途是访问上面说的特殊内存。</li>
+<li>可以结合起来，用于需要并发访问的特殊内存：<code>volatile std::atomic&lt;int&gt; vai</code>。</li>
+<li>访问<code>std::atomic</code>要比访问普通变量慢得多，它的内存屏障也会限制编译器的指令重排等优化，因此不要滥用<code>std::atomic</code>。</li>
+</ol>
+<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
+<li><a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Chapter1 类型推断 (Item 1-4)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">Chapter2 auto (Item 5-6)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">Chapter3 现代C++（Item 7-10)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm11-14/">Chapter3 现代C++（Item 11-14)</a></li>
+<li><a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/">Chapter3 现代C++（Item 15-17)</a></li>
+<li><a href="/2017/07/27/effective-modern-cpp-chapter4-iterm18-22/">Chapter4 智能指针 (Item 18-22)</a></li>
+<li><a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">Chapter5 右值引用、移动语义、完美转发（Item 23-26)</a></li>
+<li><a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Chapter5 右值引用、移动语义、完美转发（Item 27-30)</a></li>
+<li><a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">Chapter6: Lamba表达式 (Item 31-34)</a></li>
+<li><a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/">Chapter7: 并发API (Item 35-37)</a></li>
+<li><a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">Chapter7: 并发API (Item 38-40)</a></li>
+<li><a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">Chapter8: 杂项 (Item 41-42)</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/Effective-Modern-C/" rel="tag"># Effective Modern C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/09/30/why-global-static-singleton-var-evil/" rel="prev" title="为什么全局变量、静态变量、单例不好">
+      <i class="fa fa-chevron-left"></i> 为什么全局变量、静态变量、单例不好
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/" rel="next" title="Effective Modern C++ 笔记 Chapter8: 杂项 (Item 41-42)">
+      Effective Modern C++ 笔记 Chapter8: 杂项 (Item 41-42) <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Item38-%E7%9F%A5%E9%81%93%E7%BA%BF%E7%A8%8B%E5%8F%A5%E6%9F%84%E6%9E%90%E6%9E%84%E6%97%B6%E7%9A%84%E5%90%84%E7%A7%8D%E8%A1%8C%E4%B8%BA"><span class="nav-number">1.</span> <span class="nav-text">Item38: 知道线程句柄析构时的各种行为</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item39-%E8%80%83%E8%99%91%E7%94%A8%E4%B8%80%E4%B8%AAvoid-future%E6%9D%A5%E8%BF%9B%E8%A1%8C%E5%8F%AA%E8%BF%90%E8%A1%8C%E4%B8%80%E6%AC%A1%E7%9A%84%E4%BA%8B%E4%BB%B6%E9%80%9A%E4%BF%A1"><span class="nav-number">2.</span> <span class="nav-text">Item39: 考虑用一个void future来进行只运行一次的事件通信</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item40-%E4%BD%BF%E7%94%A8std-atomic%E5%BA%94%E5%AF%B9%E5%B9%B6%E5%8F%91%EF%BC%8C%E8%80%8C%E7%94%A8volatile%E8%AE%BF%E9%97%AE%E7%89%B9%E6%AE%8A%E5%86%85%E5%AD%98"><span class="nav-number">3.</span> <span class="nav-text">Item40: 使用std::atomic应对并发，而用volatile访问特殊内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E5%BD%95"><span class="nav-number">4.</span> <span class="nav-text">目录</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

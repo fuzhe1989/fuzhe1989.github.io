@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="当C++刚刚问世时，它的两大卖点是：  与C兼容。 面向对象。  而说到面向对象时，就绕不开多态。说到多态，就绕不开继承。 所谓多态，即同样的代码，不同的行为。根据这种行为差异的发生时机，我们把多态分成了编译时多态和运行时多态。继承能实现的就是运行时多态。 本文想讨论的是C++为继承和运行时多态准备了什么样的对象模型  注1：本文中的“多态”特指“运行时多态”。 注2：本文不讨论虚继承及其背后的对">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++对象模型（四）继承与多态">
+<meta property="og:url" content="http://fuzhe1989.github.io/2018/03/18/cpp-object-model-inheritance-and-polymorphism/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="当C++刚刚问世时，它的两大卖点是：  与C兼容。 面向对象。  而说到面向对象时，就绕不开多态。说到多态，就绕不开继承。 所谓多态，即同样的代码，不同的行为。根据这种行为差异的发生时机，我们把多态分成了编译时多态和运行时多态。继承能实现的就是运行时多态。 本文想讨论的是C++为继承和运行时多态准备了什么样的对象模型  注1：本文中的“多态”特指“运行时多态”。 注2：本文不讨论虚继承及其背后的对">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_one_member_one_slot.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_double_table.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_vtpr.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_single_inherit.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_single_base_nonvirtual.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_one_virtual_one_nonvirtual.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_both_virtual.png">
+<meta property="article:published_time" content="2018-03-18T15:21:14.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.652Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_one_member_one_slot.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2018/03/18/cpp-object-model-inheritance-and-polymorphism/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>C++对象模型（四）继承与多态 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/18/cpp-object-model-inheritance-and-polymorphism/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++对象模型（四）继承与多态
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-18 23:21:14" itemprop="dateCreated datePublished" datetime="2018-03-18T23:21:14+08:00">2018-03-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>当C++刚刚问世时，它的两大卖点是：</p>
+<ul>
+<li>与C兼容。</li>
+<li>面向对象。</li>
+</ul>
+<p>而说到面向对象时，就绕不开多态。说到多态，就绕不开继承。</p>
+<p>所谓多态，即同样的代码，不同的行为。根据这种行为差异的发生时机，我们把多态分成了编译时多态和运行时多态。继承能实现的就是运行时多态。</p>
+<p>本文想讨论的是C++为继承和运行时多态准备了什么样的对象模型</p>
+<ul>
+<li>注1：本文中的“多态”特指“运行时多态”。</li>
+<li>注2：本文不讨论虚继承及其背后的对象模型。</li>
+<li>注3：本文主要内容来自<a target="_blank" rel="noopener" href="https://book.douban.com/subject/10427315/">《深入探索C++对象模型》</a>。</li>
+</ul>
+<h1 id="对象模型"><a href="#对象模型" class="headerlink" title="对象模型"></a>对象模型</h1><h2 id="简单对象模型"><a href="#简单对象模型" class="headerlink" title="简单对象模型"></a>简单对象模型</h2><p>第一种模型十分简单，每个对象就是一个表格，其中每个slot按成员的声明顺序指向对应的成员，包括成员函数与成员变量。</p>
+<p>即对于下面的类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="built_in">Base</span>();</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">F</span><span class="params">()</span></span>;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">int</span> <span class="title">G</span><span class="params">()</span> <span class="type">const</span></span>;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">H</span><span class="params">()</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>它的一个对象为：</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_one_member_one_slot.png" alt="one slot per member"></p>
+<p>这个模型是为了尽量降低C++编译器的设计复杂度，这样我们不需要知道每个成员的大小，只要知道成员的数量，就能计算出对象本身需要占的空间了。每个成员都有着固定的偏移量，因此如果要实现多态，只要改变这个slot对应的函数地址即可。实际我们可以看到，这个模型下每个函数都可以是虚函数，即派生类可以改写基类的任何函数。</p>
+<p>它的缺点也很明显：不与C的struct兼容；访问成员需要至少一次间接寻址，开销大。</p>
+<p>没有哪个编译器真的采用了这个模型，但它的思想，即每个成员对应一个slot，被吸收到了“指向成员的指针”中。</p>
+<h2 id="双表格对象模型"><a href="#双表格对象模型" class="headerlink" title="双表格对象模型"></a>双表格对象模型</h2><p>第二种模型使用了两个表格，一个对应成员函数，一个对应成员变量，而对象内则只有指向这两个表格的指针。</p>
+<p>对于上面的<code>Base</code>类，新的对象模型为：</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_double_table.png" alt="double_table"></p>
+<p>这个模型的好处是令所有对象都有着相同的大小和表现形式。它也是一种停留在理论中的模型，但“函数表格”这一思想却启发了后面的虚表模型。</p>
+<h2 id="虚表对象模型"><a href="#虚表对象模型" class="headerlink" title="虚表对象模型"></a>虚表对象模型</h2><p>Stroustrup在设计C++时的一个理念就是，让用户不使用的特性零开销。C++的class就体现了这一点。</p>
+<p>从演化路径来看，从C的struct到C++的class，大致过程为：</p>
+<p>纯数据的结构体 -&gt; 数据+操作的抽象数据类型 -&gt; 能表现多态的类型。</p>
+<p>参考之前的文章，我们可以看到：</p>
+<ul>
+<li>纯数据的结构体，对应C++中的标准布局类，其相比C的struct没有任何额外开销。</li>
+<li>抽象数据类型（ADT），对应C++中的无虚函数的class，其成员变量均有着固定的偏移，与纯结构体相比无额外开销；其成员函数不占用对象本身体积，且调用一个成员函数与调用一个全局函数相比也无额外开销。</li>
+</ul>
+<p>现在到了最后一种，当class需要能支持多态，我们该如何设计，来保证上面这两种使用方式不受影响？</p>
+<p>Stroustrup选择了一种折衷的方案，即：</p>
+<ul>
+<li>每个有虚函数的类型对应一个表格，称为虚表，其中每个slot对应一个虚函数的实际地址。另外虚表的第0个slot指向了这个类型的<code>type_info</code>，用于RTTI。</li>
+<li>有虚函数的对象内会增加一个指向虚表的指针，这样在运行时可以通过虚表跳转来实现多态。</li>
+</ul>
+<p>对于上面的<code>Base</code>类，虚表对象模型为：</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_vtpr.png" alt="vtpr"></p>
+<p>当我们不向class中增加虚函数时，编译器不会生成虚表，也不会向对象内增加一个虚表指针，一切都和原来一样。当我们加入虚函数，编译器才会为了这种运行时特性而做上述工作。</p>
+<p>之所以不把虚表直接放到对象中，是为了避免对象体积太大，因此我们宁愿多一次虚表指针的跳转。</p>
+<p>这个模型下每个成员变量就在对象中，因此在定义类时我们要能看到每个成员变量的布局，知道它的大小，因此无论哪个成员变量发生了变化，我们都要重新编译、链接。这是为了运行效率而付出的代价。</p>
+<p>标准中并没有规定编译器一定要这么实现，但目前几乎所有编译器都采用了这种虚表模型，且几乎都选择了把虚表指针放到对象头部（而CFront则放到尾部）。</p>
+<h3 id="虚表"><a href="#虚表" class="headerlink" title="虚表"></a>虚表</h3><p>以下内容参考GCC的实现，部分脑补，总之理论上是个可以工作的模型。</p>
+<p>每个有虚函数的类都对应着一个单独的虚表，而这个类的所有对象中只有指向它的指针。</p>
+<p>非派生类型的虚表长度为N+2，其中N为虚函数的个数，按虚函数声明顺序对应，另外的2则分别为第0个位置的<code>type_info*</code>，和最后一个位置的<code>NULL</code>。</p>
+<p>派生类型的虚表长度为S0+S1+…+N+1，其中S0、S1等分别为其第0个基类、第1个基类等的虚表长度，N为该派生类型自己增加的虚函数数量，1是最后一个位置的<code>NULL</code>（如果N不为0的话）。按上一条，S0、S1的长度是N0+2、N1+2，已经包含了<code>type_info*</code>和<code>NULL</code>，因此派生类的虚表中有K个<code>type_info*</code>，且都指向派生类自己的<code>type_info</code>，这里K是其基类数量。</p>
+<p>因此派生类的虚表取不同的偏移，就可以得到与其某个基类完全兼容的虚表，但其中每个slot指向的函数则可能是派生类自己的实现。</p>
+<h2 id="单继承下的对象模型"><a href="#单继承下的对象模型" class="headerlink" title="单继承下的对象模型"></a>单继承下的对象模型</h2><p>从前文中我们知道派生类对象中会有一个基类的子对象，而标准规定了这个基类子对象要“有其完整原样性”，即与一个独立的基类对象有着完全相同的性质。</p>
+<p>编译器要首先保证这一点，再去安排派生类对象自己的成员。标准未规定基类子对象在派生类对象中该处于什么位置，但几乎所有编译器都将基类子对象放到了派生类对象的头部。</p>
+<h3 id="无虚函数"><a href="#无虚函数" class="headerlink" title="无虚函数"></a>无虚函数</h3><p>当基类与派生类均无虚函数时，也就意味着派生类对象中不需要有虚表。此时的派生类对象的内存布局见<a href="/2018/03/11/cpp-object-model-struct/#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E4%B8%80%E4%B8%AA%E6%97%A0%E8%99%9A%E5%87%BD%E6%95%B0%E7%9A%84%E9%9D%9E%E8%99%9A%E7%BB%A7%E6%89%BF%E5%9F%BA%E7%B1%BB">为struct添加一个无虚函数的非虚继承基类</a>。</p>
+<p>这种继承有一个很不一样的地方：它没有产生多态。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Print</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;Base&quot;</span> &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span> &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Print</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;Derived&quot;</span> &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">const</span> Base&amp; b)</span> </span>&#123;</span><br><span class="line">    b.<span class="built_in">Print</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，当我们在<code>Func</code>中调用<code>b.Print()</code>时，编译器知道<code>Base::Print</code>不是虚函数，也就意味着它不可能被任何派生类改写，因此编译器会直接将其绑定到<code>Base::Print</code>上，即<code>Func</code>的运行时行为在编译时已经确定了。</p>
+<h3 id="基类有虚函数"><a href="#基类有虚函数" class="headerlink" title="基类有虚函数"></a>基类有虚函数</h3><p>当基类有虚函数时，意味着派生类也有虚函数，即派生类对象与其中的基类子对象都需要有一个虚表指针，且要指向正确的虚表。</p>
+<p>前面我们介绍虚表的时候提到，对派生类的虚表加上不同的偏移量，就能得到与其每个基类虚表完全兼容的虚表，其中第0个基类的偏移量就是0。因此单继承下，派生类对象中也不需要有多个虚表指针，只要头部放置一个虚表指针，就可以同时满足基类子对象与派生类对象的需求。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line"></span><br><span class="line">    ~<span class="built_in">Derived</span>() <span class="keyword">override</span> &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Derived d;</span><br><span class="line">    Base&amp; b = d;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;sizeof(Base):%d sizeof(Derived):%d &amp;d:%x &amp;b:%x\n&quot;</span>, <span class="built_in">sizeof</span>(Base), <span class="built_in">sizeof</span>(Derived), &amp;d, &amp;b);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sizeof(Base):24 sizeof(Derived):24 &amp;d:edcc4968 &amp;b:edcc4968</span><br></pre></td></tr></table></figure>
+
+<p>此时<code>Derived</code>对象长成这样：</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_single_inherit.png" alt="single"></p>
+<p>可以看到：</p>
+<ul>
+<li>基类子对象的偏移确实是0，说明它与派生类对象共享了虚表指针。</li>
+<li>基类子对象与派生类自己的成员之间没有加padding，这与标准布局差别很大，更紧凑了。实际上标准没有对非标准布局有任何明确规定，且对于有虚函数的类型，直接bitwise操作本身就是未定义行为，因此编译器就可以自由选择一种比较紧凑的布局，而不需要担心我们直接操作基类子对象时把派生类的成员变量给破坏了。</li>
+</ul>
+<h3 id="基类无虚函数，派生类有虚函数"><a href="#基类无虚函数，派生类有虚函数" class="headerlink" title="基类无虚函数，派生类有虚函数"></a>基类无虚函数，派生类有虚函数</h3><p>如果基类没有虚函数，那么基类子对象就不需要有虚表指针；派生类有虚函数，那么派生类对象就需要有虚表指针。因此派生类对象内还是需要一个虚表指针。</p>
+<p>GCC的实现是仍然把虚表指针放到派生类对象头部，而基类子对象在其后，此时基类子对象有一个指针的偏移。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sizeof(Base):16 sizeof(Derived):32 &amp;d:e1855960 &amp;b:e1855968</span><br></pre></td></tr></table></figure>
+
+<p>此时<code>Derived</code>对象长成这样：<br><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_single_base_nonvirtual.png" alt="base_non_virtual"></p>
+<p>可以看到：</p>
+<ul>
+<li>基类子对象的偏移量为8。</li>
+<li>基类子对象后加了padding。此时基类是平凡类，是有可能被人直接以bitwise的方式操作，不加padding就会有危险。</li>
+</ul>
+<h2 id="多继承下的多对象模型"><a href="#多继承下的多对象模型" class="headerlink" title="多继承下的多对象模型"></a>多继承下的多对象模型</h2><p>当派生类有多个基类时，每个基类自身可能有虚函数，可能没有。对于有虚函数的基类，派生类对象需要为其准备一个虚表指针。对于没有虚函数的基类，则不需要有虚表指针。</p>
+<p>如果第0个基类是有虚函数的，那么派生类对象就可以与其共享虚表指针。因此GCC会将其第一个有虚函数的基类子对象放到派生类对象的头部，从而节省一个虚表指针。</p>
+<p>而后面的基类则因为其虚表在派生类虚表中的偏移量不为0，无法共享虚表指针。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base1</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Base2</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base1, <span class="keyword">public</span> Base2 &#123;</span><br><span class="line">    <span class="type">int32_t</span> r;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sizeof(Base1):24 sizeof(Base2):4 sizeof(Derived):32 &amp;d:e5fe3960 &amp;b1:e5fe3960 &amp;b2:e5fe3974</span><br></pre></td></tr></table></figure>
+
+<p>即使我们把<code>public Base1, public Base2</code>换成<code>public Base2, public Base1</code>，结果也没有任何变化。</p>
+<p>此时<code>Derived</code>对象长成这样：<br><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_one_virtual_one_nonvirtual.png"></p>
+<p>而当我们为<code>Base2</code>也添加一个虚函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base2</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">G</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base1, <span class="keyword">public</span> Base2 &#123;</span><br><span class="line">    <span class="type">int32_t</span> r;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">G</span><span class="params">()</span> <span class="keyword">override</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>结果为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sizeof(Base1):24 sizeof(Base2):16 sizeof(Derived):40 &amp;d:e2c5d958 &amp;b1:e2c5d958 &amp;b2:e2c5d970</span><br></pre></td></tr></table></figure>
+
+<p>此时<code>Derived</code>对象长成这样：<br><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_both_virtual.png"></p>
+<p>可以看到：</p>
+<ul>
+<li>每个基类子对象都有自己的虚表指针。其中第0个基类子对象的虚表指针与派生类对象本身是共享的。</li>
+<li>但两个虚表指针实际都指向派生类自己的虚表，只不过指向的位置不同。</li>
+<li>除了第0个基类子对象，其它基类子对象的偏移量都不是0。</li>
+</ul>
+<h1 id="指向成员的指针"><a href="#指向成员的指针" class="headerlink" title="指向成员的指针"></a>指向成员的指针</h1><p>C++中有一类指针比较特殊，它们是指向类型成员的指针，比如上例中的<code>&amp;Derived::x</code>、<code>&amp;Derived::G</code>等，它们的类型分别是<code>int64_t Base1::*</code>和<code>void (Derived::*)()</code>。这些指针是不能单独使用的，必须要通过一个对应类型的对象来解引用，例如：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Derived d;</span><br><span class="line">d.x = <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">auto</span> px = &amp;Derived::x;</span><br><span class="line">d.*px = <span class="number">2</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">auto</span> pf = &amp;Derived::F;</span><br><span class="line"><span class="type">int</span> ret = d.*<span class="built_in">pf</span>();</span><br></pre></td></tr></table></figure>
+
+<p>这里我们已经能感觉到它们的不一样了。</p>
+<p>指向成员的指针，真的是指针吗？</p>
+<p>是指针，但与普通的指针不一样：</p>
+<ul>
+<li>不能转换为<code>void*</code>或<code>intptr_t</code>等类型。</li>
+<li>与普通指针的大小不一定相同，比如在我的环境（64位clang）下，<code>&amp;Derived::x</code>是8字节，而<code>&amp;Derived::F</code>则是16字节。</li>
+<li>其值不一定表示地址。</li>
+</ul>
+<p>对于第三条，大致有以下规则：</p>
+<ul>
+<li>指向成员变量的指针，其值为该变量在对象内的偏移量，比如<code>&amp;Derived::x</code>就是8，而<code>&amp;Base1::x</code>则是0，这样我们能通过一个对象直接寻址到这个变量。</li>
+<li>指向非虚成员函数的指针，其大小仍是16字节（我的环境中），但其值真的是这个函数的入口地址，而不是偏移量。</li>
+<li>指向虚的成员函数的指针，其值是该函数在该类型的虚表中的偏移量。我们知道虚表的第0位不是虚函数，因此任何指向虚函数的合法指针都不可能是0，通过这一点我们也保证了，如果一个指向虚函数的成员指针为0，那么它一定是空指针。</li>
+</ul>
+<p>实际上指向成员函数的指针占两个普通指针的长度，其中就包含了一些辅助信息，来帮助我们在运行时无论遇到虚函数指针还是非虚函数指针，都能正确跳转。</p>
+<h1 id="static-cast、dynamic-cast、reinterpret-cast"><a href="#static-cast、dynamic-cast、reinterpret-cast" class="headerlink" title="static_cast、dynamic_cast、reinterpret_cast"></a><code>static_cast</code>、<code>dynamic_cast</code>、<code>reinterpret_cast</code></h1><p>对于基类和派生类，我们有两种cast，分别是down-cast与up-cast，即基类-&gt;派生类和派生类-&gt;基类。</p>
+<h2 id="up-cast"><a href="#up-cast" class="headerlink" title="up-cast"></a>up-cast</h2><p>up-cast通常不需要我们显式调用，因为这就是多态正常的使用方式：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(Base&amp; b)</span> </span>&#123;</span><br><span class="line">    b.<span class="built_in">F</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Derived d;</span><br><span class="line">    <span class="built_in">Func</span>(d);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里我们把<code>Derived&amp;</code>传给<code>Func</code>，后者看到的却是一个<code>Base&amp;</code>，这里就是发生了up-cast，也是一次隐式转换。如果在某个地方，我们要显式做up-cast，就要使用<code>static_cast</code>了。</p>
+<p>重点来了：当编译器做up-cast时，它会根据基类子对象在派生类对象中的偏移量，修改对应指针的值。即当代码里写</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base* pb = pd;</span><br></pre></td></tr></table></figure>
+
+<p>时，实际发生的是（假设翻译成C）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span>* p = pd;</span><br><span class="line">Base* pb = (Base*)(p == <span class="number">0</span>? <span class="number">0</span>: p + offset);</span><br></pre></td></tr></table></figure>
+
+<p>因此每次up-cast都会有一次分支。而对于基类无虚函数派生类有虚函数，以及多基类场景下，我们都能看到地址发生了变化。</p>
+<p>C++标准保证了即使我们使用C风格的转换（即<code>(Base*)pd</code>），编译器也会在其上进行正确的偏移。</p>
+<p>而如果我们使用<code>interpret_cast</code>就得不到正确的结果了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Derived d;</span><br><span class="line">Base2* x = &amp;d;</span><br><span class="line">Base2* y = <span class="built_in">reinterpret_cast</span>&lt;Base2*&gt;(&amp;d);</span><br><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;x:%p y:%p\n&quot;</span>, x, y);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">x:0x7ffee7990968 y:0x7ffee7990950</span><br></pre></td></tr></table></figure>
+
+<p>在我的环境中，这里还有个warning，提醒我换成<code>static_cast</code>。</p>
+<p>因此结论是：如果要做up-cast，一定不能用<code>reinterpret_cast</code>，要用<code>static_cast</code>，最差也要用C风格的转换。</p>
+<h2 id="down-cast"><a href="#down-cast" class="headerlink" title="down-cast"></a>down-cast</h2><p>而down-cast就是基类指针转派生类指针。这里正确的做法是使用<code>dynamic_cast</code>，它会做以下事情：</p>
+<ul>
+<li>通过基类指针找到其虚表。</li>
+<li>从虚表的第0位找到<code>type_info*</code>。</li>
+<li>对比<code>type_info*</code>与目标类型，如果无法转换，则返回<code>nullptr</code>。</li>
+<li>根据基类子对象在派生类对象中的偏移，计算出派生类指针并返回。</li>
+</ul>
+<p>而有些人会使用<code>static_cast</code>或C风格的转换来做down-cast。它们的问题都在于：不会做前三步的检查，只会做最后一步。</p>
+<p>这就导致了，如果转换失败，<code>dynamic_cast</code>会返回<code>nullptr</code>，而<code>static_cast</code>或C风格转换则只会返回一个看似正确地减去了偏移量，实际指向了不知道哪里的派生类指针。</p>
+<p>当然，<code>reinterpret_cast</code>就更不对了：它连偏移量都不会算。</p>
+<h1 id="警惕Slicing"><a href="#警惕Slicing" class="headerlink" title="警惕Slicing"></a>警惕Slicing</h1><p>在<a href="/2018/03/11/cpp-object-model-struct/#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E8%99%9A%E6%88%90%E5%91%98%E5%87%BD%E6%95%B0">为struct添加虚成员函数</a>中我们提到，只有通过引用或指针调用虚函数，编译器才会走虚表，才会有多态。实际上，为了与C兼容，保证运行效率，标准规定了这一点。因此直接操作对象时，我们只能得到确定的结果，而不是预期中的运行时多态。</p>
+<p>这里有一个陷阱：当我们用派生类对象去赋值或初始化一个基类对象时，派生类的信息会被抹掉，最终我们仅仅得到一个基类对象。这种现象叫Slicing。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Derived d;</span><br><span class="line">Base2 b2 = d;</span><br><span class="line">b2.<span class="built_in">G</span>();</span><br></pre></td></tr></table></figure>
+
+<p>也许我们预期<code>b2.G()</code>会调用<code>Derived::G</code>，但实际此时<code>b2</code>完完全全就是<code>Base2</code>的对象，因此它只会调用<code>Base2::G</code>。</p>
+<p>这么做的原因是，<code>b2</code>是一个栈上对象，给它分配的空间就只有<code>sizeof(Base2)</code>这么多，因此它只能是一个<code>Base2</code>对象，而无法是派生类的对象。</p>
+<p>这也是一个函数传递要传指针或引用的理由（除了开销与启用多态外），避免Slicing。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2018/03/17/redis-on-the-respberry-pi/" rel="prev" title="[翻译] Redis on the Raspberry Pi: adventures in unaligned lands">
+      <i class="fa fa-chevron-left"></i> [翻译] Redis on the Raspberry Pi: adventures in unaligned lands
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/03/23/cpp-object-model-ctor-dtor/" rel="next" title="C++对象模型（五）构造与析构">
+      C++对象模型（五）构造与析构 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.</span> <span class="nav-text">对象模型</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%80%E5%8D%95%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.1.</span> <span class="nav-text">简单对象模型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%8C%E8%A1%A8%E6%A0%BC%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.2.</span> <span class="nav-text">双表格对象模型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%99%9A%E8%A1%A8%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.3.</span> <span class="nav-text">虚表对象模型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%99%9A%E8%A1%A8"><span class="nav-number">1.3.1.</span> <span class="nav-text">虚表</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%95%E7%BB%A7%E6%89%BF%E4%B8%8B%E7%9A%84%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.4.</span> <span class="nav-text">单继承下的对象模型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%A0%E8%99%9A%E5%87%BD%E6%95%B0"><span class="nav-number">1.4.1.</span> <span class="nav-text">无虚函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E7%B1%BB%E6%9C%89%E8%99%9A%E5%87%BD%E6%95%B0"><span class="nav-number">1.4.2.</span> <span class="nav-text">基类有虚函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E7%B1%BB%E6%97%A0%E8%99%9A%E5%87%BD%E6%95%B0%EF%BC%8C%E6%B4%BE%E7%94%9F%E7%B1%BB%E6%9C%89%E8%99%9A%E5%87%BD%E6%95%B0"><span class="nav-number">1.4.3.</span> <span class="nav-text">基类无虚函数，派生类有虚函数</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A4%9A%E7%BB%A7%E6%89%BF%E4%B8%8B%E7%9A%84%E5%A4%9A%E5%AF%B9%E8%B1%A1%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.5.</span> <span class="nav-text">多继承下的多对象模型</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8C%87%E5%90%91%E6%88%90%E5%91%98%E7%9A%84%E6%8C%87%E9%92%88"><span class="nav-number">2.</span> <span class="nav-text">指向成员的指针</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#static-cast%E3%80%81dynamic-cast%E3%80%81reinterpret-cast"><span class="nav-number">3.</span> <span class="nav-text">static_cast、dynamic_cast、reinterpret_cast</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#up-cast"><span class="nav-number">3.1.</span> <span class="nav-text">up-cast</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#down-cast"><span class="nav-number">3.2.</span> <span class="nav-text">down-cast</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AD%A6%E6%83%95Slicing"><span class="nav-number">4.</span> <span class="nav-text">警惕Slicing</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

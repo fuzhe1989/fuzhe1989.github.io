@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="数据压缩入门">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] 数据压缩入门（Understanding Compression）">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/10/09/understanding-compression/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="数据压缩入门">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-10-09T03:21:22.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.661Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Compression">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/10/09/understanding-compression/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] 数据压缩入门（Understanding Compression） | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/09/understanding-compression/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] 数据压缩入门（Understanding Compression）
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-10-09 11:21:22" itemprop="dateCreated datePublished" datetime="2020-10-09T11:21:22+08:00">2020-10-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p><a target="_blank" rel="noopener" href="https://book.douban.com/subject/35034359/">数据压缩入门</a></p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="并非无趣的一章"><a href="#并非无趣的一章" class="headerlink" title="并非无趣的一章"></a>并非无趣的一章</h2><p>适合游戏数据的压缩：</p>
+<ol>
+<li>无损：去掉重复数据（lz）；熵压缩（Huffman，算术编码）</li>
+<li>有损：降精度，图像视频压缩，音频压缩</li>
+</ol>
+<p><a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=Eb7rzMxHyOk&list=PLOU2XLYxmsIJGErt5rrCqaSGTMyyqNt2H">Compressor Head - Youtube</a></p>
+<p>5类压缩算法：变长编码，统计压缩，字典编码，上下文模型，多上下文模型</p>
+<p>压缩数据的两个思路：</p>
+<ol>
+<li>减少符号数量（字母表尽可能小）</li>
+<li>用更少的位数对更常见的符号进行编码</li>
+</ol>
+<p><a target="_blank" rel="noopener" href="https://www.pingdom.com/blog/the-web-in-1996-1997">The web back in 1996-1997</a></p>
+<p>BWT是压缩dna信息最有效的格式</p>
+<h2 id="突破熵"><a href="#突破熵" class="headerlink" title="突破熵"></a>突破熵</h2><p><a target="_blank" rel="noopener" href="http://www.rosettacode.org/">Rosetta Code</a></p>
+<p>一组符号的香农熵是表示一个符号最小的位数</p>
+<p>通过利用真实数据的两个性质，很可能把数据压缩得比熵小</p>
+<p>突破熵：改变数据的表示形式</p>
+<p>增量编码</p>
+<p>字典编码器</p>
+<p>排列（无重复）通常很难压缩</p>
+<p>通过消除编码法压缩排列</p>
+<p>数据压缩的艺术，就在于将数据转换为熵值更小的新的表现形式</p>
+<p>对压缩进行评价时熵不是一个好指标（除了统计压缩）</p>
+<p>柯尔莫戈洛夫复杂度（Kolmogorov complexity），为了准确地生成数据，需要的生成程序的大小。如果生成程序很小，可以用它代替数据本身。逻辑综合（logic synthesis），程序综合（program synthesis）</p>
+<h2 id="VLC"><a href="#VLC" class="headerlink" title="VLC"></a>VLC</h2><p>给定一组符号，将最短的编码分配给最常见的符号</p>
+<p>编码需满足前缀性质</p>
+<p>整数转为VLC的方法称为通用编码（universal codes）。越小的数字编码越短。还有唯一可译码（uniquely decodable codes）与非奇异码（nonsingular codes）</p>
+<p>一元码：编码N为N个1加1个0。</p>
+<p>Elias Gamma编码：</p>
+<ol>
+<li>x&#x3D; 2^N + L</li>
+<li>用一元码编码N</li>
+<li>用固定长度二进制码编码L</li>
+</ol>
+<p>Elias delta</p>
+<p>Elias omega</p>
+<p>VLC的问题：</p>
+<ol>
+<li>不按字节对齐</li>
+<li>大整数的长度超过固定编码</li>
+<li>按位解码慢</li>
+</ol>
+<p>variant算法：Google用在LevelDB中的按字节vlc</p>
+<p>避免压缩整数（escaping for compressed integers）</p>
+<h2 id="统计编码"><a href="#统计编码" class="headerlink" title="统计编码"></a>统计编码</h2><p>通过数据集中符号出现的概率确定唯一的新的变长编码，有时被称为熵编码</p>
+<p>哈夫曼编码，总是将码表放在数据流前面一起传输，避免解码时创建码表</p>
+<p><a target="_blank" rel="noopener" href="https://www.ted.com/talks/robert_lang_the_math_and_magic_of_origami">TED: The math and magic of origami</a></p>
+<p>哈夫曼编码的问题：单个符号的编码长度总是整数，当符号出现概率不是2的负整数幂时达不到最优</p>
+<p>算术编码：将整个输入流转换为长度很长的数值</p>
+<p>区间编码：绕开算术编码的专利限制</p>
+<p>算术编码过程：</p>
+<ol>
+<li>初始区间为[0, 1)</li>
+<li>将当前区间按各符号概率进行分割</li>
+<li>读入一个符号，选择对应的字区间，更新当前区间</li>
+<li>重复</li>
+</ol>
+<p>最终输出最后一个区间中任意一个数（二进制位数最少的）</p>
+<p>ANS（asymmetric numeral systems）是新编码算法，压缩率和算术编码接近，性能和哈夫曼编码接近</p>
+<p><a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/document/7170048">The Use of Asymmetric Numeral Systems as an Accurate Replacement for Huffman Coding</a></p>
+<ol>
+<li>创建转换表，每个符号一列，按概率自左向右排列</li>
+<li>填入数值，满足：<ol>
+<li>唯一</li>
+<li>每列升序</li>
+<li>大于该行行号（从1开始）</li>
+<li>每列值的个数满足乘以maxVal后等于该符号的出现概率</li>
+<li>每个cell的值除以行号近似等于该符号的出现概率</li>
+</ol>
+</li>
+<li>实际使用时从maxVal开始</li>
+</ol>
+<p>变种：有限状态熵（finite state entropy）</p>
+<h2 id="自适应统计编码"><a href="#自适应统计编码" class="headerlink" title="自适应统计编码"></a>自适应统计编码</h2><p>前一章的统计编码需要先遍历数据计算符号的概率，有两个问题：</p>
+<ol>
+<li>不同部分的符号概率不同（局部偏态），数据量大的话偏差增大。</li>
+<li>流数据没办法先遍历。</li>
+</ol>
+<p>局部性很重要（locality matters）。</p>
+<p>最优方式分割数据流是NP完全问题，因此我们要做的是自动重置统计编码：如果期望的熵与实际编码位数出现显著差异，则重置概率表。</p>
+<p>通常统计压缩的步骤：</p>
+<ol>
+<li>遍历数据流并计算概率。</li>
+<li>根据概率生成VLC。</li>
+<li>再次遍历数据流真正压缩。</li>
+</ol>
+<p>动态VLC编码：</p>
+<ol>
+<li>读取符号。</li>
+<li>输出对应码字。</li>
+<li>更新符号的概率和码字。</li>
+</ol>
+<p>解码：</p>
+<ol>
+<li>读取码字。</li>
+<li>输出符号。</li>
+<li>更新符号的概率和码字。</li>
+</ol>
+<p>编解码过程中遇到第一次出现的符号时，使用一个特殊的LITERAL符号对应的码字，后面再跟着这个符号的原始编码。</p>
+<p>初始概率表只有LITERAL，概率为100%。</p>
+<p>监视平均位数，如果与熵值的差别超过阈值，表明数据模式发生了变化，需要重置。</p>
+<p>自适应算术编码可以使用类似方法。</p>
+<p>自适应Huffman编码（参见<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/10.1145/31846.42227">Design and Analysis of Dynamic Huffman Codes</a>）。</p>
+<h2 id="字典转换"><a href="#字典转换" class="headerlink" title="字典转换"></a>字典转换</h2><p>统计压缩接受任何符号；字典转换接收的是符号集，并重新定义要使用的符号以减少生成的数据流的熵。</p>
+<p>字典转换实际是一个数据流的预处理，之后数据流会更小，压缩率更高。之后还可以做统计编码。</p>
+<p>字典转换的中心问题是分词。</p>
+<p>LZ算法向前查找当前单词是否出现过，因此：</p>
+<ol>
+<li>数据流前半部分新单词很多，后半部分匹配的概率大。</li>
+<li>向前匹配可以找出最长的匹配词。</li>
+</ol>
+<p>当前位置左边叫搜索缓冲区（search buffer），是已经处理过的符号；右边叫先行缓冲区（look ahead buffer）。</p>
+<p>匹配过程类似于字符串查找的bm算法。</p>
+<p>考虑到性能和局部性，需要有滑动窗口，search buffer通常有几万B，look ahead buffer通常只有几十B。</p>
+<p>匹配完成后算法输出&lt;offset, len&gt;。或者&lt;offset, len, C&gt;，其中C是原始符号，表示匹配失败。</p>
+<p>LZ将数据流转换为了记号流，之后可以继续使用统计编码，如把offset&#x2F;len&#x2F;C分成三组再分别编码。</p>
+<h2 id="上下文数据转换"><a href="#上下文数据转换" class="headerlink" title="上下文数据转换"></a>上下文数据转换</h2><p>上下文转换：给定一组相邻的符号集，对其进行变换以易于压缩。</p>
+<p>最重要的3种转换方法：</p>
+<ol>
+<li>行程编码（run-length coding，RLE）</li>
+<li>增量编码（delta coding）</li>
+<li>Burrows-Wheeler transform，BWT</li>
+</ol>
+<p>RLE主要针对连续出现的相同符号聚类的现象。它会用包含符号值和重复次数的tuple替换单个符号连续的“行程”。编码就是找到一个符号，向前看看行程有多长。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AAAABCCCC -&gt; [A,4][B,1][C,4]</span><br></pre></td></tr></table></figure>
+
+<p>B是短行程，因此直接输出字面值B。为了区分字面值后有没有次数，在整个输出流前面加上一个bitmap，长度为符号数，1表示有次数，0表示无次数。</p>
+<p>一般来说数据流中交错出现字面值是会出问题的。</p>
+<p>压缩时字面值和次数分开压缩，解码时根据bitmap选择。</p>
+<p>通常认为RLE是单字符上下文模型。一种新的RLE：TurboRLE。</p>
+<p>增量编码是将数据转换为delta的过程。</p>
+<p>减法增量编码可能出现负数，影响效率。可以用XOR代替，保证没有负数，但不一定会缩小delta的范围。</p>
+<p>参照系（frame of reference，FOR）增量编码，即找一个参照值，将所有值减去参照值，从而缩小范围。</p>
+<p>为了处理离群值，使用修正的参照系增量编码（Patched Frame of Reference Delta Coding，PFOR）：</p>
+<ol>
+<li>选择位宽b</li>
+<li>用b位对每个值编码</li>
+<li>当遇到的值位数超过b时，将这个值单独存起来</li>
+</ol>
+<p>为了还原，需要存离群值的位置。可以将离群值的低b位留在原数据流中，只存储其余位，这样可以进一步压缩离群值。</p>
+<p>编码后可以进一步用统计编码压缩。</p>
+<p>前移编码（move-to-front coding，MTF）更多考虑在较短的窗口内某个特定符号的出现次数。</p>
+<p>预期：每出现一个符号，短时间内它可能还会出现很多次。</p>
+<p>MTF是局部自适应的。它维护一个SortedArray，保存所有出现过的符号。每遇到一个符号，输出它在Array中的索引，并将它移到Array最前面（索引0）。</p>
+<p>为了避免离群符号打乱Array，可以：</p>
+<ol>
+<li>向前K个位置。最常见的K为1。</li>
+<li>出现C次再前移。</li>
+</ol>
+<p>MTF是最简单的动态统计转换形式之一。它会输出很多0和1，因此很适合配合统计编码或RLE。</p>
+<p>BWT通过打乱数据流次序来让重复的子串聚集，从而利于后续压缩方法。</p>
+<p>BWT需要维护一张表，保存输入流的所有移位排列，之后：</p>
+<ol>
+<li>表中加入原始流。</li>
+<li>依次将原始流向右rotate1位，加入表，直到操作完一轮。</li>
+<li>按字典序排序表。</li>
+<li>依次输出每行最后一个字符，即组成原始流的一种新排列，且通常有更好的聚集性。</li>
+</ol>
+<p>如BANANA转换为NNBAAA。另一个重要数据是原始流在排序后的索引值，如3。</p>
+<p>BWT的优点是可逆，且开销极小。</p>
+<p>恢复过程：</p>
+<ol>
+<li>将NNBAAA排序为AAABNN。</li>
+<li>与NNBAAA配对组合为NA&#x2F;NA&#x2F;BA&#x2F;AB&#x2F;AN&#x2F;AN，再次排序</li>
+<li>重复以上过程，直到每个子串长度达到6，此时原始流就在它的索引位置。</li>
+</ol>
+<p>应用BWT时需要先对数据分块，如1MB。BWT压缩文本的性能不如gzip，但非常适合压缩DNA数据。</p>
+<p>最常见的组合是BWT输出给MTF，再用统计编码。</p>
+<p>不用RLE的原因是RLE对干扰敏感，而MTF不敏感。</p>
+<h2 id="数据建模"><a href="#数据建模" class="headerlink" title="数据建模"></a>数据建模</h2><p>多上下文编码算法的基本概念：考虑最后观察到的几个符号以确定当前符号的理想编码位数。</p>
+<p>可以认为统计编码算法就是一阶马尔可夫链。</p>
+<p>通过为每个前面出现过的符号增加一张符号码字对应表，可以创建二阶马尔可夫链。</p>
+<p>应用马尔可夫链编码和解码时，随着读取输入流，动态调整一阶和二阶表。可以组合之前的自适应编码方法。</p>
+<p>实际不会用原始的马尔可夫链来压缩，一个问题是高阶马尔可夫表需要的内存和计算太多。</p>
+<p>值得注意的衍生算法：部分匹配预测算法（prediction by partial matching，PPM）和上下文混合算法（context mixing）。</p>
+<p>PPM的一种构造方法：使用trie记录原始串的所有子串和出现次数。之后依次为每个节点生成概率表。匹配时先按N阶上下文匹配，如果发现概率为0则用N-1阶重试。如果N减为0，则遇到了不认识的新子串，输出转义码。对转义码的不同处理产生了不同的PPM算法。</p>
+<p>大多数PPM算法的N为5或6。</p>
+<p>上下文混合算法，即为了找出给定符号的最佳编码，使用两个或更多的统计模型。</p>
+<p>对数据压缩来说，相邻性很重要，LZ、RLE、Delta Encoding、BWT都是基于假设：数据的相邻性与最佳编码方式有关。</p>
+<p>但相邻性和局部性都只是上下文的最简单方式，不是唯一的方式。</p>
+<p>模型是用来识别和描述符号之间的关系。需要处理的数据类型不同，模型也会不同。</p>
+<p>PAQ（一种上下文混合算法）包含模型：</p>
+<ol>
+<li>n元语法（n-grams），指之前的n个字符。</li>
+<li>整词n元语法（whole-word n-grams），忽略大小写和非字母字符。</li>
+<li>稀疏上下文，由前面的8位或16位字节的高字节位组成（对多媒体文件很有用）。</li>
+<li>二维上下文（对图像、表、电子表格很有用），行的长度由找出的重复字节模式的步长决定。</li>
+<li>只针对特定文件类型的特殊模型。</li>
+</ol>
+<p>将不同模型的输出结合的方法：</p>
+<ol>
+<li>线性混合（linear mixing），将各个模型的预测值加权平均。权重是静态的。</li>
+<li>逻辑混合，使用神经网络来更新权重，缺点是内存占用大，运算复杂。</li>
+</ol>
+<p>移动设备很难应用上下文混合算法。只有当数据量很大时它才能发挥作用。</p>
+<h2 id="换个话题"><a href="#换个话题" class="headerlink" title="换个话题"></a>换个话题</h2><p>大多数多媒体数据压缩都是有损压缩算法。</p>
+<p>通用压缩是用来处理除多媒体数据之外的数据的。</p>
+<h2 id="评价数据压缩"><a href="#评价数据压缩" class="headerlink" title="评价数据压缩"></a>评价数据压缩</h2><p>ZPAQ：文本压缩率高，但内存占用和运算量大。</p>
+<p>LZMA：内存占用高。</p>
+<p>JPG、Ｈ.264在大多数客户端都有硬件支持。GZIP有专用芯片。</p>
+<p>WebP的压缩率和图片质量都好于JPEG，但最初版本解码时间长，现在改善了。</p>
+<p>GZIP流行的一个主要原因是大小合适，解码快。</p>
+<h2 id="压缩图像数据"><a href="#压缩图像数据" class="headerlink" title="压缩图像数据"></a>压缩图像数据</h2><p>大多数人分辨不出图片质量75和90的区别，前者文件大小只有后者的一半，适合作为默认上传值。75以下会影响体验。</p>
+<p>量化（quantization）和区块化（blocking）是导致图像压缩出现视觉问题的最常见形式。</p>
+<p>评价图像质量的指标：峰值信噪比（peak signal-to-noise ratio，PSNR）和结构相似性（structural similarity index，SSIM）。</p>
+<p>PSNR计算的是去噪之后经过均方处理的原始值与压缩后的值的误差</p>
+<p>SSIM考虑了人眼的感知情况，比较了源图像与压缩后图像的边缘相似性，计算更复杂。</p>
+<p>PNG：无损（使用GZIP等算法），支持透明度、元数据块（对用户无用）。</p>
+<p>JPEG：有损，不支持透明度，支持元数据块。有广泛的硬件支持。</p>
+<p>GIF：有损，支持透明度、动画。第一步将图像颜色数降到256，第二步使用LZW无损压缩。</p>
+<p>WebP：介于PNG和JPEG之间，支持有损或无损、透明度。</p>
+<p>GPU可以直接渲染以下格式而无需解压：DXT、ETC、PVR。它们适合用于游戏中。</p>
+<p>矢量格式：描述如何生成图像，能精准缩放，不适合高质量图像。SVG。</p>
+<h2 id="序列化数据"><a href="#序列化数据" class="headerlink" title="序列化数据"></a>序列化数据</h2><p>二进制序列化格式相比JSON&#x2F;XML等可读格式的真正优点是可以产生更好的压缩效果，有时后续还可以用GZIP等通用压缩算法进一步处理。</p>
+<p>对于大的序列化文件，将结构的数组转换为数组的结构极为重要。</p>
+<p>组织数据以便高效获取。服务端返回的数据不需要客户端重新组合。</p>
+<p>将数据切分为适当的压缩形式。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Compression/" rel="tag"># Compression</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/" rel="prev" title="[笔记] Hive: a warehousing solution over a map-reduce framework">
+      <i class="fa fa-chevron-left"></i> [笔记] Hive: a warehousing solution over a map-reduce framework
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/" rel="next" title="[笔记] Improving MapReduce Performance in Heterogeneous Environments">
+      [笔记] Improving MapReduce Performance in Heterogeneous Environments <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B9%B6%E9%9D%9E%E6%97%A0%E8%B6%A3%E7%9A%84%E4%B8%80%E7%AB%A0"><span class="nav-number">1.</span> <span class="nav-text">并非无趣的一章</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AA%81%E7%A0%B4%E7%86%B5"><span class="nav-number">2.</span> <span class="nav-text">突破熵</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#VLC"><span class="nav-number">3.</span> <span class="nav-text">VLC</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%9F%E8%AE%A1%E7%BC%96%E7%A0%81"><span class="nav-number">4.</span> <span class="nav-text">统计编码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%87%AA%E9%80%82%E5%BA%94%E7%BB%9F%E8%AE%A1%E7%BC%96%E7%A0%81"><span class="nav-number">5.</span> <span class="nav-text">自适应统计编码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AD%97%E5%85%B8%E8%BD%AC%E6%8D%A2"><span class="nav-number">6.</span> <span class="nav-text">字典转换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8A%E4%B8%8B%E6%96%87%E6%95%B0%E6%8D%AE%E8%BD%AC%E6%8D%A2"><span class="nav-number">7.</span> <span class="nav-text">上下文数据转换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%BB%BA%E6%A8%A1"><span class="nav-number">8.</span> <span class="nav-text">数据建模</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8D%A2%E4%B8%AA%E8%AF%9D%E9%A2%98"><span class="nav-number">9.</span> <span class="nav-text">换个话题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%84%E4%BB%B7%E6%95%B0%E6%8D%AE%E5%8E%8B%E7%BC%A9"><span class="nav-number">10.</span> <span class="nav-text">评价数据压缩</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9%E5%9B%BE%E5%83%8F%E6%95%B0%E6%8D%AE"><span class="nav-number">11.</span> <span class="nav-text">压缩图像数据</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BA%8F%E5%88%97%E5%8C%96%E6%95%B0%E6%8D%AE"><span class="nav-number">12.</span> <span class="nav-text">序列化数据</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

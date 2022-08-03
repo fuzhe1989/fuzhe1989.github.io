@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="起因上个月我做了一个实验，对比了C++中几种Callable实现方式的性能。今天我想继续这个实验，给Worker类加一个接受右值的构造函数。 下文中的编译环境都是Apple LLVM version 8.1.0 (clang-802.0.42)。 第一次尝试我的第一版代码长这样（精简后）： 12345678910111213141516template &lt;typename HandlerT&amp;">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++：关于函数的类型、完美转发、普适引用与引用折叠的一些尝试和解释">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/08/24/cpp-function-type-perfect-forward-universal-reference-collapse/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="起因上个月我做了一个实验，对比了C++中几种Callable实现方式的性能。今天我想继续这个实验，给Worker类加一个接受右值的构造函数。 下文中的编译环境都是Apple LLVM version 8.1.0 (clang-802.0.42)。 第一次尝试我的第一版代码长这样（精简后）： 12345678910111213141516template &lt;typename HandlerT&amp;">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-08-24T15:48:02.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.651Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/08/24/cpp-function-type-perfect-forward-universal-reference-collapse/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>C++：关于函数的类型、完美转发、普适引用与引用折叠的一些尝试和解释 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/08/24/cpp-function-type-perfect-forward-universal-reference-collapse/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++：关于函数的类型、完美转发、普适引用与引用折叠的一些尝试和解释
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-08-24 23:48:02" itemprop="dateCreated datePublished" datetime="2017-08-24T23:48:02+08:00">2017-08-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="起因"><a href="#起因" class="headerlink" title="起因"></a>起因</h2><p>上个月我做了一个实验，<a href="/2017/07/21/cpp-callable-implementations-benchmark/">对比了C++中几种Callable实现方式的性能</a>。今天我想继续这个实验，给<code>Worker</code>类加一个接受右值的构造函数。</p>
+<p>下文中的编译环境都是Apple LLVM version 8.1.0 (clang-802.0.42)。</p>
+<h2 id="第一次尝试"><a href="#第一次尝试" class="headerlink" title="第一次尝试"></a>第一次尝试</h2><p>我的第一版代码长这样（精简后）：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Test</span><span class="params">(HandlerT&amp;&amp; h)</span> </span>&#123;</span><br><span class="line">    Worker&lt;HandlerT&gt; worker&#123;std::forward&lt;HandlerT&gt;(h)&#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">int</span> x)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">Test</span>(Func);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>编译居然出错：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">➜ &gt; g++ -std=c++11 func_pointer_ctor.cpp</span><br><span class="line">func_pointer_ctor.cpp:12:14: error: multiple overloads of &#x27;Worker&#x27; instantiate to the same signature &#x27;void (void (&amp;&amp;)(int))&#x27;</span><br><span class="line">    explicit Worker(HandlerT&amp;&amp; handler) &#123;&#125;</span><br><span class="line">             ^</span><br><span class="line">func_pointer_ctor.cpp:17:22: note: in instantiation of template class &#x27;Worker&lt;void (&amp;)(int)&gt;&#x27; requested here</span><br><span class="line">    Worker&lt;HandlerT&gt; worker&#123;std::forward&lt;HandlerT&gt;(h)&#125;;</span><br><span class="line">                     ^</span><br><span class="line">func_pointer_ctor.cpp:23:5: note: in instantiation of function template specialization &#x27;Test&lt;void (&amp;)(int)&gt;&#x27; requested here</span><br><span class="line">    Test(Func);</span><br><span class="line">    ^</span><br><span class="line">func_pointer_ctor.cpp:11:14: note: previous declaration is here</span><br><span class="line">    explicit Worker(const HandlerT&amp; handler) &#123;&#125;</span><br><span class="line">             ^</span><br><span class="line">1 error generated.</span><br></pre></td></tr></table></figure>
+
+<p>但是把代码中的<code>Test(Func)</code>换成<code>Test([](int) &#123;&#125;)</code>就没有问题。看出错信息是说当我传入一个函数时，它实例化出来的<code>Worker</code>的两个构造函数是一样的。</p>
+<h2 id="第二次尝试"><a href="#第二次尝试" class="headerlink" title="第二次尝试"></a>第二次尝试</h2><p>那么我专门为<code>Func</code>特化一个版本好了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> FuncT = <span class="built_in">void</span> (<span class="type">int</span>);</span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span>&lt;FuncT&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(FuncT func)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>这里我专门为<code>void (int)</code>特化了一个<code>Worker</code>版本，只有一个构造函数，这回应该没问题了吧。</p>
+<p>编译还是出错：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">➜ &gt; g++ -std=c++11 func_pointer_ctor.cpp</span><br><span class="line">func_pointer_ctor.cpp:12:14: error: multiple overloads of &#x27;Worker&#x27; instantiate to the same signature &#x27;void (void (&amp;&amp;)(int))&#x27;</span><br><span class="line">    explicit Worker(HandlerT&amp;&amp; handler) &#123;&#125;</span><br><span class="line">             ^</span><br><span class="line">func_pointer_ctor.cpp:23:22: note: in instantiation of template class &#x27;Worker&lt;void (&amp;)(int)&gt;&#x27; requested here</span><br><span class="line">    Worker&lt;HandlerT&gt; worker&#123;std::forward&lt;HandlerT&gt;(h)&#125;;</span><br><span class="line">                     ^</span><br><span class="line">func_pointer_ctor.cpp:29:5: note: in instantiation of function template specialization &#x27;Test&lt;void (&amp;)(int)&gt;&#x27; requested here</span><br><span class="line">    Test(Func);</span><br><span class="line">    ^</span><br><span class="line">func_pointer_ctor.cpp:11:14: note: previous declaration is here</span><br><span class="line">    explicit Worker(const HandlerT&amp; handler) &#123;&#125;</span><br><span class="line">             ^</span><br><span class="line">1 error generated.</span><br></pre></td></tr></table></figure>
+
+<p>看出错信息，编译器并没有实例化我们的特化版本，这说明我们特化的类型有问题。仔细看错误信息，其中有<code>Worker&lt;void (&amp;)(int)&gt;</code>，与我们上面用的<code>void (int)</code>不同。</p>
+<h2 id="第三次尝试"><a href="#第三次尝试" class="headerlink" title="第三次尝试"></a>第三次尝试</h2><p>这回我们把<code>FuncT</code>的类型改为<code>void (&amp;)(int)</code>再试一下：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> FuncT = <span class="built_in">void</span> (&amp;)(<span class="type">int</span>);</span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span>&lt;FuncT&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(FuncT func)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>这回编译终于没有问题了。现在我想改一下调用<code>Test</code>时传入的参数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> f = Func;</span><br><span class="line">    <span class="built_in">Test</span>(f);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>编译居然又出错了：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">➜ &gt; g++ -std=c++11 func_pointer_ctor.cpp</span><br><span class="line">func_pointer_ctor.cpp:12:14: error: multiple overloads of &#x27;Worker&#x27; instantiate to the same signature &#x27;void (void (*&amp;&amp;)(int))&#x27;</span><br><span class="line">    explicit Worker(HandlerT&amp;&amp; handler) &#123;&#125;</span><br><span class="line">             ^</span><br><span class="line">func_pointer_ctor.cpp:23:22: note: in instantiation of template class &#x27;Worker&lt;void (*&amp;)(int)&gt;&#x27; requested here</span><br><span class="line">    Worker&lt;HandlerT&gt; worker&#123;std::forward&lt;HandlerT&gt;(h)&#125;;</span><br><span class="line">                     ^</span><br><span class="line">func_pointer_ctor.cpp:30:5: note: in instantiation of function template specialization &#x27;Test&lt;void (*&amp;)(int)&gt;&#x27; requested here</span><br><span class="line">    Test(f);</span><br><span class="line">    ^</span><br><span class="line">func_pointer_ctor.cpp:11:14: note: previous declaration is here</span><br><span class="line">    explicit Worker(const HandlerT&amp; handler) &#123;&#125;</span><br><span class="line">             ^</span><br><span class="line">1 error generated.</span><br></pre></td></tr></table></figure>
+
+<p>仔细看出错信息，里面的类型和之前的不一样了！现在是<code>Worker&lt;void (*&amp;)(int)&gt;</code>了。</p>
+<h2 id="第四次尝试"><a href="#第四次尝试" class="headerlink" title="第四次尝试"></a>第四次尝试</h2><p>这回我们再增加一种针对<code>void (*&amp;)(int)</code>的特化：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> RefFuncT = <span class="built_in">void</span> (&amp;)(<span class="type">int</span>);</span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span>&lt;RefFuncT&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(RefFuncT func)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> PRefFuncT = <span class="built_in">void</span> (*&amp;)(<span class="type">int</span>);</span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span>&lt;PRefFuncT&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(PRefFuncT func)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Test</span><span class="params">(HandlerT&amp;&amp; h)</span> </span>&#123;</span><br><span class="line">    Worker&lt;HandlerT&gt; worker&#123;std::forward&lt;HandlerT&gt;(h)&#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">int</span> x)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> f = Func;</span><br><span class="line">    <span class="built_in">Test</span>(f);</span><br><span class="line">    <span class="built_in">Test</span>(Func);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>编译成功，两种形式都支持。</p>
+<h2 id="函数的类型"><a href="#函数的类型" class="headerlink" title="函数的类型"></a>函数的类型</h2><p><code>Func</code>的类型是<code>void (int)</code>，但在模板的类型推断中，传入的<code>Func</code>会退化为它对应的函数指针或函数引用。</p>
+<p>在<a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Effective Modern C++ Item1</a>中讲到：</p>
+<blockquote>
+<p>另一个会退化为指针的类型是函数。函数会退化为函数指针，且规则与数组相同。例如：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">someFunc</span><span class="params">(<span class="type">int</span>, <span class="type">double</span>)</span></span>;    <span class="comment">// someFunc&#x27;s type is void(int, double)</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f1</span><span class="params">(T param)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f2</span><span class="params">(T&amp; param)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="built_in">f1</span>(someFunc);                  <span class="comment">// T and ParamType are both void (*)(int, double)</span></span><br><span class="line"><span class="built_in">f2</span>(someFunc);                  <span class="comment">// T is void(int, double), ParamType is void (&amp;)(int, double)</span></span><br></pre></td></tr></table></figure>
+
+</blockquote>
+<p><code>Test</code>的形参类型是带引用的，因此我们在直接传入<code>Func</code>时得到的<code>HandlerT</code>就是<code>void (&amp;)(int)</code>。</p>
+<p>而<code>auto f = Func</code>中，根据<code>auto</code>的类型推断规则，<code>Func</code>会退化为函数指针，即<code>f</code>的类型是<code>void (*)(int)</code>，传入<code>Test</code>后得到的类型是<code>void (*&amp;)(int)</code>。为什么这里多了个引用？见下节。</p>
+<h2 id="普适引用、引用折叠与完美转发"><a href="#普适引用、引用折叠与完美转发" class="headerlink" title="普适引用、引用折叠与完美转发"></a>普适引用、引用折叠与完美转发</h2><p>为了避免下面的代码太蛋疼，本小节假设有<code>using FuncT = void (int)</code>。</p>
+<p>什么是引用折叠？参见<a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Effective Modern C++ Item28</a>：</p>
+<blockquote>
+<p>普适引用是个例外，C++有单独的规则来把类型推断中出现的引用的引用转换为单个引用，称为“引用折叠”。折叠规则为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">T&amp; &amp;   =&gt; T&amp;</span><br><span class="line">T&amp; &amp;&amp;  =&gt; T&amp;</span><br><span class="line">T&amp;&amp; &amp;  =&gt; T&amp;</span><br><span class="line">T&amp;&amp; &amp;&amp; =&gt; T&amp;&amp;</span><br></pre></td></tr></table></figure>
+</blockquote>
+<p>说来你可能不信，上面的例子里出现了引用折叠。还记得我们一直在处理的编译错误是什么吗？<code>Worker</code>的两个构造函数的原型相同。我们再看一下这两个构造函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>你可能会觉得奇怪，它们明明是不同的引用类型，为什么最终会变成相同的样子？</p>
+<p>当我们调用<code>Test(Func)</code>时，编译器首先要实例化<code>Test</code>。<code>Func</code>的类型在模板类型推断时退化为函数指针，即<code>FuncT*</code>，而在普适引用的类型推断中，有以下规则：</p>
+<blockquote>
+<p>在普适引用的类型推断中，如果实参是左值，那么<code>T</code>就是左值引用；如果实参是右值，那么<code>T</code>没有引用，就是这个类型本身。</p>
+</blockquote>
+<p>因此<code>HandlerT</code>就是<code>FuncT*&amp;</code>。因此我们实例化了<code>Worker&lt;FuncT*&amp;&gt;</code>。代入到上面的两个构造函数，我们得到：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span>&lt;FuncT*&amp;&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> FuncT*&amp; &amp; handler)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(FuncT*&amp; &amp;&amp; handler)</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>再应用引用折叠，我们得到：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span>&lt;FuncT*&amp;&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> FuncT*&amp; handler)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(FuncT*&amp; handler)</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>一个是const引用，一个是非const引用。我们用于构造<code>Worker</code>的参数<code>h</code>的类型是<code>FuncT*&amp;</code>，不带const，因此编译器不知道该选择哪个函数。</p>
+<h3 id="如果实参是const引用"><a href="#如果实参是const引用" class="headerlink" title="如果实参是const引用"></a>如果实参是const引用</h3><p>那么<code>h</code>的类型就是<code>const FuncT*&amp;</code>，那么两个构造函数会变成：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span>&lt;<span class="type">const</span> FuncT*&amp;&gt; &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> FuncT*&amp; handler)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> FuncT*&amp; handler)</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>完全一样了！</p>
+<h3 id="如果实参是右值引用"><a href="#如果实参是右值引用" class="headerlink" title="如果实参是右值引用"></a>如果实参是右值引用</h3><p>根据上面的普适引用类型推断规则，你可能会认为<code>HandlerT</code>是<code>FuncT</code>，两个构造函数的参数类型一个是<code>const FuncT&amp;</code>，一个是<code>FuncT&amp;&amp;</code>，就不会出错了。可是又错了（错误就不列出来了）。原因在于，<strong>一个右值引用变量本身是左值</strong>，因此<code>HandlerT</code>的类型是<code>FuncT&amp;&amp; &amp;</code>，即<code>FuncT&amp;</code>。</p>
+<p>注意看上面的规则，“如果实参是右值”而不是“如果实参是右值引用”。</p>
+<h3 id="如果实参是右值"><a href="#如果实参是右值" class="headerlink" title="如果实参是右值"></a>如果实参是右值</h3><p>这回我们终于得到了一个正确的程序，代码如下：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Test</span><span class="params">(HandlerT&amp;&amp; h)</span> </span>&#123;</span><br><span class="line">    Worker&lt;HandlerT&gt; worker&#123;std::forward&lt;HandlerT&gt;(h)&#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> FuncT = <span class="built_in">void</span> (<span class="type">int</span>);</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">int</span> x)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">FuncT* <span class="title">Make</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> Func;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">Test</span>(<span class="built_in">Make</span>());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="如果不使用完美转发"><a href="#如果不使用完美转发" class="headerlink" title="如果不使用完美转发"></a>如果不使用完美转发</h3><p>如果我们不使用完美转发，即在代码中去掉<code>std::forward</code>，直接使用<code>Worker&lt;HandlerT&gt; worker&#123;h&#125;</code>，会发生什么？</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Test</span><span class="params">(HandlerT&amp;&amp; h)</span> </span>&#123;</span><br><span class="line">    Worker&lt;HandlerT&gt; worker&#123;h&#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> FuncT = <span class="built_in">void</span> (<span class="type">int</span>);</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">int</span> x)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">FuncT* <span class="title">Make</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> Func;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">Test</span>(<span class="built_in">Make</span>());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">➜ &gt; g++ -std=c++11 func_pointer_ctor.cpp</span><br><span class="line">➜ &gt;</span><br></pre></td></tr></table></figure>
+
+<p>编译成功了。但是不是与完美转发版本有相同的效果呢？我们运行两个版本，看一下结果：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">➜ &gt; ./perfect_forward</span><br><span class="line">rvalue</span><br><span class="line">➜ &gt; ./right_ref</span><br><span class="line">lvalue</span><br></pre></td></tr></table></figure>
+
+<p>有没有很惊讶？去掉了完美转发，我们调用的居然是const引用版本的构造函数。原因很简单，还是“右值引用本身是左值”。</p>
+<h2 id="所以结论是什么？"><a href="#所以结论是什么？" class="headerlink" title="所以结论是什么？"></a>所以结论是什么？</h2><p>总结一下我们遇到的问题。</p>
+<p>我们有一个模板类型<code>Worker</code>，它有两个构造函数，一个接受左值引用，一个接受右值引用：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>然而，当模板参数为一个左值引用类型时，这两个构造函数的函数原型会产生冲突：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Handlert        =&gt; T&amp;</span><br><span class="line">const HandlerT&amp; =&gt; const T&amp; &amp; =&gt; const T&amp;</span><br><span class="line">HandlerT&amp;&amp;      =&gt; T&amp; &amp;&amp;      =&gt; T&amp;</span><br></pre></td></tr></table></figure>
+
+<p>通常我们不会这么实例化模板类，但如果这次实例化是发生在一个完美转发函数中，众所周知，完美转发是要应用在普适引用上的，而普适引用的特性就是，如果实参是左值，形参就会被推断成左值引用。这样我们就很不幸的用左值引用类型来实例化<code>Worker</code>，导致出现上面的问题。</p>
+<p>看起来问题出在我们并不希望用一个带引用的类型来实例化<code>Worker</code>，那就把引用去掉。我们可以用<code>std::remove_reference</code>来实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Worker</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(<span class="type">const</span> HandlerT&amp; handler)</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;lvalue&quot;</span> &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Worker</span><span class="params">(HandlerT&amp;&amp; handler)</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;rvalue&quot;</span> &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> HandlerT&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Test</span><span class="params">(HandlerT&amp;&amp; h)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">using</span> T = <span class="keyword">typename</span> std::remove_reference&lt;HandlerT&gt;::type;</span><br><span class="line">    Worker&lt;T&gt; worker&#123;std::forward&lt;T&gt;(h)&#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> FuncT = <span class="built_in">void</span> (<span class="type">int</span>);</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">int</span> x)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">FuncT* <span class="title">Make</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> Func;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>** argv)</span> </span>&#123;</span><br><span class="line">    <span class="built_in">Test</span>(Func);</span><br><span class="line">    <span class="built_in">Test</span>(<span class="built_in">Make</span>());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>编译成功，运行一下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">➜ &gt; g++ -std=c++11 func_pointer_ctor.cpp</span><br><span class="line">➜ &gt; ./a.out</span><br><span class="line">lvalue</span><br><span class="line">rvalue</span><br></pre></td></tr></table></figure>
+
+<p>非常完美！所以看起来我们得到以下几个结论：</p>
+<ol>
+<li>在用普适引用参数的类型构造一个模板类时，用<code>std::remove_reference</code>去掉它的引用。</li>
+<li>普适引用不是右值引用（参见<a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">区分普适引用与右值引用</a>），如果要实现完美转发，记得用<code>std::forward</code>。</li>
+<li>谨慎重载普适引用，如果要重载，<a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/#item27-%E7%86%9F%E6%82%89%E9%87%8D%E8%BD%BD%E6%99%AE%E9%80%82%E5%BC%95%E7%94%A8%E7%9A%84%E6%9B%BF%E4%BB%A3%E6%96%B9%E6%B3%95">参考这里</a>，以及，确认你真的调用了预期的重载版本。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/" rel="prev" title="Effective Modern C++ 笔记 Chapter5 右值引用、移动语义、完美转发（Item 27-30)">
+      <i class="fa fa-chevron-left"></i> Effective Modern C++ 笔记 Chapter5 右值引用、移动语义、完美转发（Item 27-30)
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/09/05/how-to-call-method-of-base-class-in-template/" rel="next" title="C++：模板类中如何调用其模板基类中的函数">
+      C++：模板类中如何调用其模板基类中的函数 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B5%B7%E5%9B%A0"><span class="nav-number">1.</span> <span class="nav-text">起因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AC%A1%E5%B0%9D%E8%AF%95"><span class="nav-number">2.</span> <span class="nav-text">第一次尝试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AC%A1%E5%B0%9D%E8%AF%95"><span class="nav-number">3.</span> <span class="nav-text">第二次尝试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AC%A1%E5%B0%9D%E8%AF%95"><span class="nav-number">4.</span> <span class="nav-text">第三次尝试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AC%A1%E5%B0%9D%E8%AF%95"><span class="nav-number">5.</span> <span class="nav-text">第四次尝试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%87%BD%E6%95%B0%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="nav-number">6.</span> <span class="nav-text">函数的类型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%99%AE%E9%80%82%E5%BC%95%E7%94%A8%E3%80%81%E5%BC%95%E7%94%A8%E6%8A%98%E5%8F%A0%E4%B8%8E%E5%AE%8C%E7%BE%8E%E8%BD%AC%E5%8F%91"><span class="nav-number">7.</span> <span class="nav-text">普适引用、引用折叠与完美转发</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E5%AE%9E%E5%8F%82%E6%98%AFconst%E5%BC%95%E7%94%A8"><span class="nav-number">7.1.</span> <span class="nav-text">如果实参是const引用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E5%AE%9E%E5%8F%82%E6%98%AF%E5%8F%B3%E5%80%BC%E5%BC%95%E7%94%A8"><span class="nav-number">7.2.</span> <span class="nav-text">如果实参是右值引用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E5%AE%9E%E5%8F%82%E6%98%AF%E5%8F%B3%E5%80%BC"><span class="nav-number">7.3.</span> <span class="nav-text">如果实参是右值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E6%9E%9C%E4%B8%8D%E4%BD%BF%E7%94%A8%E5%AE%8C%E7%BE%8E%E8%BD%AC%E5%8F%91"><span class="nav-number">7.4.</span> <span class="nav-text">如果不使用完美转发</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%80%E4%BB%A5%E7%BB%93%E8%AE%BA%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-number">8.</span> <span class="nav-text">所以结论是什么？</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

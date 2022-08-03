@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Hekaton: SQL Server’s Memory-Optimized OLTP Engine 年代：2013  Hekaton是SQL Server的一个内存数据库子系统，它有以下特点：  数据全在内存中，但具备持久化存储能力（不会丢数据）。 使用无锁结构（latch-free&#x2F;lock-free）。 MVCC结合乐观并发控制（optimistic concurrency">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Hekaton: SQL Server&#39;s Memory-Optimized OLTP Engine">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Hekaton: SQL Server’s Memory-Optimized OLTP Engine 年代：2013  Hekaton是SQL Server的一个内存数据库子系统，它有以下特点：  数据全在内存中，但具备持久化存储能力（不会丢数据）。 使用无锁结构（latch-free&#x2F;lock-free）。 MVCC结合乐观并发控制（optimistic concurrency">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/hekaton-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/hekaton-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/hekaton-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/hekaton-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-05/hekaton-05.png">
+<meta property="article:published_time" content="2021-05-18T05:07:16.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.656Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="OLTP">
+<meta property="article:tag" content="Microsoft">
+<meta property="article:tag" content="MainMemoryDatabase">
+<meta property="article:tag" content="LockFree">
+<meta property="article:tag" content="MVOCC">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-05/hekaton-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Hekaton: SQL Server's Memory-Optimized OLTP Engine | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Hekaton: SQL Server's Memory-Optimized OLTP Engine
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-05-18 13:07:16" itemprop="dateCreated datePublished" datetime="2021-05-18T13:07:16+08:00">2021-05-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2463676.2463710">Hekaton: SQL Server’s Memory-Optimized OLTP Engine</a></p>
+<p>年代：2013</p>
+</blockquote>
+<p>Hekaton是SQL Server的一个内存数据库子系统，它有以下特点：</p>
+<ul>
+<li>数据全在内存中，但具备持久化存储能力（不会丢数据）。</li>
+<li>使用无锁结构（latch-free&#x2F;lock-free）。</li>
+<li>MVCC结合乐观并发控制（optimistic concurrency control）。</li>
+<li>存储过程可以预编译为C代码，再进一步编译为机器指令。</li>
+</ul>
+<span id="more"></span>
+
+<p>Hekaton的目标是将现有的SQL Server的吞吐提升10-100倍以上，有三个方向：</p>
+<ul>
+<li>提升scalability；</li>
+<li>提升CPI；</li>
+<li>减少指令数。</li>
+</ul>
+<p>有分析表明前两个方向只能提供3-4倍的提升，那么就要在减少指令数方面有巨大的进步：10倍提升需要减少90%的指令；100倍提升需要减少99%的指令。这就需要重新设计存储与数据处理系统。</p>
+<p>Hekaton的解法是无锁结构、乐观并发控制、预编译存储过程、不使用分区。最后一个比较有意思，其它很多内存数据库都将DB分为若干个partition，分别由不同的CPU核服务。但Hekaton认为这种做法对query的限制过强，一旦query跨分区性能就急剧下降，无法为各种各样的workload提供稳定的服务。</p>
+<p><img src="/images/2021-05/hekaton-01.png" alt="image"></p>
+<p>整体架构上Hekaton是基于SQL Server之上的，通过定制的Compiler、Runtime、Storage三个模块来提供内存数据的服务。</p>
+<p>Hekaton的MVCC是通过每个record中记录begin time和end time来实现的，一行的所有版本的begin和end time连续且不重叠，对任意时间T，都只有一个版本是有效的。</p>
+<p><img src="/images/2021-05/hekaton-02.png" alt="image"></p>
+<p>每个record中还有一些link用于构建索引。</p>
+<p>Hekaton支持两种索引，hash index（基于lock-free的hash table）与range index（基于lock-free的Bw-tree）。hash index会使用record的第一个link，将每个桶的所有record链接起来。Bw-tree中保存的是指向record的指针，且使用第二个link将相同key的record链接起来（此时Bw-tree中指针指向链表的第一项）。</p>
+<p>当执行读时，Hekaton会先指定read time，然后用这个时间去找那些有效（begin &lt;&#x3D; rt &lt; end）的记录。如前所述，每行只会有一个版本出现在read set中。</p>
+<p>当执行写时，事务提交前，Hekaton会将被删除的record的end time和插入的record的begin time改为事务ID，在提交时再修改为提交时间。</p>
+<p>与很多其它支持MVCC的系统一样，Hekaton也支持snapshot isolation，但为了提供serializable isolation，Hekaton还增加了以下两种检查：</p>
+<ul>
+<li>读集合不变（Read stability）：在事务T提交前检查它读过的数据没有被修改过。</li>
+<li>避免幻读（Phantom avoidance）：在事务T提交前再次scan，确保没有新的数据出现。</li>
+</ul>
+<p>更弱的isolation只需要放宽这两项检查：repeatable read只需要第一项，snapshot isolation与read committed不需要额外检查。</p>
+<p>这两项检查都是在提交时进行，具体来说是在获得commit time后。Hekaton认为这两项检查的开销还好，不是那么恐怖，原因是检查过程中会touch的数据大概率仍然在L1&#x2F;L2 cache中（存疑）。</p>
+<p>这里Hekaton要解决的一个问题是，在乐观并发控制下，如果T1读到了T2写的数据，当T2先进入提交检查的阶段，T1就需要依赖于T2检查的结果。这就产生了一个commit dependency：T2如果abort，则T1也需要跟着abort（避免dirty read）；T1如果要commit，需要等待T2的commit结束。</p>
+<p>事务提交过程中还会记logical redo log（不需要undo），包含所有新增与删除的record，因此每个事务需要维护自己的write set直到提交。index不需要写log。</p>
+<p>被删除或被abort的record在没有活跃事务引用之后就可以gc掉了，但前提是所有index也都不再引用这个record。</p>
+<p>整个gc过程分为两阶段：</p>
+<ul>
+<li>协作阶段，每个工作线程扫index过程中遇到无效的record都可以unlink掉，最后一个unlink的线程就可以回收这个record了。</li>
+<li>有背景线程定期并发扫无效的record，尝试将其在所有引用的index中unlink，再回收。</li>
+</ul>
+<p>最后是Hekaton的预编译。</p>
+<p><img src="/images/2021-05/hekaton-03.png" alt="image"></p>
+<p>Hekaton因为是一个OLTP系统，不值得对ad-hoc query做JIT，因此它的预编译发生在两个时刻：表创建时、存储过程创建时。</p>
+<p>Hekaton会在表创建时将每张表的schema编译为一组callback，其中包含了对record的处理，如hash、compare、serialize等，这样保证了Hekaton仍然是不需要感知表结构的。</p>
+<p>而当创建一个存储过程时，Hekaton会先为其生成C代码，再进一步编译为机器指令。</p>
+<p>Hekaton的代码生成有两个特点：</p>
+<ul>
+<li>整个query生成一个函数，其中大量使用goto跳转。这样虽然降低了可读性，但生成的代码本来就不是给人读的，且这样的代码执行效率最高。</li>
+<li>虽然executor是自顶向下的volcano风格，但生成的代码是自底向上的，函数入口是最底层operator。这个过程相当于将operator的pipeline转换为了全局的状态机。</li>
+</ul>
+<p>如下图这个简单的query：</p>
+<p><img src="/images/2021-05/hekaton-04.png" alt="image"></p>
+<p>会生成下面这种执行流：</p>
+<p><img src="/images/2021-05/hekaton-05.png" alt="image"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/OLTP/" rel="tag"># OLTP</a>
+              <a href="/tags/Microsoft/" rel="tag"># Microsoft</a>
+              <a href="/tags/MainMemoryDatabase/" rel="tag"># MainMemoryDatabase</a>
+              <a href="/tags/LockFree/" rel="tag"># LockFree</a>
+              <a href="/tags/MVOCC/" rel="tag"># MVOCC</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/" rel="prev" title="[笔记] LLAMA: A Cache/Storage Subsystem for Modern Hardware">
+      <i class="fa fa-chevron-left"></i> [笔记] LLAMA: A Cache/Storage Subsystem for Modern Hardware
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/07/24/cpp-move-ctor-with-ref-member/" rel="next" title="[C++] 带有引用类型成员的类居然默认允许移动">
+      [C++] 带有引用类型成员的类居然默认允许移动 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

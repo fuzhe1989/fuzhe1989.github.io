@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Dremel: a decade of interactive SQL analysis at web scale  TL;DR 这篇文章主要讲Dremel的核心思想和架构原则（参考2010年的paper），包括这些年Dremel的演进（作为BigQuery的后端），以及这些思想在同领域的其它系统中的异同。 在The Seattle Report on Database Research中">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Dremel: a decade of interactive SQL analysis at web scale">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Dremel: a decade of interactive SQL analysis at web scale  TL;DR 这篇文章主要讲Dremel的核心思想和架构原则（参考2010年的paper），包括这些年Dremel的演进（作为BigQuery的后端），以及这些思想在同领域的其它系统中的异同。 在The Seattle Report on Database Research中">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-07.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-08.png">
+<meta property="article:published_time" content="2020-12-08T07:06:12.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.653Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLAP">
+<meta property="article:tag" content="Columnar">
+<meta property="article:tag" content="Google">
+<meta property="article:tag" content="综述">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-12/dremel-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Dremel: a decade of interactive SQL analysis at web scale | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Dremel: a decade of interactive SQL analysis at web scale
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-08 15:06:12" itemprop="dateCreated datePublished" datetime="2020-12-08T15:06:12+08:00">2020-12-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3415478.3415568">Dremel: a decade of interactive SQL analysis at web scale</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章主要讲Dremel的核心思想和架构原则（参考<a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets">2010年的paper</a>），包括这些年Dremel的演进（作为BigQuery的后端），以及这些思想在同领域的其它系统中的异同。</p>
+<p>在<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3385658.3385668">The Seattle Report on Database Research</a>中提到了当前AP系统的若干发展趋势，其中本文重点提到的有：</p>
+<ul>
+<li>SQL：大家都开始用SQL作为查询接口了。</li>
+<li>计算存储分离。</li>
+<li>原地分析：数据湖（Data Lake）越来越流行了，同一份数据可以由不同的计算引擎使用，结果再存回数据湖中，而不需要为了不同引擎反复转换数据。</li>
+<li>Serverless计算：提供on-demand方式，用时分配资源，按使用量计费，而不是传统的预留资源。</li>
+<li>列存：Dremel对嵌套结构的列存处理方式启发了许多后来者。</li>
+</ul>
+<span id="more"></span>
+
+<h2 id="拥抱SQL"><a href="#拥抱SQL" class="headerlink" title="拥抱SQL"></a>拥抱SQL</h2><p>无论是Google还是开源世界都在重复着一个循环：放弃SQL——重新拥抱SQL。</p>
+<p>Google在00年代认为SQL无法支持大规模（SQL doesn’t scale），因此MapReduce、BigTable等系统完全不支持SQL。但SQL这种交互方式远比手写job方便，后来大家都开始试探着把SQL加回来。</p>
+<p>Dremel是最早回归SQL的Google系统之一。它的一个重要创新是将Protocol Buffer作为一等公民，支持query嵌套或重复字段。这种创新后来被GoogleSQL（开源为ZetaSQL）所继承。</p>
+<p>传统的SQL schema设计是要把层级结构拆成多张表，query时再join，有着巨大的运行期开销。在Dremel之前Google的数据集经常要把嵌套记录拍平，产生了很大的转换开销。有了对嵌套和重复字段的支持后就可以避免这两类开销了。</p>
+<p>现在GoogleSQL已经成为了Google产品的公共接口，如Dremel、F1、Spanner、PowerDrill、Procella、Tenzing等都支持GoogleSQL，这样它们可以共享以下特性：</p>
+<ul>
+<li>统一的遵从ANSI SQL标准的方言。</li>
+<li>统一的parser、编译前端、关系代数解析器。</li>
+<li>共享的SQL函数库。</li>
+<li>简单的参考实现，用于展示正确的行为。</li>
+<li>共享的测试库，包括服从性测试（compliance test）以保证不同实现都遵从规定的行为。</li>
+<li>其它基础工具，如随机query生成器和SQL格式化工具。</li>
+</ul>
+<p>开源世界也是这样的，Hadoop之后大家都在尝试在Hadoop上增加对SQL的支持。到今天主流大数据系统大多支持了SQL，比如HiveSQL、SparkSQL、PrestoSQL等。</p>
+<blockquote>
+<p>重新拥抱SQL并不意味着这些产品在走回头路。“SQL doesn’t scale”的论据是前分布式时代的数据库（包括当时的并行数据库）与数据仓库的架构不适应web规模的数据量，要么依赖中心节点，要么不够容错。而新产品是在从架构层面解决了规模上的问题之后才又加回了对SQL的支持，它们的上层API长得像不代表底下实现也类似。</p>
+</blockquote>
+<p>但现在的一个问题是大家的SQL仍然不统一：ANSI SQL标准在实践上有很多局限性，如缺少很多关键功能，每个系统都要自己加一些扩展。但这使得SQL语法变得碎片化了，学习成本高，还有“lock-in”的风险。</p>
+<h2 id="解耦"><a href="#解耦" class="headerlink" title="解耦"></a>解耦</h2><h3 id="存储解耦"><a href="#存储解耦" class="headerlink" title="存储解耦"></a>存储解耦</h3><p>Dremel一开始完全是shard-nothing（每台机器用本地磁盘管理数据），计算存储耦合，可能都没有考虑容错性。</p>
+<p>2009年计算层迁移到Borg上，开始考虑容错，存储切换到了本地多副本上。但此时计算存储耦合带来了很多问题：所有新特性都要考虑replication；不搬数据就没办法更改集群大小、存储扩容同时也意味着CPU扩容、数据只能被Dremel访问等。</p>
+<p>之后Dremel将存储迁移到GFS上，一开始遇到了延时问题：GFS引入了高一数量级的延时退步，比如打开数十万个文件要花好几秒。而且Dremel的元数据格式一开始是为磁盘访问优化的，而不是为网络往返。</p>
+<p>大量的优化后，使用GFS、计算存储分离的Dremel性能超过了原来的使用本地磁盘的版本，无论是吞吐还是延时。</p>
+<p>计算存储分离还有着其它明显的好处：</p>
+<ul>
+<li>GFS本身是完全托管的服务，有助于Dremel保持SLO和稳定。</li>
+<li>不再需要将GFS上的共享表加载到Dremel的本地磁盘上了。</li>
+<li>不加载数据就不需要扩容，其它团队就更容易接入Dremel了。</li>
+</ul>
+<p>而当Google的分布式文件系统从单master的GFS升级到多master的Colossus后，Dremel也跟着享受到了服务规模与稳健性上的升级。</p>
+<h3 id="内存解耦"><a href="#内存解耦" class="headerlink" title="内存解耦"></a>内存解耦</h3><p>shuffle是query执行性能的瓶颈之一。Dremel一开始参照MapReduce的实现，使用计算节点的本地内存和磁盘来存储排序好的中间结果，但带来了很多问题：</p>
+<ul>
+<li>shuffle次数随着参与者数量的平方增长（M×N）。</li>
+<li>资源碎片化、任意一端停顿会导致另一端跟着停顿、多租户隔离性差。</li>
+</ul>
+<p>2012年Dremel实现了基于Colossus的shuffle，2014年又扩展到了<a target="_blank" rel="noopener" href="https://cloud.google.com/blog/products/gcp/in-memory-query-execution-in-google-bigquery">支持全内存query执行的shuffle架构</a>。新架构中混合使用了内存和磁盘。</p>
+<p><img src="/images/2020-12/dremel-01.png"></p>
+<p>新架构的效果：</p>
+<ul>
+<li>shuffle的延时减少了一个数量级。</li>
+<li>shuffle支持的数据量增加了一个数量级。</li>
+<li>shuffle的资源消耗减少了超过20%。</li>
+</ul>
+<p>这种解耦内存的方式与shuffle的实现显著影响了后续的Flume和Google Cloud Dataflow等产品的架构。</p>
+<h3 id="观察"><a href="#观察" class="headerlink" title="观察"></a>观察</h3><p>解耦是数据系统的一种潮流，能提供更好的性价比和弹性。解耦突出体现在以下几方面：</p>
+<ul>
+<li>规模效应，存储的解耦路径从RAID、SAN、分布式文件系统，一直到了数据仓库级别的运算。</li>
+<li>普适性，无论是OLAP还是OLTP系统都在朝着解耦的方向，如Spanner、AWS Aurora、Snowflake、Azure SQL Hyperscale。</li>
+<li>更上层的API，一些数据访问的API还自带了filter和aggregation支持，而实现上可能一路下推到硬件层。</li>
+<li>将资源封装为服务增加了价值，例如Dremel的shuffle服务。</li>
+</ul>
+<h2 id="原地数据分析"><a href="#原地数据分析" class="headerlink" title="原地数据分析"></a>原地数据分析</h2><p>在2005年<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1107499.1107503">Jim Gray等人的paper</a>中设想了一种科学计算用到的数据管理方式，将DB和文件系统结合起来，实现秒级查询PB级别的数据。</p>
+<p>事实上整个社区正在从传统的数据仓库向着数据湖分析架构转变中。其中的三种核心转变是：</p>
+<ol>
+<li>从多个数据源消费数据。</li>
+<li>避免了将OLTP数据导入数据仓库的ETL流程。</li>
+<li>允许多种计算引擎操作数据。</li>
+</ol>
+<h3 id="Dremel的演进"><a href="#Dremel的演进" class="headerlink" title="Dremel的演进"></a>Dremel的演进</h3><p>Dremel的初始设计还残留着传统DBMS的影子：</p>
+<ul>
+<li>需要先载入数据；</li>
+<li>数据要存成指定格式；</li>
+<li>数据对其它工具不可见。</li>
+</ul>
+<p>Dremel在迁移到GFS的过程内部公开了它的文件格式（列存+自描述），这样其它工具（如MapReduce）也能直接生成Dremel需要的文件，或直接读取Dremel文件。这样Dremel可以和很多工具结合起来，不再需要反复转换数据格式，数据与执行引擎也解耦了。Google的很多后续产品（如Tenzing、PowerDrill、F1、Procella等）都采用了类似风格。</p>
+<p>随后Dremel从两方面完善了这种“原地分析”的方式：</p>
+<ul>
+<li>增加更多的格式。尽管这样带来了运行期读取和解析的开销，但用户愿意多点延时而不要转换数据格式。</li>
+<li>联合查询（federation query）。Dremel可以分析来自不同引擎——包括Google Drive——的数据。这样能充分利用不同引擎的优点（体现了<a href="/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone">‘One Size Fits All’: An Idea Whose Time Has Come and Gone</a>的思想）。</li>
+</ul>
+<h3 id="原地分析的缺点"><a href="#原地分析的缺点" class="headerlink" title="原地分析的缺点"></a>原地分析的缺点</h3><ol>
+<li>很多用户（尤其是Google外的）不愿意自己管理文件，或不能保证安全可靠。</li>
+<li>原地分析意味着没有优化存储格式或增加统计信息的优化空间了，进而导致许多常用的优化手段都没办法用。</li>
+<li>修改、删除数据或变更schema都变得不现实。</li>
+</ol>
+<p>这些需求催生了BigQuery Managed Storage。托管数据和自行管理的数据需要被同等对待。</p>
+<p>这种混合了原地分析和托管存储的模型也可见于NoDB和Delta Lake。</p>
+<h2 id="Serverless计算"><a href="#Serverless计算" class="headerlink" title="Serverless计算"></a>Serverless计算</h2><p>Dremel的这种弹性、多租户、按需的服务，现在被称为Serverless。</p>
+<h3 id="Serverless的开始"><a href="#Serverless的开始" class="headerlink" title="Serverless的开始"></a>Serverless的开始</h3><p>传统的DBMS需要部署在特定机器上；后来的MapReduce等大数据系统只支持单租户。而Dremel一开始就选择了Serverless以满足其功能需求。Dremel主要通过三个方面来实现Serverless：</p>
+<ul>
+<li>解耦。计算、内存、存储解耦可以降低成本。</li>
+<li>容错性和可重启性。这也对query的执行和分发提出了要求：<ul>
+<li>每个子任务都要是确定性的、可重复的，从而允许最小化出错时的重试范围。</li>
+<li>任务的分发器要能支持重复发同一个任务。</li>
+</ul>
+</li>
+<li>虚拟调度单元。这种资源单位比传统的多种类型的物理资源更适合于Borg这样的容器环境，也能将调度和用户看到的资源分配与实际的容器机器资源分配解耦。</li>
+</ul>
+<p>这三种思想启发了后面的很多系统。解耦已经被广泛接受了，Snowflake也使用了虚拟调度单元的概念，而各种云产品要么支持按需使用，要么把自动扩缩容作为卖点。</p>
+<h3 id="Serverless架构的演进"><a href="#Serverless架构的演进" class="headerlink" title="Serverless架构的演进"></a>Serverless架构的演进</h3><p>以下是Dremel近年来在Serverless方面的新思路：</p>
+<ul>
+<li>Dremel在2012年用集中式调度取代了旧paper中的dispatcher。新的调度器能根据全集群的状态来做决策，达到更好的利用率和隔离效果。</li>
+<li>前面介绍过的shuffle层可以用来解耦调度与不同阶段的query执行。shuffle结果可以作为一种checkpoint，因此调度器可以放心地抢占worker，将资源交给其它job。</li>
+<li>旧paper的执行模型如图3，是一种固定的树型结构。之后Dremel演进到了图4的DAG结构，更加灵活，也能支持更大的规模。</li>
+<li>Dremel会在运行期收集统计信息，用于动态修改执行plan，比如用哪种join（broadcast还是hash）。这要归功于新的shuffle和集中式调度。在broadcast和hash的例子中，Dremel会先选择hash join，同时shuffle两侧，但如果其中一侧结束得很快，size小于broadcast的阈值，Dremel会取消另一侧的shuffle，转而执行broadcast join。</li>
+</ul>
+<p><img src="/images/2020-12/dremel-02.png" alt="旧的执行模型"></p>
+<p><img src="/images/2020-12/dremel-03.png" alt="新的执行模型"></p>
+<h2 id="针对嵌套数据的列存"><a href="#针对嵌套数据的列存" class="headerlink" title="针对嵌套数据的列存"></a>针对嵌套数据的列存</h2><p>Dremel支持嵌套结构（Protocol Buffers）的原因很简单，Google内的数据几乎都是存成这种格式的。 Dremel的paper之后，很多系统都开始支持这种针对嵌套数据的列存格式了：Parquet直接源于Dremel paper、ORC、Apache Arrow。</p>
+<p>这些格式都支持嵌套和重复数据，但方式不同。Dremel和Parquet使用了repetition level和definition level。</p>
+<p>ORC记录了重复字段的长度和标记optional字段是否存在的boolean。</p>
+<p>Arrow的做法类似于ORC，但它记录了重复字段的offset，这样有助于内存中直接访问数组元素。而ORC的做法更适合压缩，因此适合用于文件中。</p>
+<p>这些方法各有取舍。repetition&#x2F;definition level的思路是将与一列有关的schema信息都封装到这列里面，这样访问一列不需要先读它的祖先。但这会导致多余的存储，因为每个child都重复着祖先的结构信息。数据结构越深和越宽，冗余信息越多。</p>
+<p>下图是Dremel用Google内部的数据集做的统计，如果将RL&#x2F;DL换成ORC的方案，这些数据集平均大小能减少13%。</p>
+<p><img src="/images/2020-12/dremel-04.png"></p>
+<p>但RL&#x2F;DL在读的时候有一定优势：不需要读祖先。而使用ORC的方案就要读祖先，会多一些I&#x2F;O。</p>
+<p>2014年Dremel公布了它用于<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/2732977.2732987">在嵌套数据上做计算、过滤、聚合的算法</a>，同年Dremel开始使用新的列存格式<a target="_blank" rel="noopener" href="https://cloud.google.com/blog/products/gcp/inside-capacitor-bigquerys-next-generation-columnar-storage-format">Capacitor</a>。</p>
+<h3 id="内嵌求值"><a href="#内嵌求值" class="headerlink" title="内嵌求值"></a>内嵌求值</h3><p>Capacitor的接口直接内嵌了filter功能，可以解析SQL谓词。这一功能被所有使用Capacitor的Google系统所使用——Dremel、F1、Procella、Flume、MapReduce等。</p>
+<p>Capacitor使用了以下技术来高效过滤数据：</p>
+<ul>
+<li>使用统计信息来裁剪掉不必要的partition和简化谓词。如<code>EXTRACT(YEAR FORM date) = 2020</code>先被改写为<code>date BETWEEN &#39;2020-01-01&#39; AND &#39;2020-12-31&#39;</code>，再将不在这个时间段的partition去掉。另一个例子是<code>ST_DISTANCE(geo, constant_geo) &lt; 100</code>，会根据统计信息算出<code>constant_geo</code>覆盖的区域，再将位于这些区域的值合并起来。</li>
+<li>向量化。</li>
+<li>skip索引。经观察，Dremel&#x2F;BigQuery中使用的filter的选择性通常都非常强（见图9），需要有快速跳过一片记录的能力。Capacitor在写的时候会把每列的数据分为多个segment，再分别压缩。在扫描时可以直接排除掉不需要的segment，不需要解压缩。</li>
+<li>谓词重排序。重排序filter中谓词的最优算法是已知的（<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/pdf/10.1145/359581.359600">link</a>），需要的输入是每个谓词的选择率和开销。Capacitor会使用多种启发式方法，根据是否使用字典、cardinality、NULL的密度、表达式的复杂度来决定如何排序。例如，考虑<code>p(x) AND q(y)</code>，其中x没有字典，cardinality很大，而y有字典，cardinality很小，那么最好先求值<code>q(y)</code>，即使它表达式更复杂。</li>
+</ul>
+<p><img src="/images/2020-12/dremel-05.png"></p>
+<h3 id="行重排序"><a href="#行重排序" class="headerlink" title="行重排序"></a>行重排序</h3><p>通常分析引擎中行序都不太重要，因此Capacitor可以自由重新排列行以达到更好的RLE效果，如图10。</p>
+<p><img src="/images/2020-12/dremel-06.png"></p>
+<p>但这里最优解是个NP完全问题。而且不是每列效果都一样——长字符串上短的RLE长度也要比短的INTEGER上很长的RLE效果更好。最后我们还要考虑到不同列的使用场景不同：有些列常被用在SELECT中，而另一些列常被用在WHERE中。Capacitor使用了一种基于抽样和启发式规则的近似模型。</p>
+<p>实践中行重排序的效果好得惊人。下图中一共有40个数据集，重排序行之后体积平均减少了17%，有些达到了40%，最好的达到了75%。</p>
+<p><img src="/images/2020-12/dremel-07.png"></p>
+<h3 id="更复杂的schema"><a href="#更复杂的schema" class="headerlink" title="更复杂的schema"></a>更复杂的schema</h3><p>Protocol Buffers支持递归，可以用于表达树等结构：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">message Node &#123;</span><br><span class="line">    optional Payload value;</span><br><span class="line">    repeated Node nodes;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>但这样递归深度是没办法先验知道的。Dremel一开始不支持递归结构，但在Capacitor中增加了对递归的支持。</p>
+<p>另一种挑战来自存储JSON或XML这样的没有严格schema的数据，可以使用proto3中的<code>Any</code>来支持这样的数据。这种挑战还来自同一列的数据类型可能不同。这个问题Capacitor只是部分解决了。</p>
+<h2 id="在大数据上的交互式查询延时"><a href="#在大数据上的交互式查询延时" class="headerlink" title="在大数据上的交互式查询延时"></a>在大数据上的交互式查询延时</h2><p>前面介绍的设计原则（解耦、原地分析、Serverless）与实现交互级别的延时是冲突的。传统的计算下推优化与解耦冲突；存储格式优化与原地分析冲突；定制机器优化与Serverless冲突。</p>
+<p>Dremel使用了以下优化从而在不违反上述设计原则的同时使延时达到了交互式分析的要求：</p>
+<ul>
+<li>stand-by机器池，请求来了立即可服务，减少了冷启动时间。</li>
+<li>探测执行，类似于MapReduce的做法。Dremel会将query分成大量小任务，这样机器间执行时间更均匀，同时对慢任务的backup执行代价也更小。</li>
+<li>多级执行树。</li>
+<li>Dremel内部的schema也是列存的，避免了解析完整schema的开销。</li>
+<li>使用轻量压缩算法来平均CPU和I&#x2F;O开销。</li>
+<li>近似结果。Dremel在处理top-k和distinct时会使用一轮的近似算法。另外用户可以指定返回结果需要扫描的数据量的阈值，比如只扫描98%的数据就可以返回，同时还能避免长尾对整个query延时的影响。图12显示这种优化可以减少1&#x2F;2到2&#x2F;3的延时。</li>
+<li>query延时分层。Dremel在调度器层面保证了快query不会被慢query阻塞，允许按query类型和优先级抢占已经运行的task。</li>
+<li>Dremel的root server会批量获取Colossus的文件元数据，随后跟着query一起发给底下的server。另一种优化是增大单个文件的体积，减少一张表的文件数，从而减少文件操作的数量。</li>
+<li>用户可以预留一些资源只用于处理延时敏感的任务。这些资源在空闲时也可以给别人用，但Dremel保证了在需要时会立即将资源还给预留用户使用。</li>
+<li>自适应调整query规模。Dremel可以根据query的特点来调整DAG，如<code>COUNT</code>和<code>SUM</code>只需要最多两层，而top-k则可以增加一层预聚合。</li>
+</ul>
+<p><img src="/images/2020-12/dremel-08.png"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLAP/" rel="tag"># OLAP</a>
+              <a href="/tags/Columnar/" rel="tag"># Columnar</a>
+              <a href="/tags/Google/" rel="tag"># Google</a>
+              <a href="/tags/%E7%BB%BC%E8%BF%B0/" rel="tag"># 综述</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/" rel="prev" title="[笔记] Procella: Unifying serving and analytical data at YouTube">
+      <i class="fa fa-chevron-left"></i> [笔记] Procella: Unifying serving and analytical data at YouTube
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/" rel="next" title="[笔记] Large-scale incremental processing using distributed transactions and notifications (Percolator)">
+      [笔记] Large-scale incremental processing using distributed transactions and notifications (Percolator) <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8B%A5%E6%8A%B1SQL"><span class="nav-number">1.</span> <span class="nav-text">拥抱SQL</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E8%80%A6"><span class="nav-number">2.</span> <span class="nav-text">解耦</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E8%A7%A3%E8%80%A6"><span class="nav-number">2.1.</span> <span class="nav-text">存储解耦</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E5%AD%98%E8%A7%A3%E8%80%A6"><span class="nav-number">2.2.</span> <span class="nav-text">内存解耦</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%82%E5%AF%9F"><span class="nav-number">2.3.</span> <span class="nav-text">观察</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%9F%E5%9C%B0%E6%95%B0%E6%8D%AE%E5%88%86%E6%9E%90"><span class="nav-number">3.</span> <span class="nav-text">原地数据分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Dremel%E7%9A%84%E6%BC%94%E8%BF%9B"><span class="nav-number">3.1.</span> <span class="nav-text">Dremel的演进</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%9F%E5%9C%B0%E5%88%86%E6%9E%90%E7%9A%84%E7%BC%BA%E7%82%B9"><span class="nav-number">3.2.</span> <span class="nav-text">原地分析的缺点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Serverless%E8%AE%A1%E7%AE%97"><span class="nav-number">4.</span> <span class="nav-text">Serverless计算</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Serverless%E7%9A%84%E5%BC%80%E5%A7%8B"><span class="nav-number">4.1.</span> <span class="nav-text">Serverless的开始</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Serverless%E6%9E%B6%E6%9E%84%E7%9A%84%E6%BC%94%E8%BF%9B"><span class="nav-number">4.2.</span> <span class="nav-text">Serverless架构的演进</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%92%88%E5%AF%B9%E5%B5%8C%E5%A5%97%E6%95%B0%E6%8D%AE%E7%9A%84%E5%88%97%E5%AD%98"><span class="nav-number">5.</span> <span class="nav-text">针对嵌套数据的列存</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E5%B5%8C%E6%B1%82%E5%80%BC"><span class="nav-number">5.1.</span> <span class="nav-text">内嵌求值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A1%8C%E9%87%8D%E6%8E%92%E5%BA%8F"><span class="nav-number">5.2.</span> <span class="nav-text">行重排序</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9B%B4%E5%A4%8D%E6%9D%82%E7%9A%84schema"><span class="nav-number">5.3.</span> <span class="nav-text">更复杂的schema</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9C%A8%E5%A4%A7%E6%95%B0%E6%8D%AE%E4%B8%8A%E7%9A%84%E4%BA%A4%E4%BA%92%E5%BC%8F%E6%9F%A5%E8%AF%A2%E5%BB%B6%E6%97%B6"><span class="nav-number">6.</span> <span class="nav-text">在大数据上的交互式查询延时</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

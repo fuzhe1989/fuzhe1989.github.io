@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Dynamo: amazon’s highly available key-value store  TL;DR Dynamo是一种去中心化的KV分布式存储系统。它的主要设计目标是：  高可用性（always writable）。 高可伸缩性。 高性能（低延时）。 面向异构机器。  为此Dynamo在CAP中选择了AP，牺牲了一部分的一致性（最终一致）。针对潜在的数据修改的冲突，Dynam">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Dynamo: amazon&#39;s highly available key-value store">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/11/11/dynamo-amazons-highly-available-key-value-store/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Dynamo: amazon’s highly available key-value store  TL;DR Dynamo是一种去中心化的KV分布式存储系统。它的主要设计目标是：  高可用性（always writable）。 高可伸缩性。 高性能（低延时）。 面向异构机器。  为此Dynamo在CAP中选择了AP，牺牲了一部分的一致性（最终一致）。针对潜在的数据修改的冲突，Dynam">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/dynamo-02.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/dynamo-01.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/dynamo-04.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/dynamo-03.jpg">
+<meta property="article:published_time" content="2020-11-11T09:49:12.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.653Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Amazon">
+<meta property="article:tag" content="Quorum">
+<meta property="article:tag" content="NoSQL">
+<meta property="article:tag" content="KV">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-11/dynamo-02.jpg">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/11/11/dynamo-amazons-highly-available-key-value-store/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Dynamo: amazon's highly available key-value store | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/dynamo-amazons-highly-available-key-value-store/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Dynamo: amazon's highly available key-value store
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-11 17:49:12" itemprop="dateCreated datePublished" datetime="2020-11-11T17:49:12+08:00">2020-11-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1323293.1294281">Dynamo: amazon’s highly available key-value store</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Dynamo是一种去中心化的KV分布式存储系统。它的主要设计目标是：</p>
+<ul>
+<li>高可用性（always writable）。</li>
+<li>高可伸缩性。</li>
+<li>高性能（低延时）。</li>
+<li>面向异构机器。</li>
+</ul>
+<p>为此Dynamo在CAP中选择了AP，牺牲了一部分的一致性（最终一致）。针对潜在的数据修改的冲突，Dynamo将选择权交给了用户，读取会返回一个“vector clock”，由用户自己解决冲突。</p>
+<p>另外为了避免单点问题影响可用性，Dynamo选择了去中心化架构，所有节点都是相同地位的，通过一致性哈希决定数据分片，通过gossip协议在不同节点间同步节点列表和所管理的数据范围。</p>
+<p>Dynamo使用了quorum协议（即R+W&gt;N）来读写不同replica的数据。为了进一步提升集群发生错误时的可用性，Dynamo使用了“sloppy quorum”以允许少数派节点也可以临时写入数据，因此造成的数据冲突由上面提到的vector clock来解决。</p>
+<p>Dynamo与BigTable是同一个时期非常不同的两种技术选择，前者看重可用性，后者看重一致性，且有着更复杂的数据模型。目前来看，用户似乎通常不太喜欢自己来解决数据冲突，默认的“last write win”策略已经够好了。对于只在一个datacenter内的后继系统来说，Dynamo有点过于复杂了，中心节点可以极大简化系统设计。但对于跨datacenter的系统，quorum的价值一下子提高了很多。</p>
+<p><img src="/images/2020-11/dynamo-02.jpg" alt="Summary of techniques used in Dynamo"></p>
+<span id="more"></span>
+
+<h2 id="Partitioning-and-Replication"><a href="#Partitioning-and-Replication" class="headerlink" title="Partitioning and Replication"></a>Partitioning and Replication</h2><p><img src="/images/2020-11/dynamo-01.jpg" alt="Partitioning"></p>
+<p>Dynamo使用一致性哈希，每个物理节点根据自己的处理能力（面向异构）使用多个虚拟节点。每个key range的N个replica由它对应的节点和前面的N-1的节点负责，其中它对应的节点称为coordinator，正常情况下负责处理这个key range的读写请求和replication。</p>
+<p>这N个节点被称为这个key range对应的“preference list”。preference list中只包含物理节点。</p>
+<p>Dynamo使用Merkle树来组织数据，这种数据结构的优点是每层都有hash value，可以非常方便地对比两个replica的数据是否一致，以及是哪部分不一致。不同replica会在使用gossip协议通信时完成这种比较，并后台合并冲突版本。</p>
+<p>使用Merkle树的缺点是在有虚拟节点加入退出时涉及到的key range数据都要重新算。</p>
+<h3 id="Ensuring-Uniform-Load-distribution"><a href="#Ensuring-Uniform-Load-distribution" class="headerlink" title="Ensuring Uniform Load distribution"></a>Ensuring Uniform Load distribution</h3><p><img src="/images/2020-11/dynamo-04.jpg" alt="Partitioning Strategies"></p>
+<p>以下三种partition策略：</p>
+<ol>
+<li>每个节点在整个哈希空间中随机选择T个token。</li>
+<li>将哈希空间切成均匀的Q个区间，每个节点仍然随机选择T个token，但token要是区间的端点。</li>
+<li>将哈希空间切成均匀的Q个区间，每个节点选择Q&#x2F;S个token（S是节点数量），token不要求是区间端点。节点退出时将它的token均匀分给其它节点，加入时从其它节点获得token。</li>
+</ol>
+<p>方案1是最早使用的，它的缺点是节点加入和退出时数据的迁移成本和Merkele树的计算成本都很高。另外它将数据分片和分布耦合在了一起，如果要增加节点以平摊负载，就不可避免地影响数据分布。</p>
+<p>方案2中要求Q远大于N和S*T，这样token只影响数据分布，不影响数据分片。</p>
+<p>方案3的metadata远比方案1要少，且有着更快的启动和恢复，也更容易归档数据。相比方案2，方案3的各节点负载更均衡。它的缺点是节点加入和退出要做额外的通信。</p>
+<p>测试显示方案3的负载更均衡。</p>
+<h2 id="Data-versioning"><a href="#Data-versioning" class="headerlink" title="Data versioning"></a>Data versioning</h2><p>Dynamo的目标应用需要保证always writable，因此Dynamo允许在网络分区发生时，位于少数派的节点仍然有能力写数据。另外正常的异步replication也有可能导致数据写入在不同节点上有不同的顺序。</p>
+<p>Dynamo选择将这些写入历史记录下来，构成vector clock，由用户解决。</p>
+<p><img src="/images/2020-11/dynamo-03.jpg" alt="Version Clock"></p>
+<p>一个vector clock由一组<code>(node, counter)</code>组成，记录了它在某个node的最后一笔写入的counter（node级别单调增），这样如果vector A在每个node上的counter都小于等于vector B，则称B包含A。两个互不包含的vector可以merge到一起，由用户决定最终值是什么。</p>
+<p>Dynamo中用户更新某个值的时候就需要带上vector clock（通常由前面的读操作返回），它会清除掉包含的其它vector clock，从而解决冲突。</p>
+<p>通常vector长度不会超过N，但考虑到极端场景（频繁失败 + 节点加入退出），Dynamo会在vector长度超过一个阈值时将最古老的那个node从vector中踢掉。理论上会丢失一些历史，但生产场景没遇到过。</p>
+<h2 id="put-and-get"><a href="#put-and-get" class="headerlink" title="put and get"></a>put and get</h2><p>client在读写某个key的时候有两种方式：</p>
+<ol>
+<li>通过load balancer，将请求扔给任一节点。</li>
+<li>直接与coordinator通信。</li>
+</ol>
+<p>方案2可以少一跳，但可能导致压力不均衡。</p>
+<p>如果client不知道谁是coordinator，或使用了load balancer，与它通信的节点会负责将请求转发给对应的coordinator。如果coordinator此时处于错误状态，请求会被转给preference list上的其它节点。</p>
+<p>coordinator收到put请求后，它会在本地写入并将请求转发给preference list上其它N-1个replica，并在收到W-1个回应后返回给client。失败的请求不会回滚，coordinator后续还会重试。</p>
+<p>读的时候coordinator也会等收集到R-1个回应后就返回client。这R个结果不需要是相同的，coordinator会负责将它们的version clock合并起来返回。</p>
+<p>如果读的时候有节点的version clock是被其它节点包含的，会触发read repair，将这个节点的数据更新成包含它的最新版本。</p>
+<p>通常coordinator就是preference list的第一个节点，但这样可能造成压力不均匀，因此Dynamo允许这N个节点作为coordinator，尤其是对于read-write场景，Dynamo会选择前一次读中响应最快的节点作为这次写的coordinator，还可以提高获得“read-your-writes”一致性的机会。</p>
+<h3 id="sloppy-quorum"><a href="#sloppy-quorum" class="headerlink" title="sloppy quorum"></a>sloppy quorum</h3><p>当健康节点不够W个时，Dynamo不会禁止写入，而是会找再之前的若干个节点临时存放数据，这种协议称为sloppy quorum。</p>
+<p>数据写入临时节点时还会附带有信息表明这些数据本该属于哪个节点，临时节点会在正式节点恢复后移交数据。</p>
+<p>当然sloppy quorum也增大了数据冲突的概率。</p>
+<h2 id="Membership-and-Failure-Detection"><a href="#Membership-and-Failure-Detection" class="headerlink" title="Membership and Failure Detection"></a>Membership and Failure Detection</h2><p>每个节点会在本地持久化集群成员列表，并通过gossip协议相互同步，同步的结果是最终一致的。</p>
+<p>当有新节点启动时，它先本地持久化几个虚拟节点，之后通过gossip协议逐渐将这个信息扩散出去。为了保证这些信息最终能传播给每个节点，Dynamo会预先选择几个种子节点，每个其它节点的初始列表都有这些种子节点。</p>
+<p>Cassandra论文中描述它的gossip协议是每个节点每轮选择一个任意节点，交换信息，这样<code>logN</code>轮之后就可以同步整个集群的信息了。</p>
+<p>相应地，如果节点A发现节点B不可达，它也会通过gossip协议同步这个信息，之后可以用不同的方案来检测哪些节点有问题了。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Amazon/" rel="tag"># Amazon</a>
+              <a href="/tags/Quorum/" rel="tag"># Quorum</a>
+              <a href="/tags/NoSQL/" rel="tag"># NoSQL</a>
+              <a href="/tags/KV/" rel="tag"># KV</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/11/11/building-a-database-on-s3/" rel="prev" title="[笔记] Building a Database on S3">
+      <i class="fa fa-chevron-left"></i> [笔记] Building a Database on S3
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/" rel="next" title="[笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees">
+      [笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Partitioning-and-Replication"><span class="nav-number">1.</span> <span class="nav-text">Partitioning and Replication</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Ensuring-Uniform-Load-distribution"><span class="nav-number">1.1.</span> <span class="nav-text">Ensuring Uniform Load distribution</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Data-versioning"><span class="nav-number">2.</span> <span class="nav-text">Data versioning</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#put-and-get"><span class="nav-number">3.</span> <span class="nav-text">put and get</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#sloppy-quorum"><span class="nav-number">3.1.</span> <span class="nav-text">sloppy quorum</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Membership-and-Failure-Detection"><span class="nav-number">4.</span> <span class="nav-text">Membership and Failure Detection</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

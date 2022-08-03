@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="Amazon Aurora目前有两篇文章：  2017年的Amazon aurora: Design considerations for high throughput cloud-native relational databases。 2018年的Amazon aurora: On avoiding distributed consensus for i&#x2F;os, commits,">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Amazon Aurora SIGMOD&#39;17 &#39;18">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/01/18/amazon-aurora/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="Amazon Aurora目前有两篇文章：  2017年的Amazon aurora: Design considerations for high throughput cloud-native relational databases。 2018年的Amazon aurora: On avoiding distributed consensus for i&#x2F;os, commits,">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/aurora-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/aurora-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/aurora-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/aurora-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/aurora-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/aurora-06.png">
+<meta property="article:published_time" content="2021-01-18T04:13:09.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.650Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLTP">
+<meta property="article:tag" content="Amazon">
+<meta property="article:tag" content="Aurora">
+<meta property="article:tag" content="Shared-disk">
+<meta property="article:tag" content="Quorum">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-01/aurora-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/01/18/amazon-aurora/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Amazon Aurora SIGMOD'17 '18 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/18/amazon-aurora/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Amazon Aurora SIGMOD'17 '18
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-01-18 12:13:09" itemprop="dateCreated datePublished" datetime="2021-01-18T12:13:09+08:00">2021-01-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Amazon Aurora目前有两篇文章：</p>
+<ul>
+<li>2017年的<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.45/3035918.3056101">Amazon aurora: Design considerations for high throughput cloud-native relational databases</a>。</li>
+<li>2018年的<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3183713.3196937">Amazon aurora: On avoiding distributed consensus for i&#x2F;os, commits, and membership changes</a>。</li>
+</ul>
+<p>其中第一篇内容比较多，重点讲架构与实现；第二篇重点讲的是细节，比如一致性、优化、恢复过程、成员变更。</p>
+<p><a target="_blank" rel="noopener" href="https://www.percona.com/live/e18/sites/default/files/slides/Deep%20Dive%20on%20Amazon%20Aurora%20-%20FileId%20-%20160328.pdf">Deep Dive on Amazon Aurora</a>这个slide还介绍了很多paper中没提到的特性，比如cache在DB进程之外、锁优化、索引构建优化等。</p>
+<span id="more"></span>
+
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>在Aurora之前，云数据库有两个思路：</p>
+<ol>
+<li>RDS，单机的MySQL&#x2F;PostgreSQL几乎原封不动地移到VM上运行，底下是云存储（EBS），我们称这种为shared-disk，属于计算存储分离的架构。扩展计算节点需要分库分表。</li>
+<li>Spanner，将数据水平切分为若干个shard，由多个节点服务，相互不共享数据，涉及到不同节点的事务需要使用两阶段提交（2PC），我们称这种为shared-nothing。</li>
+</ol>
+<blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/56669587/answer/552118039">可否对比一下 TiDB 与 AWS Aurora ？ - 朱元的回答</a></p>
+</blockquote>
+<p>shared-disk的优点是最大限度保证兼容（MySQL&#x2F;PostgreSQL），通常只需要动存储层，不需要改上面的query解析、plan生成等，另外不涉及分布式事务，性能比较稳定；缺点就是规模上不去。</p>
+<p>shared-nothing的优点是架构更scalable，缺点就是很难保证与已有应用的完全兼容，另外单shard事务与多shard事务性能会有区别，分布式事务开销比较大。</p>
+<p>Aurora仍然是顺着RDS的shard-disk的思路演进。它要解决的最大问题是RDS的网络吞吐问题。</p>
+<h3 id="写放大"><a href="#写放大" class="headerlink" title="写放大"></a>写放大</h3><p><img src="/images/2021-01/aurora-01.png"></p>
+<p>如上图，一个MySQL进程会产生如下写流量：</p>
+<ol>
+<li>redolog</li>
+<li>binlog</li>
+<li>data block</li>
+<li>double-write</li>
+<li>frm文件</li>
+</ol>
+<p>而为了实现高可用，通常用户会将主备实例分别放到两个AZ，每个AZ再分别有两份存储。两个AZ的实例之间会采用block级别的replication。这样的架构有两个问题，一是写放大非常严重，会产生非常多的网络流量，考虑到计算节点是单点，它的网络带宽就成为了瓶颈。二是上图中的1、3、4是串行同步的，多几跳网络会增加延时，还会显著增加延时抖动的概率（OLTP场景非常在乎延时抖动）。</p>
+<p>这几种写流量里，binlog和frm可以放到一边（可以单独存储），对于redolog、data、double-write，Aurora的解法就是只写redolog，将其它的page管理全都offload到存储层，也就是“THE LOG IS THE DATABASE”。</p>
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p><img src="/images/2021-01/aurora-02.png"></p>
+<p>Aurora默认会部署到三个AZ中，可以有一个可写的主实例与多个只读实例。</p>
+<p>每个DB的数据会切为若干个10GB大小的Protection Group（PG），10GB这个大小可以保证单个PG副本的MTTR不会太长（在10Gbps的网络下10秒内可以恢复一个副本），从而提升可用性。整个DB最大是64TB。</p>
+<p>每个PG在每个AZ会写两份数据，这样一共是6份存储，每份称为一个Segment。一致性协议上Aurora仍然延续了Amazon的传统，使用了6&#x2F;4&#x2F;3的quorum协议，即6份存储、写至少要4份、读至少要3份。</p>
+<blockquote>
+<p>使用quorum协议而不是MultiPaxos&#x2F;Raft有两个好处，一是网络少一跳（不需要经leader转发），二是quorum能容忍单个Segment的写出现空洞，可用性更高。</p>
+</blockquote>
+<p>采用这种配置的目的是能在1个AZ整个挂掉的情况下继续服务写，在1个AZ加1份存储挂掉的情况下继续服务读。</p>
+<blockquote>
+<p>情况一：不考虑机房整体失效的情况下，如果只有一个副本损坏，由于写请求至少写入4个副本，4-1&#x3D;3，那么读请求仍然可以读到3个相同的副本，因此读写请求仍然可以成功。</p>
+<p>情况二：假设一个机房整体失败了，<strong>Aurora设计的巧妙之处就在于，它会把读写的Quorum模式改为“总共4副本、写入最少3副本、读出最少2副本”这种模式，即4&#x2F;3&#x2F;2模式。</strong></p>
+<p>情况三：假设失败的机房又恢复了，那么系统再把它的Quorum模式改回“总共6副本、写入最少4副本、读出最少3副本”模式，即6&#x2F;4&#x2F;3模式，然后开始慢慢的修复数据。</p>
+<p>综上所述，<strong>Aurora最美妙的设计在于通过变换Quorum模式来解决单个机房长期失败的问题。</strong></p>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/435302730/answer/1634390470">请问Aurora系统为什么必须要6份copy来支持“AZ+1”failures？ - 江枫的回答</a></p>
+</blockquote>
+<h3 id="存储层"><a href="#存储层" class="headerlink" title="存储层"></a>存储层</h3><p>Aurora最大的创新就是将复杂的page管理放到了存储层。</p>
+<p><img src="/images/2021-01/aurora-03.png"></p>
+<p>DB将redolog写进存储层的UPDATE QUEUE之后就返回了，之后存储层内部完成log补齐（quorum协议会导致每个Segment的log不全，相同PG的不同Segment之间会通过gossip协议交换log record）、page管理（应用log、多版本管理、垃圾回收）、备份到S3等操作。</p>
+<p>存储层每个节点有本地的SSD盘，同时数据定期会备份到S3上（没有使用EBS）。</p>
+<h2 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h2><h3 id="一致性保证"><a href="#一致性保证" class="headerlink" title="一致性保证"></a>一致性保证</h3><p>Aurora的一致性保证的前提是单写多读（实际支持多写，但论文中没提，似乎多写也不保证全局唯一顺序，这里不讨论），由唯一的写实例来控制存储的整体推进，从而在quorum协议（通常被认为只能保证最终一致性）基础上实现了DB需要的各种一致性。整个过程中PG的各个副本（Segment）之间不会有任何的信息同步，保证了低开销。</p>
+<blockquote>
+<p>第二篇paper中有一句话：“Storage nodes do not have a vote in determining whether to accept a write, they must do so”。</p>
+</blockquote>
+<p>DB负责为每个log record分配一个单调增的Log Sequence Number（LSN）。</p>
+<p>每个Segment收到的log可能是有空洞的，其中Segment Complete LSN（SCL）表示最大的保证完整的LSN，即这个Segment在SCL之前是完整、没有空洞的。</p>
+<p>DB可以根据每个Segment的SCL生成Protection Group Complete LSN（PGCL，即PG的最大完整LSN）和Volume Complete LSN（VCL，即Volumn的最大完整LSN）。</p>
+<p>下图说明了PGCL和VCL的区别。PG1只保存奇数LSN，PG2只保存偶数LSN，则PGCL1为103，PGCL2为104，VCL为104。</p>
+<p><img src="/images/2021-01/aurora-04.png"></p>
+<p>每个DB事务在存储引擎这里可能会分为若干个mini-transaction（MTR），如页面的分裂合并等，每个MTR可能包含多个log record，在恢复时要保证MTR的完整性。因此Aurora会标记每个MTR的最后一条log为Consistency Point LSN（CPL），在恢复数据时只能恢复到VCL之前最大的一个CPL，称为Volume Durable LSN（VDL）。</p>
+<p>假设DB目前看见三个CPL分别是900、1000、1100，此时VCL为1007（大于1007的log不完整），则VDL为1000，大于1000的log都会被截断。</p>
+<h3 id="log-chain"><a href="#log-chain" class="headerlink" title="log chain"></a>log chain</h3><p>不同的log record会发送给它修改的block所在的PG，因此每个PG&#x2F;Segment只能看到部分log record。为了避免Segment之间的同步，每个log record会包含有：</p>
+<ul>
+<li>整个Volume中它的上一个LSN。</li>
+<li>这个Segment中它的上一个LSN。</li>
+<li>它修改的block的上一个LSN。</li>
+</ul>
+<p>这样Segment根据log chain就可以知道自己当前的log是否完整了。</p>
+<h3 id="写入"><a href="#写入" class="headerlink" title="写入"></a>写入</h3><p>Aurora的DB在执行写操作时是全异步I&#x2F;O，在将log record发给对应的Segment后就会将当前请求放到等待队列中继续处理下一个请求。每当有请求执行完，DB会判断是否要提升VDL，之后将等待队列中所有LSN小于等于VDL的请求标记为提交完成。为了避免太多请求等待，DB在分配LSN时会保证LSN与VDL之间的gap不会太大（LSN Allocation Limit，LAL，默认为1000万）。</p>
+<h3 id="恢复"><a href="#恢复" class="headerlink" title="恢复"></a>恢复</h3><p>可以看到client的commit在超前于VDL时是不返回的，因此Aurora可以在failover时将大于VDL（不完整）的所有log都截断掉而不影响一致性。</p>
+<p><img src="/images/2021-01/aurora-05.png"></p>
+<p>Aurora中DB初始化与故障恢复走相同流程：</p>
+<ul>
+<li>DB确认可连接的PG达到read quorum。</li>
+<li>DB收集各Segment的SCL，本地计算得到PGCL、VCL、VDL。</li>
+<li>DB向各个Segment发送truncate，将大于VDL的log删掉，避免故障前的请求飘到Segment上。后续新生成LSN时会将截断这段（VDL+1到VDL+LAL）跳过去。</li>
+<li>修复那些达不到write quorum的PG（仍然使用gossip协议）。</li>
+<li>提升所有达到write quorum的PG的epoch，避免旧的DB实例连上来。采用epoch比lease好的地方在于它不需要等待lease过期。</li>
+</ul>
+<p>在PG都恢复之后，DB自己可以慢慢做undo，不影响服务。</p>
+<p>第二篇paper中称这种复杂的恢复流程是一种tradeoff，用这种复杂度换取了正常流程的简单、低开销：“The time we save in the normal forward processing of commits using local transient state must be paid back by re-establishing consistency upon crash recovery”。</p>
+<h3 id="读取"><a href="#读取" class="headerlink" title="读取"></a>读取</h3><p>Aurora的DB只需要写redolog，不需要写data page，因此也不需要刷脏页（dirty page），但仍然需要决定如何将脏页从buffer pool中踢掉。Aurora需要保证client永远能看到最新的页。定义页的LSN就是它的最后一笔写的LSN，如果page LSN &gt; VDL，说明此时page要比存储更新，就不能踢掉。只有page LSN &lt;&#x3D; VDL的页才可以踢掉（第一篇paper这里写反了），后面如果需要读的话再从存储层load上来。</p>
+<p>Aurora的读需要固定在某个CPL上以保证read view一致，默认是读请求到达时的VDL。注意DB是有存储层各PG的全部信息的，它可以选择一个足够新的Segment来服务这次读，避免使用read quorum。</p>
+<p>DB也会追踪目前所有活跃的读事务（包括只读replica在处理的读事务）在各个PG上的最小的LSN，记为Protection Group Minimum Read Point LSN（PGMRPL），PGMRPL会发送给各个Segment，Segment可以把低于它的log record与过期的data page都清理掉。</p>
+<p>与正常的MySQL类似，读出来的页可能比想要的版本更新，需要本地应用undo record。因此本地的undo record也必须在PGMRPL提升之后才能清理掉。</p>
+<blockquote>
+<p>只读实例不能太多，否则主实例的出口流量放大会比较严重，另外落后的只读实例会影响整个DB的GC。</p>
+</blockquote>
+<h3 id="只读实例"><a href="#只读实例" class="headerlink" title="只读实例"></a>只读实例</h3><p>Aurora中每个DB最多可以有15个只读实例，它们与主实例共享存储层，理论上可以定期从各个Segment上拉取数据来保持与主实例同步。但为了降低主实例与只读实例的可见延时，主实例在写存储层的同时也会把log流发送给只读实例。注意log流中也包含了VDL的提升与主实例上的事务状态变化，这样只读实例可以正确地维护活跃事务列表。</p>
+<p>只读实例会将主实例发过来的log record应用到自己buffer pool中的page上，规则是：</p>
+<ol>
+<li>如果log record修改的page不在buffer pool中，直接丢掉。</li>
+<li>只应用那些不大于VDL的log record，这些数据可能在failover后截断掉，不能被client看到。</li>
+<li>相同MTR的log record要原子应用到page上。</li>
+</ol>
+<p>主实例到只读实例的replication是异步的，只会增加主实例的网络流量，不会对延时有明显的影响。如果主实例挂了，会有一个只读实例升级为主实例，此时它只需要走一遍恢复流程重建内存状态。</p>
+<h3 id="成员变更"><a href="#成员变更" class="headerlink" title="成员变更"></a>成员变更</h3><p>这里指PG的Segment变更。</p>
+<p>quorum协议的成员变更通常是比较复杂的，比如I&#x2F;O要停，变更过程中不能有failover等。Aurora使用了quorum set的概念，将一次成员变更分成至少两次操作，每次都会提升membership epoch，从而解决了上面这两个问题。</p>
+<p><img src="/images/2021-01/aurora-06.png"></p>
+<p>假设我们要将ABCDEF变更为ABCDEG，第一步是将write quorum变为<code>4/6 of ABCDEF AND 4/6 of ABCDEG</code>，read quorum则是<code>3/6 of ABCDEF OR 3/6 of ABCDEG</code>。此时如果F恢复了，我们可以再将成员列表变回ABCDEF。如果F一直没有恢复，当G追上其它成员后，做第二步变更，将成员列表改为ABCDEG。</p>
+<p>如果过程中E也挂了，需要替换为H，则write quorum变为<code>4/6 of ABCDEF AND 4/6 of ABCDEG AND 4/6 of ABCDFH AND 4/6 of ABCDGH</code>（不会更复杂了，4&#x2F;6的quorum只允许同时最多挂2份）。整个过程中I&#x2F;O是不需要停的。</p>
+<p>当整个AZ挂掉时，quorum需要从6&#x2F;4&#x2F;3退化为4&#x2F;3&#x2F;2，也是通过上面的机制实现的。</p>
+<h3 id="降低存储成本"><a href="#降低存储成本" class="headerlink" title="降低存储成本"></a>降低存储成本</h3><p>Aurora中每个PG的6个Segment是不对等的，分为3个完整的大Segment（包含log与data）与3个log-only的小Segment。因为log通常远小于data，这样整体存储成本更接近于3份拷贝，而不是6份。</p>
+<p>这种设计同时也影响了读写的quorum。write quorum是4&#x2F;6的任意Segment，<strong>或</strong>3&#x2F;3的大Segment，而read quorum则是3&#x2F;6的任意Segment，<strong>且</strong>1&#x2F;3的大Segment（注意read quorum不用于常规读请求）。</p>
+<p>修复一个小Segment的过程与前面一样，但修复一个大Segment就有点复杂了，因为它可能是唯一有完整数据的大Segment（注意4&#x2F;6的quorum中可能有3份是小Segment）。但回顾Aurora的口号：“THE LOG IS THE DATABASE”，只要有足够的log，仍然可以修复这样的大Segment。</p>
+<p>可以看到quorum协议有着足够的灵活性，可以用来实现非对等的成员。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLTP/" rel="tag"># OLTP</a>
+              <a href="/tags/Amazon/" rel="tag"># Amazon</a>
+              <a href="/tags/Aurora/" rel="tag"># Aurora</a>
+              <a href="/tags/Shared-disk/" rel="tag"># Shared-disk</a>
+              <a href="/tags/Quorum/" rel="tag"># Quorum</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/14/words-that-changed-me-during-tablestore-period/" rel="prev" title="回顾我在阿里云Tablestore的几年">
+      <i class="fa fa-chevron-left"></i> 回顾我在阿里云Tablestore的几年
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/07/dbmss-on-a-modern-processor-where-does-time-go/" rel="next" title="[笔记] DBMSs On A Modern Processor: Where Does Time Go?">
+      [笔记] DBMSs On A Modern Processor: Where Does Time Go? <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E6%94%BE%E5%A4%A7"><span class="nav-number">1.1.</span> <span class="nav-text">写放大</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84"><span class="nav-number">2.</span> <span class="nav-text">架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E5%B1%82"><span class="nav-number">2.1.</span> <span class="nav-text">存储层</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.</span> <span class="nav-text">实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7%E4%BF%9D%E8%AF%81"><span class="nav-number">3.1.</span> <span class="nav-text">一致性保证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#log-chain"><span class="nav-number">3.2.</span> <span class="nav-text">log chain</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E5%85%A5"><span class="nav-number">3.3.</span> <span class="nav-text">写入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%81%A2%E5%A4%8D"><span class="nav-number">3.4.</span> <span class="nav-text">恢复</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%BB%E5%8F%96"><span class="nav-number">3.5.</span> <span class="nav-text">读取</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%AA%E8%AF%BB%E5%AE%9E%E4%BE%8B"><span class="nav-number">3.6.</span> <span class="nav-text">只读实例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%88%90%E5%91%98%E5%8F%98%E6%9B%B4"><span class="nav-number">3.7.</span> <span class="nav-text">成员变更</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%99%8D%E4%BD%8E%E5%AD%98%E5%82%A8%E6%88%90%E6%9C%AC"><span class="nav-number">3.8.</span> <span class="nav-text">降低存储成本</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

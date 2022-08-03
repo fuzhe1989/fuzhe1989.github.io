@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Optimizations in C++ Compilers 作者：Matt Godbolt   在将上层容易写的代码转换为高效的由计算机去执行的机器码的过程中，编译器必不可少。但它们在其中完成的复杂工作却常常被人忽视。你也许会花许多时间来慎重考虑算法和解决错误，但可能没有足够的时间关注编译器能做什么。 本文介绍了一些编译器和代码生产方面的概念，之后着重介绍一些你的编译器为你所做的令人印">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[翻译]C++编译器中的优化">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/01/22/optimizations-in-cpp-compilers/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Optimizations in C++ Compilers 作者：Matt Godbolt   在将上层容易写的代码转换为高效的由计算机去执行的机器码的过程中，编译器必不可少。但它们在其中完成的复杂工作却常常被人忽视。你也许会花许多时间来慎重考虑算法和解决错误，但可能没有足够的时间关注编译器能做什么。 本文介绍了一些编译器和代码生产方面的概念，之后着重介绍一些你的编译器为你所做的令人印">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-01-22T14:58:28.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.658Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="翻译">
+<meta property="article:tag" content="性能">
+<meta property="article:tag" content="编译器">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/01/22/optimizations-in-cpp-compilers/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[翻译]C++编译器中的优化 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/01/22/optimizations-in-cpp-compilers/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [翻译]C++编译器中的优化
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-01-22 22:58:28" itemprop="dateCreated datePublished" datetime="2020-01-22T22:58:28+08:00">2020-01-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<ul>
+<li>原文：<a target="_blank" rel="noopener" href="https://queue.acm.org/detail.cfm?id=3372264">Optimizations in C++ Compilers</a></li>
+<li>作者：<a target="_blank" rel="noopener" href="https://www.linkedin.com/in/godbolt/">Matt Godbolt</a></li>
+</ul>
+</blockquote>
+<p>在将上层容易写的代码转换为高效的由计算机去执行的机器码的过程中，编译器必不可少。但它们在其中完成的复杂工作却常常被人忽视。你也许会花许多时间来慎重考虑算法和解决错误，但可能没有足够的时间关注编译器能做什么。</p>
+<p>本文介绍了一些编译器和代码生产方面的概念，之后着重介绍一些你的编译器为你所做的令人印象深刻的转换工作，以及我最喜欢的优化方式的一些实际例子。希望你能了解编译器可以做哪些优化，以及如何进一步探索该主题。最重要的是，你可能也会爱上看汇编输出，并开始对编译器的工程质量肃然起敬。</p>
+<p>本文举的都是C&#x2F;C++的例子，这是我最有经验的语言。但其中的许多优化方法也适用于其它编译语言。事实上，像LLVM这样的前端不可见的编译器工具包的出现意味着多数优化方法都会以相同方式作用在Rust&#x2F;Swift&#x2F;D语言等语言上。</p>
+<span id="more"></span>
+
+<h2 id="关于我"><a href="#关于我" class="headerlink" title="关于我"></a>关于我</h2><p>我一直着迷于编译器能做什么。我曾经花了10年去制作一款视频游戏，并力争在相同CPU周期数下得到比竞争对手更多的精灵（sprite）、爆炸效果，或更复杂的场景。因此手写汇编和直接看汇编输出就成了我的基本技能。</p>
+<p>5年后，我当时在一家交易公司工作，精灵和多边形换成了快速处理金融数据。和以前一样，知道编译器对代码的处理有助于了解我们如何去写代码。</p>
+<p>显然，写得好的，容易测的代码非常重要——尤其是如果这些代码可能一秒完成几千笔金融交易。跑得快很重要，但不出bug更重要。</p>
+<p>2012年时，我们在讨论可以把C++11的哪个新特性加入可接受的编码实践标准。当每一纳秒都很重要时，最好能给出不伤害性能的编码建议。在试验如何使用如<code>auto</code>、lambda、<code>range-for</code>时，我写了一个shell来持续编译并显示过滤后的输出：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$ </span><span class="language-bash">g++ /tmp/test.cc -O2 -c -S -o - -masm=intel \</span></span><br><span class="line"><span class="language-bash">    | c++filt \</span></span><br><span class="line"><span class="language-bash">    | grep -vE <span class="string">&#x27;\s+\.&#x27;</span></span></span><br></pre></td></tr></table></figure>
+
+<p>事实证明，这个脚本对于回答所有的“what if”问题都很有用，我当天晚上回家就写了Compiler Explorer。</p>
+<p>这些年我一直惊讶于编译器为了将我们的代码转换为如艺术品般的汇编指令所做的工作。为了了解编译器做的事情，我建议所有用编译语言的程序员都学一点汇编语言。即使你自己不写，能读懂汇编也很有用。</p>
+<p>本文中的所有汇编代码都是针对X86-64处理器的，这是我最熟悉的CPU，也是最常见的架构之一。一些例子只用于X86,但事实上许多优化方法很容易应用到其它架构上。另外，我只用到了GCC和Clang两种编译器，但Microsoft Visual Studio和Intel的编译器也有同样聪明的优化方法。</p>
+<h2 id="优化入门"><a href="#优化入门" class="headerlink" title="优化入门"></a>优化入门</h2><p>不需要深入编译器的优化，只了解一些编译器会用到的概念就很有用。</p>
+<p>许多优化方法属于<strong>强度降低（strenth reduction）</strong>的范畴：将昂贵的操作转换为代价更低的操作。一个非常简单的例子是在循环中对循环变量使用乘法：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">100</span>; ++i)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">func</span>(i * <span class="number">1234</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>即使是今天的CPU，乘法仍然要比更简单的算术运算要慢一些。因此编译器会将循环重写为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">int</span> iTimes1234 = <span class="number">0</span>; iTimes1234 &lt; <span class="number">100</span> * <span class="number">1234</span>; i += <span class="number">1234</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">func</span>(iTimes1234);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在这里强度降低法将使用了乘法的循环转换为了只用加法的循环。</p>
+<p>后面的实际示例将会显示更多的强度降低方法。</p>
+<p>另一个关键优化是<strong>内联（inlining）</strong>，即编译器将函数调用替换为函数体本身。它可以去掉调用的开销，因为编译器能将组合在一起的代码优化为一个编译单元，经常还能解锁进一步的优化。稍后你会看到大量这方面的例子。</p>
+<p>其它优化类别包括：</p>
+<ul>
+<li>常量折叠（constant folding）。编译器将编译期能计算为常量的表达式直接替换为计算结果。</li>
+<li>常量传播（constant propagation）。编译器追踪到一个值的源头，发现它是常量后，会将所有地方出现的这个值替换为常量。</li>
+<li>公共子表达式消除（common subexpression elimination）。将重复的计算过程重写掉，只算一次，其它地方复制结果。</li>
+<li>移除死代码（dead code removal）。用许多其它方法优化后，可能有些代码对输出不产生影响，就可以移除这些代码。这里包含了对没用到的值的读写操作，以及完全没用到的整个函数或表达式。</li>
+<li>指令选择（instruction selection）。这个不算是通常意义的优化，但既然编译器会将程序转换为它的内部表示形式，并生成CPU指令，编译器通常有一个庞大的等效指令序列的集合可供选择。编译需要知道目标处理器架构的细节以作出正确选择。</li>
+<li>移动循环中的不变代码（loop invariant code movement）。编译器能识别一块代码在循环过程中值不变，并将这块代码移出循环。其于此，编译器还能将循环中不变的条件检查移出循环外，再将循环体复制两次：一次针对条件为真，一次针对条件为假。之后还能做进一步优化。</li>
+<li>窥孔优化（peephole optimization）。编译器取一小段指令序列并做局部优化。</li>
+<li>尾调用移除（tail call removal）。一个在结尾处调用自身的递归函数通常可被重写为循环，从而降低函数调用开销，并减小栈溢出的可能。</li>
+</ul>
+<p>帮助编译器进行优化的要点就是保证它能获得尽可能多地信息，从而做出正确的优化决定。其中一个信息源就是你的代码：编译器能看到的代码越多，能做的决定越优。另一个信息源是你用的编译器配置：告诉编译器准确的目标CPU架构就能带来大不同。当然，编译器拥有的信息越多，编译时间越长，因此这里还要保持平衡。</p>
+<p>我们看个例子，统计一个<code>vector</code>中通过测试的元素个数（GCC -O3编译，<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_count1%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_count1）：</a></p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">count</span><span class="params">(<span class="type">const</span> vector&lt;<span class="type">int</span>&gt; &amp;vec)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> numPassed = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">size_t</span> i = <span class="number">0</span>; i &lt; vec.<span class="built_in">size</span>(); ++i)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (<span class="built_in">testFunc</span>(vec[i]))</span><br><span class="line">            numPassed++;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> numPassed;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果编译器对<code>testFunc</code>一无所知，它会产生这样的内循环：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">.L4:</span><br><span class="line">  mov edi, DWORD PTR [rdx+rbx*4] ; read rbx&#x27;th element of vec</span><br><span class="line">                                 ; (inlined vector::operator [])</span><br><span class="line">  call testFunc(int)             ; call test function</span><br><span class="line">  mov rdx, QWORD PTR [rbp+0]     ; reread vector base pointer</span><br><span class="line">  cmp al, 1                      ; was the result of test true?</span><br><span class="line">  mov rax, QWORD PTR [rbp+8]     ; reread the vector end pointer</span><br><span class="line">  sbb r12d, -1                   ; add 1 if true, 0 if false</span><br><span class="line">  inc rbx                        ; increment loop counter</span><br><span class="line">  sub rax, rdx                   ; subtract end from begin...</span><br><span class="line">  sar rax, 2                     ; and divide by 4 to get size()</span><br><span class="line">                                 ; (inlined vector::size())</span><br><span class="line">  cmp rbx, rax                   ; does loop counter equal size()?</span><br><span class="line">  jb .L4                         ; loop if not</span><br></pre></td></tr></table></figure>
+
+<p>为了理解这段代码，知道<code>std::vector</code>包含一些指针会很有用：一个指向数据的开始，一个指向数据的结尾，一个指定当前分配的存储空间的结尾。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt; <span class="keyword">struct</span> <span class="title class_">_Vector_impl</span> &#123;</span><br><span class="line">  T *_M_start;</span><br><span class="line">  T *_M_finish;</span><br><span class="line">  T *_M_end_of_storage;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>vector不直接存储它的大小，而是依赖<code>begin()</code>和<code>end()</code>的差值计算得到。注意<code>vector&lt;&gt;::size()</code>和<code>vector&lt;&gt;::operator[]</code>已经被彻底内联掉了。</p>
+<p>在上面的汇编代码中，<code>ebp</code>指向vector对象，<code>begin()</code>和<code>end()</code>指针因此分别是<code>QWORD PTR [rbp+0]</code>和<code>QWORD PTR [rpb+8]</code>。</p>
+<p>另一个编译器用到的技巧是移除分支：你也许有理由地期望<code>if (testFunc(...))</code>会变成比较和分支。这里编译器会用<code>cmp al, 1</code>进行比较，如果<code>testFunc()</code>返回<code>false</code>，<code>cmp</code>指令会设置CPU的进位标志，否则清除进位标志。之后<code>sbb r12d, -1</code>指令会带借位地减-1。减法等效于进位，也会用到进位标志。这会产生编译器想要的副作用：如果进位标志被清除了（<code>testFunc()</code>返回了<code>true</code>），它就会减-1,相当于加1；如果进位标志被设置了，它会减-1再加1，不改变原值。在一些CPU不好预测分支的情况下，避免分支会有帮助。</p>
+<p>编译器每次循环都会重新载入<code>begin()</code>和<code>end()</code>指针，这可能令人惊讶，事实上它每次还会重新去拿<code>size()</code>。但编译器必须这么做：它不知道<code>testFunc()</code>会做什么，必须假设最坏情况。也就是，它必须假设调用<code>testFunc()</code>可能导致<code>vec</code>被修改。因为以下原因，这里<code>const</code>引用不会开启进一步的优化：<code>testFunc()</code>可能持有<code>vec</code>的非<code>const</code>引用，或者<code>testFunc()</code>会使用<code>const_cast</code>。</p>
+<p>但如果编译器能看到<code>testFunc()</code>的函数体，因此得知它不会修改<code>vec</code>，故事就很不一样了（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_count2%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_count2）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">.L6:</span><br><span class="line">  mov edi, DWORD PTR [rdx]  ; read next value</span><br><span class="line">  call testFunc(int)        ; call testFunc with it</span><br><span class="line">  cmp al, 1                 ; check return code</span><br><span class="line">  sbb r8d, -1               ; add 1 if true, 0 otherwise</span><br><span class="line">  add rdx, 4                ; move to next element</span><br><span class="line">  cmp rcx, rdx              ; have we hit the end?</span><br><span class="line">  jne .L6                   ; loop if not</span><br></pre></td></tr></table></figure>
+
+<p>此时编译器已经知道了<code>vector</code>的<code>begin()</code>和<code>end()</code>在循环过程中是不变的。它也因此知道了<code>size()</code>的值是不变的。因此编译器可以将这些常量的计算移出循环，再将索引操作（<code>vec[i]</code>）重写为从<code>begin()</code>开始，每次移动一个<code>int</code>，直到<code>end()</code>的指针遍历。这极大简化了生成的汇编代码。</p>
+<p>这个例子中我提供了一个<code>testFunc</code>函数，但将其标记为不可内联（GNU扩展）来单独展示这一优化。在更实际的代码库中，如果编译器觉得有好处，它是可以内联掉<code>testFunc</code>的。</p>
+<p>另一个不暴露函数体就能启用这一优化的方法是标记<code>testFunc</code>为<code>[[gnu:pure]]</code>（另一个语言扩展）。它是向编译器保证这是个纯函数——功能只与它的参数有关，不带任何副作用。</p>
+<p>有趣的是，第一个例子中如果我们使用<code>range-for</code>，编译器就算不知道<code>testFunc</code>会不会修改<code>vec</code>，也会生成优化版本的汇编代码（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_count3%EF%BC%89%E3%80%82%E8%BF%99%E6%98%AF%E5%9B%A0%E4%B8%BA%60range-for%60%E8%A2%AB%E5%AE%9A%E4%B9%89%E4%B8%BA%E4%BA%86%E5%B0%86%60begin()%60%E5%92%8C%60end()%60%E4%BF%9D%E5%AD%98%E5%88%B0%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%9A%84%E4%BB%A3%E7%A0%81%E5%8F%98%E6%8D%A2%EF%BC%9A">https://godbolt.org/z/acm19_count3）。这是因为`range-for`被定义为了将`begin()`和`end()`保存到局部变量的代码变换：</a></p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="keyword">auto</span> val : vec)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">testFunc</span>(val))</span><br><span class="line">        numPassed++;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>会被解释为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="keyword">auto</span> __begin = <span class="built_in">begin</span>(vec);</span><br><span class="line">    <span class="keyword">auto</span> __end == <span class="built_in">end</span>(vec);</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">auto</span> __it = __begin; __it != __end; ++__it)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (<span class="built_in">testFunc</span>(*__it))</span><br><span class="line">            numPassed++;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>考虑各种因素，如果你需要裸写循环，推荐使用现代的<code>range-for</code>：它在编译器看不到函数体时也能生成优化代码，且更清晰。但更好的方法是用STL的<code>count_if</code>完成所有工作：编译器也会生成优化代码（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_count4%EF%BC%89%E3%80%82">https://godbolt.org/z/acm19_count4）。</a></p>
+<p>在传统的一次一个编译单元的编译模型下，函数调用处通常看不到函数体，只能看到函数声明。LTO（链接时优化，也称作LTCG，链接时代码生成）允许编译器看到跨编译单元的代码。在LTO中，单个编译单元会被编译为中间代码，而不是机器码。在链接时——整个程序（或动态链接库）都可见时——再去生成机器码。编译器可以利用这点跨编译单元内联，或至少能知道被调用的函数有没有副作用，从而进行优化。</p>
+<p>通常在需要优化的构建中启用LTO是不错的选择，这样编译器就能看到整个程序了。我现在依赖于LTO将更多的函数体移出头文件，从而减少耦合程序、编译时间、debug构建和测试中的依赖，且还能在最终构建产物中达到想要的性能。</p>
+<p>尽管LTO已经是很成熟的技术了（我在21世纪初的XBOX上就用过了LTCG），我仍然惊讶于只有很少的项目使用了LTO。部分原因可能是程序员无意间依赖了编译器的未定义行为，这种行为（优化）只有在编译器有更高的可见性（看到更多代码）时才会变得更明显：我知道我犯了这样的错误。</p>
+<h2 id="我最喜欢的优化示例"><a href="#我最喜欢的优化示例" class="headerlink" title="我最喜欢的优化示例"></a>我最喜欢的优化示例</h2><p>过去这些年我收集了不少有趣的真实世界中的优化示例，既有来自我自己代码的第一手经验，也有来自在Compiler Explorer上帮助其他人理解代码的经验。下面是我最喜欢的，展示了编译器有多聪明的几个例子。</p>
+<h3 id="除数为常量的整数除法"><a href="#除数为常量的整数除法" class="headerlink" title="除数为常量的整数除法"></a>除数为常量的整数除法</h3><p>（直到最近）我们可能惊讶于整数除法是现代CPU能执行的最昂贵的操作。除法比加法慢50倍以上，比乘法慢10倍以上。（这一说法直到Intel的Cannon Lake之前都成立，Cannon Lake将64位整数除法的最大延时从96个周期降为了18个周期。这样除法就只比加法慢20倍，比乘法慢5倍。）</p>
+<p>庆幸的是，当除数为常量时，编译器作者有一些降低强度的技巧。我相信大家都知道当除数为2的整数次幂时，除法可以替换为逻辑右移——请放心，编译器会帮你做的。我建议不要在代码里写<code>&lt;&lt;</code>做除法；让编译器帮你做。这样会更清晰，编译器也知道怎么正确处理有符号数：整数除法朝0的方向截断，而负数自身移位会朝着负无穷的方向截断。</p>
+<p>但是，如果你除的不是2的整数幂呢？你会失去运气吗？</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">unsigned</span> <span class="title">divideByThree</span><span class="params">(<span class="type">unsigned</span> x)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> x / <span class="number">3</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>幸运的是编译器又一次站在了你身后。这段代码被编译为（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_div3%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_div3）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">divideByThree(unsigned int):</span><br><span class="line">  mov eax, edi          ; eax = edi</span><br><span class="line">  mov edi, 2863311531   ; edi = 0xaaaaaaab</span><br><span class="line">  imul rax, rdi         ; rax = rax * 0xaaaaaaab</span><br><span class="line">  shr rax, 33           ; rax &gt;&gt;= 33</span><br><span class="line">  ret</span><br></pre></td></tr></table></figure>
+
+<p>其中看不到除法指令。只是一次移位，以及乘一个奇怪的巨大的常数：输入的32位无符号整数乘上<code>0xaaaaaaab</code>，结果是一个64位整数，再右移33位。编译器将除法替换为了更廉价的定点乘法逆运算。这里的定点是33位，常数是这种形式下的1&#x2F;3（实际是0.33333333337213844）。编译器有种算法来决定合适的定点和常数值，同时在输入范围内以相同的精度保留与真正的除法运算相同的四舍五入。有时这需要一些额外的运算——例如除以1023（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_div1023%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_div1023）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">divideBy1023(unsigned int):</span><br><span class="line">  mov eax, edi</span><br><span class="line">  imul rax, rax, 4198405</span><br><span class="line">  shr rax, 32</span><br><span class="line">  sub edi, eax</span><br><span class="line">  shr edi</span><br><span class="line">  add eax, edi</span><br><span class="line">  shr eax, 9</span><br><span class="line">  ret</span><br></pre></td></tr></table></figure>
+
+<p>该算法广为人知，在《<a target="_blank" rel="noopener" href="https://book.douban.com/subject/1784887/">Hacker’s Delight</a>》中有大量记录。</p>
+<p>简而言之，你可以依靠编译器通过编译期已知的常量来很好地优化除法。</p>
+<p>你可能在想：这为什么是如此重要的优化方法？我们执行除法的频率是多少？它不光与除法本身有关，还与相关的取余操作有关，后者常被用于hash-map实现中将hash值映射到hash桶数范围的操作中。</p>
+<p>知道这里编译器能做什么可以通往有趣的hash-map实现。一种方法是使用固定数量的桶以允许编译器产生完美的不使用昂贵的除法指令的取余。</p>
+<p>大多数hash-map支持rehash到不同数量的桶。朴素的实现会用运行期才知道的数字去取余，导致编译器只能用慢的除法指令。事实上gcc的libstdc++实现中的<code>std::unordered_map</code>就是这么做的。</p>
+<p>Clang的libc++往前走了一步：它会检查桶的数量是否是2的幂，如果是的话就跳过除法指令，转而使用逻辑与。桶数量是2的幂的想法很诱人，因为它使模运算变快了，但它要依靠好的hash函数实现来避免频繁冲突。而质数个桶可以在非常简单的hash函数时也能很好地避免冲突。</p>
+<p>诸如<code>boost::multi_index</code>这样的库又往前走了一步：与其保存实际的桶数，不如使用固定的质数作为桶数。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">size_t</span> <span class="title">reduce</span><span class="params">(<span class="type">size_t</span> hash, <span class="type">int</span> bucketCountIndex)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">switch</span> (tableSizeIndex)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0</span>: <span class="keyword">return</span> hash % <span class="number">7</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">1</span>: <span class="keyword">return</span> hash % <span class="number">17</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">2</span>: <span class="keyword">return</span> hash % <span class="number">37</span>;</span><br><span class="line">        <span class="comment">// and so on...</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这样编译器对于所有可能的hash-map大小都能产生完美的取余代码，仅有的额外开销就是<code>switch</code>中的分派代码。</p>
+<p>gcc9有一个技巧来检查是否可被非2的幂整除（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_multof3%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_multof3）：</a></p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">divisibleBy3</span><span class="params">(<span class="type">unsigned</span> x)</span></span></span><br><span class="line"><span class="function"></span>&#123;          </span><br><span class="line">    <span class="keyword">return</span> x % <span class="number">3</span> == <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>会被编译为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">divisibleBy3(unsigned int):</span><br><span class="line">  imul edi, edi, -1431655765    ; edi = edi * 0xaaaaaaab</span><br><span class="line">  cmp edi, 1431655765 ; compare with 0x55555555</span><br><span class="line">  setbe al                      ; return 1 if edi &lt;= 0x55555555</span><br><span class="line">  ret</span><br></pre></td></tr></table></figure>
+
+<p>Daniel Lemire的<a target="_blank" rel="noopener" href="https://lemire.me/blog/2019/02/08/faster-remainders-when-the-divisor-is-a-constant-beating-compilers-and-libdivide/">博客</a>中很好地解释了这种表面上的巫术。另外，运行时也有可能用到这些整数除法的技巧。如果你需要用相同的除数去除很多数字，你可以用像<a target="_blank" rel="noopener" href="https://libdivide.com/"><code>libdivide</code></a>这样的库。</p>
+<h3 id="统计为1的位数"><a href="#统计为1的位数" class="headerlink" title="统计为1的位数"></a>统计为1的位数</h3><p>有多少次你想知道，一个整数中有多少位是1？也许没那么频繁。但事实证明，这种简单的操作在许多情况下非常有用。例如，计算两个位集合的hamming距离，处理稀疏矩阵的紧凑表示，或处理向量运算的结果。</p>
+<p>你可能会写这样的函数来统计1：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">countSetBits</span><span class="params">(<span class="type">unsigned</span> a)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> count = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span> (a != <span class="number">0</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        count++;</span><br><span class="line">        a &amp;= (a - <span class="number">1</span>); <span class="comment">// clears the bottom set bit</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> count;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>值得注意的是其中的位运算技巧<code>a &amp;= (a - 1)</code>，它会清除最低位的1。在纸上证明这一点很有意思，试一下吧。</p>
+<p>目标架构是Haswell时，gcc8.2会产生这样的汇编（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_bits%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_bits）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">countSetBits(unsigned int):</span><br><span class="line">  xor eax, eax      ; count = 0</span><br><span class="line">  test edi, edi     ; is a == 0?</span><br><span class="line">  je .L4            ; if so, return</span><br><span class="line">.L3:</span><br><span class="line">  inc eax           ; count ++</span><br><span class="line">  blsr edi, edi     ; a &amp;= (a - 1);</span><br><span class="line">  jne .L3           ; jump back to L3 if a != 0</span><br><span class="line">  ret  </span><br><span class="line">.L4:</span><br><span class="line">  Ret</span><br></pre></td></tr></table></figure>
+
+<p>请注意gcc如何巧妙地找到了<code>BLSR</code>指令来去掉最低位的1。很干净，但还是不如Clang7.0聪明：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">countSetBits(unsigned int):</span><br><span class="line">  popcnt eax, edi     ; count = number of set bits in a</span><br><span class="line">  ret</span><br></pre></td></tr></table></figure>
+
+<p>这个操作足够通用，大多数CPU都有一条指令可以一次完成：<code>POPCNT</code>（population count）。Clang聪明到将C++中的整个循环简化为一条指令。这是良好的指令选择的非常棒的例子：Clang的代码生成器认出了这个模式，并能选出最好的指令。</p>
+<p>前面我对gcc有点不公平，gcc9也实现了这种方法，但还有点区别：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">countSetBits(unsigned int):</span><br><span class="line">  xor eax, eax          ; count = 0</span><br><span class="line">  popcnt eax, edi       ; count = number of set bits in a</span><br><span class="line">  ret</span><br></pre></td></tr></table></figure>
+
+<p>第一眼看上去不够优化：为什么要写一个马上被<code>POPCNT</code>指令的返回值覆盖的0呢？</p>
+<p>简单研究之后，我们找到了Intel CPU的勘误SKL029：“<code>POPCNT</code>指令的执行时间可能比预期要长”——这是CPU的bug！尽管<code>POPCNT</code>指令的输出会完全覆盖<code>eax</code>寄存器，它被错误地标记为依赖于<code>eax</code>之前的值。这会限制CPU将<code>POPCNT</code>指令调度到它前面的对<code>eax</code>写操作完成后执行——尽管它们完全没关系。</p>
+<p>gcc的解法是破除对<code>eax</code>的依赖：CPU将<code>xor eax, eax</code>视作打破依赖的惯用法。不会有<code>POPCNT</code>之前指令可以在<code>xor eax, eax</code>之后还影响到<code>eax</code>的值了，因此<code>POPCNT</code>可以在它的输入<code>edi</code>准备好后立即执行。</p>
+<p>这只会影响Intel的CPU，而且看起来在Cannon Lake中已经修复了，但gcc在目标为Cannon Lake时仍然会产生<code>xor</code>指令。</p>
+<h3 id="链式条件"><a href="#链式条件" class="headerlink" title="链式条件"></a>链式条件</h3><p>也许你从未需要统计一个整数中1的数量，但你也许写过这样的代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">isWhitespace</span><span class="params">(<span class="type">char</span> c)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> c == <span class="string">&#x27; &#x27;</span></span><br><span class="line">      || c == <span class="string">&#x27;\r&#x27;</span></span><br><span class="line">      || c == <span class="string">&#x27;\n&#x27;</span></span><br><span class="line">      || c == <span class="string">&#x27;\t&#x27;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我本能地以为生成的代码会充满比较和分支，但Clang和gcc都用了一个技巧令这段代码非常高效。下面是gcc9.1的输出（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_conds%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_conds）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">isWhitespace(char):</span><br><span class="line">  xor eax, eax              ; result = false</span><br><span class="line">  cmp dil, 32               ; is c &gt; 32</span><br><span class="line">  ja .L4                    ; if so, exit with false</span><br><span class="line">  movabs rax, 4294977024    ; rax = 0x100002600</span><br><span class="line">  shrx rax, rax, rdi        ; rax &gt;&gt;= c</span><br><span class="line">  and eax, 1                ; result = rax &amp; 1</span><br><span class="line">.L4:</span><br><span class="line">  ret</span><br></pre></td></tr></table></figure>
+
+<p>编译器将一系列比较转换为了查表。加载到<code>rax</code>中的魔数是一个33位的查找表，表中为1的位置是你需要返回<code>true</code>的情况（下标为32、13、10、9，分别对应<code> </code>、<code>\r</code>、<code>\n</code>、<code>\t</code>）。之后移位和<code>&amp;</code>就可以取到第<code>c</code>位并返回。Clang生成的代码与之有细微差别，但大体上等价。这是另一个强度降低的例子。</p>
+<p>我被这种优化惊到了。在使用Compiler Explorer调查问题之前，我会假设我比编译器更懂，因此会手写这样的代码。</p>
+<p>但在试验时我发现一件不幸的事（至少对于gcc）：比较的顺序可以影响编译器能不能做这种优化。如果你交换了<code>\r</code>和<code>\n</code>的顺序，gcc会生成如下代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">isWhitespace(char):</span><br><span class="line">  cmp dil, 32   ; is c == 32?</span><br><span class="line">  sete al       ; al = 1 if so, else 0</span><br><span class="line">  cmp dil, 10   ; is c == 10?</span><br><span class="line">  sete dl       ; dl = 1 if so, else 0</span><br><span class="line">  or al, dl     ; al |= dl</span><br><span class="line">  jne .L3       ; if al is non-zero return it (c was ` ` or `\n`)</span><br><span class="line">  and edi, -5   ; clear bit 2 (the only bit that differs between</span><br><span class="line">                ;              `\r` and `\t`)</span><br><span class="line">  cmp dil, 9    ; compare with `\t`</span><br><span class="line">  sete al       ; dl = 1 if so, else 0</span><br><span class="line">.L3:</span><br><span class="line">  ret</span><br></pre></td></tr></table></figure>
+
+<p>用<code>and</code>将对<code>\r</code>和<code>\n</code>的比较合并到一起绝对是非常巧妙的，但看起来它会导致生成比之前的例子更差的代码。<a target="_blank" rel="noopener" href="http://quick-bench.com/0TbNkJr6KkEXyy6ixHn3ObBEi4w">Quick Bench上的一个简化测试</a>表明，在可预测的紧凑循环中，基于比较的版本可能会稍快一点点。是谁说这东西简单的？</p>
+<h3 id="求和"><a href="#求和" class="headerlink" title="求和"></a>求和</h3><p>有时你需要将一堆东西加起来。编译器非常擅长利用大多数现代CPU都支持的向量指令来加速求和，因此下面这段非常直接的代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">sumSquared</span><span class="params">(<span class="type">const</span> vector&lt;<span class="type">int</span>&gt; &amp;v)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> res = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">auto</span> i : v)</span><br><span class="line">    &#123;</span><br><span class="line">        res += i * i;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> res;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>转化后的核心循环长这样（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_sum%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_sum）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">.loop:</span><br><span class="line">  vmovdqu ymm2, YMMWORD PTR [rax]   ; read 32 bytes into ymm2</span><br><span class="line">  add rax, 32                       ; advance to the next element</span><br><span class="line">  vpmulld ymm0, ymm2, ymm2          ; square ymm2, treating as</span><br><span class="line">                                    ;   8 32-bit values</span><br><span class="line">  vpaddd ymm1, ymm1, ymm0           ; add to sub-totals</span><br><span class="line">  cmp rax, rdx                      ; have we reached the end?</span><br><span class="line">  jne .loop                         ; if not, keep looping</span><br></pre></td></tr></table></figure>
+
+<p>通过将总和分成8个部分和，编译器每条指令能处理8个值。最后它再将所有部分和汇总为最终的总和。这相当于把代码重写成这样：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> res_[] = &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"><span class="keyword">for</span> (; index &lt; v.<span class="built_in">size</span>(); index += <span class="number">8</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// This can be performed by parallel instructions without</span></span><br><span class="line">    <span class="comment">// an actual loop. The following boils down to a couple</span></span><br><span class="line">    <span class="comment">// of vector instructions:</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">size_t</span> j = <span class="number">0</span>; j &lt; <span class="number">8</span>; ++j)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">auto</span> val = v[index + j];</span><br><span class="line">        res_[j] += val * val;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">res = res_[<span class="number">0</span>] + res_[<span class="number">1</span>]</span><br><span class="line">    + res_[<span class="number">2</span>] + res_[<span class="number">3</span>]</span><br><span class="line">    + res_[<span class="number">4</span>] + res_[<span class="number">5</span>]</span><br><span class="line">    + res_[<span class="number">6</span>] + res_[<span class="number">7</span>];</span><br></pre></td></tr></table></figure>
+
+<p>只要简单地将编译器的优化级别设置得足够高，并设置合适的目标CPU架构，向量化就自己完成了。太棒了！</p>
+<p>这要依赖于一个事实，将总和分成若干个部分和，最终再加起来，等效于按顺序累加。显然对于整数这是对的，但对于浮点数就不一定了。浮点数是不可结合的：<code>(a+b)+c</code>不等价于<code>a+(b+c)</code>，因为浮点加法的结果精度依赖于两个输入的相对量级。</p>
+<p>这就意味着，很不幸，将<code>vector&lt;int&gt;</code>改为<code>vector&lt;float&gt;</code>得不到你想要的代码。编译器可以用一些向量指令（它可以一次算8个值的平方），但必须按顺序累加这些值（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_sumf%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_sumf）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">.loop:</span><br><span class="line">  vmovups ymm4, YMMWORD PTR [rax]   ; read 32 bytes into ymm4</span><br><span class="line">  add rax, 32                       ; advance</span><br><span class="line">  vmulps ymm1, ymm4, ymm4           ; square 8 floats</span><br><span class="line">                                    ; (the one parallel operation)</span><br><span class="line">  vaddss xmm0, xmm0, xmm1           ; accumulate the first value</span><br><span class="line">  vshufps xmm3, xmm1, xmm1, 85      ; shuffle things around</span><br><span class="line">                                    ; (permutes the 8 floats</span><br><span class="line">                                    ;  within the register)</span><br><span class="line">  vshufps xmm2, xmm1, xmm1, 255     ; ...</span><br><span class="line">  vaddss xmm0, xmm0, xmm3           ; accumulate the second value</span><br><span class="line">  vunpckhps xmm3, xmm1, xmm1        ; more shuffling</span><br><span class="line">  vextractf128 xmm1, ymm1, 0x1      ; ...</span><br><span class="line">  vaddss xmm0, xmm0, xmm3           ; accumulate third...</span><br><span class="line">  vaddss xmm0, xmm0, xmm2           ; and fourth value</span><br><span class="line">  vshufps xmm2, xmm1, xmm1, 85      ; shuffling</span><br><span class="line">  vaddss xmm0, xmm0, xmm1           ; accumulate fifth</span><br><span class="line">  vaddss xmm0, xmm0, xmm2           ; and sixth</span><br><span class="line">  vunpckhps xmm2, xmm1, xmm1        ; shuffle some more...</span><br><span class="line">  vshufps xmm1, xmm1, xmm1, 255     ; ...</span><br><span class="line">  vaddss xmm0, xmm0, xmm2           ; accumulate the seventh</span><br><span class="line">  vaddss xmm0, xmm0, xmm1           ; and final value</span><br><span class="line">  cmp rax, rcx                      ; are we done?</span><br><span class="line">  jne .loop                         ; if not, keep going</span><br></pre></td></tr></table></figure>
+
+<p>不幸的是还没有简单的方法绕过这个限制。如果你保证这种情况下加法的顺序不重要，你可以启用gcc的一个危险的（但名字很有趣）标志：<code>-funsafe-math-optimizations</code>。这样gcc就能生成漂亮的内循环了（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_sumf_unsafe%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_sumf_unsafe）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">.loop:</span><br><span class="line">  vmovups ymm2, YMMWORD PTR [rax]   ; read 8 floats</span><br><span class="line">  add rax, 32                       ; advance</span><br><span class="line">  vfmadd231ps ymm0, ymm2, ymm2      ; for the 8 floats:</span><br><span class="line">                                    ;   ymm0 += ymm2 * ymm2</span><br><span class="line">  cmp rax, rcx                      ; are we done?</span><br><span class="line">  jne .loop                         ; if not, keep going</span><br></pre></td></tr></table></figure>
+
+<p>令人吃惊：一次处理8个浮点数，用一条指令完成累加和平方。缺点是可能有无上限的精度损失。另外gcc不允许你只对你需要的函数打开这个功能——它是编译单元粒度的标志。Clang至少允许你在代码中用<code>#pragma Clang fp contract</code>来控制开关。</p>
+<p>在尝试这些优化时，我发现编译器还有更多的花招：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">sumToX</span><span class="params">(<span class="type">int</span> x)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> result = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; x; ++i)</span><br><span class="line">    &#123;</span><br><span class="line">        result += i;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>gcc会很直接地翻译这些代码，配上合适的设置后它就会像上面一样用上向量指令。而Clang会生成下面这样的代码（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_sum_up%EF%BC%89%EF%BC%9A">https://godbolt.org/z/acm19_sum_up）：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">sumToX(int): # @sumToX(int)</span><br><span class="line">  test edi, edi             ; test x</span><br><span class="line">  jle .zeroOrBelow          ; skip if x &lt;= 0</span><br><span class="line">  lea eax, [rdi - 1]        ; eax = x - 1</span><br><span class="line">  lea ecx, [rdi - 2]        ; ecx = x - 2</span><br><span class="line">  imul rcx, rax             ; rcx = ecx * eax</span><br><span class="line">  shr rcx                   ; rcx &gt;&gt;= 1</span><br><span class="line">  lea eax, [rcx + rdi]      ; eax = rcx + x</span><br><span class="line">  add eax, -1               ; return eax - 1</span><br><span class="line">  ret                      </span><br><span class="line">.zeroOrBelow:</span><br><span class="line">  xor eax, eax              ; answer is zero</span><br><span class="line">  ret</span><br></pre></td></tr></table></figure>
+
+<p>首先，请注意这里完全没有循环。通过生成的代码，你发现Clang返回了：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(x-1) * (x-2) / 2 + x - 1</span><br></pre></td></tr></table></figure>
+
+<p>它将循环换成了封闭形式的通用求和解法。这种解法与我自己会写出来的朴素代码不同：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">x * (x - 1) / 2</span><br></pre></td></tr></table></figure>
+
+<p>这大概是Clang使用的通用算法的结果。</p>
+<p>进一步的试验显示Clang聪明到能优化很多种类似的循环。Clang和gcc追踪循环变量的方式都能做这类优化，但只有Clang选择生成这种封闭形式的代码。但它不保证总是降低工作量：对于很小的<code>x</code>，封闭形式的开销也许比直接循环要大。Krister Walfridsson在<a target="_blank" rel="noopener" href="https://kristerw.blogspot.com/2019/04/how-llvm-optimizes-geometric-sums.html">他的博客</a>中详细介绍了如何实现这种优化。</p>
+<p>同样值得注意的是，为了做这种优化，编译器可能要依赖于“有符号整数溢出是未定义行为”。这样它就能假设你的代码不会传入可能会使结果溢出（这个例子中是65536）的<code>x</code>。如果Clang不能做这个假设，有时候它没办法找到封闭形式的解（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_sum_fail%EF%BC%89%E3%80%82">https://godbolt.org/z/acm19_sum_fail）。</a></p>
+<h3 id="去虚拟化"><a href="#去虚拟化" class="headerlink" title="去虚拟化"></a>去虚拟化</h3><p>尽管传统的基于虚函数的多态看起来有点过气了，但它仍然有一定的市场。无论是需要真正的多态行为，还是要为可测性增加“接缝”，或是允许未来的扩展，基于虚函数的多态都是不错的选择。</p>
+<p>但如我们所知，虚函数很慢。是不是呢？我们看它们是怎么影响前面的平方和例子吧——有这样的代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Transform</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">operator</span><span class="params">()</span><span class="params">(<span class="type">int</span> x)</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> x * x; &#125;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">sumTransformed</span><span class="params">(<span class="type">const</span> vector&lt;<span class="type">int</span>&gt; &amp;v,</span></span></span><br><span class="line"><span class="params"><span class="function">                   <span class="type">const</span> Transform &amp;transform)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">int</span> res = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">auto</span> i : v)</span><br><span class="line">    &#123;</span><br><span class="line">        res += <span class="built_in">transform</span>(i);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> res;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>显然现在它还没有多态。快速用编译器跑一下可以看到它生成了相同的高度向量化的汇编（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_poly1%EF%BC%89%E3%80%82">https://godbolt.org/z/acm19_poly1）。</a></p>
+<p>现在我们为<code>int operator()</code>加上<code>virtual</code>，就会得到一个慢得多的实现，被填进了间接调用，对吧？当然，有点（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_poly2%EF%BC%89%E3%80%82%E7%94%9F%E6%88%90%E7%9A%84%E4%BB%A3%E7%A0%81%E8%A6%81%E6%AF%94%E4%B9%8B%E5%89%8D%E6%9B%B4%E5%A4%9A%EF%BC%8C%E4%BD%86%E6%A0%B8%E5%BF%83%E5%BE%AA%E7%8E%AF%E5%8F%AF%E8%83%BD%E4%BC%9A%E8%AE%A9%E4%BD%A0%E6%83%B3%E4%B8%8D%E5%88%B0%EF%BC%9A">https://godbolt.org/z/acm19_poly2）。生成的代码要比之前更多，但核心循环可能会让你想不到：</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">  ; rdx points to the vtable</span><br><span class="line">.L8:</span><br><span class="line">  mov rax, QWORD PTR [rdx]  ; read the virtual function pointer</span><br><span class="line">  mov esi, DWORD PTR [rbx]  ; read the next int element</span><br><span class="line">  ; compare the function pointer with the address of the only</span><br><span class="line">  ; known implementation...</span><br><span class="line">  cmp rax, Transform::operator()(int) const</span><br><span class="line">  jne .L5                   ; if it&#x27;s not the only known impl,</span><br><span class="line">                            ; then jump off to a more complex case</span><br><span class="line">  imul esi, esi             ; square the number</span><br><span class="line">  add rbx, 4                ; move to next</span><br><span class="line">  add r12d, esi             ; accumulate the square</span><br><span class="line">  cmp rbp, rbx              ; finished?</span><br><span class="line">  jne .L8                   ; if not, loop</span><br></pre></td></tr></table></figure>
+
+<p>这里gcc赌了一把。已知它只看到了<code>Transform</code>的一个实现，这里用到的很可能就是这个实现。相比无脑通过虚表间接跳转，将虚表指针与已知的唯一实现做比较只需要一点点时间。如果相同，编译器就知道该做什么了：它会内联掉<code>Transform::operator()</code>的函数体，并原地平方。</p>
+<p>是的：编译器内联掉了一个虚函数调用。棒极了，我第一次发现这个的时候非常吃惊。这种优化叫做推测性去虚拟化（speculative devirtualization），是编译器作者不断研究和改进的源泉。编译器也能在LTO时做去虚拟化，能在整个程序范围内确定可能的函数实现。</p>
+<p>但编译器漏掉了一个技巧。注意到每次循环入口它都重新从虚表中载入虚函数指针。如果编译器能发现这个值在被调函数不会修改<code>Transform</code>的动态类型时保持不变，这次检查就可以移出循环，这样在循环内就完全没有动态检查了。编译器可以用移动循环不变量的方法将虚表检查移出循环。此时其它优化方法就可以介入了，在虚表检查通过时，整段代码可以替换为之前的向量化循环。</p>
+<p>你可能以为对象的动态类型不可能变化，但这是标准允许的：对象可以对自身调用placement new，析构时再变回原来的类型。但建议你别这么做。Clang有选项承诺你不会这么做：<code>-fstrict-vtable-pointers</code>。</p>
+<p>在我用的编译器中，gcc是仅有的这么做的一个，但Clang正在重构它的类型系统，从而更多利用上这类优化。</p>
+<p>C++11增加了<code>final</code>限定符以允许标记类和虚函数不可重写。这就给了编译器更多的关于哪些方法能受益于这类优化的信息了，在某些情况下甚至允许编译器完全避免虚函数调用（<a target="_blank" rel="noopener" href="https://godbolt.org/z/acm19_poly3%EF%BC%89%E3%80%82%E5%8D%B3%E4%BD%BF%E6%B2%A1%E6%9C%89%60final%60%EF%BC%8C%E6%9C%89%E6%97%B6%E5%88%86%E6%9E%90%E9%98%B6%E6%AE%B5%E4%B9%9F%E8%83%BD%E8%AF%81%E6%98%8E%E4%BB%A3%E7%A0%81%E4%B8%AD%E7%94%A8%E5%88%B0%E7%9A%84%E6%98%AF%E7%89%B9%E5%AE%9A%E7%9A%84%E5%85%B7%E4%BD%93%E7%B1%BB%EF%BC%88https://godbolt.org/z/acm19_poly4%EF%BC%89%E3%80%82%E8%BF%99%E7%B1%BB%E9%9D%99%E6%80%81%E5%8E%BB%E8%99%9A%E6%8B%9F%E5%8C%96%E6%93%8D%E4%BD%9C%E8%83%BD%E5%B8%A6%E6%9D%A5%E6%98%8E%E6%98%BE%E7%9A%84%E6%80%A7%E8%83%BD%E6%8F%90%E5%8D%87%E3%80%82">https://godbolt.org/z/acm19_poly3）。即使没有`final`，有时分析阶段也能证明代码中用到的是特定的具体类（https://godbolt.org/z/acm19_poly4）。这类静态去虚拟化操作能带来明显的性能提升。</a></p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>希望在读完本文以后，你能欣赏编译器为确保生成高效代码所付出的努力。我希望其中一些优化能让你感到惊喜，帮助你决定写出清晰的、意图明显的代码，将优化工作留给编译器去做。我再次强调，编译器知道的越多，它能做得越好。这包括允许编译器一次看到更多代码，以及将你的目标平台信息交给编译器。在给编译器更多信息时你要做一些权衡：这会让编译更慢。LTO之类的优化能让你兼顾两者。</p>
+<p>编译器中的优化一直在提高，即将到来的间接调用和虚函数分派上的提高也许很快带来更快的多态。我为编译器优化技术的未来而感到兴奋。快去看看你的编译器的输出吧。</p>
+<h3 id="致谢"><a href="#致谢" class="headerlink" title="致谢"></a>致谢</h3><p>The author would like to extend his thanks to Matt Hellige, Robert Douglas, and Samy Al Bahra, who gave feedback on drafts of this article.</p>
+<h3 id="引用"><a href="#引用" class="headerlink" title="引用"></a>引用</h3><ol>
+<li>Godbolt, M. 2012. Compiler explorer; <a target="_blank" rel="noopener" href="https://godbolt.org/">https://godbolt.org/</a>.</li>
+<li>Lemire, D. 2019. Faster remainders when the divisor is a constant: beating compilers and libdivide. <a target="_blank" rel="noopener" href="https://lemire.me/blog/2019/02/08/faster-remainders-when-the-divisor-is-a-constant-beating-compilers-and-libdivide/">https://lemire.me/blog/2019/02/08/faster-remainders-when-the-divisor-is-a-constant-beating-compilers-and-libdivide/</a>.</li>
+<li>LLVM. 2003. The LLVM compiler infrastructure.; <a target="_blank" rel="noopener" href="https://llvm.org/">https://llvm.org</a>.</li>
+<li>Padlewski, P. 2018. RFC: Devirtualization v2. LLVM; <a target="_blank" rel="noopener" href="http://lists.llvm.org/pipermail/llvm-dev/2018-March/121931.html">http://lists.llvm.org/pipermail/llvm-dev/2018-March/121931.html</a>.</li>
+<li>ridiculous_fish. 2010. Libdivide; <a target="_blank" rel="noopener" href="https://libdivide.com/">https://libdivide.com/</a>.</li>
+<li>Uops. Uops.info Instruction Latency Tables; <a target="_blank" rel="noopener" href="https://uops.info/table.html">https://uops.info/table.html</a>.</li>
+<li>Walfridsson, K. 2019. How LLVM optimizes power sums; <a target="_blank" rel="noopener" href="https://kristerw.blogspot.com/2019/04/how-llvm-optimizes-geometric-sums.html">https://kristerw.blogspot.com/2019/04/how-llvm-optimizes-geometric-sums.html</a>.</li>
+<li>Warren, H. S. 2012. Hacker’s Delight. 2nd edition. Addison-Wesley Professional.</li>
+</ol>
+<h3 id="相关文章"><a href="#相关文章" class="headerlink" title="相关文章"></a>相关文章</h3><ul>
+<li><a target="_blank" rel="noopener" href="https://queue.acm.org/detail.cfm?id=3212479">C Is Not a Low-level Language</a> Your computer is not a fast PDP-11. - David Chisnall</li>
+<li><a target="_blank" rel="noopener" href="https://queue.acm.org/detail.cfm?id=3041020">Uninitialized Reads</a> Understanding the proposed revisions to the C language - Robert C. Seacord</li>
+<li><a target="_blank" rel="noopener" href="https://queue.acm.org/detail.cfm?id=2088916">You Don’t Know Jack about Shared Variables or Memory Models</a> Data races are evil. - Hans-J. Boehm, Sarita V. Adve</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/%E7%BF%BB%E8%AF%91/" rel="tag"># 翻译</a>
+              <a href="/tags/%E6%80%A7%E8%83%BD/" rel="tag"># 性能</a>
+              <a href="/tags/%E7%BC%96%E8%AF%91%E5%99%A8/" rel="tag"># 编译器</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/01/02/the-tail-at-scale/" rel="prev" title="[笔记] The Tail at Scale">
+      <i class="fa fa-chevron-left"></i> [笔记] The Tail at Scale
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/06/28/2020-h1-summary/" rel="next" title="2020年上半年总结">
+      2020年上半年总结 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B3%E4%BA%8E%E6%88%91"><span class="nav-number">1.</span> <span class="nav-text">关于我</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BC%98%E5%8C%96%E5%85%A5%E9%97%A8"><span class="nav-number">2.</span> <span class="nav-text">优化入门</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%88%91%E6%9C%80%E5%96%9C%E6%AC%A2%E7%9A%84%E4%BC%98%E5%8C%96%E7%A4%BA%E4%BE%8B"><span class="nav-number">3.</span> <span class="nav-text">我最喜欢的优化示例</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%99%A4%E6%95%B0%E4%B8%BA%E5%B8%B8%E9%87%8F%E7%9A%84%E6%95%B4%E6%95%B0%E9%99%A4%E6%B3%95"><span class="nav-number">3.1.</span> <span class="nav-text">除数为常量的整数除法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%9F%E8%AE%A1%E4%B8%BA1%E7%9A%84%E4%BD%8D%E6%95%B0"><span class="nav-number">3.2.</span> <span class="nav-text">统计为1的位数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%93%BE%E5%BC%8F%E6%9D%A1%E4%BB%B6"><span class="nav-number">3.3.</span> <span class="nav-text">链式条件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B1%82%E5%92%8C"><span class="nav-number">3.4.</span> <span class="nav-text">求和</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%BB%E8%99%9A%E6%8B%9F%E5%8C%96"><span class="nav-number">3.5.</span> <span class="nav-text">去虚拟化</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E8%AE%BA"><span class="nav-number">4.</span> <span class="nav-text">结论</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%B4%E8%B0%A2"><span class="nav-number">4.1.</span> <span class="nav-text">致谢</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BC%95%E7%94%A8"><span class="nav-number">4.2.</span> <span class="nav-text">引用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E6%96%87%E7%AB%A0"><span class="nav-number">4.3.</span> <span class="nav-text">相关文章</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Pebblesdb: Building key-value stores using fragmented log-structured merge trees  TL;DR PebblesDB在LevelDB（实际是HyperLevelDB）的基础上，借鉴了SkipList中的guard概念，提出了一种Fragmented Log-Structured Merge Trees（FLSM）">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Pebblesdb: Building key-value stores using fragmented log-structured merge trees  TL;DR PebblesDB在LevelDB（实际是HyperLevelDB）的基础上，借鉴了SkipList中的guard概念，提出了一种Fragmented Log-Structured Merge Trees（FLSM）">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/pebblesdb-01.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/pebblesdb-02.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/pebblesdb-03.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/pebblesdb-04.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/pebblesdb-05.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/pebblesdb-06.jpg">
+<meta property="article:published_time" content="2020-11-13T15:35:48.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.658Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="KV">
+<meta property="article:tag" content="LSM">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-11/pebblesdb-01.jpg">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-13 23:35:48" itemprop="dateCreated datePublished" datetime="2020-11-13T23:35:48+08:00">2020-11-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3132747.3132765">Pebblesdb: Building key-value stores using fragmented log-structured merge trees</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>PebblesDB在LevelDB（实际是HyperLevelDB）的基础上，借鉴了SkipList中的guard概念，提出了一种Fragmented Log-Structured Merge Trees（FLSM），将整个fileset分成了多层的，层内多个不重叠的区间，每个区间内可以有多个文件。这样compaction可以只在level i做，而不涉及level i+1，从而显著降低了写放大。代价是读的时候从level 1开始每层都可能引入多个文件（对比LevelDB每层一个），开销会变大。PebblesDB因此也引入了一些优化以降低读路径的延时。</p>
+<p>生产中有大量写多的workload，这些场景下PebblesDB的意义很大，且它的实践难度并不高，值得集成到现有系统中。</p>
+<span id="more"></span>
+
+<h2 id="写放大"><a href="#写放大" class="headerlink" title="写放大"></a>写放大</h2><p>LevelDB和RocksDB是最常见的LSM存储引擎，它们的特点是：</p>
+<ul>
+<li>SST分为若干个level。</li>
+<li>Flush会生成level 0的文件，level 0的文件key range可以重叠。</li>
+<li>从level 1开始文件key range不可重叠。</li>
+<li>Compaction会选择第i层的一个文件（如果是第0层，可以是与它有重叠的所有文件），加上第i+1层所有与之有重叠的文件，生成一个i+1层的文件。</li>
+</ul>
+<p>这个过程中，一个key的整个生命期（从第0层到最高层），可能要经历多次重写，称为写放大。</p>
+<p><img src="/images/2020-11/pebblesdb-01.jpg" alt="Write Amplification"></p>
+<p>图中可以看到LevelDB和RocksDB有着非常高的写放大系数。而FLSM在这方面有着非常好的表现。</p>
+<p>传统的Leveled Compaction如此之大的写放大是因为它要时刻保证每层的严格有序。</p>
+<p><img src="/images/2020-11/pebblesdb-02.jpg" alt="Leveled Compaction"></p>
+<p>写放大一方面会占用磁盘带宽，另一方面会导致compaction不及时而影响正常的写请求处理。</p>
+<p>RocksDB中的Universal Compaction（或称Tiered Compaction）的思路是第i层做compaction时不要涉及到第i+1层的文件，从而控制写放大（每层只需要一次重写）。但这是以牺牲读性能为代价的——每一层的文件都是可能重叠的。</p>
+<h2 id="Fragmented-Log-Structured-Merge-Trees"><a href="#Fragmented-Log-Structured-Merge-Trees" class="headerlink" title="Fragmented Log-Structured Merge Trees"></a>Fragmented Log-Structured Merge Trees</h2><p>传统的Leveled Compaction保证了每层的严格有序，代价是写放大；Tiered Compaction不保证这点，降低了写放大，但增加了读放大。FLSM在其中寻找到了一个平衡点，每层整体有序，局部无序：每层分为若干个不重叠的连续的区间，称为fragment，区间之间显然是有序的，每个区间内可以有多个文件，相互不保证顺序。</p>
+<p>每个fragment的文件数量或大小超过一定阈值后就会触发compaction，新生成的文件从第i层下移到第i+1层。这次compaction不会涉及第i+1层的已有文件。</p>
+<p>为了保证文件从第i层移入第i+1层时既不需要与第i+1层的文件做compaction，又不破坏区间性质，FLSM借鉴了SkipList中的guard，使用guard来划分区间，保证第i层的guard也会是第i+1层的guard。</p>
+<p><img src="/images/2020-11/pebblesdb-03.jpg" alt="FLSM Guard"></p>
+<p>与SkipList类似，FLSM中guard也是在插入时随机选取，一个key是第i+1层开始的guard的概率是第i层的概率的B倍。</p>
+<p>Guard生成后是异步生效的：下次compaction时才会根据新的guard列表来切分文件。被切分的文件会被移到下一层。</p>
+<p>理论上guard也是可以删除的，但实践中并没有发现空的fragment会对性能产生影响：都被过滤掉了。但当文件在fragment之间分布不均匀时，通过删除guard来合并fragment是有价值的。Guard的删除也是异步生效的，被合并的两个fragment的文件既可以停留在第i层，也可以下移到第i+1层。</p>
+<p>Guard不一定需要被整个删掉，可以只删掉它的最上面k层。</p>
+<p>FLSM的缺点与Tiered Compaction类似，局部的无序也会带来读放大，尤其是范围读。应用以下几种优化可以提升读性能：</p>
+<ul>
+<li>激进的compaction策略，从而减少需要<code>seek</code>的文件数。</li>
+<li>并行<code>seek</code>。但如果要读的block已经在cache中了，并行<code>seek</code>实际会降低性能。为此，PebblesDB只针对最底层文件使用并行<code>seek</code>。</li>
+<li>文件级别而不是block级别的BloomFilter（这也是优化？）。</li>
+</ul>
+<p>总体来看FLSM非常适合那些大量随机写的场景，但以下场景并不适合用FLSM：</p>
+<ul>
+<li>数据量小，可以常驻内存的，此时FLSM的读放大对性能的影响会非常明显，而降低写放大的收益又没那么大。</li>
+<li>顺序写场景，此时Leveled Compaction直接移动文件即可，不需要真正做compaction，而FLSM会在尾部一直生成guard，导致文件下移时仍然需要做compaction。</li>
+<li>大量写之后立即大量小的范围读的场景，此时FLSM的开销要比RocksDB多30%。但一旦读范围变大，或读写交替进行，这种额外的开销就会降低甚至消失。</li>
+</ul>
+<h2 id="性能评估"><a href="#性能评估" class="headerlink" title="性能评估"></a>性能评估</h2><p><img src="/images/2020-11/pebblesdb-04.jpg" alt="Micro-benchmarks"></p>
+<ul>
+<li>写放大：PebblesDB有明显优势。</li>
+<li>单线程：<ul>
+<li>随机读写：PebblesDB在所有写场景都有明显优势；随机点查上PebblesDB因为允许更大的文件，文件数更少，且所有index block都常驻内存，性能略有优势。</li>
+<li>顺序写：PebblesDB显然不适合这种场景。</li>
+<li>范围读：PebblesDB因为需要读的文件数更多，在范围读上有着明显的劣势。</li>
+</ul>
+</li>
+<li>空间放大：大家都差不多。</li>
+<li>多线程：<ul>
+<li>并发读写：PebblesDB有明显优势，因为写放大不严重，写吞吐就更高；FLSM的compaction更快，因此文件数下降更快，文件体积更大，读延时因此更低。</li>
+<li>小数据集：当数据集可以常驻内存时，PebblesDB的劣势体现出来了。但如果把每个区间的最大文件数改为1，此时FLSM与LSM的性能就很接近了。</li>
+</ul>
+</li>
+</ul>
+<p>之前提到的三种读优化的效果：</p>
+<ul>
+<li>不做任何优化时，PebblesDB的范围读吞吐下降66%。</li>
+<li>启用并行<code>seek</code>后，范围读吞吐下降48%。</li>
+<li>启用激进的compaction后，范围读吞吐下降7%。</li>
+<li>启用文件级别BloomFilter后，点查QPS提升63%。</li>
+</ul>
+<p>YCSB测试的结论也差不多。</p>
+<p><img src="/images/2020-11/pebblesdb-05.jpg" alt="YCSB"></p>
+<p>值得一提的是，PebblesDB的index block常驻内存，因此它的内存使用要高于LevelDB和RocksDB：</p>
+<p><img src="/images/2020-11/pebblesdb-06.jpg" alt="Memory"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/KV/" rel="tag"># KV</a>
+              <a href="/tags/LSM/" rel="tag"># LSM</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store/" rel="prev" title="[笔记] Dynamo: amazon's highly available key-value store">
+      <i class="fa fa-chevron-left"></i> [笔记] Dynamo: amazon's highly available key-value store
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/" rel="next" title="[笔记] Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing">
+      [笔记] Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%99%E6%94%BE%E5%A4%A7"><span class="nav-number">1.</span> <span class="nav-text">写放大</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Fragmented-Log-Structured-Merge-Trees"><span class="nav-number">2.</span> <span class="nav-text">Fragmented Log-Structured Merge Trees</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%A7%E8%83%BD%E8%AF%84%E4%BC%B0"><span class="nav-number">3.</span> <span class="nav-text">性能评估</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

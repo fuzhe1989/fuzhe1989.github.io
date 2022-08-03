@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="Item11: 优先用deleted函数取代private的未定义函数有时C++会为你自动生成一些函数，但你想要阻止其他人调用这些函数。 C++98中，为了避免编译器为我们生成拷贝构造函数和赋值函数，最佳实践是：将它们声明为private函数，且不定义。 比如basic_ios类不希望自己被拷贝构造和赋值，在C++98中的做法是： 12345678template &lt;class charT,">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Effective Modern C++ 笔记 Chapter3 现代C++（Item 11-14)">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/07/05/effective-modern-cpp-chapter3-iterm11-14/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="Item11: 优先用deleted函数取代private的未定义函数有时C++会为你自动生成一些函数，但你想要阻止其他人调用这些函数。 C++98中，为了避免编译器为我们生成拷贝构造函数和赋值函数，最佳实践是：将它们声明为private函数，且不定义。 比如basic_ios类不希望自己被拷贝构造和赋值，在C++98中的做法是： 12345678template &lt;class charT,">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-07-05T14:54:15.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.654Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="Effective Modern C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/07/05/effective-modern-cpp-chapter3-iterm11-14/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>Effective Modern C++ 笔记 Chapter3 现代C++（Item 11-14) | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/07/05/effective-modern-cpp-chapter3-iterm11-14/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Effective Modern C++ 笔记 Chapter3 现代C++（Item 11-14)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-07-05 22:54:15" itemprop="dateCreated datePublished" datetime="2017-07-05T22:54:15+08:00">2017-07-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Item11-优先用deleted函数取代private的未定义函数"><a href="#Item11-优先用deleted函数取代private的未定义函数" class="headerlink" title="Item11: 优先用deleted函数取代private的未定义函数"></a>Item11: 优先用deleted函数取代private的未定义函数</h2><p>有时C++会为你自动生成一些函数，但你想要阻止其他人调用这些函数。</p>
+<p>C++98中，为了避免编译器为我们生成拷贝构造函数和赋值函数，最佳实践是：将它们声明为private函数，且不定义。</p>
+<p>比如<code>basic_ios</code>类不希望自己被拷贝构造和赋值，在C++98中的做法是：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">charT</span>, <span class="keyword">class</span> <span class="title class_">traits</span> = char_traits&lt;charT&gt; &gt;</span><br><span class="line"><span class="keyword">class</span> basic_ios: <span class="keyword">public</span> ios_base &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="built_in">basic_ios</span>(<span class="type">const</span> basic_ios&amp;);             <span class="comment">// not defined</span></span><br><span class="line">    basic_ios&amp; <span class="keyword">operator</span>=(<span class="type">const</span> basic_ios&amp;);  <span class="comment">// not defined</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这样对于没有权限访问它们的用户，编译期会报访问权限的错误，而对于<code>basic_ios</code>的友元这样有权限访问private函数的用户，链接期会报”undefined reference”。</p>
+<p>C++11中我们可以将这样的函数声明为<code>= delete</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">charT</span>, <span class="keyword">class</span> <span class="title class_">traits</span> = char_traits&lt;charT&gt;&gt;</span><br><span class="line"><span class="keyword">class</span> basic_ios: <span class="keyword">public</span> ios_base &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="built_in">basic_ios</span>(<span class="type">const</span> basic_ios&amp;) = <span class="keyword">delete</span>;</span><br><span class="line">    basic_ios&amp; <span class="keyword">operator</span>=(<span class="type">const</span> basic_ios&amp;) = <span class="keyword">delete</span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>注意到C++11中我们将这两个函数声明为public，这样友元也会在编译期报错，错误会更友好一些。</p>
+<p>deleted函数的一个重要优势在于，它不只能用于成员函数（未定义的private函数只能是成员函数）！</p>
+<p>例如我们有这么个函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">isLucky</span><span class="params">(<span class="type">int</span> number)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>C++的隐式转换导致非整数的基本类型也能调用这个函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (<span class="built_in">isLucky</span>(<span class="string">&#x27;a)) ...</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">if (isLucky(true)) ...</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">if (isLucky(3.5)) ...</span></span><br></pre></td></tr></table></figure>
+
+<p>C++11中我们可以将这些我们不想要的函数定义为deleted：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">isLucky</span><span class="params">(<span class="type">int</span> number)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">isLucky</span><span class="params">(<span class="type">char</span>)</span> </span>= <span class="keyword">delete</span>;</span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">isLucky</span><span class="params">(<span class="type">bool</span>)</span> </span>= <span class="keyword">delete</span>;</span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">isLucky</span><span class="params">(<span class="type">double</span>)</span> </span>= <span class="keyword">delete</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这些deleted函数仍然会参与到重载决议中，再报错。</p>
+<p>deleted函数的另一类用途是禁止模板的某个特化版本。例如：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">processPointer</span><span class="params">(T* ptr)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>我们不想将其用于<code>void*</code>和<code>char*</code>，就将它们声明为deleted：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="type">void</span> <span class="built_in">processPointer</span>&lt;<span class="type">void</span>&gt;(<span class="type">void</span>*) = <span class="keyword">delete</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="type">void</span> <span class="built_in">processPointer</span>&lt;<span class="type">char</span>&gt;(<span class="type">char</span>*) = <span class="keyword">delete</span>;</span><br></pre></td></tr></table></figure>
+
+<p>如果要做彻底的话，我们还要将<code>const void*</code>、<code>const volatile void*</code>、<code>wchar_t</code>这样的类型一一禁止掉。</p>
+<p>C++98中，我们没办法通过声明为private来禁止其他人调用模板成员函数的某个特化版本，因为模板成员函数的所有版本的访问权限都是一样的：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">processPointer</span><span class="params">(T* ptr)</span> </span>&#123;...&#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;&gt;</span><br><span class="line">    <span class="type">void</span> <span class="built_in">processPointer</span>&lt;<span class="type">void</span>&gt;(<span class="type">void</span>*);   <span class="comment">// error!</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>而C++11中我们可以在类外面将这个特化版本标记为deleted：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">processPointer</span><span class="params">(T* ptr)</span> </span>&#123;...&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="type">void</span> Widget::<span class="built_in">processPointer</span>&lt;<span class="type">void</span>&gt;(<span class="type">void</span>*) = <span class="keyword">delete</span>;   <span class="comment">// still public</span></span><br></pre></td></tr></table></figure>
+
+<p>C++98的未定义private函数的方法其实就是要达到C++11中deleted函数的效果，因此在C++11中使用deleted函数总是更好的。</p>
+<h2 id="Item12-将重写函数声明为override"><a href="#Item12-将重写函数声明为override" class="headerlink" title="Item12: 将重写函数声明为override"></a>Item12: 将重写函数声明为<code>override</code></h2><p>C++的面向对象的基础就是类的继承和虚函数的重写(override)，允许把对基类的接口调用转到子类的重写函数上：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">doWork</span><span class="params">()</span></span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">doWork</span><span class="params">()</span></span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">std::unique_ptr&lt;Base&gt; upb = std::<span class="built_in">make_unique</span>&lt;Derived&gt;();</span><br><span class="line">upb-&gt;<span class="built_in">doWork</span>();   <span class="comment">// call Derived::doWork</span></span><br></pre></td></tr></table></figure>
+
+<p>重写需要满足几个条件：</p>
+<ul>
+<li>基类中的函数必须是虚函数。</li>
+<li>基类与子类中的函数必须同名（析构函数除外）。</li>
+<li>基类函数与子类函数的参数类型必须相同。</li>
+<li>基类函数与子类函数的const性必须相同。</li>
+<li>子类函数的返回类型和异常规格必须与基类函数的兼容。</li>
+</ul>
+<p>以上是C++98中对重写的要求，C++11又加了一条：</p>
+<ul>
+<li>函数的引用限制必须相同（被调用的对象是左值还是右值）。</li>
+</ul>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">doWork</span><span class="params">()</span> &amp;</span>;   <span class="comment">// applies only when *this is an lvalue</span></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">doWork</span><span class="params">()</span> &amp;&amp;</span>;  <span class="comment">// applies only when *this is an rvalue</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>如果违反了这些条件，我们就会遇到一个名字差不多，但实际没有关系的概念：重载(overload)。重载函数就是名字相同，但不符合上面其它条件的函数。而且，子类中的重载函数会屏蔽基类中同名的版本，即在重载决议阶段我们只能看到子类中的各个重载版本。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf1</span><span class="params">()</span> <span class="type">const</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf2</span><span class="params">(<span class="type">int</span> x)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf3</span><span class="params">()</span> &amp;</span>;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">mf4</span><span class="params">()</span> <span class="type">const</span></span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf1</span><span class="params">()</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf2</span><span class="params">(<span class="type">unsigned</span> <span class="type">int</span> x)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf3</span><span class="params">()</span> &amp;&amp;</span>;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">mf4</span><span class="params">()</span> <span class="type">const</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>我们很容易就制造了一个全是重载没有重写的场景：</p>
+<ul>
+<li><code>mf1</code>的const性不同。</li>
+<li><code>mf2</code>的参数类型不同。</li>
+<li><code>mf3</code>的引用性不同。</li>
+<li><code>mf4</code>在基类中不同虚函数。</li>
+</ul>
+<p>编译器不一定会提醒我们弄出了重载函数，但我们需要保证这点。C++11增加了<code>override</code>修饰符，可以声明一个函数是重写函数，否则就会报错。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf1</span><span class="params">()</span> <span class="keyword">override</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf2</span><span class="params">(<span class="type">unsigned</span> <span class="type">int</span> x)</span> <span class="keyword">override</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf3</span><span class="params">()</span> &amp;&amp; <span class="keyword">override</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">mf4</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>以上4个函数在编译时都会报错。</p>
+<p>在这个基础上，把所有的重写函数都加上<code>override</code>，还能帮助我们去衡量修改一个基类接口的代价：所有标记了<code>override</code>的子类重写函数都会报错。如果没有加上<code>override</code>，我们就只能人肉去修改，再指望单元测试足够全面了。</p>
+<p>C++11引入了两个局部关键字：<code>override</code>和<code>final</code>(阻止子类重写此函数)，它们只在函数声明的修饰符区域才是关键字，其它地方不是。你不必担心下面的代码出错：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Warning</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">override</span><span class="params">()</span></span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>下面说一下函数的引用限制。我们在某些场景下需要知道对象是左值还是右值。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">using</span> DataType = std::vector&lt;<span class="type">double</span>&gt;;</span><br><span class="line">    ...</span><br><span class="line">    <span class="function">DataType&amp; <span class="title">data</span><span class="params">()</span> </span>&#123; <span class="keyword">return</span> values; &#125;</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    DataType values;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">Widget w;</span><br><span class="line"><span class="keyword">auto</span> vals1 = w.<span class="built_in">data</span>();</span><br></pre></td></tr></table></figure>
+
+<p>这里<code>Widget::data</code>返回了一个左值，因此<code>vals1</code>的初始化调用了<code>vector</code>的拷贝构造函数。</p>
+<p>假设我们有个函数<code>Widget makeWidget()</code>，它返回一个临时的<code>Widget</code>对象，在这个临时对象上调用<code>data</code>就不太值了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> vals2 = <span class="built_in">makeWidget</span>().<span class="built_in">data</span>();</span><br></pre></td></tr></table></figure>
+
+<p>如果我们能在调用<code>data</code>时知道*this是右值的话，就可以返回一个右值：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">using</span> DataType = std::vector&lt;<span class="type">double</span>&gt;;</span><br><span class="line">    ...</span><br><span class="line">    <span class="function">DataType&amp; <span class="title">data</span><span class="params">()</span> &amp; </span>&#123; <span class="keyword">return</span> values; &#125;</span><br><span class="line">    <span class="function">DataType&amp;&amp; <span class="title">data</span><span class="params">()</span> &amp;&amp; </span>&#123; <span class="keyword">return</span> std::<span class="built_in">move</span>(values); &#125;</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    DataType values;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这样<code>vals2</code>的初始化就只需要调用<code>vector</code>的移动构造函数。</p>
+<h2 id="Item13-优先用const-iterator代替iterator"><a href="#Item13-优先用const-iterator代替iterator" class="headerlink" title="Item13: 优先用const_iterator代替iterator"></a>Item13: 优先用const_iterator代替iterator</h2><p>const_iterator指向const对象，我们当然希望尽可能用它，但C++98对它的支持很不全面，首先难以创建，其次可使用的场景很受限。</p>
+<p>例如，下面这段代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;<span class="type">int</span>&gt; values;</span><br><span class="line">...</span><br><span class="line">std::vector&lt;<span class="type">int</span>&gt;::iterator it = std::<span class="built_in">find</span>(values.<span class="built_in">begin</span>(), values.<span class="built_in">end</span>(), <span class="number">1983</span>);</span><br><span class="line">values.<span class="built_in">insert</span>(it, <span class="number">1988</span>);</span><br></pre></td></tr></table></figure>
+
+<p>这里有3个iterator：<code>it</code>、<code>values.begin()</code>、<code>values.end()</code>，最好是能把它们替换为const_iterator。但：</p>
+<ol>
+<li>非const的容器对象的<code>begin()</code>和<code>end()</code>只能返回iterator，不能返回const_iterator。</li>
+<li><code>vector::insert</code>的第一个参数只接受iterator，不接受const_iterator。</li>
+</ol>
+<p>如果非要在C++98中把上面的iterator替换为const_iterator，我们需要使用多次<code>static_cast</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> std::vector&lt;<span class="type">int</span>&gt;::iterator IterT;</span><br><span class="line"><span class="keyword">typedef</span> std::vector&lt;<span class="type">int</span>&gt;::const_iterator ConstIterT;</span><br><span class="line">std::vector&lt;<span class="type">int</span>&gt; values;</span><br><span class="line">...</span><br><span class="line">ConstIterT ci = std::<span class="built_in">find</span>(</span><br><span class="line">    <span class="built_in">static_cast</span>&lt;ConstIterT&gt;(values.<span class="built_in">begin</span>()),</span><br><span class="line">    <span class="built_in">static_cast</span>&lt;ConstIterT&gt;(values.<span class="built_in">end</span>()),</span><br><span class="line">    <span class="number">1983</span></span><br><span class="line">);</span><br><span class="line">values.<span class="built_in">insert</span>(<span class="built_in">static_cast</span>&lt;IterT&gt;(ci), <span class="number">1988</span>);</span><br></pre></td></tr></table></figure>
+
+<p>实际上面这段代码可能都编译不了，因为const_iterator到iterator并没有一个可移植的转换方式，<code>static_cast</code>不行，<code>reinterpret_cast</code>也不行。总之C++98中用const_iterator就是会有一堆的麻烦，结果就是大家都不用const_iterator了。</p>
+<p>C++11做了几个改变，令const_iterator重新回到人们的视野中：</p>
+<ol>
+<li>STL中的几个容器类提供了<code>cbegin</code>和<code>cend</code>成员函数，返回非const对象的const_iterator。</li>
+<li>提供<code>std::cbegin</code>和<code>std::cend</code>函数，返回参数的const_iterator，甚至支持数组。</li>
+<li>STL的几个容器类增加了多个接受const_iterator参数的成员函数重载版本，比如<code>insert</code>。</li>
+</ol>
+<p>上面的第2条不太准确，实际上C++11只增加了<code>begin</code>和<code>end</code>这两个非成员函数，C++14则一口气增加了<code>cbegin</code>、<code>cend</code>、<code>rbegin</code>、<code>rend</code>、<code>crbegin</code>和<code>crend</code>这六个非成员函数。</p>
+<p>前面的代码在C++11中是这样的：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;<span class="type">int</span>&gt; values;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">auto</span> it = std::<span class="built_in">find</span>(values.<span class="built_in">cbegin</span>(), values.<span class="built_in">cend</span>(), <span class="number">1983</span>);</span><br><span class="line">values.<span class="built_in">insert</span>(it, <span class="number">1988</span>);</span><br></pre></td></tr></table></figure>
+
+<p>如果我们想在C++11中就用到非成员版的<code>cbegin</code>，大可以自己写一个：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> C&gt;</span><br><span class="line"><span class="function"><span class="keyword">auto</span> <span class="title">cbegin</span><span class="params">(<span class="type">const</span> C&amp; container)</span> -&gt; <span class="title">decltype</span><span class="params">(std::begin(container))</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> std::<span class="built_in">begin</span>(container);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里为什么返回的是<code>std::begin(container)</code>？为什么不返回<code>container.cbegin()</code>？</p>
+<ol>
+<li><p>注意<code>container</code>的类型是<code>const C&amp;</code>，通常来说const对象的<code>begin</code>与<code>cbegin</code>都会返回const_iterator。而且还会有一些类只定义了<code>begin</code>，没有定义<code>cbegin</code>，这样调用<code>begin</code>可以适用于更多的类型。</p>
+</li>
+<li><p>调用<code>std::begin</code>的话，对于定义了<code>begin</code>成员函数的类，与调用成员版本的<code>begin</code>是相同效果的；对于数组类型，它没有成员版本的<code>begin</code>，但有<code>std::begin</code>的一个特化版本，因此调用<code>std::begin</code>能适用于更多的情况。</p>
+</li>
+</ol>
+<p>回到正题上，C++11后，你就可以尽量多地用const_iterator了。</p>
+<h2 id="Item14-如果函数永远不会抛出异常，则声明其为noexcept"><a href="#Item14-如果函数永远不会抛出异常，则声明其为noexcept" class="headerlink" title="Item14: 如果函数永远不会抛出异常，则声明其为noexcept"></a>Item14: 如果函数永远不会抛出异常，则声明其为<code>noexcept</code></h2><p>C++98中的异常规格是一个很难用的特性：你要总结出这个函数可能抛哪些异常，还包括它下层函数可能抛的异常，把这些异常类型写到异常规格中，一旦改了实现（或下层函数改了实现），你还要修改异常规格，由此导致函数签名发生变化，可能破坏一大堆用户代码。这其中编译器通常帮不上忙。总之大多数人都认同C++98的异常规格是一个设计失误，不值得花那么大的代价来使用它。</p>
+<p>但人们发现，标记一个函数可能抛哪些异常通常没什么意义，还惹来一大堆麻烦，但标记一个函数<strong>会不会</strong>抛异常却很有意义。</p>
+<p>因此C++11中我们可以标记一个不会抛异常的函数为<code>noexcept</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">f</span><span class="params">(<span class="type">int</span> x)</span> <span class="title">throw</span><span class="params">()</span></span>;   <span class="comment">// C++98 style</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">f</span><span class="params">(<span class="type">int</span> x)</span> <span class="keyword">noexcept</span></span>;  <span class="comment">// C++11 style</span></span><br></pre></td></tr></table></figure>
+
+<p>编译器不会在编译期检查这个限制，但在运行期，一个标记为<code>noexcept</code>的函数如果抛了异常，程序会直接终止。这里与违背异常规格的现象有些像，但有不同：违背异常规格时，程序会展开调用栈，再终止；而违背<code>noexcept</code>时，程序<strong>可能</strong>会展开调用栈，再终止。</p>
+<p>这个“可能”非常重要，它允许编译器不去生成处理栈展开的代码（可能对目标代码的大小有明显的影响），不去按构造的相反顺序析构对象，甚至不去析构对象。</p>
+<p>而且，在某些场景下，我们可以利用有没有<code>noexcept</code>来做不同的操作，从而优化代码。一个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;Widget&gt; vw;</span><br><span class="line">...</span><br><span class="line">Widget w;</span><br><span class="line">...</span><br><span class="line">vw.<span class="built_in">push_back</span>(w);</span><br></pre></td></tr></table></figure>
+
+<p>如果vw空间已经满了，再调用<code>push_back</code>就需要重新分配一块更大的空间。现在的问题就是如何把vw中旧的元素转移到新的空间上。为了保证转移过程中的异常安全性，C++98中我们只能一个一个拷贝过去，全部成功后再把旧的对象依次销毁掉。但C++11中，我们可以用到<code>noexcept</code>的信息：如果<code>Widget</code>有移动构造函数，且标记为<code>noexcept</code>，我们就可以放心地用移动构造函数去构造新元素，而不用担心抛异常导致vw被破坏。</p>
+<p><code>vector</code>的<code>push_back</code>就是这么做的，一些其它C++98保证了强异常安全性的函数也有着类似的行为。但它们是如何知道函数的<code>noexcept</code>信息的呢？<code>vector::push_back</code>中调用了<code>std::move_if_noexcept</code>，而<code>std::move_if_noexcept</code>调用了<code>std::is_nothrow_move_constructible</code>，后者的值是由编译器给的。</p>
+<p>一些泛型函数可以根据它们的参数来推断是否有<code>noexcept</code>的保证。以<code>swap</code>为例：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T, <span class="type">size_t</span> N&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">swap</span><span class="params">(T (&amp;a)[N], T (&amp;b)[N])</span> <span class="title">noexcept</span><span class="params">(<span class="keyword">noexcept</span>(swap(*a, *b)))</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T1, <span class="keyword">typename</span> T2&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">pair</span> &#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">swap</span><span class="params">(pair&amp; p)</span> <span class="title">noexcept</span><span class="params">(<span class="keyword">noexcept</span>(swap(first, p.first)) &amp;&amp;</span></span></span><br><span class="line"><span class="params"><span class="function">                                <span class="keyword">noexcept</span>(swap(second, p.second)))</span></span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>noexcept</code>实际上有三种用法：</p>
+<ol>
+<li>作为函数规格的单独的<code>noexcept</code>，即不抛异常的保证。</li>
+<li>作为函数规格区域的<code>noexcept(bool-expression)</code>，如果bool-exp为<code>true</code>，则与单独的<code>noexcept</code>相同，否则与没有这个<code>noexcept</code>相同。</li>
+<li>表达式<code>noexcept(func-call-exp)</code>，如果func-call-exp为<code>noexcept</code>则返回<code>true</code>，否则返回<code>false</code>。</li>
+</ol>
+<p>上面的<code>swap</code>的第一个例子，说的是如果<code>swap&lt;T&gt;</code>有<code>noexcept</code>的保证，则<code>swap&lt;T, N&gt;</code>也有，否则也没有。第二个例子是只有<code>swap&lt;T1&gt;</code>和<code>swap&lt;T2&gt;</code>都有<code>noexcept</code>，<code>pair::swap</code>才有<code>noexcept</code>的保证。</p>
+<p>看起来很美好，但是不是所有函数都要加上<code>noexcept</code>呢？</p>
+<ol>
+<li>优化很重要，但正确性更重要。只有真的不应该抛异常的函数才应该加上<code>noexcept</code>。</li>
+<li><code>noexcept</code>是函数签名的一部分，所以如果一个接口当前不抛异常，但长远来看不确定会不会抛异常，那么也不建议加<code>noexcept</code>。</li>
+<li>加了<code>noexcept</code>不代表这个函数不能抛异常，而是“如果这里抛了异常，程序就应该直接挂掉”，只有这样的函数，才应该加<code>noexcept</code>。</li>
+</ol>
+<p>注意第3点，C++98中我们认为内存释放函数（<code>operator delete</code>和<code>operator delete[]</code>）和析构函数抛异常是种不好的写法，而C++11中干脆默认它们都是<code>noexcept</code>的。如果你不想要这个特性，需要显式声明它们为<code>noexcept(false)</code>。但为什么要这么做呢？标准库中没有这种写法，且一个析构函数可能抛异常的类型与标准库同时使用的行为也是未定义的。</p>
+<p>一些库作者会把函数分成“高可用性”和“低可用性”两种，“高可用性”指对参数没有要求，调用方可以任意传参数而不用担心出错，这样的函数当然可以声明为<code>noexcept</code>。剩下的函数就是低可用性的，它可能对参数有检查，或者在参数不符合要求时行为未定义。这样的函数就要好好想一想要不要声明为<code>noexcept</code>了：如果声明为<code>noexcept</code>，抛异常就会导致程序终止，那么怎么测试它对参数的要求？</p>
+<p>最后需要注意的是一个声明为<code>noexcept</code>的函数，如果内部调用了未声明为<code>noexcept</code>的函数，编译器不会抛错，连警告都没有，原因是：</p>
+<ol>
+<li>作者想表达的是“正常不会抛异常，如果这里抛了异常，程序就应该直接挂掉”，编译器需要尊重这种选择。</li>
+<li>可能调用的函数是C函数，或是C++98中的确实不会抛异常的函数，这些函数显然没办法声明为<code>noexcept</code>。</li>
+</ol>
+<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
+<li><a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Chapter1 类型推断 (Item 1-4)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">Chapter2 auto (Item 5-6)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">Chapter3 现代C++（Item 7-10)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm11-14/">Chapter3 现代C++（Item 11-14)</a></li>
+<li><a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/">Chapter3 现代C++（Item 15-17)</a></li>
+<li><a href="/2017/07/27/effective-modern-cpp-chapter4-iterm18-22/">Chapter4 智能指针 (Item 18-22)</a></li>
+<li><a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">Chapter5 右值引用、移动语义、完美转发（Item 23-26)</a></li>
+<li><a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Chapter5 右值引用、移动语义、完美转发（Item 27-30)</a></li>
+<li><a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">Chapter6: Lamba表达式 (Item 31-34)</a></li>
+<li><a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/">Chapter7: 并发API (Item 35-37)</a></li>
+<li><a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">Chapter7: 并发API (Item 38-40)</a></li>
+<li><a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">Chapter8: 杂项 (Item 41-42)</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/Effective-Modern-C/" rel="tag"># Effective Modern C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/" rel="prev" title="Effective Modern C++ 笔记 Chapter3 现代C++（Item 7-10)">
+      <i class="fa fa-chevron-left"></i> Effective Modern C++ 笔记 Chapter3 现代C++（Item 7-10)
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/" rel="next" title="Effective Modern C++ 笔记 Chapter3 现代C++（Item 15-17)">
+      Effective Modern C++ 笔记 Chapter3 现代C++（Item 15-17) <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Item11-%E4%BC%98%E5%85%88%E7%94%A8deleted%E5%87%BD%E6%95%B0%E5%8F%96%E4%BB%A3private%E7%9A%84%E6%9C%AA%E5%AE%9A%E4%B9%89%E5%87%BD%E6%95%B0"><span class="nav-number">1.</span> <span class="nav-text">Item11: 优先用deleted函数取代private的未定义函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item12-%E5%B0%86%E9%87%8D%E5%86%99%E5%87%BD%E6%95%B0%E5%A3%B0%E6%98%8E%E4%B8%BAoverride"><span class="nav-number">2.</span> <span class="nav-text">Item12: 将重写函数声明为override</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item13-%E4%BC%98%E5%85%88%E7%94%A8const-iterator%E4%BB%A3%E6%9B%BFiterator"><span class="nav-number">3.</span> <span class="nav-text">Item13: 优先用const_iterator代替iterator</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item14-%E5%A6%82%E6%9E%9C%E5%87%BD%E6%95%B0%E6%B0%B8%E8%BF%9C%E4%B8%8D%E4%BC%9A%E6%8A%9B%E5%87%BA%E5%BC%82%E5%B8%B8%EF%BC%8C%E5%88%99%E5%A3%B0%E6%98%8E%E5%85%B6%E4%B8%BAnoexcept"><span class="nav-number">4.</span> <span class="nav-text">Item14: 如果函数永远不会抛出异常，则声明其为noexcept</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E5%BD%95"><span class="nav-number">5.</span> <span class="nav-text">目录</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

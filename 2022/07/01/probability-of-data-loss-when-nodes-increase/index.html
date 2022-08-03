@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="TL;DR 分布式系统中我们经常会使用多副本策略来保证数据的可靠性。常见的多副本策略可以按容错能力分为两类。假设系统需要能容忍最多 f 个节点失败：  需要 2f+1 个副本的 Quorum 策略，如 Paxos&#x2F;Raft  需要 f+1 个副本，如 chain replication（下文称 CR）。  本文通过简单的模拟计算，得到以下结论：  固定节点失败概率与每个节点上的 shar">
+<meta property="og:type" content="article">
+<meta property="og:title" content="数据丢失概率与节点数量的关系">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/07/01/probability-of-data-loss-when-nodes-increase/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="TL;DR 分布式系统中我们经常会使用多副本策略来保证数据的可靠性。常见的多副本策略可以按容错能力分为两类。假设系统需要能容忍最多 f 个节点失败：  需要 2f+1 个副本的 Quorum 策略，如 Paxos&#x2F;Raft  需要 f+1 个副本，如 chain replication（下文称 CR）。  本文通过简单的模拟计算，得到以下结论：  固定节点失败概率与每个节点上的 shar">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-07.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-08.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-09.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-10.png">
+<meta property="article:published_time" content="2022-07-01T04:23:54.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.659Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-07/data-loss-prob-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/07/01/probability-of-data-loss-when-nodes-increase/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>数据丢失概率与节点数量的关系 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/07/01/probability-of-data-loss-when-nodes-increase/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          数据丢失概率与节点数量的关系
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-07-01 12:23:54" itemprop="dateCreated datePublished" datetime="2022-07-01T12:23:54+08:00">2022-07-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>TL;DR</strong></p>
+<p>分布式系统中我们经常会使用多副本策略来保证数据的可靠性。常见的多副本策略可以按容错能力分为两类。假设系统需要能容忍最多 f 个节点失败：</p>
+<ol>
+<li>需要 2f+1 个副本的 Quorum 策略，如 Paxos&#x2F;Raft </li>
+<li>需要 f+1 个副本，如 chain replication（下文称 CR）。</li>
+</ol>
+<p>本文通过简单的模拟计算，得到以下结论：</p>
+<ol>
+<li>固定节点失败概率与每个节点上的 shard 数量，数据丢失概率是节点数量的凸函数，即随着节点数量增加，数据丢失概率逐渐增大，到达峰值后再逐渐减小。</li>
+<li>同等存储成本下，CR 的数据丢失概率远低于 Quorum。</li>
+</ol>
+<span id="more"></span>
+
+<p>我们假设节点失败概率为 P，每个节点上有 K 个 shard，每个 shard 有 3 个副本。对于 Quorum，shard 容忍最多一个副本失败。对于 CR，shard 容忍最多两个副本失败。</p>
+<p>数据丢失可以被定义为：当有超过 f 个节点同时失败，且存在 shard 恰好有超过 f 个副本位于这些节点上。这样我们可以将数据丢失概率计算为以下两个概率的乘积：</p>
+<ol>
+<li>超过 f 个节点同时失败的概率。</li>
+<li>存在 shard 恰好有超过 f 个副本位于这些节点的概率。</li>
+</ol>
+<p>前者我们记为 P<sub>n</sub>，后者记为 P<sub>s</sub>。为了简化计算，下面我们只计算 shard 恰好有 f+1 个副本位于这些节点的概率。且记 P<sub>ss</sub> 为一个 shard 发生数据丢失的概率。则 P<sub>s</sub> &#x3D; (1-P<sub>ss</sub>)<sup>NK</sup>。</p>
+<p>对于Quorum，f &#x3D; 1，则发生了超过 2 个节点失败，且有 shard 有 2 个副本位于其上的概率为：</p>
+<ul>
+<li>P<sub>n</sub> &#x3D; P<sub>n</sub> &#x3D; 1 - (1-P)<sup>n</sup> - C(N, 1) * P(1-P)<sup>N-1</sup></li>
+<li>P<sub>ss</sub> &#x3D; C(2, 2) * C(N-2, 1) &#x2F; C(N, 3)</li>
+<li>P<sub>s</sub> &#x3D; (1-P<sub>ss</sub>)<sup>NK</sup></li>
+<li>P<sub>res</sub> &#x3D; P<sub>n</sub> * P<sub>s</sub></li>
+</ul>
+<p>对于 CR，f &#x3D; 2，则发生了超过 3 个节点失败，且有 shard 有 3 个副本位于其上的概率为：</p>
+<ul>
+<li>P<sub>n</sub> &#x3D; 1 - (1-P)<sup>n</sup> - C(N, 1) * P(1-P)<sup>N-1</sup> - C(N, 2) * P<sup>2</sup>(1-P)<sup>(N-2)</sup>，其中分别减掉了：<ul>
+<li>所有节点都正常的概率</li>
+<li>只有一个节点失败的概率</li>
+<li>只有两个节点失败的概率</li>
+</ul>
+</li>
+<li>P<sub>ss</sub> &#x3D; C(3, 3) &#x2F; C(N, 3)</li>
+<li>P<sub>s</sub> &#x3D; (1-P<sub>ss</sub>)<sup>NK</sup></li>
+<li>P<sub>res</sub> &#x3D; P<sub>n</sub> * P<sub>s</sub></li>
+</ul>
+<blockquote>
+<p>以上对于 P<sub>ss</sub> 的计算做了一些简化，但不影响结论。</p>
+</blockquote>
+<p>可以看到 P<sub>n</sub> 是关于 n 的单调增函数，而 P<sub>s</sub> 则是关于 n 的单调减函数。</p>
+<p>接下来直接上图。</p>
+<p>Quorum</p>
+<p>P &#x3D; 0.001，K &#x3D; 1000</p>
+<p><img src="/images/2022-07/data-loss-prob-01.png"></p>
+<p>P &#x3D; 0.001，K &#x3D; 5000</p>
+<p><img src="/images/2022-07/data-loss-prob-02.png"></p>
+<p>P &#x3D; 0.0001，K &#x3D; 5000</p>
+<p><img src="/images/2022-07/data-loss-prob-03.png"></p>
+<p>P &#x3D; 0.00001，K &#x3D; 5000</p>
+<p><img src="/images/2022-07/data-loss-prob-04.png"></p>
+<p>Chain replication（注意 Y 轴）</p>
+<p>P &#x3D; 0.001，K &#x3D; 1000</p>
+<p><img src="/images/2022-07/data-loss-prob-05.png"></p>
+<p>P &#x3D; 0.001，K &#x3D; 5000</p>
+<p><img src="/images/2022-07/data-loss-prob-06.png"></p>
+<p>P &#x3D; 0.0001，K &#x3D; 5000</p>
+<p><img src="/images/2022-07/data-loss-prob-07.png"></p>
+<p>P &#x3D; 0.00001，K &#x3D; 5000</p>
+<p><img src="/images/2022-07/data-loss-prob-08.png"></p>
+<p>可以看到：</p>
+<ol>
+<li>随着节点数量增加，数据丢失概率先增大后减小。</li>
+<li>同样 3 副本，CR 因为可以容忍 2 副本失败，相同参数下数据丢失概率远小于 Quorum。</li>
+</ol>
+<p>如果我们将 CR 设置为 2 副本，因此同样容忍 1 副本失败（但更省存储空间），此时 P<sub>n</sub> 与 Quorum 相同，而 P<sub>ss</sub> &#x3D; C(2, 2) &#x2F; C(N, 2)，小于 Quorum。</p>
+<p>P &#x3D; 0.001，K &#x3D; 1000</p>
+<p><img src="/images/2022-07/data-loss-prob-09.png"></p>
+<p>P &#x3D; 0.00001，K &#x3D; 5000</p>
+<p><img src="/images/2022-07/data-loss-prob-10.png"></p>
+<p>可以看到，CR 用更少的存储空间实现了更低的数据丢失概率。</p>
+<p>启示：</p>
+<ol>
+<li>只考虑存储空间与数据可靠性的话，Chain replication 相比 Quorum（Paxos&#x2F;Raft）更适合用于数据平面。</li>
+<li>在集群节点数量增加时，需要考虑是否有必要增加副本数量。</li>
+</ol>
+<p>上述结论与数据分布无关，如 Copyset 等策略相当于降低了 P<sub>ss</sub>，正交于具体的共识算法。</p>
+<blockquote>
+<p>安利一个网站：<a target="_blank" rel="noopener" href="https://www.desmos.com/calculator">https://www.desmos.com/calculator</a></p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/" rel="prev" title="基于 fs 抽象实现 cloud native kv engine">
+      <i class="fa fa-chevron-left"></i> 基于 fs 抽象实现 cloud native kv engine
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/08/01/cpp-variadic-macro-tips/" rel="next" title="C++ 变参宏的两个技巧">
+      C++ 变参宏的两个技巧 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

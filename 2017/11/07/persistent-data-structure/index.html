@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="Persistent Data StructurePersistent Data Structure，直译就是“持久性数据结构”。根据Wiki定义，如果一种数据结构，能保留它每一次被修改前的版本，就可以被称为“持久性数据结构”。而与之相对的就是Ephemeral Data Structure，即“暂存性数据结构”。 C++中，我们熟悉的数据结构大多数都属于暂存性数据结构，比如std::vector">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Persistent Data Structure">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/11/07/persistent-data-structure/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="Persistent Data StructurePersistent Data Structure，直译就是“持久性数据结构”。根据Wiki定义，如果一种数据结构，能保留它每一次被修改前的版本，就可以被称为“持久性数据结构”。而与之相对的就是Ephemeral Data Structure，即“暂存性数据结构”。 C++中，我们熟悉的数据结构大多数都属于暂存性数据结构，比如std::vector">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/persistent-data-structure-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/persistent-data-structure-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/persistent-data-structure-03.png">
+<meta property="article:published_time" content="2017-11-07T15:29:27.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.659Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="函数式编程">
+<meta property="article:tag" content="数据结构">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-11/persistent-data-structure-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/11/07/persistent-data-structure/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>Persistent Data Structure | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/11/07/persistent-data-structure/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Persistent Data Structure
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-11-07 23:29:27" itemprop="dateCreated datePublished" datetime="2017-11-07T23:29:27+08:00">2017-11-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="Persistent-Data-Structure"><a href="#Persistent-Data-Structure" class="headerlink" title="Persistent Data Structure"></a>Persistent Data Structure</h1><p>Persistent Data Structure，直译就是“持久性数据结构”。根据<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Persistent_data_structure">Wiki定义</a>，如果一种数据结构，能保留它每一次被修改前的版本，就可以被称为“持久性数据结构”。而与之相对的就是Ephemeral Data Structure，即“暂存性数据结构”。</p>
+<p>C++中，我们熟悉的数据结构大多数都属于暂存性数据结构，比如<code>std::vector</code>，当我们修改了一个<code>std::vector</code>，与之相关的所有已存在的Iterator就失效了，不能再访问了。而如果我们修改了一个持久性数据结构，我们仍然能够访问到它修改之前的版本，比如Iterator（假如有的话）不会失效，不会读到修改后的数据等。从这个角度讲，持久性数据结构也是不可变（Immutable）的。</p>
+<p>什么地方需要用到持久性数据结构？</p>
+<ol>
+<li>函数式编程语言。它的定义就要求了不能有可变数据和可变数据结构。</li>
+<li>并发编程。</li>
+</ol>
+<p>（另外，使用Persistent Map&#x2F;HashMap有助于简化Prototype的实现，也算是一个用途。）</p>
+<p>持久性数据结构对Lazy Evaluation也很有帮助：如果一个数据结构是可变的，我们肯定不会放心对它使用Lazy Evaluation。</p>
+<h2 id="Persistent-Data-Structure与并发"><a href="#Persistent-Data-Structure与并发" class="headerlink" title="Persistent Data Structure与并发"></a>Persistent Data Structure与并发</h2><p>并发编程的核心问题是竞争，即不同线程同时访问相同数据。对此我们往往需要用到一些同步手段来保证临界区的原子性，即同时只有一个线程能读出或写入相同的共享数据。</p>
+<p>最常见的同步手段就是锁，但锁也会引起一大堆的问题：</p>
+<ul>
+<li>死锁。</li>
+<li>活锁。</li>
+<li>临界区太大导致性能低下。</li>
+<li>错误地在临界区外访问数据导致数据竞争。</li>
+<li>控制反转。</li>
+<li>…</li>
+</ul>
+<p>另一种同步手段基于原子操作，从而实现出一套lock-free的数据结构。它的问题在于：</p>
+<ul>
+<li>原子操作本质上也是锁（总线锁），因此高并发度时开销还是会很大。</li>
+<li>需要非常精细的实现一个lock-free的数据结构，维护难度大，且很难证明其正确性。一些久经考验的数据结构仍然可能存在bug。</li>
+</ul>
+<p>而当我们在不同线程间访问相同的持久性数据结构时，我们很清楚其中不会有任何的数据竞争，因为无论其他线程如何修改这个结构，当前线程看到的结构永远是不变的。这不需要异常复杂的实现和同样复杂的测试来保证。</p>
+<p>可以认为通过锁和原子操作实现的并发数据结构追求的是“没有明显的错误”，而持久性数据结构则是“明显没有错误”。</p>
+<p>而从性能角度，持久性数据结构也并非一定处于劣势。实现良好的持久性数据结构，通常都可以提供一种或多种操作，其时间和空间复杂度与对应的暂存性数据结构相同。且编译器针对持久性数据结构的不变性，往往能给出更优化的目标代码。</p>
+<h1 id="如何实现Persistent-Data-Structure"><a href="#如何实现Persistent-Data-Structure" class="headerlink" title="如何实现Persistent Data Structure"></a>如何实现Persistent Data Structure</h1><p>想要实现一种持久性数据结构，最简单的方法就是“Copy Anything”，即每当我们修改原结构时，实际上我们都创建了一个副本，再在副本上修改。</p>
+<p>当然这种方法的缺点也是很明显的：开销太大。</p>
+<p>第二种方法是修改时不创建数据的副本，而是保存每次对结构的修改操作，当需要读取的时候再创建数据的副本，再在其上应用每个操作。显然这种方法在读取时的开销非常大。一种改进方案是每K个修改操作创建一次数据副本。</p>
+<p>第三种方法是路径复制（Path Copy），即对于基于Node的数据结构，当我们进行修改时，我们会复制路径上经过的Node，直到最终修改发生的Node。这里我们用“构造”代替了“修改”。</p>
+<p>目前最常用的实现方法就是路径复制。</p>
+<h2 id="垃圾回收与引用计数"><a href="#垃圾回收与引用计数" class="headerlink" title="垃圾回收与引用计数"></a>垃圾回收与引用计数</h2><p>持久性数据结构的一个核心思想是为当前每个持有的人保留一个版本，即对于相同的数据可能同时存在多个版本。这样我们就需要有垃圾回收机制，对于每个版本的数据，在没有人持有之后回收掉。</p>
+<p>对于C++而言，通常引用计数就足够了。因为持久化数据结构有一个特点：它的引用链一定是无回路的，只有新对象引用老对象，不可能有老对象引用新对象，因此单纯的引用计数就可以完全回收掉所有垃圾数据。</p>
+<p>同时，这个特点对Java类的分代GC也是很有好处的。</p>
+<p>有位老同志指出：对于非特定的基于引用计数的数据结构，不能使用<code>std::shared_ptr</code>，原因是它的析构是链式递归进行的，C++的编译器不一定能去掉所有的尾递归，可能会打爆栈。一种解法是从Root节点开始，收集后面所有的节点，然后循环析构。</p>
+<p>为什么<code>std::map</code>可以递归析构？因为平衡树的析构链长度为lgn，假设系统的栈深度上限为100，需要<code>std::map</code>中有2^100个元素以上才会栈溢出，此时内存早就爆掉了。</p>
+<h1 id="Persistent-List"><a href="#Persistent-List" class="headerlink" title="Persistent List"></a>Persistent List</h1><p>Persistent List可能是最简单的持久性数据结构。它支持两种基本操作：构造、插入头节点，即：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">List</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">List</span>();</span><br><span class="line">    <span class="built_in">List</span>(T val, List tail);</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这里我们使用的实现方法就是路径复制：当我们插入或删除或修改List的第N个节点时，我们需要复制前N-1个节点。</p>
+<p>因此，插入或删除头节点都是O(1)的开销，而任意位置插入或删除节点则是O(n)的开销。</p>
+<h2 id="基本操作"><a href="#基本操作" class="headerlink" title="基本操作"></a>基本操作</h2><p>以下是List的一个最简单实现，包括了支持的几个O(1)操作：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">List</span> &#123;</span><br><span class="line">    <span class="keyword">struct</span> <span class="title class_">Item</span> &#123;</span><br><span class="line">        <span class="built_in">Item</span>(<span class="type">const</span> T&amp; v, <span class="type">const</span> Item* tail) : <span class="built_in">mValue</span>(v), <span class="built_in">mNext</span>(tail) &#123;&#125;</span><br><span class="line">        T mValue;</span><br><span class="line">        <span class="type">const</span> Item* mNext;</span><br><span class="line">    &#125;;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">List</span><span class="params">(<span class="type">const</span> Item* item)</span>: mHead(item) &#123;</span>&#125;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">List</span>(): <span class="built_in">mHead</span>(<span class="literal">nullptr</span>) &#123;&#125;</span><br><span class="line">    <span class="built_in">List</span>(<span class="type">const</span> T&amp; val, List tail): <span class="built_in">mHead</span>(<span class="keyword">new</span> <span class="built_in">Item</span>(val, tail.mHead)) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">Empty</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> mHead == <span class="literal">nullptr</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">const</span> T&amp; <span class="title">Front</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="built_in">assert</span>(mHead);</span><br><span class="line">        <span class="keyword">return</span> *mHead;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">List <span class="title">PushFront</span><span class="params">(<span class="type">const</span> T&amp; val)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">List</span>(val, mHead);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">List <span class="title">PopFront</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">List</span>(mHead-&gt;mNext);</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">const</span> Item* mHead;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到这个实现中还没有任何引用计数有关的代码。我们有两种方式来实现引用计数：</p>
+<ol>
+<li>使用<code>std::shared_ptr</code>，这样只需要把每个使用<code>const Item*</code>的地方都换成<code>std::shared_ptr&lt;const Item&gt;</code>即可。</li>
+<li>自己实现一种侵入式的引用计数基类<code>Reference</code>，并令<code>Item</code>继承自它。</li>
+</ol>
+<h2 id="其它列表操作"><a href="#其它列表操作" class="headerlink" title="其它列表操作"></a>其它列表操作</h2><p>当我们拥有了一个持久性的List后，我们就可以在其上实现一套函数式的操作：</p>
+<ul>
+<li>fmap</li>
+<li>filter</li>
+<li>foldl&#x2F;foldr</li>
+<li>forEach</li>
+</ul>
+<p>实现<a target="_blank" rel="noopener" href="https://github.com/BartoszMilewski/Okasaki/blob/master/SimpleList/ListGC.h">戳这里</a>。</p>
+<h1 id="Persistent-Map"><a href="#Persistent-Map" class="headerlink" title="Persistent Map"></a>Persistent Map</h1><p>Persistent Map的实现也是基于路径复制的。算法导论上有这么一道习题，清晰的体现了它的实现思路：</p>
+<p><img src="/images/2020-11/persistent-data-structure-01.png" alt="Persistent Map"></p>
+<p>当我们插入或删除一个节点时，路径上的每个节点都需要被复制一次，因此这样的操作的开销是O(lgn)的。</p>
+<p>插入操作是很简单的：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Node* <span class="title">Insert</span><span class="params">(Node* root, <span class="type">const</span> T&amp; val)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!root) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Node</span>(val, <span class="literal">nullptr</span>, <span class="literal">nullptr</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &lt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Node</span>(root-&gt;mValue, <span class="built_in">Insert</span>(root-&gt;mLeft, val), root-&gt;mRight);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &gt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Node</span>(root-&gt;mValue, root-&gt;mLeft, <span class="built_in">Insert</span>(root-&gt;mRight, val));</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> root;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>删除操作有些麻烦，需要处理删除的节点有子节点的情况。原则就是：用构造代替所有的修改。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Node* <span class="title">Delete</span><span class="params">(Node* root, <span class="type">const</span> T&amp; val)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!root) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">nullptr</span>;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &lt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Node</span>(root-&gt;mValue, <span class="built_in">Delete</span>(root-&gt;mLeft, val), root-&gt;mRight);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (val &gt; root-&gt;mValue) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Node</span>(root-&gt;mValue, root-&gt;mLeft, <span class="built_in">Delete</span>(root-&gt;mRight, val));</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (!root-&gt;mLeft) &#123;</span><br><span class="line">            <span class="keyword">return</span> root-&gt;mRight;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!root-&gt;mRight) &#123;</span><br><span class="line">            <span class="keyword">return</span> root-&gt;mLeft;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            Node* leftMost;</span><br><span class="line">            <span class="built_in">tie</span>(leftMost, root-&gt;mRight) = <span class="built_in">RemoveLeftMost</span>(root-&gt;mRight);</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">new</span> <span class="built_in">Node</span>(leftMost-&gt;mValue, root-&gt;mLeft, root-&gt;mRight);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注：以上代码均未考虑垃圾回收。</p>
+<p>对于红黑树而言，每次它平衡时，同样要复制涉及到的节点。每次平衡最多涉及3个节点，因此平衡的开销是O(1)。</p>
+<p>实现<a target="_blank" rel="noopener" href="https://github.com/BartoszMilewski/Okasaki/blob/master/RBTree/RBTree.h">戳这里</a>。不过这个实现没有删除功能。</p>
+<h1 id="Persistent-Vector"><a href="#Persistent-Vector" class="headerlink" title="Persistent Vector"></a>Persistent Vector</h1><p>Persistent Vector的基本思想与Persistent Map非常接近：你把Persistent Vector想象成以下标为Key的Map即可：</p>
+<p><img src="/images/2020-11/persistent-data-structure-02.png" alt="Basic Persistent Vector"></p>
+<p>图中就是一个这样的Map，它有如下特点：</p>
+<ol>
+<li>分为内部节点和叶节点两类，其中数据都在叶节点上。</li>
+<li>所有叶节点的高度相同。</li>
+<li>每个内部节点有两个子节点。</li>
+<li>每层节点中，只有最后一个节点有可能是半满的，其它节点都是满的。</li>
+</ol>
+<p>当然这样的实现效率是很低的，每次Update、PushBack的时间复杂度是O(lgn)。因此实践上我们会使用类似于Trie树的结构，即每个节点能容纳多于两个子节点，通常为32个，这样一个6层的Map就可以容纳最多1073741824个元素，每次Update、PushBack最多需要复制6个节点，可以认为变成了一次O(1)操作。</p>
+<p>查找：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">const</span> T&amp; <span class="title">Get</span><span class="params">(Node* root, <span class="type">int32_t</span> index)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">while</span> (!root-&gt;<span class="built_in">IsLeaf</span>()) &#123;</span><br><span class="line">        <span class="type">const</span> <span class="type">int32_t</span> mask = root-&gt;<span class="built_in">Mask</span>();</span><br><span class="line">        root = root-&gt;<span class="built_in">Get</span>(index / mask);</span><br><span class="line">        index %= mask;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> *(<span class="type">const</span> T*)root-&gt;<span class="built_in">Get</span>(index);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="保留Tail节点来提高PushBack性能"><a href="#保留Tail节点来提高PushBack性能" class="headerlink" title="保留Tail节点来提高PushBack性能"></a>保留Tail节点来提高PushBack性能</h2><p>想想一个Persistent Vector执行PushBack的时候都发生了什么？从Root开始，一直复制到Tail叶节点。原因是当我们复制了一个子节点，我们就需要修改它的父节点，根据“修改即构造”原则，就需要重新构造一个父节点，从而一直到Root都要构造一遍。</p>
+<p>那么，假如Persistent Vector直接持有Tail节点呢？这样当它未满时，PushBack只要复制两个节点：Tail节点和Vector本身。当Tail节点已满时，我们才需要真正做一次PushBack。对于32个子节点的Persistent Vector来说，有31&#x2F;32的PushBack是真正的O(1)操作，其它1&#x2F;32的PushBack才需要O(lgn)。</p>
+<p><img src="/images/2020-11/persistent-data-structure-03.png" alt="Tail"></p>
+<p>新的查找也很简单。为了配合查找，我们要记录下Tail节点的offset：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> lookup_index &lt; tail_offset:</span><br><span class="line">  <span class="comment"># tree_lookup = old lookup technique</span></span><br><span class="line">  <span class="keyword">return</span> tree_lookup(lookup_index)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">  <span class="keyword">return</span> tail[lookup_index - tail_offset]</span><br></pre></td></tr></table></figure>
+
+<h2 id="Transient"><a href="#Transient" class="headerlink" title="Transient"></a>Transient</h2><p>当我们要对Persistent Vector进行一系列修改时，每次Update&#x2F;PushBack&#x2F;PopBack都要复制lgn节点，即使有了Tail节点优化，也只能对PushBack和PopBack有一定的效果。问题在于，我们即使每个操作都复制了一个新节点，下次操作这个节点时还是要再复制，因为我们要保证不破坏其它人的使用。那么什么时候可以直接重用这个节点，不用复制呢？</p>
+<ol>
+<li>只能被当前Vector访问到的节点。</li>
+<li>当前Vector在这次操作后不会被其它人使用。</li>
+</ol>
+<p>对于条件1，很好解决：我们每次修改Vector时都申请一个UUID，并放到这次修改创建的节点中，这样通过UUID就能判断节点是不是当前Vector创建出来的。</p>
+<p>对于条件2，我们没有办法阻止用户在所有修改完成之前使用这个Vector。因此我们使用一个新类型Transient来进行批量修改。好处：显式的让用户知道，我们要做一些不一样的事情啦，在它结束之前不要访问这个Vector。</p>
+<p>在批量修改结束之后，还需要一个操作来把Transient变为Persistent，这步操作会把每个节点中的ID置为NULL，保证合法的Vector的节点没有ID，从而避免一个Transient被误用。</p>
+<h1 id="Persistent-HashMap"><a href="#Persistent-HashMap" class="headerlink" title="Persistent HashMap"></a>Persistent HashMap</h1><p>当我们有了一个Persistent Vector的实现之后，实现一个Persistent HashMap也就不困难了。</p>
+<p>一个HashMap是什么？如果我们使用分桶链表来实现HashMap，它就是一个Vector，其中每个元素是一个List。那么我们可以用Persistent Vector + Persistent List来实现Persistent HashMap。如果我们使用开放散列法来实现HashMap，它就是单纯的一个Vector，只要用Persistent Vector来实现就可以了。</p>
+<h1 id="Persistent-Data-Structure的一个使用场景"><a href="#Persistent-Data-Structure的一个使用场景" class="headerlink" title="Persistent Data Structure的一个使用场景"></a>Persistent Data Structure的一个使用场景</h1><p>想象我们有一个UserMap，保存每个UserID和对应的NickName。有两种操作：</p>
+<ul>
+<li>NewUser：增加一对新的UserID和NickName。</li>
+<li>Update：修改已有UserID对应的NickName。</li>
+</ul>
+<p>现在我们用一个Persistent HashMap作为UserMap。有若干个前台线程可以访问和修改UserMap。</p>
+<p>最简单的做法：</p>
+<ol>
+<li>前台线程获得当前UserMap，称为M0。</li>
+<li>前台线程修改UserMap，得到M1。</li>
+<li>前台线程将M0替换为M1，原有的M0析构。</li>
+</ol>
+<p>只有一个前台线程时，这种用法是没什么问题的。但当我们有多个前台线程时，就会有问题：</p>
+<ol>
+<li>线程T1获得M0。</li>
+<li>线程T2获得M0。</li>
+<li>线程T1修改M0，得到M1。</li>
+<li>线程T2修改M0，得到M2。</li>
+<li>线程T1将M0替换为M1。</li>
+<li>线程T2将M1替换为M2。</li>
+</ol>
+<p>结果就是丢了一次数据！实际上这就是一个很经典的RMW操作，先Read，再本地Modify，再Write写回。对于RMW操作，必不可少的操作就是CompareAndExchange，也就是在Write时比较一下原对象有没有在你的Read之后被修改过。如果有的话，需要重试整个RMW操作。</p>
+<p>在我们这个场景中，我们需要做的就是每个线程在替换UserMap时确认一下UserMap的最后修改时间是否与自己手上持有的M0的修改时间相同，如果相同才能完成替换，否则就整个操作重来。这种先确认数据是否冲突再写入的操作，就是一种很典型的Transaction。因此我们可以使用STM（Software Transactional Memory）来更规范的使用UserMap：</p>
+<ol>
+<li>线程创建Transaction t。</li>
+<li>线程通过t获得M0。</li>
+<li>线程通过t修改M0，得到M1。</li>
+<li>线程通过t替换UserMap为M1。</li>
+</ol>
+<p>这个过程中，如果有数据冲突，根据STM的实现不同，可能在不同的地方失败，只有当没有数据冲突时，整个操作才能顺利走下去。</p>
+<p>可以看到，当我们使用Persistent Data Structure时，数据冲突的概率决定了它的使用是否高效。上面的例子中，对于全局唯一的UserMap，如果有大量的修改操作同时进行，那么其中只会有非常少量的操作能成功，其它操作都会因为数据冲突而失败。那么我们在使用时，就要考虑能否减少UserMap的粒度，从而降低冲突概率，提高性能。比如，我们将UserMap分成4096个桶，每个桶是一个Persistent HashMap，那么冲突概率就会小很多，整体性能就上去了。</p>
+<p>当然，在分桶后，如果有涉及多个UserID的操作，我们就需要一次性原子的替换多个UserMap。这不是一件容易的事情，幸好，STM就是干这个的。这也说明Persistent Data Structure和STM确实是好朋友。</p>
+<h1 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h1><ul>
+<li><a target="_blank" rel="noopener" href="http://hypirion.com/musings/understanding-persistent-vector-pt-1">Understanding Clojure’s Persistent Vectors, pt. 1</a></li>
+<li><a target="_blank" rel="noopener" href="http://hypirion.com/musings/understanding-persistent-vector-pt-2">Understanding Clojure’s Persistent Vectors, pt. 2</a></li>
+<li><a target="_blank" rel="noopener" href="http://hypirion.com/musings/understanding-persistent-vector-pt-3">Understanding Clojure’s Persistent Vectors, pt. 3</a></li>
+<li><a target="_blank" rel="noopener" href="http://hypirion.com/musings/understanding-clojure-transients">Understanding Clojure’s Transients</a></li>
+<li><a target="_blank" rel="noopener" href="http://hypirion.com/musings/persistent-vector-performance-summarised">Persistent Vector Performance Summarised</a></li>
+<li><a target="_blank" rel="noopener" href="https://bartoszmilewski.com/2013/11/13/functional-data-structures-in-c-lists/">Functional Data Structures in C++: Lists</a></li>
+<li><a target="_blank" rel="noopener" href="http://blog.higher-order.net/2009/09/08/understanding-clojures-persistenthashmap-deftwice">Understanding Clojure’s PersistentHashMap</a></li>
+<li><a target="_blank" rel="noopener" href="https://gotocon.com/dl/goto-amsterdam-2012/slides/KarlKrukow_IntroductionToConcurrencyandDataStructuresInClojure.pdf">Intro to Clojure data structures</a></li>
+<li><a target="_blank" rel="noopener" href="https://kunigami.blog/2017/03/18/amortization-and-persistence-via-lazy-evaluation/">Amortization and Persistence via Lazy Evaluation</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/rsms/immutable-cpp">GitHub: Immutable Array via C++</a></li>
+<li><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/1536953/recommend-a-fast-scalable-persistent-map-java">Recommend a fast &amp; scalable persistent Map - Java</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%87%BD%E6%95%B0%E5%BC%8F%E7%BC%96%E7%A8%8B/" rel="tag"># 函数式编程</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" rel="tag"># 数据结构</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/10/29/cpp-type-erasure/" rel="prev" title="C++: Type Erasure">
+      <i class="fa fa-chevron-left"></i> C++: Type Erasure
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2018/01/30/future-promise/" rel="next" title="Future与Promise">
+      Future与Promise <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Persistent-Data-Structure"><span class="nav-number">1.</span> <span class="nav-text">Persistent Data Structure</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Persistent-Data-Structure%E4%B8%8E%E5%B9%B6%E5%8F%91"><span class="nav-number">1.1.</span> <span class="nav-text">Persistent Data Structure与并发</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0Persistent-Data-Structure"><span class="nav-number">2.</span> <span class="nav-text">如何实现Persistent Data Structure</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E4%B8%8E%E5%BC%95%E7%94%A8%E8%AE%A1%E6%95%B0"><span class="nav-number">2.1.</span> <span class="nav-text">垃圾回收与引用计数</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Persistent-List"><span class="nav-number">3.</span> <span class="nav-text">Persistent List</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C"><span class="nav-number">3.1.</span> <span class="nav-text">基本操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E5%AE%83%E5%88%97%E8%A1%A8%E6%93%8D%E4%BD%9C"><span class="nav-number">3.2.</span> <span class="nav-text">其它列表操作</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Persistent-Map"><span class="nav-number">4.</span> <span class="nav-text">Persistent Map</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Persistent-Vector"><span class="nav-number">5.</span> <span class="nav-text">Persistent Vector</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BF%9D%E7%95%99Tail%E8%8A%82%E7%82%B9%E6%9D%A5%E6%8F%90%E9%AB%98PushBack%E6%80%A7%E8%83%BD"><span class="nav-number">5.1.</span> <span class="nav-text">保留Tail节点来提高PushBack性能</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Transient"><span class="nav-number">5.2.</span> <span class="nav-text">Transient</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Persistent-HashMap"><span class="nav-number">6.</span> <span class="nav-text">Persistent HashMap</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Persistent-Data-Structure%E7%9A%84%E4%B8%80%E4%B8%AA%E4%BD%BF%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="nav-number">7.</span> <span class="nav-text">Persistent Data Structure的一个使用场景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E9%93%BE%E6%8E%A5"><span class="nav-number">8.</span> <span class="nav-text">相关链接</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Column-Stores vs. Row-Stores: How Different Are They Really?   TL;DR 本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。 本文针对的场景：星型的data warehouse，OLAP。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Column-Stores vs. Row-Stores: How Different Are They Really?">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Column-Stores vs. Row-Stores: How Different Are They Really?   TL;DR 本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。 本文针对的场景：星型的data warehouse，OLAP。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-08-31T04:29:30.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.651Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="探索研究">
+<meta property="article:tag" content="Columnar">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Column-Stores vs. Row-Stores: How Different Are They Really? | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Column-Stores vs. Row-Stores: How Different Are They Really?
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-31 12:29:30" itemprop="dateCreated datePublished" datetime="2020-08-31T12:29:30+08:00">2020-08-31</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2017/2010/Papers/sigmod08-columstore-abadi.pdf">Column-Stores vs. Row-Stores: How Different Are They Really?</a> </p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。</p>
+<p>本文针对的场景：星型的data warehouse，OLAP。</p>
+<span id="more"></span>
+
+<h2 id="针对RowStore的优化技术"><a href="#针对RowStore的优化技术" class="headerlink" title="针对RowStore的优化技术"></a>针对RowStore的优化技术</h2><h3 id="垂直分片"><a href="#垂直分片" class="headerlink" title="垂直分片"></a>垂直分片</h3><p>每列对应一个分片，每个分片存储一列数据加主键。重新组合relation的时候要join涉及的列。</p>
+<h3 id="全部索引化"><a href="#全部索引化" class="headerlink" title="全部索引化"></a>全部索引化</h3><p>每列建一个索引。查询的时候分别在每个索引上应用谓词，再在内存中join结果。对于那些没有谓词的列，可以将其与同query的有谓词的列组成一个索引以避免扫描整个索引。</p>
+<h3 id="物化视图"><a href="#物化视图" class="headerlink" title="物化视图"></a>物化视图</h3><p>创建好一些物化视图，只包含query需要的列，避免加载不需要的列。</p>
+<h2 id="针对ColumnStore的优化技术"><a href="#针对ColumnStore的优化技术" class="headerlink" title="针对ColumnStore的优化技术"></a>针对ColumnStore的优化技术</h2><h3 id="压缩"><a href="#压缩" class="headerlink" title="压缩"></a>压缩</h3><p>列存的压缩效果往往远好于行存，原因是同一列数据的局部性更好，墒更低。而且列存可以用像RLE这样的不需要解压缩就能扫描的压缩算法。</p>
+<p>一列排序好的数据的压缩效果会非常好，列存比较容易实现排序，而行存因为同一列不是连续排列的，这种排序性很难被利用上。</p>
+<h3 id="延迟物化"><a href="#延迟物化" class="headerlink" title="延迟物化"></a>延迟物化</h3><p>同一个relation的不同列在被加载上来之后，最原始的做法是直接组合成relation，再运算。这样列存与行存就只是存储格式的区别了。我们还可以尽量延迟组合物化的时间，在此之前完成尽量多的操作。一列数据可以表示为数组、位图等数据结构，可以做非常高效的操作。延迟物化的好处：物化前先进行过滤和组合可以避免掉一些不必要的物化；避免不必要的解压缩；cache更友好；更容易应用按块迭代；固定长度的列操作更高效，延迟物化可以避免少量变长列影响其它列的操作。</p>
+<h3 id="按块迭代"><a href="#按块迭代" class="headerlink" title="按块迭代"></a>按块迭代</h3><p>算子一次处理一个block，函数调用次数更少，不需要额外的提取操作，如果是固定长度的列，可以以数组形式处理。</p>
+<h3 id="隐式join"><a href="#隐式join" class="headerlink" title="隐式join"></a>隐式join</h3><p>对于星型data warehouse，处理query时比较常见的做法是先join fact table和最具选择性的维表，再在fact table上做aggregation，之后再针对每个谓词join不同的维表。</p>
+<p>另一种延迟join的做法是先在维表上应用谓词，再将结果与fact table join，这样能得到两组选中的位置，一组来自维表，一组来自fact table，从维表的位置中我们能得到其它需要的列（但通常是乱序的）。这样依次处理完所有维表，再最终与fact table join得到想要的relation。</p>
+<p>本文引入了另一种方法，隐式join。它也是延迟join，但会最小化需要乱序提取的值。它将join改写为应用在fact table上的谓词，这些谓词会通过hash查找（值来自各个维表应用谓词的结果）或区间谓词等方式求值。不同列的隐式join可以同时进行，直到最终选出想要的relation后再与各个维表进行join。</p>
+<h3 id="区间谓词"><a href="#区间谓词" class="headerlink" title="区间谓词"></a>区间谓词</h3><p>如果应用过谓词后得到了某一列上连续的区间，我们可以将hash查找改写为一个区间上的IN谓词。这种优化没办法应用在非排序列上。对于原本排序好的列，一些重排序操作也会打乱它们的顺序，此时可以应用字典编码来重新给这些列赋值，以保持其有序性，从而可以继续应用这种优化。</p>
+<h2 id="性能对比"><a href="#性能对比" class="headerlink" title="性能对比"></a>性能对比</h2><p>RowStore的三种模拟ColumnStore的优化都没办法得到特别好的效果。垂直分片只在选择的列少于1&#x2F;4时有一定优势，超过之后它的空间上的额外开销（重复存储的主键）影响了影响。完全index要求fact table在应用谓词前一定要与维表join。物化视图有效果，但效果仍赶不上ColumnStore。</p>
+<p>ColumnStore的优化方法中，按块迭代提升了5%到50%的性能。隐式join提升了50%到75%的性能，主要是区间谓词的贡献。压缩提升了2倍性能，且仍有上升空间（多维度排序维表）。对于一些不需要解压缩就能过滤的场景，压缩的性能提升可以达到10倍。延迟物化提升了3倍性能。</p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>只是将RowStore改造为按列存储是达不到完全针对列存优化的ColumnStore的性能的。这种性能差异的主要因素是压缩和延迟物化，次要因素是按块迭代和隐式join。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Database/" rel="tag"># Database</a>
+              <a href="/tags/%E6%8E%A2%E7%B4%A2%E7%A0%94%E7%A9%B6/" rel="tag"># 探索研究</a>
+              <a href="/tags/Columnar/" rel="tag"># Columnar</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/" rel="prev" title="[笔记] The Chubby lock service for loosely-coupled distributed systems">
+      <i class="fa fa-chevron-left"></i> [笔记] The Chubby lock service for loosely-coupled distributed systems
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/" rel="next" title="[笔记] OLTP Through the Looking Glass, and What We Found There">
+      [笔记] OLTP Through the Looking Glass, and What We Found There <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%92%88%E5%AF%B9RowStore%E7%9A%84%E4%BC%98%E5%8C%96%E6%8A%80%E6%9C%AF"><span class="nav-number">1.</span> <span class="nav-text">针对RowStore的优化技术</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9E%82%E7%9B%B4%E5%88%86%E7%89%87"><span class="nav-number">1.1.</span> <span class="nav-text">垂直分片</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%A8%E9%83%A8%E7%B4%A2%E5%BC%95%E5%8C%96"><span class="nav-number">1.2.</span> <span class="nav-text">全部索引化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%89%A9%E5%8C%96%E8%A7%86%E5%9B%BE"><span class="nav-number">1.3.</span> <span class="nav-text">物化视图</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%92%88%E5%AF%B9ColumnStore%E7%9A%84%E4%BC%98%E5%8C%96%E6%8A%80%E6%9C%AF"><span class="nav-number">2.</span> <span class="nav-text">针对ColumnStore的优化技术</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9"><span class="nav-number">2.1.</span> <span class="nav-text">压缩</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BB%B6%E8%BF%9F%E7%89%A9%E5%8C%96"><span class="nav-number">2.2.</span> <span class="nav-text">延迟物化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E5%9D%97%E8%BF%AD%E4%BB%A3"><span class="nav-number">2.3.</span> <span class="nav-text">按块迭代</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9A%90%E5%BC%8Fjoin"><span class="nav-number">2.4.</span> <span class="nav-text">隐式join</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8C%BA%E9%97%B4%E8%B0%93%E8%AF%8D"><span class="nav-number">2.5.</span> <span class="nav-text">区间谓词</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%A7%E8%83%BD%E5%AF%B9%E6%AF%94"><span class="nav-number">3.</span> <span class="nav-text">性能对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E8%AE%BA"><span class="nav-number">4.</span> <span class="nav-text">结论</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

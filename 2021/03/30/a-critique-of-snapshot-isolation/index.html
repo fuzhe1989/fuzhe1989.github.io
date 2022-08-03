@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：A Critique of Snapshot Isolation  这篇文章提出了一种保证了serializability的write-snapshot isolation（WSI）。相比snapshot isolation（SI），WSI是serializable的，且有着不弱于SI的并发性能。相比serializable snapshot isolation（SSI），它的检测成本更低">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] A Critique of Snapshot Isolation">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/03/30/a-critique-of-snapshot-isolation/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：A Critique of Snapshot Isolation  这篇文章提出了一种保证了serializability的write-snapshot isolation（WSI）。相比snapshot isolation（SI），WSI是serializable的，且有着不弱于SI的并发性能。相比serializable snapshot isolation（SSI），它的检测成本更低">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/wsi-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/wsi-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/wsi-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/wsi-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/wsi-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/wsi-06.png">
+<meta property="article:published_time" content="2021-03-30T13:50:37.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.650Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Transaction">
+<meta property="article:tag" content="OLTP">
+<meta property="article:tag" content="Snapshot Isolation">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-03/wsi-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/03/30/a-critique-of-snapshot-isolation/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] A Critique of Snapshot Isolation | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/30/a-critique-of-snapshot-isolation/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] A Critique of Snapshot Isolation
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-30 21:50:37" itemprop="dateCreated datePublished" datetime="2021-03-30T21:50:37+08:00">2021-03-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2168836.2168853">A Critique of Snapshot Isolation</a></p>
+</blockquote>
+<p>这篇文章提出了一种保证了serializability的write-snapshot isolation（WSI）。相比snapshot isolation（SI），WSI是serializable的，且有着不弱于SI的并发性能。相比serializable snapshot isolation（SSI），它的检测成本更低，性能更高。</p>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>事务ACID中的I即Isolation，定义了并发事务间的相互作用。最高的isolation级别是serializability（可串行化），这个级别保证了系统的行为如同是将所有事务按某个顺序串行执行的结果。但众所周知的是serializability实现开销巨大，且严重限制了系统的并发能力。</p>
+<p>许多实际系统因而采用了另一种可以达到高并发的isolation，snapshot isolation。这种isolation下，每个事务只能看到它开始时的DB状态（一个snapshot）。只读事务不会与其它事务冲突，因而不需要任何锁机制。但两个修改相同元素的写事务之间仍然可能有冲突，称为写写冲突（write-write conflict）。</p>
+<p>基于锁的snapshot isolation实现非常直接，每个事务在修改元素前尝试加锁，如果加锁失败则abort（或wait）。但snapshot isolation相比serializability还欠缺一项，即检测出读写冲突（read-write conflict）的能力。然而检测RW冲突会带来明显的开销，因为读事务占了典型workload的大头，且最直接的RW检测还可能导致只读事务abort，限制了系统的并发能力。</p>
+<p>一种无锁的snapshot isolation实现（omid前身）[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/5958809/">1</a>]中每个事务都要将自己的修改列表发给中心节点（status oracle）来检测WW冲突。这种设计同样也可以用来检测RW冲突，只要每个事务将自己读过的row也发给SO即可。</p>
+<p>这篇文章分析了WW和RW冲突，得出结论：</p>
+<ul>
+<li>SI的WW冲突超出了serializability的需要，即允许WW冲突也可以实现serializability。</li>
+<li>只需要检测RW冲突就可以满足serializability。</li>
+</ul>
+<p>作者随后提出了write snapshot isolation，只检测RW冲突（不需要处理WW冲突），如果一个事务读过的数据在提交前被其它事务修改了，这个事务就需要abort。</p>
+<p>作者预期WSI能达到SI同等的并发能力：</p>
+<ol>
+<li>WSI和SI都不会abort只读事务，而这就占据了大部分事务。</li>
+<li>RW冲突和WW冲突都有假阳性（事务冲突但仍然满足serializability）。</li>
+</ol>
+<p>（WSI因此具备和SI同等级的性能，且拥有更高的isolation级别，但似乎仍然达不到serializability，还需要gap锁之类的机制来避免conditional update中的phantom read）。</p>
+<h2 id="Snapshot-Isolation"><a href="#Snapshot-Isolation" class="headerlink" title="Snapshot Isolation"></a>Snapshot Isolation</h2><p>Snapshot isolation的机制略。SI的优势在于一个事务的写不会阻塞其它事务的读。</p>
+<p>两个事务Ti和Tj发生WW冲突的条件是：</p>
+<ol>
+<li>空间上重叠：都写同一行r。</li>
+<li>时间上重叠：T<sub>s</sub>(Ti) &lt; T<sub>c</sub>(Tj)且T<sub>s</sub>(Tj) &lt; T<sub>c</sub>(Ti)。</li>
+</ol>
+<p>如下图中txn<sub>n</sub>和txn<sub>c</sub>存在WW冲突。</p>
+<p><img src="/images/2021-03/wsi-01.png"></p>
+<p>基于锁的SI实现有<a href="/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications">Percolator</a>。当一个事务要写被锁住的行时，可以有不同实现：wait；自身abort；强行abort掉占有锁的事务（wound-wait）。</p>
+<p>作者本身倾向于[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/5958809/">1</a>]这样的无锁的SI实现。它会依赖于一个中心化的SO。作者认为SO可以达到50K的TPS，不太会成为并发的瓶颈（严重怀疑）。</p>
+<p>下面是这种实现的commit过程。</p>
+<p><img src="/images/2021-03/wsi-02.png"></p>
+<p>这里关键是如何管理每行的commit ts。最直接的想法是由SO本身管理，但这样扩展性不好。也可以写回DB[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/5958809/">1</a>]或由client来维护[<a target="_blank" rel="noopener" href="https://www.sigops.org/s/conferences/sosp/2011/posters/summaries/sosp11-final12.pdf">2</a>]（更详细的分析可以看omid[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/6816691/">3</a>][<a target="_blank" rel="noopener" href="https://www.usenix.org/conference/fast17/technical-sessions/presentation/shacham">4</a>][<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3229863.3229868">5</a>]）。</p>
+<h2 id="Serializability"><a href="#Serializability" class="headerlink" title="Serializability"></a>Serializability</h2><p><strong>Q1</strong>：避免WW冲突是serializability的充分条件吗？</p>
+<p>显然不是，避免WW冲突也没办法避免write skew：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">H 1. r1[x] r2[y] w1[y] w2[x] c1 c2</span><br></pre></td></tr></table></figure>
+
+<p>H1中两个事务分别读了对方要写的行，显然没有WW冲突，但不满足serializability。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">H 2. r1[x] r1[y] r2[x] r2[y] w1[x] w2[y] c1 c2</span><br></pre></td></tr></table></figure>
+
+<p>H2中两个事务都读了x和y，想要保证x + y &gt; 0，假设初始x &#x3D; y &#x3D; 1，T1将x改为-1，T2将y改为-1，两个事务在SI下都会成功，不满足serializability。</p>
+<p><strong>Q2</strong>：避免WW冲突是serializability的必要条件吗？</p>
+<p>SI能避免ANSI SQL标准中定义的以下异常：</p>
+<ul>
+<li>脏读（dirty read），读到了未提交的值。</li>
+<li>不可重复读（fuzzy read），读到了已被其它并发事务删除的值。</li>
+<li>幻读（phantom），满足一组条件的数据集被并发事务修改且被读到。</li>
+</ul>
+<p>另外它还能避免写丢失（lost update)异常：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">H 3. r1[x] r2[x] w2[x] w1[x] c1 c2</span><br></pre></td></tr></table></figure>
+
+<p>但注意如果T2没有读x，则不构成写丢失异常：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">H 4. r1[x] w2[x] w1[x] c1 c2</span><br></pre></td></tr></table></figure>
+
+<p>这是因为在事务重排序后，H4等效于：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">H 5. r1[x] w1[x] c1 w2[x] c2</span><br></pre></td></tr></table></figure>
+
+<p>显然H5是满足serializability的，H4因此也满足。</p>
+<p>H4的例子就说明WW冲突可能会阻止一些合法的、满足serializability的场景。</p>
+<p>结论就是：避免WW冲突既不是serializability的充分条件，也非必要条件，我们需要重新审视SI要避免WW这一观点。</p>
+<h2 id="Read-Write-vs-Write-Write"><a href="#Read-Write-vs-Write-Write" class="headerlink" title="Read-Write vs. Write-Write"></a>Read-Write vs. Write-Write</h2><p>SI实际应该称为RSI（read-snapshot isolation），因为事务的读永远不会被打断，每个read对应的snapshot是隔离的（isolated）。而对应地，WSI中事务的写永远不会被打断，每个write对应的snapshot是隔离的。但如果它的read set被其它事务修改了，就没办法提交了。</p>
+<p>WSI中Ti与Tj冲突的条件是：</p>
+<ol>
+<li>RW空间重叠：Tj写行r，Ti读行r。</li>
+<li>RW时间重叠：T<sub>s</sub>(Ti) &lt; T<sub>c</sub>(Tj) &lt; T<sub>c</sub>(Ti)。</li>
+</ol>
+<p>注意到WSI中只有写的事务（即blind write）是不会被打断的。</p>
+<p><img src="/images/2021-03/wsi-03.png"></p>
+<p>上图中：</p>
+<ol>
+<li>T<sub>n</sub>和T<sub>c’’</sub>在SI的定义中时间是重叠的，但在WSI的定义中时间是不重叠的：T<sub>c’’</sub>的提交时间晚于T<sub>n</sub>。</li>
+<li>T<sub>n</sub>和T<sub>c</sub>存在RW时间重叠，但RW空间不重叠：T<sub>n</sub>读行r，T<sub>c</sub>写行r’。</li>
+<li>T<sub>n</sub>和T<sub>c’</sub>存在RW时间和空间重叠，必须abort掉其中一个。</li>
+</ol>
+<p>我们知道只读事务占了实际workload的大头（只读事务占了TPC-E的77%，Megastore超过86%）。为了优化只读事务的场景，注意到只读事务的commit不会修改任何数据，所有数据的版本由start ts决定，因此可以把commit ts设置为不小于start ts的任意值，因此它不会与任何事务有时间重叠。因此WSI中只读事务不参与冲突检测，也就不会abort。</p>
+<p><img src="/images/2021-03/wsi-04.png"></p>
+<p><strong>Q1</strong>：避免RW冲突是serializability的充分条件吗？</p>
+<p>我们需要证明任何满足WSI的历史都等价于某个满足serializability的历史。</p>
+<p>我们保证以下顺序不变：</p>
+<ol>
+<li>一个事务内的操作顺序。</li>
+<li>事务的提交顺序。</li>
+</ol>
+<p>这样如果一个事务在两个历史中读到的snapshot不变，它提交时写下去的内容也不变。为了保证这种，我们可以再保证事务的开始顺序不变。</p>
+<p>接下来我们需要避免事务间有重叠。做法是将写事务的所有操作都移到它的commit ts，只读事务的所有操作都移到它的start ts。因为WSI保证了不会有RW冲突，这种移动不会影响最终结果。</p>
+<p><img src="/images/2021-03/wsi-05.png"></p>
+<p>abort的事务不会对其它事务有影响，因此不参与讨论。</p>
+<p><strong>引理1</strong>：这样生成的历史是serial的。</p>
+<p>既然每个事务的操作要么在commit时发生，要么在start时发生，且timestamp不重复，也就不存在并发事务，整个历史就是serial的。</p>
+<p><strong>引理2</strong>：新历史与旧历史是等价的。</p>
+<p>已知只读事务读到的数据只与它的start ts有关，又知所有写事务的commit ts不变，因此每个只读事务读到的值不变。因此整个历史的结果是由写事务的提交决定的。已知所有写事务的提交顺序不变，那么只要保证它们读到的数据不变，它们提交的结果也就不变，新历史与旧历史就是等价的。</p>
+<p>而WSI保证了一个最终走到提交的事务，它读到的数据不会在start ts到commit ts之间被修改，即使用commit ts来读与用start ts来读是一样的。因此新历史中每个事务读到的数据与旧历史相同。</p>
+<p>结论：WSI是serializable的。</p>
+<p><strong>Q2</strong>：避免WW冲突是serializability的必要条件吗？</p>
+<p>WSI相比SI的一个优势就是避免了一些serializable但WW冲突的事务被abort。但它也会abort其它有RW冲突但serializable的事务。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">H 6. r1[x] r2[z] w2[x] w1[y] c2 c1</span><br></pre></td></tr></table></figure>
+
+<p>H6会被WSI阻止，但它实际等价于：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">H 7. r1[x] w1[y] c1 r2[z] w2[x] c2</span><br></pre></td></tr></table></figure>
+
+<p>结论：SI和WSI都有假阳性，都会abort满足serializability的事务。</p>
+<h2 id="Lock-free-Implementation-of-Write-snapshot-Isolation"><a href="#Lock-free-Implementation-of-Write-snapshot-Isolation" class="headerlink" title="Lock-free Implementation of Write-snapshot Isolation"></a>Lock-free Implementation of Write-snapshot Isolation</h2><p><img src="/images/2021-03/wsi-06.png"></p>
+<p>WSI的commit开销比SI要大，因为每个请求要同时包含读过的数据和要写的数据。</p>
+<p>只读事务仍然要执行commit，但请求中不需要携带任何数据。理论上只读事务可以跳过commit，但这样SO就无法分辨正常的事务与client失败了。</p>
+<p>这套实现是针对OLTP的，如果要用在OLAP中，障碍在于每个事务的读数据集会非常庞大，导致commit开销大，且abort概率也增加了。前者可以通过精简请求格式缓解，后者是本质问题，需要通过分离系统的TP和AP部分来解决（ingestion路径独立出来）。</p>
+<h2 id="Evaluation"><a href="#Evaluation" class="headerlink" title="Evaluation"></a>Evaluation</h2><p>后面的评测略过，这里只介绍一下作者的实现。作者使用了BookKeeper作为SO的WAL，HBase作为data store。整条路径为：读HBase；写暂存在client buffer中；SO使用BookKeeper记录redo；最终数据再写回HBase。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Transaction/" rel="tag"># Transaction</a>
+              <a href="/tags/OLTP/" rel="tag"># OLTP</a>
+              <a href="/tags/Snapshot-Isolation/" rel="tag"># Snapshot Isolation</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/" rel="prev" title="[笔记] Ceph: A Scalable, High-Performance Distributed File System">
+      <i class="fa fa-chevron-left"></i> [笔记] Ceph: A Scalable, High-Performance Distributed File System
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores/" rel="next" title="[笔记] Omid: Lock-free transactional support for distributed data stores">
+      [笔记] Omid: Lock-free transactional support for distributed data stores <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Snapshot-Isolation"><span class="nav-number">2.</span> <span class="nav-text">Snapshot Isolation</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Serializability"><span class="nav-number">3.</span> <span class="nav-text">Serializability</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Read-Write-vs-Write-Write"><span class="nav-number">4.</span> <span class="nav-text">Read-Write vs. Write-Write</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Lock-free-Implementation-of-Write-snapshot-Isolation"><span class="nav-number">5.</span> <span class="nav-text">Lock-free Implementation of Write-snapshot Isolation</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Evaluation"><span class="nav-number">6.</span> <span class="nav-text">Evaluation</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

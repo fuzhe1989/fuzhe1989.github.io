@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="随便看看如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎  从停机问题角度看待这个悖论，很有意思。  李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎  李白的生平。  《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎  而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读今">
+<meta property="og:type" content="article">
+<meta property="og:title" content="随便看看 0002">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="随便看看如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎  从停机问题角度看待这个悖论，很有意思。  李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎  李白的生平。  《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎  而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读今">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-08-13T07:37:57.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.655Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="随便看看">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>随便看看 0002 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          随便看看 0002
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-13 15:37:57" itemprop="dateCreated datePublished" datetime="2020-08-13T15:37:57+08:00">2020-08-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/406623513/answer/1338119623">如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎</a></p>
+<blockquote>
+<p>从停机问题角度看待这个悖论，很有意思。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/410908068/answer/1379726440">李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎</a></p>
+<blockquote>
+<p>李白的生平。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/58835500/answer/1374006629">《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎</a></p>
+<blockquote>
+<p>而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读<a target="_blank" rel="noopener" href="https://www.sohu.com/a/305206459_574698">今天通知明天要，只能是假报告</a>。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/411958013/answer/1388346437">31 省养老金已全部上调，你父母的退休工资比自己的在职工资高吗？ - 王海的回答 - 知乎</a></p>
+<blockquote>
+<p>现阶段养老基金投资实践中，负债端最大的问题就是资金短期化，委托规模低，资产负债不匹配这三点。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/166552504">揭阳食物中毒案中，为什么一碗河粉就能要人命？ - 厨房人类的文章 - 知乎</a></p>
+<blockquote>
+<p>河粉、米粉不能久放，木耳不能泡太长时间，在外面吃少点这些东西。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/409372180/answer/1384298523">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 塔列朗的回答 - 知乎</a></p>
+<blockquote>
+<p>凡尔赛条约最大的失误，就是在侮辱德国的同时，没有伤害德国基本盘；讽刺的是，从事后看，凡尔赛合约在保留德国基本盘的同时，彻底摧毁了中欧及东南欧的强权，德国的战略态势相比于1914年反而还好了，中欧和东南欧没有了任何制衡力量。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/409372180/answer/1365283381">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 路易-拿破仑的回答 - 知乎</a></p>
+<blockquote>
+<p>凡尔赛条约的一个典型特点是它在政治上非常宽松，另一个特点是在经济惩罚上非常严厉。在赔款以外，凡尔赛体系在民族自决这一原则上的“真双标”也是“屈辱”说的一个助推剂。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/357966552/answer/1021968782">如何评价电影《1917》？ - 电影榨汁的回答 - 知乎</a></p>
+<blockquote>
+<p>《1917》中的行军路线、所属部队和战役历史。</p>
+</blockquote>
+<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/163236128">浅谈OLAP系统核心技术点 - neoReMinD的文章 - 知乎</a></p>
+<blockquote>
+<p>不错的科普，参考文献很棒。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/312019918/answer/608965942">作为 IT 行业的过来人，你有什么话想对后辈说的？ - 二律背反的回答 - 知乎</a></p>
+<blockquote>
+<p>世界上没有技术驱动型公司；IT领域最重要的是经验而不是你有多聪明；能大规模商用的技术，都不需要智商；要有分享精神；现代管理学的精髓，就是让每个人都变得可替代；程序员工作创造的价值，至少一半是通过文档体现出来才对。</p>
+<p>评论里对什么是技术驱动吵了起来。我的理解：做决定时，技术 or 市场，这条线该划在哪，无论什么公司，总会有一些决定偏向市场，程序员要接受这些决定，但这不妨碍我们尝试把线往技术那边推一推。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/411917655/answer/1385638325">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 崔晨的回答 - 知乎</a></p>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/411917655/answer/1388596024">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 大宽宽的回答 - 知乎</a></p>
+<blockquote>
+<p>shell的历史包袱；奇怪的设计一定是有原因的。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/20405888/answer/15040566">如何理解「面向对象编程的精髓在于将操作绑定在数据上」？ - 冯东的回答 - 知乎</a></p>
+<blockquote>
+<p>data structure over procedure。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/166345772">关于程序员的59条搞笑但却真实无比的编程语录 - 动力节点的文章 - 知乎</a></p>
+<blockquote>
+<p>很多条很有道理。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.theverge.com/2018/7/16/17577654/amazon-prime-day-website-down-deals-service-disruption">Amazon’s website crashed as soon as Prime Day began</a></p>
+<blockquote>
+<p>Amazon在2018年的一次崩溃。</p>
+</blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/67858225/answer/1091344044">如何看待sqlite作者放弃sqlite4的开发，说使用LSM Tree是一种失败？ - auxten的回答 - 知乎</a></p>
+<blockquote>
+<p>重点关注其中Dr. D. Richard Hipp关于测试的看法。</p>
+<p>100％MC &#x2F; DC只是一个阈值，一个很高的阈值，一个易于测量且难以作弊的门槛。100％MC &#x2F; DC 的主要好处之一并不是每个分支都经过测试，而是你必须编写如此多的测试，然后你就可以发现问题，并修复了许多你从未想过的问题。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E9%9A%8F%E4%BE%BF%E7%9C%8B%E7%9C%8B/" rel="tag"># 随便看看</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/08/13/c-store-a-column-oriented-dbms/" rel="prev" title="[笔记] C-store: a column-oriented DBMS">
+      <i class="fa fa-chevron-left"></i> [笔记] C-store: a column-oriented DBMS
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/" rel="next" title="[笔记] The Chubby lock service for loosely-coupled distributed systems">
+      [笔记] The Chubby lock service for loosely-coupled distributed systems <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9A%8F%E4%BE%BF%E7%9C%8B%E7%9C%8B"><span class="nav-number">1.</span> <span class="nav-text">随便看看</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%9B%B8%E5%85%B3"><span class="nav-number">2.</span> <span class="nav-text">计算机相关</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

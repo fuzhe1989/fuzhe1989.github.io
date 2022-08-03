@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="Item7: 创建对象时区分开()和{}通常来说，C++11中我们能用()、&amp;#123;&amp;#125;和&#x3D;来初始化一个变量： 1234int x(0);int y &#x3D; 0;int z&amp;#123;0&amp;#125;;int z &#x3D; &amp;#123;0&amp;#125;;  &#x2F;&#x2F; available in many cases  但这几种初始化方式之间还有着区别。 &#x3D;与另外两个不太一样，它代表着拷贝构造函数或赋值函数">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Effective Modern C++ 笔记 Chapter3 现代C++（Item 7-10)">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="Item7: 创建对象时区分开()和{}通常来说，C++11中我们能用()、&amp;#123;&amp;#125;和&#x3D;来初始化一个变量： 1234int x(0);int y &#x3D; 0;int z&amp;#123;0&amp;#125;;int z &#x3D; &amp;#123;0&amp;#125;;  &#x2F;&#x2F; available in many cases  但这几种初始化方式之间还有着区别。 &#x3D;与另外两个不太一样，它代表着拷贝构造函数或赋值函数">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-05-22T15:13:03.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.654Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="Effective Modern C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>Effective Modern C++ 笔记 Chapter3 现代C++（Item 7-10) | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Effective Modern C++ 笔记 Chapter3 现代C++（Item 7-10)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-05-22 23:13:03" itemprop="dateCreated datePublished" datetime="2017-05-22T23:13:03+08:00">2017-05-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="Item7-创建对象时区分开-和"><a href="#Item7-创建对象时区分开-和" class="headerlink" title="Item7: 创建对象时区分开()和{}"></a>Item7: 创建对象时区分开()和{}</h2><p>通常来说，C++11中我们能用<code>()</code>、<code>&#123;&#125;</code>和<code>=</code>来初始化一个变量：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">x</span><span class="params">(<span class="number">0</span>)</span></span>;</span><br><span class="line"><span class="type">int</span> y = <span class="number">0</span>;</span><br><span class="line"><span class="type">int</span> z&#123;<span class="number">0</span>&#125;;</span><br><span class="line"><span class="type">int</span> z = &#123;<span class="number">0</span>&#125;;  <span class="comment">// available in many cases</span></span><br></pre></td></tr></table></figure>
+
+<p>但这几种初始化方式之间还有着区别。</p>
+<p><code>=</code>与另外两个不太一样，它代表着拷贝构造函数或赋值函数。</p>
+<p><code>&#123;&#125;</code>是C++11引入的新的初始化方式，它被设计为能用在各种地方，表达各种形式的值，也可以称为“统一初始化式”。</p>
+<p>它能表达一组值，来初始化STL容器：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;<span class="type">int</span>&gt; v&#123;<span class="number">1</span>, <span class="number">3</span>, <span class="number">5</span>&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>它能用来给类的非static成员设定默认值（而<code>()</code>就不行）：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">int</span> x&#123;<span class="number">0</span>&#125;;   <span class="comment">// fine</span></span><br><span class="line">    <span class="type">int</span> y = <span class="number">0</span>;  <span class="comment">// also fine</span></span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">z</span><span class="params">(<span class="number">0</span>)</span></span>;   <span class="comment">// error!</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>它和<code>()</code>都能用于初始化一个uncopyable的对象（而<code>=</code>就不行）：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">std::atomic&lt;<span class="type">int</span>&gt; ai1&#123;<span class="number">0</span>&#125;;   <span class="comment">// fine</span></span><br><span class="line"><span class="function">std::atomic&lt;<span class="type">int</span>&gt; <span class="title">ai2</span><span class="params">(<span class="number">0</span>)</span></span>;   <span class="comment">// also fine</span></span><br><span class="line">std::atomic&lt;<span class="type">int</span>&gt; ai3 = <span class="number">0</span>;  <span class="comment">// error!</span></span><br></pre></td></tr></table></figure>
+
+<p><code>&#123;&#125;</code>有一个性质：它会阻止基本类型向下转换：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">double</span> x, y, z;</span><br><span class="line">...</span><br><span class="line"><span class="type">int</span> sum1&#123;x + y + z&#125;;    <span class="comment">// error! double -&gt; int is prohibited</span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">sum2</span><span class="params">(x + y + z)</span></span>;    <span class="comment">// ok</span></span><br><span class="line"><span class="type">int</span> sum3 = x + y + z;   <span class="comment">// ditto</span></span><br></pre></td></tr></table></figure>
+
+<p>另一个性质是：它不会被认为是声明。</p>
+<p>C++中规定“所有看起来像声明的语句都会被视为声明”，这导致<code>()</code>在一些场景下会被视为函数声明，而<code>&#123;&#125;</code>则不会：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Widget <span class="title">w1</span><span class="params">(<span class="number">10</span>)</span></span>;      <span class="comment">// call Widget ctor with 10</span></span><br><span class="line"><span class="function">Widget <span class="title">w2</span><span class="params">()</span></span>;        <span class="comment">// NOTICE: w2 is a function declare!</span></span><br><span class="line">Widget w3&#123;&#125;;        <span class="comment">// call Widget ctor with no args</span></span><br></pre></td></tr></table></figure>
+
+<p>但是<code>&#123;&#125;</code>也不是什么都好，在类有<code>std::initializer_list</code>参数的构造函数时，<code>&#123;&#125;</code>会有麻烦：<code>&#123;&#125;</code>总会被认为是<code>std::initializer_list</code>，即使解析出错。</p>
+<p>我们先看一个没有<code>std::initializer_list</code>构造函数的类<code>Widget</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">Widget</span>(<span class="type">int</span> i, <span class="type">bool</span> b);</span><br><span class="line">    <span class="built_in">Widget</span>(<span class="type">int</span> i, <span class="type">double</span> d);</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">Widget <span class="title">w1</span><span class="params">(<span class="number">10</span>, <span class="literal">true</span>)</span></span>;     <span class="comment">// call first ctor</span></span><br><span class="line">Widget w2&#123;<span class="number">10</span>, ture&#125;;     <span class="comment">// also call first ctor</span></span><br><span class="line"><span class="function">Widget <span class="title">w3</span><span class="params">(<span class="number">10</span>, <span class="number">5.0</span>)</span></span>;      <span class="comment">// call second ctor</span></span><br><span class="line">Widget w4&#123;<span class="number">10</span>, <span class="number">5.0</span>&#125;;      <span class="comment">// also call second ctor</span></span><br></pre></td></tr></table></figure>
+
+<p>一切都很正常，直到我们给<code>Widget</code>添加了一个新构造函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">Widget</span>(<span class="type">int</span> i, <span class="type">bool</span> b);</span><br><span class="line">    <span class="built_in">Widget</span>(<span class="type">int</span> i, <span class="type">double</span> d);</span><br><span class="line">    <span class="built_in">Widget</span>(std::initializer_list&lt;<span class="type">long</span> <span class="type">double</span>&gt; il); <span class="comment">// added</span></span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">Widget <span class="title">w1</span><span class="params">(<span class="number">10</span>, <span class="literal">true</span>)</span></span>;     <span class="comment">// call first ctor</span></span><br><span class="line">Widget w2&#123;<span class="number">10</span>, ture&#125;;     <span class="comment">// NOTICE: now call third ctor(10 and true convert to long double)</span></span><br><span class="line"><span class="function">Widget <span class="title">w3</span><span class="params">(<span class="number">10</span>, <span class="number">5.0</span>)</span></span>;      <span class="comment">// call second ctor</span></span><br><span class="line">Widget w4&#123;<span class="number">10</span>, <span class="number">5.0</span>&#125;;      <span class="comment">// NOTICE: now call third ctor(10 and 5.0 convert to long double)</span></span><br></pre></td></tr></table></figure>
+
+<p>甚至通常拷贝和移动构造函数该被调用的地方，都会被劫持到<code>std::initializer_list</code>构造函数上：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">Widget</span>(<span class="type">int</span> i, <span class="type">bool</span> b);</span><br><span class="line">    <span class="built_in">Widget</span>(<span class="type">int</span> i, <span class="type">double</span> d);</span><br><span class="line">    <span class="built_in">Widget</span>(std::initializer_list&lt;<span class="type">long</span> <span class="type">double</span>&gt; il);</span><br><span class="line">    <span class="function"><span class="keyword">operator</span> <span class="title">float</span><span class="params">()</span> <span class="type">const</span></span>;   <span class="comment">// added</span></span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">Widget <span class="title">w5</span><span class="params">(w4)</span></span>;            <span class="comment">// call copy ctor</span></span><br><span class="line">Widget w6&#123;w4&#125;;            <span class="comment">// call third ctor! w4 -&gt; float -&gt; long double</span></span><br><span class="line"><span class="function">Widget <span class="title">w7</span><span class="params">(std::move(w4))</span></span>; <span class="comment">// call move ctor</span></span><br><span class="line">Widget w8&#123;std::<span class="built_in">move</span>(w4)&#125;; <span class="comment">// call third ctor! w4 -&gt; float -&gt; long double</span></span><br></pre></td></tr></table></figure>
+
+<p>甚至在<code>&#123;&#125;</code>中的内容没办法完全匹配<code>std::initializer_list</code>时：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">Widget</span>(<span class="type">int</span> i, <span class="type">bool</span> b);</span><br><span class="line">    <span class="built_in">Widget</span>(<span class="type">int</span> i, <span class="type">double</span> d);</span><br><span class="line">    <span class="built_in">Widget</span>(std::initializer_list&lt;<span class="type">bool</span>&gt; il);</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line">Widget w&#123;<span class="number">10</span>, <span class="number">5.0</span>&#125;;  <span class="comment">// error! requires narrowing conversions</span></span><br></pre></td></tr></table></figure>
+
+<p>只有当<code>&#123;&#125;</code>中的所有元素都没办法转换为<code>std::initializer_list</code>需要的类型时，编译器才会去选择其它构造函数。比如上面的<code>bool</code>改为<code>std::string</code>，编译器找不到<code>&#123;10, 5.0&#125;</code>中有能转换为<code>std::string</code>的元素，就会去匹配我们希望的前两个构造函数了。</p>
+<p>一个有趣的地方：如果<code>&#123;&#125;</code>中没有元素，那么被调用的是默认构造函数，而不是一个空的<code>std::initializer_list</code>。</p>
+<p>如果你真的想传入一个空的<code>std::initializer_list</code>，那么这样：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Widget <span class="title">w4</span><span class="params">(&#123;&#125;)</span></span>;</span><br><span class="line">Widget w5&#123;&#123;&#125;&#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>std::vector&lt;int&gt;</code>就有上面说的问题：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::vector&lt;<span class="type">int</span>&gt; <span class="title">v1</span><span class="params">(<span class="number">10</span>, <span class="number">20</span>)</span></span>;   <span class="comment">// use non-std::initializer_list ctor:</span></span><br><span class="line">                               <span class="comment">// create 10-element std::vector, all</span></span><br><span class="line">                               <span class="comment">// elements are 20</span></span><br><span class="line">std::vector&lt;<span class="type">int</span>&gt; v2&#123;<span class="number">10</span>, <span class="number">20</span>&#125;;   <span class="comment">// use std::initializer_list ctor:</span></span><br><span class="line">                               <span class="comment">// create 2-element std::vector whose</span></span><br><span class="line">                               <span class="comment">// values are 10 and 20</span></span><br></pre></td></tr></table></figure>
+
+<p>从这个问题中，我们能学到什么？</p>
+<p>首先，向一个已有的类添加<code>std::initialzier_list</code>构造函数要非常谨慎，这可能会导致用户的调用被劫持。</p>
+<p>其次，作为用户的我们，要小心选择用<code>()</code>还是<code>&#123;&#125;</code>。<code>&#123;&#125;</code>的好处上面已经说了。<code>()</code>的好处是：与C++98风格的连续性，还能避免陷入<code>std::initializer_list</code>的问题。</p>
+<p>当你写模板代码时，如果需要创建一个对象，你会用哪种语法？</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">T <span class="title">localObject</span><span class="params">(std::forward&lt;Ts&gt;(params)...)</span></span>;</span><br><span class="line">T localObject&#123;std::forward&lt;Ts&gt;(params)...&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>如果<code>T</code>是<code>std::vector&lt;int&gt;</code>，参数是<code>&#123;10, 20&#125;</code>，哪种是对的？只有用户才知道。</p>
+<p><code>std::make_unique</code>和<code>std::make_shared</code>遇到了这个问题，它们选择了<code>()</code>，并在文档中说明了这个选择。</p>
+<p>有一种方法允许用户来指定用<code>()</code>还是<code>&#123;&#125;</code>：<a target="_blank" rel="noopener" href="https://akrzemi1.wordpress.com/2013/06/05/intuitive-interface-part-i/">Intuitive interface</a>。</p>
+<p>（我觉得只在<code>&#123;&#125;</code>明确有好处的地方用<code>&#123;&#125;</code>，其它地方还是用<code>()</code>比较好）</p>
+<h2 id="Item8-优先选用nullptr来替代0和NULL"><a href="#Item8-优先选用nullptr来替代0和NULL" class="headerlink" title="Item8: 优先选用nullptr来替代0和NULL"></a>Item8: 优先选用<code>nullptr</code>来替代0和<code>NULL</code></h2><p>首先是结论：</p>
+<ol>
+<li><code>NULL</code>是0，0是<code>int</code>，不是指针；</li>
+<li><code>nullptr</code>不是指针，但可以安全地用在需要用指针的场合；</li>
+<li>因此在需要空指针的地方，用<code>nullptr</code>。</li>
+<li>用<code>nullptr</code>还能提高代码的可读性。</li>
+</ol>
+<p><code>NULL</code>和0不是指针会带来什么问题？函数重载。当一个函数同时有<code>int</code>参数和指针参数的两个重载版本时，传入<code>NULL</code>或0（下面只说<code>NULL</code>吧，反正它们两个是完全一样的），你猜编译器会匹配哪个版本？</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">(<span class="type">int</span>)</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">(<span class="type">bool</span>)</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">(<span class="type">void</span>*)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="built_in">f</span>(<span class="number">0</span>);     <span class="comment">// calls f(int), not f(void*)</span></span><br><span class="line"><span class="built_in">f</span>(<span class="literal">NULL</span>);  <span class="comment">// might not complie. typically calls f(int). Never calls f(void*)</span></span><br></pre></td></tr></table></figure>
+
+<p><code>f(NULL)</code>能否编译过取决于<code>NULL</code>被定义成了什么：如果定义为0，就能编译过，调用<code>f(int)</code>；如果定义为<code>0L</code>，那么<code>NULL</code>的类型就是<code>long</code>，编译器会发现<code>f</code>没有直接匹配<code>long</code>的重载版本，但有两个相同优先级的转换后匹配<code>f(int)</code>和<code>f(void*)</code>，于是就报错。</p>
+<p>C++98中我们只能尽量避免同时存在整数参数和指针参数的重载版本，但C++11中我们可以用<code>nullptr</code>。</p>
+<p><code>nullptr</code>不是指针，它的类型是<code>std::nullptr_t</code>，但C++11保证它能转换为任意的裸指针类型。</p>
+<p>上面的例子中，<code>f(nullptr)</code>就会乖乖地调用<code>f(void*)</code>。</p>
+<p><code>nullptr</code>还能让代码更清晰，尤其是和<code>auto</code>配合使用时。假设你看到这么一段代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> result = <span class="built_in">findRecord</span>(<span class="comment">/* args */</span>);</span><br><span class="line"><span class="keyword">if</span> (result == <span class="number">0</span>) &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果你不看<code>findRecord</code>的签名，就没办法区分<code>result</code>是整数还是指针。但如果用<code>nullptr</code>就很明显的表达了<code>result</code>是指针：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> result = <span class="built_in">findRecord</span>(<span class="comment">/* args */</span>);</span><br><span class="line"><span class="keyword">if</span> (result == <span class="literal">nullptr</span>) &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在有模板出现的地方，<code>nullptr</code>更加有优势。看下面的例子，我们有三个函数，都需要持有相应的锁时才能调用：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span>    <span class="title">f1</span><span class="params">(std::shared_ptr&lt;Widget&gt; spw)</span></span>;</span><br><span class="line"><span class="function"><span class="type">double</span> <span class="title">f2</span><span class="params">(std::unique_ptr&lt;Widget&gt; upw)</span></span>;</span><br><span class="line"><span class="function"><span class="type">bool</span>   <span class="title">f3</span><span class="params">(Widget* pw)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>刚开始代码是这样的：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">std::mutex f1m, f2m, f3m; <span class="comment">// mutexes for f1, f2, and f3.</span></span><br><span class="line"><span class="keyword">using</span> MuxGuard = std::lock_guard&lt;std::mutex&gt;;</span><br><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">MuxGuard <span class="title">g</span><span class="params">(f1m)</span></span>;</span><br><span class="line">    <span class="keyword">auto</span> result = <span class="built_in">f1</span>(<span class="number">0</span>); <span class="comment">// pass 0 as null ptr to f1</span></span><br><span class="line">&#125;</span><br><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">MuxGuard <span class="title">g</span><span class="params">(f2m)</span></span>;</span><br><span class="line">    <span class="keyword">auto</span> result = <span class="built_in">f2</span>(<span class="literal">NULL</span>); <span class="comment">// pass NULL as null ptr to f2</span></span><br><span class="line">&#125;</span><br><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">MuxGuard <span class="title">g</span><span class="params">(f3m)</span></span>;</span><br><span class="line">    <span class="keyword">auto</span> result = <span class="built_in">f3</span>(<span class="literal">nullptr</span>); <span class="comment">// pass nullptr as null ptr to f3</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面这段代码能工作，但是丑了点：三段代码的模式都是一样的，应该封装起来。鉴于f1、f2、f3的参数和返回类型都不一样，我们需要用模板来实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> FuncT, <span class="keyword">typename</span> MuxT, <span class="keyword">typename</span> PtrT&gt;</span><br><span class="line"><span class="function"><span class="keyword">auto</span> <span class="title">lockAndCall</span><span class="params">(FuncT func, MuxT&amp; mutex, PtrT ptr)</span> -&gt; <span class="title">decltype</span><span class="params">(func(ptr))</span> </span>&#123;</span><br><span class="line">    <span class="keyword">using</span> MuxGuard = std::lock_guard&lt;MuxT&gt;;</span><br><span class="line">    <span class="function">MuxGuard <span class="title">g</span><span class="params">(mutex)</span></span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">func</span>(ptr);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>C++14中我们还可以用<code>decltype(auto)</code>作为返回值类型，但不影响结论。</p>
+<p>现在我们来试一下新代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> r1 = <span class="built_in">lockAndCall</span>(f1, f1m, <span class="number">0</span>);         <span class="comment">// error! PtrT is deduced to int</span></span><br><span class="line"><span class="keyword">auto</span> r2 = <span class="built_in">lockAndCall</span>(f2, f2m, <span class="literal">NULL</span>);      <span class="comment">// error! PtrT is deduced to int</span></span><br><span class="line"><span class="keyword">auto</span> r3 = <span class="built_in">lockAndCall</span>(f3, f3m, <span class="literal">nullptr</span>);   <span class="comment">// OK, PtrT is nullptr_t</span></span><br></pre></td></tr></table></figure>
+
+<p>前两个调用是错的！模板只能看到<code>int</code>，而<code>shared_ptr</code>和<code>unique_ptr</code>没有<code>int</code>参数的构造函数。第三个调用则没有任何问题，<code>PtrT</code>被推断为<code>std::nullptr_t</code>，在调用f3时隐式转换为<code>Widget*</code>。</p>
+<p>我们再回头看一下本节的结论，在下个需要传入空指针的地方，你还会用<code>0</code>或<code>NULL</code>吗？</p>
+<h2 id="Item9-优先选用using来替代typedef"><a href="#Item9-优先选用using来替代typedef" class="headerlink" title="Item9: 优先选用using来替代typedef"></a>Item9: 优先选用<code>using</code>来替代<code>typedef</code></h2><p>大家在用STL时，经常会搞出来<code>std::unique_ptr&lt;std::unordered_map&lt;std::string, std::string&gt;&gt;</code>这么长的类型出来。为了避免写好几次这么长的类型，我们会用<code>typedef</code>将它定义为一个新类型：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> std::unique_ptr&lt;std::unordered_map&lt;std::string, std::string&gt;&gt; UPtrMapSS;</span><br></pre></td></tr></table></figure>
+
+<p>而在C++11中，我们多了一种选择：可以用<code>using</code>做类似的事：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> UPtrMapSS = std::unique_ptr&lt;std::unordered_map&lt;std::string, std::string&gt;&gt;;</span><br></pre></td></tr></table></figure>
+
+<p>那么为什么在有<code>typedef</code>的情况下C++还要再增加一个<code>using</code>呢？</p>
+<p>首先，<code>using</code>在表达类型时更清晰：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">typedef</span> <span class="title">void</span> <span class="params">(*FP)</span><span class="params">(<span class="type">int</span>, <span class="type">const</span> std::string&amp;)</span></span>;</span><br><span class="line"><span class="keyword">using</span> FP = <span class="built_in">void</span> (*)(<span class="type">int</span>, <span class="type">const</span> std::string&amp;);</span><br></pre></td></tr></table></figure>
+
+<p><code>typedef</code>来自于C，它的设计初衷是想用声明变量的方式来声明一个类型，但这导致名字和类型搅合在了一起，严重的影响了可读性。而<code>using</code>则将名字和类型分开了，我们能更容易的看出我们声明的类型到底是什么。</p>
+<p>其次，<code>using</code>能模板化，称为”别名模板”，而<code>typedef</code>不能：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">using</span> MyAllocList = std::list&lt;T, MyAlloc&lt;T&gt;&gt;;  <span class="comment">// OK</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">typedef</span> std::list&lt;T, MyAlloc&lt;T&gt;&gt; MyAllockList; <span class="comment">// error!</span></span><br></pre></td></tr></table></figure>
+
+<p>C++98中我们可以通过struct来绕过这个问题：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">MyAllocList</span> &#123;</span><br><span class="line">    <span class="keyword">typedef</span> std::list&lt;T, MyAlloc&lt;T&gt;&gt; type;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">MyAllocList&lt;Widget&gt;::type lw; <span class="comment">// client code</span></span><br></pre></td></tr></table></figure>
+
+<p>但在模板里我们不能直接使用这个类型，要在前面加上<code>typename</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">typename</span> MyAllocList&lt;T&gt;::type list;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>原因是编译器在第一次处理模板时，不知道<code>T</code>是什么，也没办法知道<code>MyAllocList&lt;T&gt;::type</code>是什么，它只能假设<code>type</code>是<code>MyAllocList&lt;T&gt;</code>的一个成员。只有前面加上<code>typename</code>编译器才能放心的将<code>type</code>按类型处理。</p>
+<p>而<code>using</code>则明确表明它就是声明了一个类型，因此不需要加<code>typename</code>。</p>
+<p>做过一些模板元编程（TMP）的人应该都有体会，在处理类型时，我们经常要用到下面的trait类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">std::remove_const&lt;T&gt;::type          <span class="comment">// const T -&gt; T</span></span><br><span class="line">std::remove_reference&lt;T&gt;::type      <span class="comment">// T&amp; and T&amp;&amp; -&gt; T</span></span><br><span class="line">std::add_lvalue_reference&lt;T&gt;::type  <span class="comment">// T -&gt; T&amp;</span></span><br></pre></td></tr></table></figure>
+
+<p>但每次使用都要在前面加上<code>typename</code>，就是因为这些trait类都是通过<code>typedef</code>定义出来的。</p>
+<p>C++14中这些类都有了一个<code>using</code>版本，直接是一个类型，使用时不需要加<code>typename</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">std::remove_const&lt;T&gt;::type         -&gt; std::<span class="type">remove_const_t</span>&lt;T&gt;</span><br><span class="line">std::remove_reference&lt;T&gt;::type     -&gt; std::<span class="type">remove_reference_t</span>&lt;T&gt;</span><br><span class="line">std::add_lvalue_reference&lt;T&gt;::type -&gt; std::<span class="type">add_lvalue_reference_t</span>&lt;T&gt;</span><br></pre></td></tr></table></figure>
+
+<p>如果你还在用C++11，但很羡慕这些新类型，你也可以自己动手实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">using</span> <span class="type">remove_const_t</span> = <span class="keyword">typename</span> remove_const&lt;T&gt;::type;</span><br></pre></td></tr></table></figure>
+
+<h2 id="Item10-优先选用有界枚举来替代无界枚举"><a href="#Item10-优先选用有界枚举来替代无界枚举" class="headerlink" title="Item10: 优先选用有界枚举来替代无界枚举"></a>Item10: 优先选用有界枚举来替代无界枚举</h2><p>C++的通用规则是name会从属于它所在的scope，只在这个scope内可见。但C++98的enum没有遵循这个规则，enum内定义的name，不只在这个enum内可见，而是在enum所在的整个scope内可见！</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> <span class="title class_">Color</span> &#123;black, white, red&#125;;</span><br><span class="line"><span class="keyword">auto</span> white = <span class="literal">false</span>;             <span class="comment">// error! white already declared in this scope</span></span><br></pre></td></tr></table></figure>
+
+<p>这种enum我们称为“无界枚举”，源自C。C++11增加了一种有界的枚举，来解决name泄漏到整个scope的问题。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum class</span> <span class="title class_">Color</span> &#123;black, white, red&#125;;</span><br><span class="line"><span class="keyword">auto</span> white = <span class="literal">false</span>;             <span class="comment">// fine, no other &quot;white&quot; in this scope</span></span><br><span class="line">Color c = white;                <span class="comment">// error!</span></span><br><span class="line">Color c = Color::white;         <span class="comment">// fine</span></span><br><span class="line"><span class="keyword">auto</span> c = Color::white;          <span class="comment">// also find, c is &#x27;Color&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>enum class</code>定义的枚举又被称为“枚举类”。而且它还有一个特性：无法隐式转换为整数类型（也因此无法隐式转换为浮点类型）：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> <span class="title class_">Color</span> &#123;black, white, red&#125;;</span><br><span class="line"><span class="function">std::vector&lt;std::<span class="type">size_t</span>&gt; <span class="title">primeFactors</span><span class="params">(std::<span class="type">size_t</span> x)</span></span>;</span><br><span class="line"></span><br><span class="line">Color c = red;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">if</span> (c &lt; <span class="number">14.5</span>) &#123;                      <span class="comment">// compare Color to double!</span></span><br><span class="line">    <span class="keyword">auto</span> factors = <span class="built_in">primeFactors</span>(c);  <span class="comment">// compute prime factors of a Color!</span></span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面的转换显然不是我们预期的，而用enum class就可以避免这种转换：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum class</span> <span class="title class_">Color</span> &#123;black, white, red&#125;;</span><br><span class="line"><span class="function">std::vector&lt;std::<span class="type">size_t</span>&gt; <span class="title">primeFactors</span><span class="params">(std::<span class="type">size_t</span> x)</span></span>;</span><br><span class="line"></span><br><span class="line">Color c = Color::red;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">if</span> (c &lt; <span class="number">14.5</span>) &#123;                      <span class="comment">// error! can&#x27;t compare Color and double!</span></span><br><span class="line">    <span class="keyword">auto</span> factors = <span class="built_in">primeFactors</span>(c);  <span class="comment">// error! can&#x27;t pass Color to primeFactors</span></span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果实在需要做这种转换，我们可以用<code>static_cast</code>来做，比如<code>static_cast&lt;std::size_t&gt;(c)</code>。</p>
+<p>enum class还有一个特性：可以前向声明。C++98中的无界enum则不能前向声明。C++11中的无界enum可以在指定底层类型后前向声明。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> <span class="title class_">Color</span>;          <span class="comment">// error!</span></span><br><span class="line"><span class="keyword">enum class</span> <span class="title class_">Color</span>;    <span class="comment">// fine</span></span><br></pre></td></tr></table></figure>
+
+<p>为什么C++98只支持enum的定义，而不支持声明？因为C++中每个enum类都对应着一个底层整数类型，但C++98中我们没办法指定这个类型，也没办法确定这个类型。编译器会在看到enum的定义时确定它底层用什么整数类型来存储。而前向声明的一个基本要求是：知道对应类型的大小。如果我们没办法确定enum是用什么类型存储的，我们也就没办法知道enum的大小，也就没办法前向声明。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> <span class="title class_">Status</span> &#123;</span><br><span class="line">    good = <span class="number">0</span>,</span><br><span class="line">    failed = <span class="number">1</span>,</span><br><span class="line">    incomplete = <span class="number">100</span>,</span><br><span class="line">    corrupt = <span class="number">200</span>,</span><br><span class="line">    indeterminate = <span class="number">0xFFFFFFFF</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>编译器在看到上面的<code>Status</code>定义时，发现它的所有的值范围都在[-1, 200]之间，最合适的类型就是<code>char</code>。如果我们增加一项<code>audited = 500</code>，值范围就变成了[-1, 500]，最合适的类型变成了<code>short</code>！</p>
+<p>但C++98这种过于死板的规定也导致了：每当我们向<code>Status</code>中增加一项，所有引用了它的.cpp文件都需要被重新编译一次。</p>
+<p>C++11允许我们指定enum的底层类型，尤其是enum class在不指定时默认使用int。这就保证了我们能安全的前向声明enum和enum class。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum class</span> <span class="title class_">Status</span>;                 <span class="comment">// underlying type is int</span></span><br><span class="line"><span class="keyword">enum class</span> <span class="title class_">Status</span>: std::<span class="type">uint32_t</span>;  <span class="comment">// underlying type is std::uint32_t</span></span><br><span class="line"><span class="keyword">enum</span> <span class="title class_">Status</span>;                       <span class="comment">// error!</span></span><br><span class="line"><span class="keyword">enum</span> <span class="title class_">Status</span>: std::<span class="type">uint32_t</span>;        <span class="comment">// underlying type is std::uint32_t</span></span><br></pre></td></tr></table></figure>
+
+<p>注意：如果要指定底层类型，需要在enum和enum class的声明和定义处都指定相同的底层类型。</p>
+<p>那么enum class有什么地方不如enum呢？还真有。</p>
+<p>C++11中我们使用<code>std::tuple</code>时需要用到整数常量作为下标：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> val = std::<span class="built_in">get</span>&lt;<span class="number">1</span>&gt;(uInfo);</span><br></pre></td></tr></table></figure>
+
+<p>如果用enum来代替硬编码的下标，对可读性有好处：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> <span class="title class_">UserInfoFields</span> &#123;uiName, uiEmail, uiReputation&#125;;</span><br><span class="line"><span class="keyword">auto</span> val = std::<span class="built_in">get</span>&lt;uiEmail&gt;(uInfo);</span><br></pre></td></tr></table></figure>
+
+<p>但换成enum class上面的代码就不行了：enum class没办法隐式转换为整数类型。但我们可以用<code>static_cast</code>。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum class</span> <span class="title class_">UserInfoFields</span> &#123;uiName, uiEmail, uiReputation&#125;;</span><br><span class="line"><span class="keyword">auto</span> val = std::get&lt;<span class="built_in">static_cast</span>&lt;std::<span class="type">size_t</span>&gt;(UserInfoFields::uiEmail)&gt;(uInfo);</span><br></pre></td></tr></table></figure>
+
+<p>这么写太长了，我们可能需要一个辅助函数。注意：<code>std::get</code>是模板，它的参数需要是编译期常量，因此这个辅助函数必须是一个<code>constexpr</code>函数。我们来通过<code>std::underlying_type</code>实现一个将enum class的值转换为它的底层类型值的<code>constexpr</code>函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> E&gt;</span><br><span class="line"><span class="keyword">constexpr</span> <span class="keyword">typename</span> std::underlying_type&lt;E&gt;::<span class="function">type <span class="title">toUType</span><span class="params">(E e)</span> <span class="keyword">noexcept</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;<span class="keyword">typename</span> std::underlying_type&lt;E&gt;::type&gt;(e);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>C++14中我们可以用<code>std::underlying_type_t</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> E&gt;</span><br><span class="line"><span class="keyword">constexpr</span> std::<span class="type">underlying_type_t</span>&lt;E&gt;::<span class="function">type <span class="title">toUType</span><span class="params">(E e)</span> <span class="keyword">noexcept</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;std::<span class="type">underlying_type_t</span>&lt;E&gt;&gt;(e);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这样我们在使用<code>std::tuple</code>时就可以：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> val = std::<span class="built_in">get</span>&lt;<span class="built_in">toUType</span>(UserInfoFields::uiEmail)&gt;(uInfo);</span><br></pre></td></tr></table></figure>
+
+<p>还是有点长，但已经好多了，尤其是考虑到enum class相比于enum的其它好处：不污染<code>namespace</code>；不会莫名的做隐式转换。</p>
+<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
+<li><a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Chapter1 类型推断 (Item 1-4)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">Chapter2 auto (Item 5-6)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">Chapter3 现代C++（Item 7-10)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm11-14/">Chapter3 现代C++（Item 11-14)</a></li>
+<li><a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/">Chapter3 现代C++（Item 15-17)</a></li>
+<li><a href="/2017/07/27/effective-modern-cpp-chapter4-iterm18-22/">Chapter4 智能指针 (Item 18-22)</a></li>
+<li><a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">Chapter5 右值引用、移动语义、完美转发（Item 23-26)</a></li>
+<li><a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Chapter5 右值引用、移动语义、完美转发（Item 27-30)</a></li>
+<li><a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">Chapter6: Lamba表达式 (Item 31-34)</a></li>
+<li><a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/">Chapter7: 并发API (Item 35-37)</a></li>
+<li><a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">Chapter7: 并发API (Item 38-40)</a></li>
+<li><a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">Chapter8: 杂项 (Item 41-42)</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/Effective-Modern-C/" rel="tag"># Effective Modern C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/" rel="prev" title="Effective Modern C++ 笔记 Chapter2 auto (Item 5-6)">
+      <i class="fa fa-chevron-left"></i> Effective Modern C++ 笔记 Chapter2 auto (Item 5-6)
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/07/05/effective-modern-cpp-chapter3-iterm11-14/" rel="next" title="Effective Modern C++ 笔记 Chapter3 现代C++（Item 11-14)">
+      Effective Modern C++ 笔记 Chapter3 现代C++（Item 11-14) <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Item7-%E5%88%9B%E5%BB%BA%E5%AF%B9%E8%B1%A1%E6%97%B6%E5%8C%BA%E5%88%86%E5%BC%80-%E5%92%8C"><span class="nav-number">1.</span> <span class="nav-text">Item7: 创建对象时区分开()和{}</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item8-%E4%BC%98%E5%85%88%E9%80%89%E7%94%A8nullptr%E6%9D%A5%E6%9B%BF%E4%BB%A30%E5%92%8CNULL"><span class="nav-number">2.</span> <span class="nav-text">Item8: 优先选用nullptr来替代0和NULL</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item9-%E4%BC%98%E5%85%88%E9%80%89%E7%94%A8using%E6%9D%A5%E6%9B%BF%E4%BB%A3typedef"><span class="nav-number">3.</span> <span class="nav-text">Item9: 优先选用using来替代typedef</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item10-%E4%BC%98%E5%85%88%E9%80%89%E7%94%A8%E6%9C%89%E7%95%8C%E6%9E%9A%E4%B8%BE%E6%9D%A5%E6%9B%BF%E4%BB%A3%E6%97%A0%E7%95%8C%E6%9E%9A%E4%B8%BE"><span class="nav-number">4.</span> <span class="nav-text">Item10: 优先选用有界枚举来替代无界枚举</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E5%BD%95"><span class="nav-number">5.</span> <span class="nav-text">目录</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

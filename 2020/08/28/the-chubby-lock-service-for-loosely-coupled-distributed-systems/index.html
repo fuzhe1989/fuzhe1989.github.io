@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：The Chubby lock service for loosely-coupled distributed systems  TL;DR 本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。 论证过程：  如何实现强一致：Paxos。 实现为库还是外部服务：库是侵入式的，应用接入困难；外部服务能把应用与Chubby解耦开。 提供什么样的接口：类UNIX文件系统，建议式锁，">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] The Chubby lock service for loosely-coupled distributed systems">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：The Chubby lock service for loosely-coupled distributed systems  TL;DR 本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。 论证过程：  如何实现强一致：Paxos。 实现为库还是外部服务：库是侵入式的，应用接入困难；外部服务能把应用与Chubby解耦开。 提供什么样的接口：类UNIX文件系统，建议式锁，">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-08-28T03:59:16.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.660Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Paxos">
+<meta property="article:tag" content="Google">
+<meta property="article:tag" content="分布式锁">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] The Chubby lock service for loosely-coupled distributed systems | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] The Chubby lock service for loosely-coupled distributed systems
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-28 11:59:16" itemprop="dateCreated datePublished" datetime="2020-08-28T11:59:16+08:00">2020-08-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/event/osdi06/tech/full_papers/burrows/burrows_html/">The Chubby lock service for loosely-coupled distributed systems</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。</p>
+<p>论证过程：</p>
+<ol>
+<li>如何实现强一致：Paxos。</li>
+<li>实现为库还是外部服务：库是侵入式的，应用接入困难；外部服务能把应用与Chubby解耦开。</li>
+<li>提供什么样的接口：类UNIX文件系统，建议式锁，尽可能降低应用接入和开发者的使用难度。</li>
+<li>针对读远多于写的使用场景，如何降低server负载：尽可能地cache，为了降低开发者的理解难度，使用一致性cache而不是基于TTL的cache。</li>
+<li>如何提高可用性：粗粒度锁，client在session过期后有一个grace period。</li>
+<li>未来可以做哪些改进：使用proxy和partitioning进一步提升服务规模。</li>
+</ol>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>Chubby是一个<strong>锁服务</strong>。通过Chubby，不同client可以实现临界区，或达成共识。Chubby的主要设计目的是可靠性、可用性（服务大量普通商用机器）、语义容易理解，次要目的是吞吐和存储容量。Chubby提供了类似于文件系统的API（每个操作都会读写整个文件），建议式锁和事件通知。</p>
+<p>Chubby预期提供<strong>粗粒度</strong>的同步，尤其是选举leader。</p>
+<p>Chubby内核是Paxos算法。</p>
+<h2 id="Design"><a href="#Design" class="headerlink" title="Design"></a>Design</h2><h3 id="Rationale"><a href="#Rationale" class="headerlink" title="Rationale"></a>Rationale</h3><p>为什么不实现一个Paxos库（client会成为一个Paxos系统的一个node），而是实现一个外部的锁服务：</p>
+<ul>
+<li>应用一开始可能对可用性没那么高要求，等到后面再想接入Paxos库就困难了（比如要重新实现一个Paxos需要的状态机）；而接入一个外部的锁不需要做很多修改。</li>
+<li>许多应用需要有办法能知道当前的共识是什么（谁是leader、某块数据是什么），外部服务可以提供一致的cache，而库只能实现基于时间过期的cache。</li>
+<li>开发者更熟悉基于锁的API。</li>
+<li>使用Paxos库会导致replica数量与client数量成正比，而外部服务将其解耦开，只需要少量机器运行Chubby就可以满足大量机器的一致性需求。</li>
+</ul>
+<p>基于以上理由产生的两个关键决策：</p>
+<ul>
+<li>锁服务而不是Paxos库或服务。</li>
+<li>提供小文件的读写服务以广播和获取共识结果，而不是实现第二种服务（name service）。</li>
+</ul>
+<p>一些根据使用场景而做出的决策：</p>
+<ul>
+<li>需要支持一个Chubby file被数千个client读取，最好不需要大量机器。</li>
+<li>需要提供事件通知，这样client不需要轮询结果。</li>
+<li>需要有cache来支持大量client轮询。</li>
+<li>需要一致性cache以降低开发者理解难度。</li>
+<li>需要支持ACL。</li>
+</ul>
+<p>Chubby不打算支持细粒度锁（通常只持有若干秒或更短时间），原因：</p>
+<ul>
+<li>粗粒度锁的获取频率更低，降低server压力。</li>
+<li>受server failover影响的client更少（粗粒度锁在failover期间client很可能不需要与server交互）。</li>
+</ul>
+<p>应用可以基于Chubby的粗粒度锁自己实现细粒度锁：通过Chubby lock来维持若干个app lock server，每个app lock server管理若干个app lock，与app client之间通过lease维持。</p>
+<h3 id="System-structure"><a href="#System-structure" class="headerlink" title="System structure"></a>System structure</h3><p>Chubby通常有5个replica，之间使用共识协议算法选举master。master与其它replica之间的lease为若干秒。每个replica都维护一个小DB，但只有master提供读写服务。</p>
+<p>client通过DNS获取replica列表，与非master的replica通信时会被告知master地址。</p>
+<p>如果有replica挂掉数小时没有恢复，它会被自动替换掉，更新DNS，master从而知道replica列表变动。</p>
+<h3 id="Files-directories-and-handles"><a href="#Files-directories-and-handles" class="headerlink" title="Files, directories, and handles"></a>Files, directories, and handles</h3><p>Chubby提供的文件路径类似于：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/ls/foo/wombat/pouch</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>ls</code>表示lock service，<code>foo</code>是cell name（如果是<code>local</code>表示访问应用所在的cell）。</p>
+<p>Chubby因此可以被其它文件系统使用，可以使用现成的工具，极大降低了教育成本。</p>
+<p>Chubby与UNIX文件系统间的设计差异是为了降低分布难度：不同的目录可能被不同的Chubby集群服务，因此：</p>
+<ul>
+<li>不支持跨目录的文件移动；</li>
+<li>不支持目录修改时间；</li>
+<li>避免依赖于路径的权限机制（文件权限只取决于文件自身而不是目录权限）；</li>
+<li>为了方便缓存meta数据，不显示最近访问时间。</li>
+</ul>
+<p>文件或目录都被称为node，不同的node有不同的路径，不存在软硬链接。永久的node需要显式删除，临时的node在没有client使用时自动删除。临时node通常用于临时文件或标识client存活。</p>
+<p>node的meta数据包含三类ACL（读、写、修改ACL），这些ACL在node创建时从它的父node处继承来（可覆盖）。ACL本身也是文件，存放在每个cell的固定路径下。Chubby的ACL机制类似于Plan9的groups。</p>
+<p>node的meta数据中来包含4个单调增的64位整数：</p>
+<ul>
+<li>instance number，重复创建node时增加；</li>
+<li>content generation number，文件被写入时增加；</li>
+<li>lock generation number，node的锁被持有时增加；</li>
+<li>ACL generation number，node的ACL名字发生变化时增加。</li>
+</ul>
+<p>Chubby也提供了每个文件的checksum，可以用来检测文件内容变化。</p>
+<p>client持有的handle包含：</p>
+<ul>
+<li>标识handle是否创建完成的位，这样只在创建handle时做完整的权限检查。</li>
+<li>sequence number，允许master检查这是不是之前master创建的handle。</li>
+<li>打开文件时使用的模式，允许新master重建handle对应的状态。</li>
+</ul>
+<h3 id="Locks-and-sequencers"><a href="#Locks-and-sequencers" class="headerlink" title="Locks and sequencers"></a>Locks and sequencers</h3><p>Chubby提供的lock都是建议式的读写锁。不提供强制锁的原因：</p>
+<ul>
+<li>应用可能使用Chubby保护lock对应的文件之外的资源。</li>
+<li>通过查看被锁住的文件来debug或做维护工作。</li>
+<li>相信开发者，强制锁也没办法保护错误或恶意的使用。</li>
+</ul>
+<p>分布式锁常见的一个问题是一个client先获得锁，进一步操作时已经丢掉锁了但自己不知道，最终导致数据错误。常见解法是使用sequence number。</p>
+<p>Chubby默认不使用sequence number（开销大），但允许client获取锁时同时也获得一个sequencer（包含lock name、mode、generation number的字符串），client后续操作可以带上这个sequencer从而允许server检测lock是否还有效。</p>
+<p>对于早期的不支持sequencer的Chubby服务，有另一种机制，在一个lock holder挂掉后不立即允许其它client获取，而是等一段时间（如1分钟），这样避免出错的client破坏整个系统。</p>
+<h3 id="Events"><a href="#Events" class="headerlink" title="Events"></a>Events</h3><p>client在创建handle时可以订阅若干事件，包括：</p>
+<ul>
+<li>文件内容修改；</li>
+<li>子node的增删改（从而可以监控临时文件）；</li>
+<li>Chubby master自己的failover，表明可能有其它event丢失，client要自己处理这种情况，比如重新扫描文件；</li>
+<li>handle和lock不可用；</li>
+<li>锁被人获取成功；</li>
+<li>与另一个client的锁请求冲突。</li>
+</ul>
+<p>事件投递晚于事件发生。</p>
+<p>最后两个事件很少被用到：</p>
+<ul>
+<li>client通常不仅要知道选举结果产生了，还要知道leader是谁，因此它直接订阅文件内容修改就好了；</li>
+<li>订阅另一个client的锁请求冲突可以实现一种场景，即当前持有锁的client提前释放锁，但实践中没有应用这么用。</li>
+</ul>
+<h3 id="API"><a href="#API" class="headerlink" title="API"></a>API</h3><ul>
+<li><code>open</code>：返回handle。</li>
+<li><code>close</code>：不会失败，调用后不再允许使用该handle（进程可能会挂掉）。</li>
+<li><code>poison</code>：使该handle的后续操作失败，可以跨线程使用。</li>
+<li><code>GetContentsAndStat</code>：返回文件数据和meta。</li>
+<li><code>GetStat</code>：只返回meta。</li>
+<li><code>ReadDir</code>：返回目录的子结点的名字和meta。</li>
+<li><code>SetContents</code>：覆盖整个文件，可以传入content generation number以实现CAS。</li>
+<li><code>SetACL</code>：设置文件的ACL。</li>
+<li><code>Delete</code>：删除没有子结点的结点。</li>
+<li><code>Acquire</code>、<code>TryAcquire</code>、<code>Release</code>：与锁相关。</li>
+<li><code>GetSequencer</code>：返回sequencer。</li>
+<li><code>CheckSequencer</code>：检测sequencer是否有效。</li>
+</ul>
+<h3 id="Caching"><a href="#Caching" class="headerlink" title="Caching"></a>Caching</h3><p>client有一个文件内容和node meta的一致的写穿透的cache。master与client间通过lease维护cache，因此master知道client可能cache了什么。当文件内容或meta变动时，master会向可能缓存了这个文件的client发送invalidation。invalidation包含在了KeepAlive请求中，client收到后会在下次KeepAlive请求中回复master。文件内容或meta的修改要等到master获得了所有client的回复或cache lease过期后才生效。</p>
+<p>如果client不回复invalidation，master就认为这个node不能缓存，这样invalidation只需要一轮RPC。Chubby的场景下读远多于写，因此可以这么做。另一个方案是阻塞住对这个node的后续操作，从而避免太多对这个node的操作击垮master，但会增加延迟。</p>
+<p>Chubby的cache协议只失效，不更新，从而简化设计，也避免了访问过一个文件的client就要接收这个文件的后续的无穷无尽的更新消息。</p>
+<p>Chubby没有选择更弱化的一致性cache是因为那样的cache很难使用。那些需要client在每个消息中都交换sequence number的方案不适用于已经存在多套通信协议的环境。</p>
+<p>client还会cache handle，因此一个client重复<code>open</code>一个文件时，会返回相同的handle，避免每次都发RPC给master。</p>
+<p>Chubby协议允许client缓存lock，即在lock失效后继续持有lock，直到另一个client冲突再主动释放。</p>
+<h3 id="Sessions-and-KeepAlives"><a href="#Sessions-and-KeepAlives" class="headerlink" title="Sessions and KeepAlives"></a>Sessions and KeepAlives</h3><p>只要client与master之间的session有效，client的handl、lock、cache都有效。如果client不持有任何handle且1分钟以上无调用，session自动失效。</p>
+<p>master延长client的lease timeout的情况：</p>
+<ul>
+<li>创建session时</li>
+<li>master发生failover时</li>
+<li>回复KeepAlive时</li>
+</ul>
+<p>master收到KeepAlive时会hold，直到当前lease快过期时再回复。client收到回复后会立即发送下个KeepAlive。</p>
+<p>master会把event和invalidation也加到KeepAlive的回复中，保证了client如果不告知invalidation是否成功，就没办法保有session。</p>
+<p>client自己也维护一个local lease timeout，比master的lease timeout略大一点点（包含KeepAlive网络传输时间）。一旦local lease过期，client就会清空cache，等待grace period（45秒）后如果仍不能收到master回复，client就假设session已失效。</p>
+<h3 id="Fail-overs"><a href="#Fail-overs" class="headerlink" title="Fail-overs"></a>Fail-overs</h3><p>master一旦丢掉了master资格，就会清空掉session、handle、lock的内存状态。但session timer会直到新master产生才结束（不立即让client的session失效）。这样如果client能在grace period与新master建立通信，它的所有现存session都不会受影响。</p>
+<p>在grace period中，client会阻塞住应用调用，以避免应用看到不一致的数据。</p>
+<p>新master产生后通过读取持久化数据以及从client获取数据来重建内存状态。</p>
+<p>新master要执行的操作：</p>
+<ul>
+<li>选择新的epoch给client后续API使用。</li>
+<li>可以回复master-location请求。</li>
+<li>从DB中读取session和lock，将session lease延长至前一个master可能达到的最大值。</li>
+<li>可以回复client的KeepAlive请求，但不做其它session相关的操作。</li>
+<li>向每个session发送failover事件，收到的client会清空cache。</li>
+<li>等待直到每个client要么告知了failover事件已收到，要么session过期。</li>
+<li>可以执行任何操作。</li>
+<li>将上一个master创建的handle延长至当前epoch。在当前epoch内该handle不可重建，从而避免网络上飘的请求创建出已经close的handle。</li>
+<li>等待一段时间后删除没人打开的临时文件。client在收到failover事件后应该重新刷新临时文件的handle。但如果某个持有该临时文件的client的session过期了，临时文件可能不会立即删除。</li>
+</ul>
+<h3 id="Database-implementation"><a href="#Database-implementation" class="headerlink" title="Database implementation"></a>Database implementation</h3><p>Chubby一开始使用BDB，但不需要那么完整的功能，同时BDB的replication带来了过高的风险，最终Chubby选择了实现一个简化版的使用WAL和snapshot的DB。</p>
+<h3 id="Backup"><a href="#Backup" class="headerlink" title="Backup"></a>Backup</h3><p>Chubby会定期把DB的snapshot写入另一个cell的GFS上。</p>
+<h3 id="Mirroring"><a href="#Mirroring" class="headerlink" title="Mirroring"></a>Mirroring</h3><p>Chubby可以在一个cell上镜像另一个cell的若干文件。<code>/ls/global/master</code>在各个cell都有镜像，路径为<code>/ls/cellname/slave</code>。</p>
+<h2 id="Mechanisms-for-scaling"><a href="#Mechanisms-for-scaling" class="headerlink" title="Mechanisms for scaling"></a>Mechanisms for scaling</h2><p>Chubby为了提高伸缩性而采取的部分措施：</p>
+<ul>
+<li>多创建cell，保证不同client可以就近访问Chubby。</li>
+<li>master在高负载时可能会把lease timeout从12秒上调到60秒。</li>
+<li>Chubby client会缓存文件数据、meta、文件不存在、handle等，以降低rpc call。</li>
+<li>有server将Chubby协议转换为更简单的协议如DNS。</li>
+</ul>
+<p>Proxy和Partitioning是已设计但未实现的功能，原因是目前压力还没那么大：</p>
+<ul>
+<li>一个数据中心的机器数量有限。</li>
+<li>硬件性能的提升也会带来Chubby容量的提升。</li>
+</ul>
+<h3 id="Proxies"><a href="#Proxies" class="headerlink" title="Proxies"></a>Proxies</h3><p>Proxy可以处理KeepAlive和读请求，但不能处理写请求。使用Proxy会降低可用性，Proxy和Chubby master不可用都会导致client受影响。</p>
+<h3 id="Partitioning"><a href="#Partitioning" class="headerlink" title="Partitioning"></a>Partitioning</h3><p>一个Chubby cell可以分为N个partition，每个目录根据其路径的hash只由一个partition服务，这样目录与父目录可能在不同partition上。</p>
+<p>需要跨partition的操作：</p>
+<ul>
+<li>访问ACL。但ACL非常适合缓存（数据量小、修改极少）。</li>
+<li>删除目录时可能需要跨partition以确认它为空。</li>
+</ul>
+<p>partitioning可以降低读写的压力，但每个client仍然要与多数partition保持KeepAlive，因此KeepAlive的压力没办法降低。</p>
+<h2 id="Use-surprises-and-design-errors"><a href="#Use-surprises-and-design-errors" class="headerlink" title="Use, surprises and design errors"></a>Use, surprises and design errors</h2><h3 id="Use-and-behaviour"><a href="#Use-and-behaviour" class="headerlink" title="Use and behaviour"></a>Use and behaviour</h3><p>一些结论：</p>
+<ul>
+<li>多数（60%）文件需要按名字访问。</li>
+<li>配置、ACL、元数据文件很常见。</li>
+<li>缓存文件不存在的信息是很重要的。</li>
+<li>平均每个被缓存的文件有10个client使用。</li>
+<li>很少的client会持有锁，共享锁很罕见。锁主要用在选举leader和数据分片上。</li>
+<li>RPC主要由KeepAlive贡献。</li>
+</ul>
+<p>9次服务中断：</p>
+<ul>
+<li>网络维护：4次。</li>
+<li>未知网络链路问题：2次。</li>
+<li>软件错误：2次。</li>
+<li>过载：1次。</li>
+</ul>
+<p>6次丢失数据：</p>
+<ul>
+<li>DB软件错误：4次。</li>
+<li>误操作：2次。</li>
+</ul>
+<p>上调lease timeout可以降低KeepAlive的压力。group commit可以降低写压力，但通常不需要。</p>
+<p>Chubby伸缩性的关键不是server性能，而是降低通信次数。</p>
+<h3 id="Java-clients"><a href="#Java-clients" class="headerlink" title="Java clients"></a>Java clients</h3><p>略</p>
+<h3 id="Use-as-a-name-service"><a href="#Use-as-a-name-service" class="headerlink" title="Use as a name service"></a>Use as a name service</h3><p>用作name service时，对比DNS，Chubby的优势是一致性cache，不需要设置TTL。但Chubby也会遇到性能问题，尤其是大量job启动时，此时可以用batch name lookup来缓解。</p>
+<p>Chubby cache的一致性已经超出了name service需要的程度，因此可以使用专门为name service设计的协议转换server来进一步降低Chubby的负载。</p>
+<h3 id="Problems-with-fail-over"><a href="#Problems-with-fail-over" class="headerlink" title="Problems with fail-over"></a>Problems with fail-over</h3><p>Chubby的旧的failover方案需要master在创建session时写DB，使用BDB时写入压力太大，Chubby选择只在session第一次执行写（包括open和lock）操作时写DB。但这带来一个问题，readonly的session不在DB中，在master发生failover后很可能已经失效了，存在一个窗口期client可能读到过期的数据。</p>
+<p>新方案中master不会在DB中记录session，而是在启动后等待最长可能的lease timeout，保证在此期间没有与master建立连接的client的session过期。这也允许proxy来管理与client的session。</p>
+<h3 id="Abusive-clients"><a href="#Abusive-clients" class="headerlink" title="Abusive clients"></a>Abusive clients</h3><ul>
+<li>应用接入前review很重要。用户经常没办法预计业务增长速度，因此review时要找出使开销线性化的因素，想办法弥补。</li>
+<li>多数文档中缺乏性能方面的建议，导致一个调用了Chubby的接口未来被其它应用误用。</li>
+<li>一开始Chubby没有缓存handle和文件不存在，导致<code>open</code>开销很大，经常有业务反复<code>open</code>。</li>
+<li>一开始Chubby没有限制文件大小，导致有应用拿它作为存储用。最终Chubby上线了256KB的文件大小限制。</li>
+<li>有应用拿Chubby作为PubSub用，但Chubby的重一致性导致了它不适合这个场景。</li>
+</ul>
+<h3 id="Lessons-learned"><a href="#Lessons-learned" class="headerlink" title="Lessons learned"></a>Lessons learned</h3><ul>
+<li>开发者经常忽视可用性：<ul>
+<li>Chubby稍有波动就可能导致应用出现严重问题。</li>
+<li>服务在线与服务可用之间有差别。如Chubby的global cell的总在线时间是超过local cell的，但从某个client来看，global cell的可用性却低于local cell，因为local cell与client之间网络通常不会分区，它们的维护时间通常也是重合的。</li>
+<li>Chubby提供了master failover的事件，但发现应用经常收到这个event后直接crash。</li>
+<li>Chubby提供了三种机制：接入前review；client中提供接口以自动处理Chubby中断；为Chubby中断提供事后报告。</li>
+</ul>
+</li>
+<li>可以不实现细粒度锁。</li>
+<li>将KeepAlive与invalidation合并可以强制client一定要回复invalidation，否则session就会过期，但这样就给KeepAlive的协议选择带来了压力。TCP的退避重试可能会影响到lease timeout，因此Chubby选择了用UDP发送KeepAlive。</li>
+</ul>
+<h2 id="Comparison-with-related-work"><a href="#Comparison-with-related-work" class="headerlink" title="Comparison with related work"></a>Comparison with related work</h2><p>略</p>
+<h2 id="Summary"><a href="#Summary" class="headerlink" title="Summary"></a>Summary</h2><p>略</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Paxos/" rel="tag"># Paxos</a>
+              <a href="/tags/Google/" rel="tag"># Google</a>
+              <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81/" rel="tag"># 分布式锁</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/08/13/explore-the-world-0002/" rel="prev" title="随便看看 0002">
+      <i class="fa fa-chevron-left"></i> 随便看看 0002
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/" rel="next" title="[笔记] Column-Stores vs. Row-Stores: How Different Are They Really?">
+      [笔记] Column-Stores vs. Row-Stores: How Different Are They Really? <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Design"><span class="nav-number">2.</span> <span class="nav-text">Design</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Rationale"><span class="nav-number">2.1.</span> <span class="nav-text">Rationale</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#System-structure"><span class="nav-number">2.2.</span> <span class="nav-text">System structure</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Files-directories-and-handles"><span class="nav-number">2.3.</span> <span class="nav-text">Files, directories, and handles</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Locks-and-sequencers"><span class="nav-number">2.4.</span> <span class="nav-text">Locks and sequencers</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Events"><span class="nav-number">2.5.</span> <span class="nav-text">Events</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#API"><span class="nav-number">2.6.</span> <span class="nav-text">API</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Caching"><span class="nav-number">2.7.</span> <span class="nav-text">Caching</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Sessions-and-KeepAlives"><span class="nav-number">2.8.</span> <span class="nav-text">Sessions and KeepAlives</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Fail-overs"><span class="nav-number">2.9.</span> <span class="nav-text">Fail-overs</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Database-implementation"><span class="nav-number">2.10.</span> <span class="nav-text">Database implementation</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Backup"><span class="nav-number">2.11.</span> <span class="nav-text">Backup</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Mirroring"><span class="nav-number">2.12.</span> <span class="nav-text">Mirroring</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Mechanisms-for-scaling"><span class="nav-number">3.</span> <span class="nav-text">Mechanisms for scaling</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Proxies"><span class="nav-number">3.1.</span> <span class="nav-text">Proxies</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Partitioning"><span class="nav-number">3.2.</span> <span class="nav-text">Partitioning</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Use-surprises-and-design-errors"><span class="nav-number">4.</span> <span class="nav-text">Use, surprises and design errors</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Use-and-behaviour"><span class="nav-number">4.1.</span> <span class="nav-text">Use and behaviour</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Java-clients"><span class="nav-number">4.2.</span> <span class="nav-text">Java clients</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Use-as-a-name-service"><span class="nav-number">4.3.</span> <span class="nav-text">Use as a name service</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Problems-with-fail-over"><span class="nav-number">4.4.</span> <span class="nav-text">Problems with fail-over</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Abusive-clients"><span class="nav-number">4.5.</span> <span class="nav-text">Abusive clients</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Lessons-learned"><span class="nav-number">4.6.</span> <span class="nav-text">Lessons learned</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Comparison-with-related-work"><span class="nav-number">5.</span> <span class="nav-text">Comparison with related work</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Summary"><span class="nav-number">6.</span> <span class="nav-text">Summary</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

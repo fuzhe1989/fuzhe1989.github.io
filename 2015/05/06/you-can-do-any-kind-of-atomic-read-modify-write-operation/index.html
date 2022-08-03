@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文地址：You Can Do Any Kind of Atomic Read-Modify-Write Operation">
+<meta property="og:type" content="article">
+<meta property="og:title" content="翻译：You Can Do Any Kind of Atomic Read-Modify-Write Operation">
+<meta property="og:url" content="http://fuzhe1989.github.io/2015/05/06/you-can-do-any-kind-of-atomic-read-modify-write-operation/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文地址：You Can Do Any Kind of Atomic Read-Modify-Write Operation">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/compare-exchange.png">
+<meta property="og:image" content="http://7xipsa.com1.z0.glb.clouddn.com/fetch-multiply-timeline.png">
+<meta property="og:image" content="http://preshing.com/images/atomic-terms-rmw.png">
+<meta property="article:published_time" content="2015-05-06T06:31:05.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.661Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="Atomic">
+<meta property="article:tag" content="翻译">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://7xipsa.com1.z0.glb.clouddn.com/compare-exchange.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2015/05/06/you-can-do-any-kind-of-atomic-read-modify-write-operation/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>翻译：You Can Do Any Kind of Atomic Read-Modify-Write Operation | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2015/05/06/you-can-do-any-kind-of-atomic-read-modify-write-operation/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          翻译：You Can Do Any Kind of Atomic Read-Modify-Write Operation
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2015-05-06 14:31:05" itemprop="dateCreated datePublished" datetime="2015-05-06T14:31:05+08:00">2015-05-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>原文地址：<a target="_blank" rel="noopener" href="http://preshing.com/20150402/you-can-do-any-kind-of-atomic-read-modify-write-operation/">You Can Do Any Kind of Atomic Read-Modify-Write Operation</a></p>
+<span id="more"></span>
+
+<p>原子的read-modify-write操作——简称RMW——要比<a target="_blank" rel="noopener" href="http://preshing.com/20130618/atomic-vs-non-atomic-operations">原子的load&#x2F;store</a>更复杂。RMW允许读一块共享数据的同时还原地修改它的值。C++11的atomic库中的下列函数都属于RMW操作：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">std::atomic&lt;&gt;::<span class="built_in">fetch_add</span>()</span><br><span class="line">std::atomic&lt;&gt;::<span class="built_in">fetch_sub</span>()</span><br><span class="line">std::atomic&lt;&gt;::<span class="built_in">fetch_and</span>()</span><br><span class="line">std::atomic&lt;&gt;::<span class="built_in">fetch_or</span>()</span><br><span class="line">std::atomic&lt;&gt;::<span class="built_in">fetch_xor</span>()</span><br><span class="line">std::atomic&lt;&gt;::<span class="built_in">exchange</span>()</span><br><span class="line">std::atomic&lt;&gt;::<span class="built_in">compare_exchange_strong</span>()</span><br><span class="line">std::atomic&lt;&gt;::<span class="built_in">compare_exchange_weak</span>()</span><br></pre></td></tr></table></figure>
+
+<p>以<code>fetch_add</code>为例，它首先读取一个共享变量的当前值，对这个值做加法，再将新的值写回去——这3步是原子完成的。你可以用锁来完成同样的操作，但这就不是<a target="_blank" rel="noopener" href="http://preshing.com/20120612/an-introduction-to-lock-free-programming">无锁</a>的了。而RMW操作则天生就被设计为是无锁的。RMW操作可以受益于任何CPU的无锁指令，如ARMv7的<code>ldrex</code>&#x2F;<code>strex</code>。</p>
+<p>初学者看完上面的函数列表后可能会问：“为什么C++11只提供了这么少的RMW操作？为什么有<code>fetch_add</code>却没有<code>fetch_multiply</code>、<code>fetch_divide</code>或<code>fetch_shift_left</code>？”</p>
+<p>原因有两点：</p>
+<ol>
+<li>实践中对这几个RMW操作的需求非常少。不要对RMW的使用方式产生错误的印象，将一个单线程算法中每一步都换成RMW操作是得不到多线程安全的代码的。</li>
+<li>这些操作实现起来很简单，需要的时候自己实现一下就好。就像本文标题说的，你可以做任何RMW操作！</li>
+</ol>
+<h2 id="Compare-and-Swap：所有RMW操作的基础"><a href="#Compare-and-Swap：所有RMW操作的基础" class="headerlink" title="Compare-and-Swap：所有RMW操作的基础"></a>Compare-and-Swap：所有RMW操作的基础</h2><p>C++11所有可用的RMW操作之中，最基础的就是<code>compare_exchange_weak</code>，其它的RMW操作都是用它实现的。<code>compare_exchange_weak </code>最少需要两个参数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">shared.<span class="built_in">compare_exchange_weak</span>(T&amp; expected, T desired, ...);</span><br></pre></td></tr></table></figure>
+
+<p>它会在<code>shared</code>的当前值与<code>expected</code>相等时将<code>shared</code>替换为<code>desired</code>。如果替换成功，返回<code>true</code>；如果失败，它会将<code>shared</code>的当前值保存到<code>expected</code>中——无视<code>expected</code>的名字，它其实是一个in&#x2F;out参数。</p>
+<p>以上过程被称为<strong>compare-and-swap</strong>操作，整个过程就是一次原子操作。</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/compare-exchange.png"></p>
+<p>假设你确实需要原子的<code>fetch_multiply</code>操作，下面是一种实现方法：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">uint32_t</span> <span class="title">fetch_multiply</span><span class="params">(std::atomic&lt;<span class="type">uint32_t</span>&gt;&amp; shared, <span class="type">uint32_t</span> multiplier)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">uint32_t</span> oldValue = shared.<span class="built_in">load</span>();</span><br><span class="line">    <span class="keyword">while</span> (!shared.<span class="built_in">compare_exchange_weak</span>(oldValue, oldValue * multiplier))</span><br><span class="line">    &#123;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> oldValue;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面这个循环被称为compare-and-swap循环，或<strong>CAS循环</strong>。函数里反复尝试将<code>oldValue</code>替换为<code>oldValue * multiplier</code>，直至替换成功。如果没有其它线程同时也在做修改，<code>compare_exchange_weak</code>一般第一次尝试就会成功。另一方面，如果有其它线程同时在修改<code>shared</code>，它的值就有可能在<code>load</code>和<code>compare_exchange_weak</code>之间被改变，就会导致CAS操作失败。这种情况下<code>oldValue</code>会更新为<code>shared</code>的最新值，循环继续。</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/fetch-multiply-timeline.png"></p>
+<p>上面的<code>fetch_multiply</code>既是原子的，又是无锁的。原子性是因为：尽管CAS循环可能会重复不确定次，但最后的修改动作是原子的。无锁是因为：如果CAS循环的某次迭代失败了，往往是由于另一个线程修改成功了。最后这个结论取决于一个假设：<code>compare_exchange_weak</code>会被编译为无锁的机器码——细节见下文。它也忽略了一个事实：在某些平台上<code>compare_exchange_weak</code>可能会<a target="_blank" rel="noopener" href="http://en.cppreference.com/w/cpp/atomic/atomic/compare_exchange">假失败</a>，但这种情况很罕见，不需要考虑使用锁的算法。</p>
+<h2 id="可以将多个步骤组合为一次RMW"><a href="#可以将多个步骤组合为一次RMW" class="headerlink" title="可以将多个步骤组合为一次RMW"></a>可以将多个步骤组合为一次RMW</h2><p><code>fetch_modify</code>只是将<code>shared</code>的值替换为它的倍数。如何实现更复杂的RMW操作？还能保证新操作是原子的<strong>且</strong>无锁吗？当然能。我们举一个有点绕的例子。有一个函数，它会读一个变量的值，如果是奇数就减1，偶数就除以2，如果新值大于等于10则写回去，整个过程是一个原子且无锁的操作：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">uint32_t</span> <span class="title">atomicDecrementOrHalveWithLimit</span><span class="params">(std::atomic&lt;<span class="type">uint32_t</span>&gt;&amp; shared)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">uint32_t</span> oldValue = shared.<span class="built_in">load</span>();</span><br><span class="line">    <span class="type">uint32_t</span> newValue;</span><br><span class="line">    <span class="keyword">do</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (oldValue % <span class="number">2</span> == <span class="number">1</span>)</span><br><span class="line">            newValue = oldValue - <span class="number">1</span>;</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            newValue = oldValue / <span class="number">2</span>;</span><br><span class="line">        <span class="keyword">if</span> (newValue &lt; <span class="number">10</span>)</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">while</span> (!shared.<span class="built_in">compare_exchange_weak</span>(oldValue, newValue));</span><br><span class="line">    <span class="keyword">return</span> oldValue;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>思路和上节一样：如果<code>compare_exchange_weak</code>失败——通常是因为其它线程的并发修改——就将<code>oldValue</code>更新为最新值，再重试。如果中间某步我们发现<code>newValue</code>小于10，就提前结束循环。</p>
+<p>重点是你可以在CAS循环中放任何操作。想像CAS循环体就是一段临界区。通常我们用mutex来保护临界区，而在CAS循环中我们只是简单的重试整个事务，直到成功。</p>
+<p>上面只是一个生造的例子。一个更实际的例子见我在<a target="_blank" rel="noopener" href="http://preshing.com/20150316/semaphores-are-surprisingly-versatile">关于信号量的早期文章</a>中描述的<code>AutoResetEvent</code>类。它用了包含多步的CAS循环将一个共享变量自增至1。</p>
+<h2 id="可以将多个变量组合为一次RMW"><a href="#可以将多个变量组合为一次RMW" class="headerlink" title="可以将多个变量组合为一次RMW"></a>可以将多个变量组合为一次RMW</h2><p>说了这么多，我们只看到了如何对一个共享变量进行原子操作。怎么用一个原子操作修改多个变量？一般我们都用mutex来保护：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">std::mutex mutex;</span><br><span class="line"><span class="type">uint32_t</span> x;</span><br><span class="line"><span class="type">uint32_t</span> y;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">atomicFibonacciStep</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">lock</span><span class="params">(mutex)</span></span>;</span><br><span class="line">    <span class="type">int</span> t = y;</span><br><span class="line">    y = x + y;</span><br><span class="line">    x = t;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这种基于mutex的方法是原子的，但显然不是无锁的。当然这<a target="_blank" rel="noopener" href="http://preshing.com/20111118/locks-arent-slow-lock-contention-is">可能足够好了</a>，但出于演示的目的，我们再进一步，将它改写为一个CAS循环。<code>std::atomic&lt;&gt;</code>是一个模板，所以我们可以将两个变量打包为一个<code>struct</code>，再应用之前的模式：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Terms</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">uint32_t</span> x;</span><br><span class="line">    <span class="type">uint32_t</span> y;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line">std::atomic&lt;Terms&gt; terms;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">atomicFibonacciStep</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Terms oldTerms = terms.<span class="built_in">load</span>();</span><br><span class="line">    Terms newTerms;</span><br><span class="line">    <span class="keyword">do</span></span><br><span class="line">    &#123;</span><br><span class="line">        newTerms.x = oldTerms.y;</span><br><span class="line">        newTerms.y = oldTerms.x + oldTerms.y;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">while</span> (!terms.<span class="built_in">compare_exchange_weak</span>(oldTerms, newTerms));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对<code>Terms</code>的操作是无锁的吗？接下来我们要进入不确定的领域了。在我开始写这篇文章时，C++11的原子操作被设计为<strong>尽可能</strong>使用无锁的CPU指令——明显是一个很宽泛的定义。在我们的场景中，我们包装在<code>std::atomic&lt;&gt;</code>中的是一个结构体，<code>Term</code>。我们来看看GCC4.9.2是如何将它编译成x64代码的：</p>
+<p><img src="http://preshing.com/images/atomic-terms-rmw.png"></p>
+<p>很幸运，编译器很聪明，知道<code>Terms</code>刚好可以放到一个64位寄存器中，于是使用<code>lock cmpxchg</code>实现的<code>compare_exchange_weak</code>。编译出来的代码是无锁的。</p>
+<p>这里引出了一件有意思的事：一般而言，C++11标准<strong>没有</strong>承诺原子操作是无锁的。编译器要支持太多的CPU架构，而且有太多实例化<code>std::atomic&lt;&gt;</code>模板的方法了。你需要<a target="_blank" rel="noopener" href="http://en.cppreference.com/w/cpp/atomic/atomic/is_lock_free">检查你的编译器</a>来确认这件事。但在实践中如果下面的条件都满足，你可以放心假设原子操作就是无锁的：</p>
+<ol>
+<li>编译器是最新版的MSVC、GCC或Clang。</li>
+<li>目标处理器是x86、x64或ARMv7（等等）。</li>
+<li>模板参数是<code>uint32_t</code>或<code>uint64_t</code>或<code>T*</code>。</li>
+</ol>
+<p>我个人喜欢保证第3点，限制自己只用整型或指针类型去特化<code>std::atomic&lt;&gt;</code>。使用我之前文章提到的<a target="_blank" rel="noopener" href="http://preshing.com/20150324/safe-bitfields-in-cpp">安全位域技术</a>可以用<code>std::atomic&lt;uint64_t&gt;</code>方便的改写上面的函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">BEGIN_BITFIELD_TYPE</span>(Terms, <span class="type">uint64_t</span>)</span><br><span class="line">    <span class="built_in">ADD_BITFIELD_MEMBER</span>(x, <span class="number">0</span>, <span class="number">32</span>)</span><br><span class="line">    <span class="built_in">ADD_BITFIELD_MEMBER</span>(y, <span class="number">32</span>, <span class="number">32</span>)</span><br><span class="line"><span class="built_in">END_BITFIELD_TYPE</span>()</span><br><span class="line"></span><br><span class="line">std::atomic&lt;<span class="type">uint64_t</span>&gt; terms;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">atomicFibonacciStep</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Terms oldTerms = terms.<span class="built_in">load</span>();</span><br><span class="line">    Terms newTerms;</span><br><span class="line">    <span class="keyword">do</span></span><br><span class="line">    &#123;</span><br><span class="line">        newTerms.x = oldTerms.y;</span><br><span class="line">        newTerms.y = (<span class="type">uint32_t</span>) (oldTerms.x + oldTerms.y);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">while</span> (!terms.<span class="built_in">compare_exchange_weak</span>(oldTerms, newTerms));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>一些将多个值打包为一个原子位域的真实例子：</p>
+<ul>
+<li>实现带tag的指针来<a target="_blank" rel="noopener" href="http://en.wikipedia.org/wiki/ABA_problem#Tagged_state_reference">绕过ABA问题</a>。</li>
+<li>实现一种<a target="_blank" rel="noopener" href="http://preshing.com/20150316/semaphores-are-surprisingly-versatile">轻量的读写锁</a>。</li>
+</ul>
+<p>一般来说，如果你需要用mutex保护少量的几个变量，且这几个变量可以打包成32或64位整数，你就可以将基于mutex的代码改写成基于无锁的RMW操作，无论这些RMW操作底层是如何实现的！我之前在<a target="_blank" rel="noopener" href="http://preshing.com/20150316/semaphores-are-surprisingly-versatile">信号量是如此的通用</a>中为了实现一组轻量的同步原语，曾充分利用了这一原则。</p>
+<p>当然这种技术不只适用于C++11的atomic库。上文的例子都使用C++11的atomic是因为它已经被广泛使用了，而且编译器的支持也非常好。你可以基于任何提供了CAS的库实现自己的RMW操作，例如<a target="_blank" rel="noopener" href="https://msdn.microsoft.com/en-us/library/ttk2z1ws.aspx">Win32</a>、<a target="_blank" rel="noopener" href="https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man3/OSAtomicCompareAndSwap32.3.html">March kernel API</a>、<a target="_blank" rel="noopener" href="http://lxr.free-electrons.com/ident?i=atomic_cmpxchg">Linux kernel API</a>、<a target="_blank" rel="noopener" href="https://gcc.gnu.org/onlinedocs/gcc-4.9.2/gcc/_005f_005fatomic-Builtins.html">GCC atomic扩展</a>或<a target="_blank" rel="noopener" href="http://mintomic.github.io/lock-free/atomics/">Mintomic</a>。简洁起见，我没有讨论内存顺序，但一定要去考虑你的atomic库提供了怎样的顺序保证。尤其是，如果你自己写的RMW操作是要在线程间传递非atomic的信息，那至少你要保证它与某种<a target="_blank" rel="noopener" href="http://preshing.com/20130823/the-synchronizes-with-relation">同步关系</a>是等价的。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/Atomic/" rel="tag"># Atomic</a>
+              <a href="/tags/%E7%BF%BB%E8%AF%91/" rel="tag"># 翻译</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2014/08/11/why-rebase-harmful/" rel="prev" title="翻译：为什么Rebase是有害的">
+      <i class="fa fa-chevron-left"></i> 翻译：为什么Rebase是有害的
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/" rel="next" title="Effective Modern C++ 笔记 Chapter1 类型推断 (Item 1-4)">
+      Effective Modern C++ 笔记 Chapter1 类型推断 (Item 1-4) <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Compare-and-Swap%EF%BC%9A%E6%89%80%E6%9C%89RMW%E6%93%8D%E4%BD%9C%E7%9A%84%E5%9F%BA%E7%A1%80"><span class="nav-number">1.</span> <span class="nav-text">Compare-and-Swap：所有RMW操作的基础</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%AF%E4%BB%A5%E5%B0%86%E5%A4%9A%E4%B8%AA%E6%AD%A5%E9%AA%A4%E7%BB%84%E5%90%88%E4%B8%BA%E4%B8%80%E6%AC%A1RMW"><span class="nav-number">2.</span> <span class="nav-text">可以将多个步骤组合为一次RMW</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%AF%E4%BB%A5%E5%B0%86%E5%A4%9A%E4%B8%AA%E5%8F%98%E9%87%8F%E7%BB%84%E5%90%88%E4%B8%BA%E4%B8%80%E6%AC%A1RMW"><span class="nav-number">3.</span> <span class="nav-text">可以将多个变量组合为一次RMW</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

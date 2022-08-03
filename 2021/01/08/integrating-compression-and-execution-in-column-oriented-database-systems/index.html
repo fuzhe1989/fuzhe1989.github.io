@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Integrating Compression and Execution in Column-Oriented Database Systems 可以与The design and implementation of modern column-oriented database systems对照阅读。  TL;DR 一篇略老（2006年）的paper，但很重要。 数据库中压缩算法的使">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Integrating Compression and Execution in Column-Oriented Database Systems">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Integrating Compression and Execution in Column-Oriented Database Systems 可以与The design and implementation of modern column-oriented database systems对照阅读。  TL;DR 一篇略老（2006年）的paper，但很重要。 数据库中压缩算法的使">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-07.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-08.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-09.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-10.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-11.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-12.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-13.png">
+<meta property="article:published_time" content="2021-01-08T00:41:03.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.656Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="探索研究">
+<meta property="article:tag" content="Columnar">
+<meta property="article:tag" content="Compression">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-01/integrating-compression-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Integrating Compression and Execution in Column-Oriented Database Systems | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Integrating Compression and Execution in Column-Oriented Database Systems
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-01-08 08:41:03" itemprop="dateCreated datePublished" datetime="2021-01-08T08:41:03+08:00">2021-01-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1142473.1142548">Integrating Compression and Execution in Column-Oriented Database Systems</a></p>
+<p>可以与The design and implementation of modern column-oriented database systems对照阅读。</p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>一篇略老（2006年）的paper，但很重要。</p>
+<p>数据库中压缩算法的使用是非常影响性能的。这方面列存要比行存更有优势：每列排列在一起天然就适合压缩，而行存中相同列的值是被其它列隔开的。</p>
+<p>这篇文章探讨的是，如何在列存数据库中使用压缩，以及不同压缩算法在不同场景中的比较。</p>
+<span id="more"></span>
+
+<h2 id="Advantages-of-Column-Stores-vs-Row-Stores-in-Compression"><a href="#Advantages-of-Column-Stores-vs-Row-Stores-in-Compression" class="headerlink" title="Advantages of Column-Stores vs. Row-Stores in Compression"></a>Advantages of Column-Stores vs. Row-Stores in Compression</h2><p>列存相比行存，在压缩方面有以下优势：</p>
+<ul>
+<li>列存可以用的压缩算法种类更多。一列的值连续排列，就允许跨行压缩多个值，比如RLE等。此外行存常用的字典等方法仍然可以在列存中使用。</li>
+<li>列存的压缩率通常更高。一列的值通常比较类似。</li>
+<li>列存的page通常比行存的page更紧凑，扫描时cache命中率更高，CPU消耗更低（尤其是值等大小时），可以使用向量化代码提高解压速度。</li>
+<li>列存可以有不同的key order（参考C-Store），而排序好的值更容易压缩。</li>
+<li>像RLE这样的压缩算法可以不解压直接操作（比如看到<code>(&quot;x&quot;, 100)</code>就可以直接选中或淘汰100个值），更是加速了操作。</li>
+</ul>
+<h2 id="Related-Work"><a href="#Related-Work" class="headerlink" title="Related Work"></a>Related Work</h2><p>Graefe和Sahpiro[<a target="_blank" rel="noopener" href="https://cs.brown.edu/courses/cs227/archives/2008/Papers/Compression/GraefeShapiro.pdf">1</a>])指出了延迟物化的好处，数据在内存中保持压缩状态，只在必要时解压。</p>
+<p>Chen等人[<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/375663.375692">2</a>]指出有些算子可以临时性解压来求解谓词，如果有效的话仍然返回压缩数据。</p>
+<p>[<a target="_blank" rel="noopener" href="https://cs.brown.edu/courses/cs227/archives/2008/Papers/Compression/GraefeShapiro.pdf">1</a>]也提出了直接在压缩数据上操作的想法。他们指出如果谓词中的常量部分与数据的压缩方式相同，则可以直接在压缩数据上进行exact-match比较和natural-join。如果使用顺序一致的压缩方式的话，还可以不解压直接做exact-match的index查找。接下来还可以做projection和去重。</p>
+<p>但以上工作都没有尝试一个操作同时作用在多个值上，这是本文的贡献之一。</p>
+<p>本文的另一个贡献是提出了一种新架构，可以在算子间传递压缩数据，且最小化算子代码复杂度，同时最大化直接在压缩数据上操作的可能。之前的一些工作（[<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/375663.375692">2</a>], [<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/655800/">3</a>], [<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/362084.362137">4</a>]）也指出了将压缩本身与更高level的代码隔离的重要性，但通常只是在算子间传递压缩数据，算子内处理前解压。</p>
+<p>与Zukowski等人在MonetDB&#x2F;X100上的工作[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1617427/">5</a>]相比，本文更侧重列存上的压缩算法与压缩数据上的直接操作，而[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1617427/">5</a>]更侧重提升行存上轻量压缩算法的CPU&#x2F;cache性能。</p>
+<h2 id="C-Store-Architecture"><a href="#C-Store-Architecture" class="headerlink" title="C-Store Architecture"></a>C-Store Architecture</h2><p>C-Store的内容可以参考<a href="/2020/08/13/c-store-a-column-oriented-dbms">之前的博客</a>，这里简单回顾一下。</p>
+<p>C-Store中数据分为RS和WS，RS是全量数据，WS是增量数据，有定期的tuple mover将WS的数据合并进RS。insert会直接写进WS，delete则需要在RS中维护一个标记，update实现为insert+delete。</p>
+<p>C-Store的一大特点是数据可以保存为若干个projection，每个projection可以是完整schema的部分列，有自己的sort order（可有多个sort key），很多压缩算法（如RLE）都可以获得更好的压缩效果。不同projection之间通过join index关联。</p>
+<p>C-Store的算子是面向列存的，相比传统的面向行存的算子，区别在于：</p>
+<ul>
+<li>selection返回bitset，支持高效合并。</li>
+<li>有特殊的permute算子可以使用join index来重排序一列。</li>
+<li>projection不需要修改数据，因此没有额外开销；两个顺序相同的projection也可以无开销地连起来。</li>
+<li>join产生position，而不是value。</li>
+</ul>
+<h2 id="Compression-Schemes"><a href="#Compression-Schemes" class="headerlink" title="Compression Schemes"></a>Compression Schemes</h2><h3 id="Null-Suppression"><a href="#Null-Suppression" class="headerlink" title="Null Suppression"></a>Null Suppression</h3><p>Null Suppression的定义参考<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Zero_suppression">Wikipedia</a>。它是将数据中的连续的0或空白替换为出现次数和出现位置。本文的实现参考了[<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/362084.362137">4</a>]，但做了如下改动：允许变长字段，方法是在每个值前面附上实际长度。</p>
+<p>比如在压缩一组int时，作者不会每个值固定4B，而是用2b编码这个值实际长度，再将所有长度编码保存在一起以保证字节对齐。</p>
+<h3 id="Dictionary-Encoding"><a href="#Dictionary-Encoding" class="headerlink" title="Dictionary Encoding"></a>Dictionary Encoding</h3><p>字典编码的定义参考<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Dictionary_coder">Wikipedia</a>。它是将经常出现的模式替换为对应的更短的编码。</p>
+<p>row-store中使用的字典编码通常只能考虑一条记录的值。本文实现的面向列存优化的字典编码则可以考虑多条记录的值。首先计算编码单个值需要的位数X（直接通过distinct数量计算），再计算多少个X位的编码可以放进1-4B中。例如一列有32个值，则X为5，所以1个编码可以放进1B中，3个放进2B，4个放进3B，6个放进4B。假设我们选择3&#x2F;2，接下来要创建所有可能的3个5b编码与它们的原始值的映射。例如，1、25、31被编码为00000、00001、00010，则字典中会有一项是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">X000000000100010 -&gt; 31 25 1</span><br></pre></td></tr></table></figure>
+
+<p>其中X代表未使用的一位。解码过程就很直接了：每读取2B就得到3个值。</p>
+<p>注意到我们前面做了字节对齐。即使现代CPU的移位操作已经非常快了，字节对齐仍然能在解码这个CPU性能critical的场合下发挥作用（[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1617427/">5</a>]有类似结论）。</p>
+<h4 id="Cache-Conscious-Optimization"><a href="#Cache-Conscious-Optimization" class="headerlink" title="Cache-Conscious Optimization"></a>Cache-Conscious Optimization</h4><p>前面编码组的长度为1-4B，选择时要考虑到L2缓存大小。前面的例子中我们选择了3&#x2F;2方案，则可能的字典项为32<sup>3</sup> &#x3D; 32768个，因此字典大小为512KB（每项16B，对应3个原始值加上2B的编码也才14B，另外2B不清楚用在哪了）。作者的机器L2缓存为1MB，则512KB刚好是一半。</p>
+<h4 id="Parsing-Into-Single-Values"><a href="#Parsing-Into-Single-Values" class="headerlink" title="Parsing Into Single Values"></a>Parsing Into Single Values</h4><p>前面的解码过程很容易降级到每次取一个值：用mask与一下就可以了：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">(X000000000100010 &amp; 0000000000011111) &gt;&gt; 0 = 00010</span><br><span class="line">(X000000000100010 &amp; 0000001111100000) &gt;&gt; 5 = 00001</span><br><span class="line">(X000000000100010 &amp; 0111110000000000) &gt;&gt; 10 = 00000</span><br></pre></td></tr></table></figure>
+
+<p>很多场合我们可以直接在压缩数据上取出编码值操作，将解压推迟到整个query plan最顶端。</p>
+<p>作者实现的字典编码是定长但不保留顺序的，相比保留顺序但变长的方案要有一定性能优势。</p>
+<h3 id="Run-length-Encoding"><a href="#Run-length-Encoding" class="headerlink" title="Run-length Encoding"></a>Run-length Encoding</h3><p>RLE的定义参考<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Run-length_encoding">Wikipedia</a>。它是将连续出现的值替换为三元组：<code>(value, start position, run_length)</code>，其中每个元素都是定长的（因此不能直接用于字符串）。</p>
+<p>行存中RLE通常只用于压缩长的字符串，但在列存中RLE有着更广泛的应用，因为一列中经常有连续的值。</p>
+<h3 id="Bit-Vector-Encoding"><a href="#Bit-Vector-Encoding" class="headerlink" title="Bit-Vector Encoding"></a>Bit-Vector Encoding</h3><p>Bit-vector encoding的定义参考<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Bitmap_index">Wikipedia</a>。它用于cardinality比较小的场景，每个distinct的值对应一个bit-string，长度为这列所有值的数量，其中为1的位代表目标值出现，0代表没出现。如<code>1 1 3 2 2 3 1</code>可以编码为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1: 1100001</span><br><span class="line">2: 0001100</span><br><span class="line">3: 0010010</span><br></pre></td></tr></table></figure>
+
+<p>这种编码在行存中被用作bit-map索引[<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/253260.253268">6</a>]，有很多关于进一步压缩bit-map和这种压缩对query性能影响的研究。但最近的研究指出[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1029710/">7</a>][<a target="_blank" rel="noopener" href="https://escholarship.org/uc/item/9zz3r6k7">8</a>]只在有bit-map非常稀疏（1&#x2F;1000这个量级）时进一步的压缩才不会阻碍query性能。本文的bit-map只在cardinality很小时使用，此时每个bit-map会比较稠密，因此也没做进一步的压缩。</p>
+<h3 id="Heavyweight-Compression-Schemes"><a href="#Heavyweight-Compression-Schemes" class="headerlink" title="Heavyweight Compression Schemes"></a>Heavyweight Compression Schemes</h3><p>LZ编码可以参考<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Welch">Wikipedia</a>和<a href="/2020/10/09/understanding-compression">之前的博客</a>。它有非常多的变种，是使用最广泛的通用压缩算法。</p>
+<p>作者选择了<a target="_blank" rel="noopener" href="http://www.lzop.org/">LZ算法的一个可以任意使用的版本</a>，针对解压速度有优化。</p>
+<h2 id="Compressed-Query-Execution"><a href="#Compressed-Query-Execution" class="headerlink" title="Compressed Query Execution"></a>Compressed Query Execution</h2><h3 id="Query-Executor-Architecture"><a href="#Query-Executor-Architecture" class="headerlink" title="Query Executor Architecture"></a>Query Executor Architecture</h3><p>直接在压缩数据上操作可以带来非常明显的性能提升，但如果因此而需要让算子知道具体的压缩类型，就太耦合了，因此作者引入了两个类作为中间层。</p>
+<p>第一个类称为compression block，是压缩数据的一种封装。它提供了以下API供算子使用：</p>
+<p><img src="/images/2021-01/integrating-compression-01.png"></p>
+<p>有两种方法遍历解压过的数据：调用<code>getNext()</code>会返回一个解压过的值和对应的位置；调用<code>asArray()</code>会返回整个buffer解压过的数组指针。</p>
+<p>三个Block Information API都是可以不解压就得到的。重点说下bit-vector encoding，每个compression block只对应一个特定值，因此<code>isPosContig</code>返回false，<code>getSize</code>返回1的数量，<code>getStartValue</code>返回值本身，<code>getEndPosition</code>返回最后一个1的位置。</p>
+<p>第二个类是一个新的scan算子，叫DataSource。它作为query plan和存储层之间的接口，知道压缩过的page保存在哪，有哪些索引可用。scan时它会将压缩的page读上来，转换为compression block。对于像LZ这样的重量级算法，DataSource会在读page时直接解压。</p>
+<p>有些谓词可以直接下推给DataSource，比如下推equal，且数据是bit-vector编码的，就可以直接返回bit-string。而如果下推equal给字典编码的数据，DataSource会将谓词值转换为字典值再做比较（不用解压数据）。其它时候谓词可以在数据刚从磁盘中读出来时就求值，总之尽可能避免解压。</p>
+<h3 id="Compression-Aware-Optimizations"><a href="#Compression-Aware-Optimizations" class="headerlink" title="Compression-Aware Optimizations"></a>Compression-Aware Optimizations</h3><p>考虑一个nested loops join的例子。C-Store中，如果数据已经被组装为tuple了，join就和正常的row-store一样了。但如果数据仍然是列存格式的，join的输出会是两边的position list：</p>
+<p><img src="/images/2021-01/integrating-compression-02.png"></p>
+<p>考虑到各种压缩算法，可能伪代码会写成这样：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">NLJoin(Predicate q, Column c1, Column c2)</span><br><span class="line">    IF c1 IS NOT COMPRESSED AND c2 IS NOT COMPRESSED</span><br><span class="line">        FOR EACH VALUE valc1 WITH POSITION i IN c1 DO</span><br><span class="line">            FOR EACH VALUE valc2 WITH POSITION j IN c2 DO</span><br><span class="line">                IF q(valc1, valc2) THEN OUTPUT-LEFT: (i), OUTPUT-RIGHT: (j)</span><br><span class="line">            END</span><br><span class="line">        END</span><br><span class="line">    IF c1 IS NOT COMPRESSED AND c2 IS RLE COMPRESSED</span><br><span class="line">        FOR EACH VALUE valc1 WITH POSITION i IN c1 DO</span><br><span class="line">            FOR EACH TRIPLE t WITH VAL v, STARTPOS j AND RUNLEN k IN c2</span><br><span class="line">                IF q(valc1, v) THEN:</span><br><span class="line">                    OUTPUT-LEFT: t,</span><br><span class="line">                    OUTPUT-RIGHT: (j ... j+k-1)</span><br><span class="line">            END</span><br><span class="line">        END</span><br><span class="line">     IF c1 IS NOT COMPRESSED AND c2 IS BIT-VECTOR COMPRESSED</span><br><span class="line">        FOR EACH VALUE valc1 WITH POSITION i IN c1 DO</span><br><span class="line">            FOR EACH VALUE valc2 WITH BITSTRING b IN c2 DO</span><br><span class="line">                // ASSUME THAT THERE ARE num &#x27;1&#x27;s IN b</span><br><span class="line">                IF q(valc1, valc2) THEN OUTPUT</span><br><span class="line">                    OUTPUT-LEFT: NEW RLE TRIPLE (NULL, i, num)</span><br><span class="line">                    OUTPUT-RIGHT: b</span><br><span class="line">            END</span><br><span class="line">        END</span><br><span class="line">    ETC. ETC. FOR EVERY POSSIBLE COMBINATION OF ENCODING TYPES</span><br></pre></td></tr></table></figure>
+
+<p>可以看出为了充分利用不同压缩算法的特点，上面这段代码变得非常繁琐，如果有N种压缩算法，需要写N<sup>2</sup>种情况。</p>
+<p>为了避免这种代码爆炸的情况出现，作者总结了几种压缩算法的特点，提炼为前面的三个Properties API，其中<code>isPosContig()</code>表示这个compression block中的值是否是这列数据中连续的一段。</p>
+<p><img src="/images/2021-01/integrating-compression-03.png"></p>
+<p>注意上面的表格只对应本文使用的几种实现的特点。</p>
+<p>算子可以在无法操作压缩数据时退化到调用<code>getNext()</code>和<code>asArray()</code>来操作解压过的值。我们可以把<code>SELECT  c1, COUNT(*) FROM t GROUP BY c1</code>实现为下面的伪代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">COUNT(COLUMN c1)</span><br><span class="line">    b = GET NEXT COMPRESSED BLOCK FROM c1</span><br><span class="line">    WHILE b IS NOT NULL</span><br><span class="line">        IF b.IsOneValue()</span><br><span class="line">            x = FETCH CURRENT COUNT FOR b.GetStartValue()</span><br><span class="line">            x = x + b.GetSize()</span><br><span class="line">        ELSE</span><br><span class="line">            a = b.AsArray()</span><br><span class="line">            FOR EACH ELEMENT i IN a</span><br><span class="line">                x = FETCH CURRENT COUNT FOR i</span><br><span class="line">                x = x + 1</span><br><span class="line">        b = GET NEXT COMPRESSED BLOCK FROM c1</span><br></pre></td></tr></table></figure>
+
+<p>这段代码中RLE和bit-vector会走同一条路径，从而降低了代码的复杂度。</p>
+<p>下图给了更多join和聚合如何使用这几个API的例子。</p>
+<p><img src="/images/2021-01/integrating-compression-04.png"></p>
+<h2 id="Experimental-Results"><a href="#Experimental-Results" class="headerlink" title="Experimental Results"></a>Experimental Results</h2><h3 id="Eager-Decompression"><a href="#Eager-Decompression" class="headerlink" title="Eager Decompression"></a>Eager Decompression</h3><p>这项测试的是数据读出来就立刻解压。query很简单：<code>SELECT SUM(C) FROM TABLE GROUP BY C</code>。C列生成了1亿个32位整数。这组测试中C的NDA在2-40之间，模拟一种低cardinality的场景，理论上会比较适合bit-vector。下图是几种压缩算法在不同情况下的压缩后体积。配合这个projection前两列的NDA，我们控制数据的sorted run length为50（图左）和1000（图右），其中C列连续的run length为sorted run length除以它的NDA。</p>
+<p><img src="/images/2021-01/integrating-compression-05.png"></p>
+<p>一些结论：</p>
+<ul>
+<li>字典和LZ有着最高的压缩率。字典在低cardinality时表现要比LZ好一点。</li>
+<li>RLE在run length比较大（低cardinality）时表现良好。</li>
+<li>bit-vector的压缩率与NDA呈线性关系。一旦NDA大于32，bit-vector还不如不压缩。</li>
+</ul>
+<p>下图是性能对比。</p>
+<p><img src="/images/2021-01/integrating-compression-06.png"></p>
+<p>可以看出压缩后体积小不意味着性能好。比如bit-vector体积只有未压缩的一半，但它要比未压缩慢一个数量级（35~120秒，图里没显示）。这也说明解压严重影响了性能，体积小带来的I&#x2F;O延时优势完全被解压速度淹没了。</p>
+<p>bit-vector解压慢是因为它要把并发读多个bit-string再合并起来。RLE和NS比字典和LZ慢是因为它们的解压代码中有比较多的分支，无法充分利用CPU的流水线（[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1617427/">5</a>]有相同结论）。</p>
+<h3 id="Operation-Directly-on-Compressed-Data"><a href="#Operation-Directly-on-Compressed-Data" class="headerlink" title="Operation Directly on Compressed Data"></a>Operation Directly on Compressed Data</h3><p>这项测试与上一项的区别在于可以直接在压缩数据上操作。LZ和NS没办法操作，因此它们的性能直接取自上个测试（或忽略）。字典编码有两种直接操作压缩数据的方式，第一种一次取一个编码，局部做group-by得到次数，再将编码替换为真实值乘以次数，得到sum。例如2映射为000，4映射为001，8映射为002。当操作<code>001, 001, 000, 001, 002, 002</code>时，先聚合为<code>001: 3, 000: 1, 002:２</code>，再替换得到结果<code>12, 2, 16</code>。</p>
+<p>第二种直接用多个编码值的字典项聚合，然后将所有包含特定值的字典项的聚合值加起来，再乘以真实值。第一种方式适用于所有聚合情况，第二种方式只适用于group-by自身。</p>
+<p>下图a和b是性能对比。</p>
+<p><img src="/images/2021-01/integrating-compression-07.png"></p>
+<p>可以看到在sorted run为1000时，RLE相比上一项的性能平均提升了3.3倍，bit-vector则是10.3倍，字典则分别是3.94倍（group-by自身）和1.1倍（group-by非自身）。</p>
+<p>图c是在有外界CPU竞争下，测试用时相比图a和b的增加。这里的主要因素是CPU cycle的竞争，而不是cache的竞争。</p>
+<p>RLE（run length很短时）和字典的聚合方法一表现不太好，但列存仍然体现出了对行存的优势：一次可以聚合多个值，聚合次数更少了。因此相比于常规压缩的拿CPU换I&#x2F;O，直接在压缩数据上操作同时节省了I&#x2F;O和CPU，意味着即使在I&#x2F;O更快CPU更慢的机器上，压缩加上直接在压缩数据上操作仍然有用。</p>
+<h3 id="Higher-column-cardinalities"><a href="#Higher-column-cardinalities" class="headerlink" title="Higher column cardinalities"></a>Higher column cardinalities</h3><p>下图是更高cardinality时的性能对比。</p>
+<p><img src="/images/2021-01/integrating-compression-08.png"></p>
+<p>图a的run length为1，图b的run length为14。NS与bit-vector性能太差，图中没显示。注意到cardinality特别大时，hash table已经超过cache大小了，造成了性能的陡降。</p>
+<p>注意到RLE和LZ这样依赖于数据局部性的算法在run length为1时表现很差，但run length大一点就有很好的表现。字典则在局部性不好时也有着良好的表现。</p>
+<p>下图是几项测试的总结。</p>
+<p><img src="/images/2021-01/integrating-compression-09.png"></p>
+<p>可以看出对于RLE和LZ来说，run length是比cardinality更好的指示器。</p>
+<h3 id="Generated-vs-TPC-H-Data"><a href="#Generated-vs-TPC-H-Data" class="headerlink" title="Generated vs. TPC-H Data"></a>Generated vs. TPC-H Data</h3><p><img src="/images/2021-01/integrating-compression-10.png"></p>
+<h3 id="Other-Query-Types"><a href="#Other-Query-Types" class="headerlink" title="Other Query Types"></a>Other Query Types</h3><p>这项测试关心一列的压缩是如何影响另一列的访问的。query为：<code>SELECT COL1, COUNT(*) FROM TABLE WHERE PREDICATE(COL2) GROUP BY COL1</code>。</p>
+<p>C-Store中会使用position filter来处理这种query，有谓词的列会通过DataSource算子得到一个表示position的bit-string，所有这些bit-string在与&#x2F;或之后再交给上层算子来取出想要的值。</p>
+<p>第一个试验使用TPC-H数据，COL2是quantity列（<code>quantity == 1</code>），使用RLE压缩。COL1列可以是suppkey、shipdata、linenumber、returnflag列。使用的projection是按COL1、COL2排序的，因此COL1使用RLE压缩（对有序数据友好）。下图a是结果。</p>
+<p><img src="/images/2021-01/integrating-compression-11.png"></p>
+<p>bit-vector这么快是因为它保存的已经是position list了。而且COL1是RLE编码，与bit-string的与操作可以很高效。</p>
+<p>第二个试验的query是一样的，但两列的角色交换了下，现在COL1有谓词（仍然是RLE），COL2用来聚合。结果见图b。这个试验中bit-vector表现就不太好了，前面已经提到过它的解压是比较慢的。但在run length很长时，开始出现整个page都是0或1的情况，允许bit-vector做一些优化，表现又变好了。</p>
+<p>图a和b的对比说明列该如何编码不光要看数据本身，还要看query类型。一个可能的优化是将相同列以相同顺序但不同压缩方式保存多份。</p>
+<p>下一个query是：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> S.COL3, <span class="built_in">COUNT</span>(<span class="operator">*</span>)</span><br><span class="line"><span class="keyword">FROM</span> P1 <span class="keyword">AS</span> L, P2 <span class="keyword">AS</span> S</span><br><span class="line"><span class="keyword">WHERE</span> PREDICATE(S.COL2) <span class="keyword">AND</span> PREDICATE(L.COL1)</span><br><span class="line">            <span class="keyword">AND</span> L.COL2 <span class="operator">=</span> S.COL1</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> S.COL3</span><br></pre></td></tr></table></figure>
+
+<p>这里假设P1是事实表，P2是维度表，projection按S.COL2和L.COL1排序（C-Store会优先按有谓词的列排序projection），因此都使用RLE编码。L.COL2是二级排序列，用来试验不同压缩方式。结果如下：</p>
+<p><img src="/images/2021-01/integrating-compression-12.png"></p>
+<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h2><p><img src="/images/2021-01/integrating-compression-13.png"></p>
+<p>上图总结了用于选择编码的决策树。</p>
+<p>其中“exhibits good locality”意思是这列要么已排序，要么与已排序的列有关系，要么数据本身有重复pattern。“likely to be used in a position contiguous manner”意思是这列需要与其它列并行读，因此不能乱序。</p>
+<p>除了如何使用压缩算法外，以下几点也很关键：</p>
+<ul>
+<li>数据库的schema设计需要感知压缩子系统。数据局部性很重要。</li>
+<li>如果能直接在压缩数据上操作的话，就值得牺牲一些压缩率，将重量级压缩算法替换为轻量级压缩算法。</li>
+<li>优化器在估计cost时需要意识到压缩算法的影响。</li>
+</ul>
+<h2 id="References"><a href="#References" class="headerlink" title="References"></a>References</h2><ol>
+<li><a target="_blank" rel="noopener" href="https://cs.brown.edu/courses/cs227/archives/2008/Papers/Compression/GraefeShapiro.pdf">G.Graefe and L.Shapiro. Data compression and database performance. In ACM&#x2F;IEEE-CS Symp. On Applied Computing pages 22 -27, April 1991.</a></li>
+<li><a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/375663.375692">Z. Chen, J. Gehrke, and F. Korn. Query optimization in compressed database systems. In SIGMOD ’01, pages 271–282, 2001.</a></li>
+<li><a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/655800/">J. Goldstein, R. Ramakrishnan, and U. Shaft. Compressing relations and indexes. In ICDE ’98, pages 370–379, 1998.</a></li>
+<li><a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/362084.362137">T. Westmann, D. Kossmann, S. Helmer, and G. Moerkotte. The implementation and performance of compressed databases. SIGMOD Rec., 29(3):55–67, 2000.</a></li>
+<li><a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1617427/">M. Zukowski, S. Heman, N. Nes, and P. Boncz. Super-scalar ram-cpu cache compression. In ICDE, 2006.</a></li>
+<li><a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/253260.253268">P. O’Neil and D. Quass. Improved query performance with variant indexes. In SIGMOD, pages 38–49, 1997.</a></li>
+<li><a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1029710/">K. Wu, E. Otoo, and A. Shoshani. Compressing bitmap indexes for faster search operations. In SSDBM’02, pages 99–108, 2002. LBNL-49627., 2002.</a></li>
+<li><a target="_blank" rel="noopener" href="https://escholarship.org/uc/item/9zz3r6k7">K. Wu, E. Otoo, A. Shoshani, and H. Nordberg. Notes on design and implementation of compressed bit vectors. Technical Report LBNL&#x2F;PUB-3161, 2001.</a></li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/%E6%8E%A2%E7%B4%A2%E7%A0%94%E7%A9%B6/" rel="tag"># 探索研究</a>
+              <a href="/tags/Columnar/" rel="tag"># Columnar</a>
+              <a href="/tags/Compression/" rel="tag"># Compression</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/03/tidb-a-raft-based-htap-database/" rel="prev" title="[笔记] TiDB: a Raft-based HTAP database">
+      <i class="fa fa-chevron-left"></i> [笔记] TiDB: a Raft-based HTAP database
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/01/10/performance-tradeoffs-in-read-optimized-databases/" rel="next" title="[笔记] Performance Tradeoffs in Read-Optimized Databases">
+      [笔记] Performance Tradeoffs in Read-Optimized Databases <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Advantages-of-Column-Stores-vs-Row-Stores-in-Compression"><span class="nav-number">1.</span> <span class="nav-text">Advantages of Column-Stores vs. Row-Stores in Compression</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Related-Work"><span class="nav-number">2.</span> <span class="nav-text">Related Work</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#C-Store-Architecture"><span class="nav-number">3.</span> <span class="nav-text">C-Store Architecture</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Compression-Schemes"><span class="nav-number">4.</span> <span class="nav-text">Compression Schemes</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Null-Suppression"><span class="nav-number">4.1.</span> <span class="nav-text">Null Suppression</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Dictionary-Encoding"><span class="nav-number">4.2.</span> <span class="nav-text">Dictionary Encoding</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Cache-Conscious-Optimization"><span class="nav-number">4.2.1.</span> <span class="nav-text">Cache-Conscious Optimization</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Parsing-Into-Single-Values"><span class="nav-number">4.2.2.</span> <span class="nav-text">Parsing Into Single Values</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Run-length-Encoding"><span class="nav-number">4.3.</span> <span class="nav-text">Run-length Encoding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Bit-Vector-Encoding"><span class="nav-number">4.4.</span> <span class="nav-text">Bit-Vector Encoding</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Heavyweight-Compression-Schemes"><span class="nav-number">4.5.</span> <span class="nav-text">Heavyweight Compression Schemes</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Compressed-Query-Execution"><span class="nav-number">5.</span> <span class="nav-text">Compressed Query Execution</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Query-Executor-Architecture"><span class="nav-number">5.1.</span> <span class="nav-text">Query Executor Architecture</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Compression-Aware-Optimizations"><span class="nav-number">5.2.</span> <span class="nav-text">Compression-Aware Optimizations</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Experimental-Results"><span class="nav-number">6.</span> <span class="nav-text">Experimental Results</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Eager-Decompression"><span class="nav-number">6.1.</span> <span class="nav-text">Eager Decompression</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Operation-Directly-on-Compressed-Data"><span class="nav-number">6.2.</span> <span class="nav-text">Operation Directly on Compressed Data</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Higher-column-cardinalities"><span class="nav-number">6.3.</span> <span class="nav-text">Higher column cardinalities</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Generated-vs-TPC-H-Data"><span class="nav-number">6.4.</span> <span class="nav-text">Generated vs. TPC-H Data</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Other-Query-Types"><span class="nav-number">6.5.</span> <span class="nav-text">Other Query Types</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Conclusion"><span class="nav-number">7.</span> <span class="nav-text">Conclusion</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#References"><span class="nav-number">8.</span> <span class="nav-text">References</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="The Interface Principle in C++原文地址 背景C++的接口原则对于写出既有表现力，又保证了封装性的代码是非常重要的，当前即有语言特性与之相关，且未来还可能有更多特性来增强这一原则，值得我们注意。 本文用到的名词：  方法：类的成员函数。 函数：非成员函数。  非成员（非友元）函数Effective C++的Item23中，Scott Meyers鼓励我们将只需要类的公开">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The Interface Principle in C++">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/09/28/cpp-interface-principle/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="The Interface Principle in C++原文地址 背景C++的接口原则对于写出既有表现力，又保证了封装性的代码是非常重要的，当前即有语言特性与之相关，且未来还可能有更多特性来增强这一原则，值得我们注意。 本文用到的名词：  方法：类的成员函数。 函数：非成员函数。  非成员（非友元）函数Effective C++的Item23中，Scott Meyers鼓励我们将只需要类的公开">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-09-28T01:56:49.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.652Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/09/28/cpp-interface-principle/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>The Interface Principle in C++ | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/09/28/cpp-interface-principle/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          The Interface Principle in C++
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-09-28 09:56:49" itemprop="dateCreated datePublished" datetime="2017-09-28T09:56:49+08:00">2017-09-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="The-Interface-Principle-in-C"><a href="#The-Interface-Principle-in-C" class="headerlink" title="The Interface Principle in C++"></a>The Interface Principle in C++</h1><p><a target="_blank" rel="noopener" href="https://www.fluentcpp.com/2017/06/20/interface-principle-cpp/">原文地址</a></p>
+<h2 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h2><p>C++的接口原则对于写出既有表现力，又保证了封装性的代码是非常重要的，当前即有语言特性与之相关，且未来还可能有更多特性来增强这一原则，值得我们注意。</p>
+<p>本文用到的名词：</p>
+<ul>
+<li>方法：类的成员函数。</li>
+<li>函数：非成员函数。</li>
+</ul>
+<h2 id="非成员（非友元）函数"><a href="#非成员（非友元）函数" class="headerlink" title="非成员（非友元）函数"></a>非成员（非友元）函数</h2><p>Effective C++的Item23中，Scott Meyers鼓励我们将只需要类的公开方法就能实现的函数移到类外面。下面是一个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Circle</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Circle</span><span class="params">(<span class="type">double</span> radius)</span> : m_radius(radius) &#123;</span>&#125;</span><br><span class="line"> </span><br><span class="line">    <span class="function"><span class="type">double</span> <span class="title">getRadius</span><span class="params">()</span> <span class="type">const</span> </span>&#123;<span class="keyword">return</span> m_radius;&#125;</span><br><span class="line">    <span class="function"><span class="type">double</span> <span class="title">getPerimeter</span><span class="params">()</span> <span class="type">const</span> </span>&#123;<span class="keyword">return</span> <span class="number">2</span> * Pi * m_radius;&#125;</span><br><span class="line">    <span class="function"><span class="type">double</span> <span class="title">getArea</span><span class="params">()</span> <span class="type">const</span> </span>&#123;<span class="keyword">return</span> Pi * m_radius * m_radius;&#125;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">double</span> m_radius;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>注意下面两个方法，都只用到了<code>Circle</code>的其它公开方法：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">double</span> <span class="title">getPerimeter</span><span class="params">()</span> <span class="type">const</span> </span>&#123;<span class="keyword">return</span> <span class="number">2</span> * Pi * <span class="built_in">getRadius</span>();&#125;</span><br><span class="line"><span class="function"><span class="type">double</span> <span class="title">getArea</span><span class="params">()</span> <span class="type">const</span> </span>&#123;<span class="keyword">return</span> Pi * <span class="built_in">getRadius</span>() * <span class="built_in">getRadius</span>();&#125;</span><br></pre></td></tr></table></figure>
+
+<p>那么把它们移到<code>Circle</code>外面作为非成员函数，就遵守了Meyers原则，增强了<code>Circle</code>类的封装性：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Circle</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Circle</span><span class="params">(<span class="type">double</span> radius)</span> : m_radius(radius) &#123;</span>&#125;</span><br><span class="line"> </span><br><span class="line">    <span class="function"><span class="type">double</span> <span class="title">getRadius</span><span class="params">()</span> <span class="type">const</span> </span>&#123;<span class="keyword">return</span> m_radius;&#125;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">double</span> m_radius;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="function"><span class="type">double</span> <span class="title">getPerimeter</span><span class="params">(Circle <span class="type">const</span>&amp; circle)</span> </span>&#123;<span class="keyword">return</span> <span class="number">2</span> * Pi * circle.<span class="built_in">getRadius</span>();&#125;</span><br><span class="line"><span class="function"><span class="type">double</span> <span class="title">getArea</span><span class="params">(Circle <span class="type">const</span>&amp; circle)</span> </span>&#123;<span class="keyword">return</span> Pi * circle.<span class="built_in">getRadius</span>() * circle.<span class="built_in">getRadius</span>();</span><br></pre></td></tr></table></figure>
+
+<p>另一方面，这样也减少了<code>Circle</code>本身的代码量，重构时涉及的代码更少，更稳定。</p>
+<p>以下是应用这一原则的步骤：</p>
+<ul>
+<li>确认指定方法是否只依赖类的其它公开方法（或改起来也比较容易）。</li>
+<li>创建一个同名的非成员函数。</li>
+<li>将该类型作为函数的<strong>第一个参数</strong>：<ul>
+<li>如果原方法不是const方法，参数类型就是非const引用。</li>
+<li>如果原方法是const方法，参数类型就是const引用。</li>
+</ul>
+</li>
+<li>将实现代码复制过来，并在每个调用类公开方法的地方加上参数的名字。</li>
+</ul>
+<p>注意，要保证新函数与旧方法<strong>同名</strong>。有时候我们会不喜欢给一个非成员函数起名为<code>getPerimeter</code>，更愿意起名为<code>getCirclePerimeter</code>，这样会显得更具体一些。但这是错的：“Circle”已经出现在第一个参数的类型中了，不管是对人还是对编译器，都不需要在函数名上再加一个“Circle”了。<code>getPerimeter(circle)</code>看起来也要比<code>getCirclePerimeter(circle)</code>更自然。</p>
+<h2 id="接口原则"><a href="#接口原则" class="headerlink" title="接口原则"></a>接口原则</h2><p>新的<code>Circle</code>类有点令人不安：它有在类外面的功能。这是我们在上一节有意做的，但通常来说类的功能不就是它的接口吗？</p>
+<p>上面说对了一半，类的功能就应该是它的接口。但接口也不仅仅包括类的公开方法。这就是“接口原则”要说的。Herb Sutter在Exceptional C++的Item31-34中详细解释了这一原则（见相关文档1和2）。</p>
+<p>满足以下条件的非成员函数也是类接口的一部分：</p>
+<ul>
+<li>它的某个参数是该类的对象。</li>
+<li>它与该类在<strong>相同的命名空间</strong>。</li>
+<li>它与该类一同发布，即它们声明在<strong>相同的头文件</strong>。</li>
+</ul>
+<p>上节中的<code>getPerimeter</code>和<code>getArea</code>就满足这些条件，因此它们也是<code>Circle</code>接口的一部分。换句话说，下面两种调用方式，差别只在于语法：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">getPerimeter</span>(circle);</span><br></pre></td></tr></table></figure>
+
+<p>VS</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">circle.<span class="built_in">getPerimeter</span>();</span><br></pre></td></tr></table></figure>
+
+<p>根据接口原则，这两种表达方式都是在调用<code>Circle</code>类的<code>getPerimeter</code>功能。</p>
+<h2 id="ADL（参数依赖查找）：接口原则与命名空间配合良好"><a href="#ADL（参数依赖查找）：接口原则与命名空间配合良好" class="headerlink" title="ADL（参数依赖查找）：接口原则与命名空间配合良好"></a>ADL（参数依赖查找）：接口原则与命名空间配合良好</h2><p>当引入命名空间之后，接口原则可能会有问题：调用函数时要加命名空间，而方法则不用。也就是函数与方法开始有不一致了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">namespace</span> geometry</span><br><span class="line">&#123;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Circle</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Circle</span><span class="params">(<span class="type">double</span> radius)</span> : m_radius(radius) &#123;</span>&#125;</span><br><span class="line"> </span><br><span class="line">    <span class="function"><span class="type">double</span> <span class="title">getRadius</span><span class="params">()</span> <span class="type">const</span> </span>&#123;<span class="keyword">return</span> m_radius;&#125;</span><br><span class="line"> </span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">double</span> m_radius;</span><br><span class="line">&#125;;</span><br><span class="line"> </span><br><span class="line"><span class="function"><span class="type">double</span> <span class="title">getPerimeter</span><span class="params">(Circle <span class="type">const</span>&amp; circle)</span> </span>&#123;<span class="keyword">return</span> <span class="number">2</span> * Pi * circle.<span class="built_in">getRadius</span>();&#125;</span><br><span class="line"><span class="function"><span class="type">double</span> <span class="title">getArea</span><span class="params">(Circle <span class="type">const</span>&amp; circle)</span> </span>&#123;<span class="keyword">return</span> Pi * m_radius * circle.<span class="built_in">getRadius</span>();&#125;</span><br><span class="line"> </span><br><span class="line">&#125; <span class="comment">// end of namespace geometry</span></span><br></pre></td></tr></table></figure>
+
+<p>现在函数的调用方式：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">geometry::<span class="built_in">getArea</span>(circle);</span><br></pre></td></tr></table></figure>
+
+<p>而如果是方法的话，调用方式：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">circle.<span class="built_in">getArea</span>();</span><br></pre></td></tr></table></figure>
+
+<p>这两者的不一致对接口原则而言是一种挑战，因为接口原则需要函数与方法间只有语法上的区别，不应该有其它信息上的区别。</p>
+<p>幸好C++有参数依赖查找（ADL），又称Koenig查找：将参数类型所在的命名空间的所有函数声明带到当前作用域，来解决名字查找的问题。上例中，在查找<code>getArea</code>时，<code>circle</code>触发了ADL，从而<code>geometry</code>的所有声明被带到当前作用域，其中也包括了<code>getArea</code>，因此不加命名空间编译器仍然能找到这个函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">getArea</span>(circle);</span><br></pre></td></tr></table></figure>
+
+<h2 id="泛型代码"><a href="#泛型代码" class="headerlink" title="泛型代码"></a>泛型代码</h2><p>泛型代码中，非成员函数能发挥更大的作用。</p>
+<p>前文中我们说过不建议在函数名字中嵌入参数类型的名字。事实上名字起的通用一些还有助于将其用于泛型代码。假设你还有一个<code>Rectangle</code>类也能计算周长，因此你会为其实现一个<code>getPerimeter</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">double</span> <span class="title">getPerimeter</span><span class="params">(Rectangle <span class="type">const</span>&amp; rectangle)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>之后我们就可以把<code>getPerimeter</code>用到泛型代码中了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> Shape&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">operateOnShape</span><span class="params">(Shape <span class="type">const</span>&amp; shape)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="type">double</span> perimeter = <span class="built_in">getPerimeter</span>(shape);</span><br><span class="line">    ....</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>而且，有些类型不是类（比如内置类型）或你没办法给它加方法（比如三方库代码），这时候想为其增加一个泛型代码中可以用的功能，唯一可行的方法就是通过非成员函数。例如C++11增加的<code>std::begin</code>和<code>std::end</code>，设计为非成员函数的一大因素就是为了处理内置数组类型。</p>
+<p>（实际上这就是另一种实现OO和多态的思路：Traits，很多人觉得它是比继承更好的OO方案，比如Rust就只有Traits没有继承。C++中用Traits还能减少类型间的耦合。）</p>
+<h2 id="C-的统一函数调用语法？"><a href="#C-的统一函数调用语法？" class="headerlink" title="C++的统一函数调用语法？"></a>C++的统一函数调用语法？</h2><p>C++已经有一些语言特性在支持接口原则了，ADL就是其中最显眼的一个。未来还可能会有更多语言特性与接口原则相关。</p>
+<p><code>std::invoke</code>（C++17）允许你用一套语法同时处理方法和函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">std::<span class="built_in">invoke</span>(f, x, x1, ..., xn);</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>如果<code>f</code>是方法，则调用<code>x.f(x1, ..., xn)</code>。</li>
+<li>如果<code>f</code>是函数，则调用<code>f(x, x1, ..., xn)</code>。</li>
+</ul>
+<p>已经有提案（见相关文档3）建议语言中直接支持以下两种语法的等价性：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">f</span>(x, x1, ..., xn);</span><br></pre></td></tr></table></figure>
+
+<p>如果<code>f</code>是<code>x</code>的一个方法，则等价于<code>x.f(x1, ..., xn)</code>。而：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">x.<span class="built_in">f</span>(x1, ..., xn);</span><br></pre></td></tr></table></figure>
+
+<p>如果<code>f</code>是函数，则等价于<code>f(x, x1, ..., xn)</code>。</p>
+<h2 id="相关文档"><a href="#相关文档" class="headerlink" title="相关文档"></a>相关文档</h2><ul>
+<li><a target="_blank" rel="noopener" href="http://www.gotw.ca/publications/mill02.htm">What’s In a Class? - The Interface Principle</a></li>
+<li><a target="_blank" rel="noopener" href="http://www.gotw.ca/publications/mill08.htm">Namespaces and the Interface Principle</a></li>
+<li><a target="_blank" rel="noopener" href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4474.pdf">Unified Call Syntax: x.f(y) and f(x,y)</a></li>
+</ul>
+<h1 id="What’s-In-a-Class"><a href="#What’s-In-a-Class" class="headerlink" title="What’s In a Class"></a>What’s In a Class</h1><p>本节主要介绍下这篇文章没有被前面内容覆盖到的东西。</p>
+<h2 id="C风格的OO"><a href="#C风格的OO" class="headerlink" title="C风格的OO"></a>C风格的OO</h2><p>接口原则实际上起源于C风格的OO。例子：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> _<span class="title">iobuf</span> &#123;</span> <span class="comment">/*...data goes here...*/</span> &#125;;</span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> _<span class="title">iobuf</span> <span class="title">FILE</span>;</span> </span><br><span class="line"></span><br><span class="line">FILE* <span class="title function_">fopen</span><span class="params">(<span class="type">const</span> <span class="type">char</span>* filename, <span class="type">const</span> <span class="type">char</span>* mode)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">fclose</span><span class="params">(FILE* stream)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">fseek</span> <span class="params">(FILE* stream, <span class="type">long</span> offset, <span class="type">int</span> origin)</span>;</span><br><span class="line"><span class="type">long</span> <span class="title function_">ftell</span> <span class="params">(FILE* stream)</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这里<code>FILE</code>就是一个类型，而<code>fopen</code>、<code>fclose</code>、<code>fseek</code>、<code>ftell</code>是它的公开方法，也就是它的接口。它的C++形式为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">FILE</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">FILE</span>(<span class="type">const</span> <span class="type">char</span>* filename, <span class="type">const</span> <span class="type">char</span>* mode);</span><br><span class="line">    ~<span class="built_in">FILE</span>();</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">seek</span><span class="params">(<span class="type">long</span> offset, <span class="type">int</span> origin)</span></span>;</span><br><span class="line">    <span class="function"><span class="type">long</span> <span class="title">tell</span><span class="params">()</span></span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>从接口的角度，这两种形式没有什么区别。</p>
+<h2 id="类依赖什么"><a href="#类依赖什么" class="headerlink" title="类依赖什么"></a>类依赖什么</h2><p>假设我们为类<code>X</code>实现<code>operator&lt;&lt;</code>，有两种方式：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">X</span> &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line">ostream&amp; <span class="keyword">operator</span>&lt;&lt;(ostream&amp; o, <span class="type">const</span> X&amp; x) &#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">return</span> o;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>以及</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">X</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> ostream&amp; <span class="title">print</span><span class="params">(ostream&amp; o)</span> </span>&#123;</span><br><span class="line">        ...</span><br><span class="line">        <span class="keyword">return</span> o;   </span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br><span class="line">ostream&amp; <span class="keyword">operator</span>&lt;&lt;(ostream&amp; o, <span class="type">const</span> X&amp; x) &#123;</span><br><span class="line">    <span class="keyword">return</span> x.<span class="built_in">print</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>传统上我们会认为第一种方式更好，因为<code>X</code>没有依赖<code>ostream</code>。但实际上对吗？</p>
+<ol>
+<li>根据接口原则，<code>operator&lt;&lt;</code>参数中有<code>X</code>，且和<code>X</code>一同被引入，它就是<code>X</code>的一部分。</li>
+<li><code>operator&lt;&lt;</code>参数中有<code>ostream</code>，因此<code>operator&lt;&lt;</code>依赖于<code>ostream</code>。</li>
+<li>因此<code>X</code>也依赖于<code>ostream</code>。</li>
+</ol>
+<p>所以第一种方式根本没有减少<code>X</code>的依赖。</p>
+<h2 id="一些有意思的结果"><a href="#一些有意思的结果" class="headerlink" title="一些有意思的结果"></a>一些有意思的结果</h2><p>如果<code>A</code>和<code>B</code>是类，而<code>f(A, B)</code>是一个非成员函数：</p>
+<ul>
+<li>如果<code>A</code>与<code>f</code>在一起，那么<code>f</code>就是<code>A</code>的一部分，那么<code>A</code>就依赖<code>B</code>。</li>
+<li>如果<code>B</code>与 <code>f</code>在一起，那么<code>B</code>就依赖<code>A</code>。</li>
+<li>如果三个都在一起，那么<code>A</code>与<code>B</code>就相互依赖。</li>
+</ul>
+<p>下面更有意思。假设有类<code>A</code>和<code>B</code>，且<code>A</code>有方法<code>A::g(B)</code>，那么有：</p>
+<ul>
+<li>显然<code>A</code>依赖<code>B</code>。</li>
+<li>假设<code>A</code>和<code>B</code>在一起，<code>A::g(B)</code>的参数中有<code>B</code>，且和<code>B</code>在一起，那么<code>A::g(B)</code>也是<code>B</code>的一部分。显然<code>A::g(B)</code>的参数中也有<code>A</code>，即<code>B</code>的一部分依赖<code>A</code>，那么<code>B</code>也依赖<code>A</code>。因此<code>A</code>和<code>B</code>是相互依赖的关系。</li>
+</ul>
+<h2 id="“PartOf”的关系到底有多强"><a href="#“PartOf”的关系到底有多强" class="headerlink" title="“PartOf”的关系到底有多强"></a>“PartOf”的关系到底有多强</h2><p>接口原则一直在强调非成员函数也可以是类接口的“一部分”，那么这个关系到底有多强？</p>
+<p>答案是比成员函数低一些。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/" rel="prev" title="Effective Modern C++ 笔记 Chapter7: 并发API (Item 35-37)">
+      <i class="fa fa-chevron-left"></i> Effective Modern C++ 笔记 Chapter7: 并发API (Item 35-37)
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/09/30/why-global-static-singleton-var-evil/" rel="next" title="为什么全局变量、静态变量、单例不好">
+      为什么全局变量、静态变量、单例不好 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#The-Interface-Principle-in-C"><span class="nav-number">1.</span> <span class="nav-text">The Interface Principle in C++</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%9E%E6%88%90%E5%91%98%EF%BC%88%E9%9D%9E%E5%8F%8B%E5%85%83%EF%BC%89%E5%87%BD%E6%95%B0"><span class="nav-number">1.2.</span> <span class="nav-text">非成员（非友元）函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8E%A5%E5%8F%A3%E5%8E%9F%E5%88%99"><span class="nav-number">1.3.</span> <span class="nav-text">接口原则</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ADL%EF%BC%88%E5%8F%82%E6%95%B0%E4%BE%9D%E8%B5%96%E6%9F%A5%E6%89%BE%EF%BC%89%EF%BC%9A%E6%8E%A5%E5%8F%A3%E5%8E%9F%E5%88%99%E4%B8%8E%E5%91%BD%E5%90%8D%E7%A9%BA%E9%97%B4%E9%85%8D%E5%90%88%E8%89%AF%E5%A5%BD"><span class="nav-number">1.4.</span> <span class="nav-text">ADL（参数依赖查找）：接口原则与命名空间配合良好</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B3%9B%E5%9E%8B%E4%BB%A3%E7%A0%81"><span class="nav-number">1.5.</span> <span class="nav-text">泛型代码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#C-%E7%9A%84%E7%BB%9F%E4%B8%80%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E8%AF%AD%E6%B3%95%EF%BC%9F"><span class="nav-number">1.6.</span> <span class="nav-text">C++的统一函数调用语法？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E6%96%87%E6%A1%A3"><span class="nav-number">1.7.</span> <span class="nav-text">相关文档</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#What%E2%80%99s-In-a-Class"><span class="nav-number">2.</span> <span class="nav-text">What’s In a Class</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#C%E9%A3%8E%E6%A0%BC%E7%9A%84OO"><span class="nav-number">2.1.</span> <span class="nav-text">C风格的OO</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B1%BB%E4%BE%9D%E8%B5%96%E4%BB%80%E4%B9%88"><span class="nav-number">2.2.</span> <span class="nav-text">类依赖什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E4%BA%9B%E6%9C%89%E6%84%8F%E6%80%9D%E7%9A%84%E7%BB%93%E6%9E%9C"><span class="nav-number">2.3.</span> <span class="nav-text">一些有意思的结果</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E2%80%9CPartOf%E2%80%9D%E7%9A%84%E5%85%B3%E7%B3%BB%E5%88%B0%E5%BA%95%E6%9C%89%E5%A4%9A%E5%BC%BA"><span class="nav-number">2.4.</span> <span class="nav-text">“PartOf”的关系到底有多强</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

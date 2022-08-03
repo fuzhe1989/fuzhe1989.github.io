@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Druid: A real-time analytical data store  TL;DR Druid是一种实时分析系统，它主要面向时序数据的复杂分析。Druid使用了lambda架构，使用实时节点来服务新数据，历史节点来服务历史数据，从而同时保证了查询效率、空间效率、数据可见性。Druid是存储计算分离架构，支持多种存储引擎，如HDFS、AWS S3等。 Druid比较有价值的点是它">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Druid: A real-time analytical data store">
+<meta property="og:url" content="http://fuzhe1989.github.io/2020/11/21/druid-a-real-time-analytical-data-store/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Druid: A real-time analytical data store  TL;DR Druid是一种实时分析系统，它主要面向时序数据的复杂分析。Druid使用了lambda架构，使用实时节点来服务新数据，历史节点来服务历史数据，从而同时保证了查询效率、空间效率、数据可见性。Druid是存储计算分离架构，支持多种存储引擎，如HDFS、AWS S3等。 Druid比较有价值的点是它">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/druid-01.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/druid-02.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/druid-03.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/druid-04.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/druid-05.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/druid-06.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/druid-07.jpg">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2020-11/druid-08.jpg">
+<meta property="article:published_time" content="2020-11-21T15:21:11.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.653Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="OLAP">
+<meta property="article:tag" content="Columnar">
+<meta property="article:tag" content="开源系统">
+<meta property="article:tag" content="Druid">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2020-11/druid-01.jpg">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2020/11/21/druid-a-real-time-analytical-data-store/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Druid: A real-time analytical data store | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/21/druid-a-real-time-analytical-data-store/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Druid: A real-time analytical data store
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-21 23:21:11" itemprop="dateCreated datePublished" datetime="2020-11-21T23:21:11+08:00">2020-11-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2588555.2595631">Druid: A real-time analytical data store</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Druid是一种实时分析系统，它主要面向时序数据的复杂分析。Druid使用了lambda架构，使用实时节点来服务新数据，历史节点来服务历史数据，从而同时保证了查询效率、空间效率、数据可见性。Druid是存储计算分离架构，支持多种存储引擎，如HDFS、AWS S3等。</p>
+<p>Druid比较有价值的点是它的lambda架构、列存、倒排索引、良好的可伸缩性和高可用性。</p>
+<span id="more"></span>
+
+<h2 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h2><p>Druid服务的典型时序场景，数据模式如下图：</p>
+<p><img src="/images/2020-11/druid-01.jpg" alt="Sample Data"></p>
+<p>一个Druid集群包含多种角色，如下图：</p>
+<p><img src="/images/2020-11/druid-02.jpg" alt="Overview"></p>
+<h3 id="实时节点（Real-time-Nodes）"><a href="#实时节点（Real-time-Nodes）" class="headerlink" title="实时节点（Real-time Nodes）"></a>实时节点（Real-time Nodes）</h3><p>实时节点负责服务实时读写请求，新写下去的数据立即可读。这些节点只负责最近很短时间段的数据，且定期会把这些数据发给历史节点。Druid有一个Zookeeper集群来管理所有实时节点，每个节点会将它们的状态和服务的数据范围写到ZK上。</p>
+<p>实时节点针对新写的数据有一个内存中的行格式index，定期会转换为列存格式写进本地磁盘中，再load上来，从而避免JVM堆溢出。所有磁盘文件都是不可变的。</p>
+<p><img src="/images/2020-11/druid-03.jpg"></p>
+<p>每隔一段时间实时节点会有背景任务将所有本地文件compact成一个大文件，称为segment，这个segment会包含当前节点一个时间段内的所有数据。之后实时节点会将segment上传到存储引擎。</p>
+<p><img src="/images/2020-11/druid-04.jpg"></p>
+<p>一开始实时节点在ZK上记录它服务13:00-14:00的数据。在到达14:00后，它会声明自己同时还服务于14:00-15:00的数据，再等一会前一小时的晚到数据，不立即持久化。等到持久化完egment并上传成功后，实时节点会在ZK上将13:00-14:00从自己的服务范围去掉。</p>
+<p><img src="/images/2020-11/druid-05.jpg"></p>
+<p>实时节点的上游可能是像Kafka这样的系统，实时节点会在每次写磁盘文件时把从Kafka中读到的offset记录下来。不同的实时节点可能会对应相同的Kafka流，相当于创建了数据备份；也可以一个实时节点对应一个Kafka分片，这样能最大化处理能力。</p>
+<h3 id="历史节点（Historical-Nodes）"><a href="#历史节点（Historical-Nodes）" class="headerlink" title="历史节点（Historical Nodes）"></a>历史节点（Historical Nodes）</h3><p>历史节点是shared-nothing架构，相互不知道对方存在，只需要支持非常简单的操作：如何载入、丢弃、服务不可变的segment。</p>
+<p>类似于实时节点，Zookeeper也服务于所有历史节点。载入和丢弃segment的请求就是通过ZK发送的，里面会包含这个segment的位置和解压、处理方式。每个历史节点有一个本地的cache进程。历史节点在载入segment前，会先看cache中有没有segment。引入本地cache允许历史节点快速更新和重启，而不需要担心预热。</p>
+<p><img src="/images/2020-11/druid-06.jpg"></p>
+<p>因为只服务不可变的数据，历史节点可以做无阻塞的一致性读、并发scan和聚合。</p>
+<p>Druid可以将历史节点分为多层，每层单独配置性能和容错等参数，目的是区分不同segment的优先级。</p>
+<h3 id="路由节点（Broker-Nodes）"><a href="#路由节点（Broker-Nodes）" class="headerlink" title="路由节点（Broker Nodes）"></a>路由节点（Broker Nodes）</h3><p>路由节点通过读取ZK上的数据来获得segment的列表和位置，之后将请求转给相应的实时节点或历史节点，最后再将不同节点返回的结果数据合并返回给用户。</p>
+<p>路由节点本地维护了一个LRU cache存放segment信息，这样处理请求的时候路由节点只需要去ZK中读那些未命中的segment就可以了。</p>
+<p><img src="/images/2020-11/druid-07.jpg"></p>
+<p>实时节点的数据无法缓存，因此请求总是会被发给实时节点。</p>
+<p>如果ZK不可用，路由节点会假设集群结构不会改变，一直使用cache中的数据。</p>
+<h3 id="协调节点（Coordinator-Nodes）"><a href="#协调节点（Coordinator-Nodes）" class="headerlink" title="协调节点（Coordinator Nodes）"></a>协调节点（Coordinator Nodes）</h3><p>协调节点负责历史节点上的数据管理和分布，它会告诉历史节点去载入、丢弃、复制数据，还会在历史节点之间做负载均衡。为了维护一个稳定的视图，Druid会用MVCC交换协议来管理segment（听起来像是复制或compaction），被新的segment完全覆盖的旧segment会被移除掉。</p>
+<p>协调节点内部会选举leader，leader以外的节点作为热备，不操作。</p>
+<p>协调节点会定期对比当前集群状态和期望的集群状态，再做出决策。这些信息主要保存在ZK上，另外一些配置信息则在MySQL上。MySQL上会有一张表保存所有应该被历史节点服务的segment。所有能创建segment的节点都可以写这张表，如实时节点。MySQL上也有一张表保存segment的创建、销毁、复制规则。</p>
+<p>针对每个segment，协调节点会用它匹配到的第一个规则来决定如何管理这个segment。</p>
+<p>协调节点在做负载均匀的时候要考虑到查询模式。Druid中的典型查询会覆盖来自一个数据源的近期的连续时间段的segment，且通常segment越小访问越快。</p>
+<p>因此Druid会以较快的速度复制最新的segment，从而打散大的segment，分摊压力。Druid有一套基于开销的优化器，会考虑segment的数据源、时间段、大小，来决定这个segment的分布。</p>
+<p>通过复制segment，Druid可以避免单个历史节点挂掉影响服务。</p>
+<p>如果ZK挂掉了，协调节点就没办法管理历史节点了，但不影响数据安全性。如果MySQL挂掉了，协调节点就停止新segment的指派（交给哪个历史节点）和旧segment的清理，但不会影响其它节点的查询。</p>
+<h2 id="存储格式"><a href="#存储格式" class="headerlink" title="存储格式"></a>存储格式</h2><p>TODO：Druid中每个数据源会被分为若干个segment，每个负责一个时间段。</p>
+<p>Druid要求数据中一定要有一列时间戳，以简化数据管理和加速查询。Druid中数据会先按时间（如一小时或一天）分成若干个segment，每个segment还可以再用其它列分区，从而控制大小。</p>
+<p>每个segment的命名包括了数据源、时间段、单调增的version。查询的时候对于每个时间段的数据，只会读最新的segment。</p>
+<p>Druid中数据是按列存储的，根据每列的类型选择不同的压缩方式。字符串可以用字典编码，从而将这列转换为一个int数组，如Table 1中的Page列编码为<code>[0, 0, 1, 1]</code>。 这个int数组本身非常适合再次编码。Druid中使用LZF编码这样的int数组。</p>
+<p>数字类型的列可以用类似的方式编码。</p>
+<h3 id="用于过滤数据的索引"><a href="#用于过滤数据的索引" class="headerlink" title="用于过滤数据的索引"></a>用于过滤数据的索引</h3><p>Druid会使用bitmap为string列创建倒排索引。如Table 1中的”Justin Bieber”对应<code>[1, 1, 0, 0]</code>，而”Ke$ha”则对应<code>[0, 0, 1, 1]</code>。bitmap经常会使用RLE进一步编码。Druid中使用了Concise算法。下图是Concise算法对于整数数组的压缩效果。</p>
+<p><img src="/images/2020-11/druid-08.jpg"></p>
+<p>有意思的是图中排序只换来了很小的收益。</p>
+<h3 id="存储引擎"><a href="#存储引擎" class="headerlink" title="存储引擎"></a>存储引擎</h3><p>Druid可以使用多种存储引擎，类似于Dynamo（这就是它称自己为Dynamo-style的原因？）。</p>
+<h2 id="查询API"><a href="#查询API" class="headerlink" title="查询API"></a>查询API</h2><p>Druid支持JSON格式的查询API（这篇文章没提到SQL），支持复杂的过滤条件。</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;queryType&quot;</span><span class="punctuation">:</span> <span class="string">&quot;timeseries&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;dataSource&quot;</span><span class="punctuation">:</span> <span class="string">&quot;wikipedia&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;intervals&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2013-01-01/2013-01-08&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;filter&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;selector&quot;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;dimension&quot;</span><span class="punctuation">:</span> <span class="string">&quot;page&quot;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;value&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Ke$ha&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;granularity&quot;</span><span class="punctuation">:</span> <span class="string">&quot;day&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;aggregations&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="punctuation">&#123;</span><span class="attr">&quot;type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;count&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;rows&quot;</span><span class="punctuation">&#125;</span><span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>聚合的结果可以被其它聚合的表达式所引用。</p>
+<p>截止到这篇文章发表，Druid还不支持join，认为join的收益小于代价，原因：「」</p>
+<ul>
+<li>分布式数据库中join是制约可伸缩性的一大瓶颈。</li>
+<li>相比对高并发重度使用join的场景的支持开销，join功能上的收益还不够大。</li>
+</ul>
+<p>常见的join主要是hash join和merge join，但都需要物化一些中间结果。当数据量非常大时，这种物化会带来非常复杂的分布式内存管理。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/OLAP/" rel="tag"># OLAP</a>
+              <a href="/tags/Columnar/" rel="tag"># Columnar</a>
+              <a href="/tags/%E5%BC%80%E6%BA%90%E7%B3%BB%E7%BB%9F/" rel="tag"># 开源系统</a>
+              <a href="/tags/Druid/" rel="tag"># Druid</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/11/21/f1-query-declarative-querying-at-scale/" rel="prev" title="[笔记] F1 query: declarative querying at scale">
+      <i class="fa fa-chevron-left"></i> [笔记] F1 query: declarative querying at scale
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/" rel="next" title="[笔记] AnalyticDB: Real-time OLAP Database System at Alibaba Cloud">
+      [笔记] AnalyticDB: Real-time OLAP Database System at Alibaba Cloud <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">架构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E6%97%B6%E8%8A%82%E7%82%B9%EF%BC%88Real-time-Nodes%EF%BC%89"><span class="nav-number">1.1.</span> <span class="nav-text">实时节点（Real-time Nodes）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%86%E5%8F%B2%E8%8A%82%E7%82%B9%EF%BC%88Historical-Nodes%EF%BC%89"><span class="nav-number">1.2.</span> <span class="nav-text">历史节点（Historical Nodes）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B7%AF%E7%94%B1%E8%8A%82%E7%82%B9%EF%BC%88Broker-Nodes%EF%BC%89"><span class="nav-number">1.3.</span> <span class="nav-text">路由节点（Broker Nodes）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%8F%E8%B0%83%E8%8A%82%E7%82%B9%EF%BC%88Coordinator-Nodes%EF%BC%89"><span class="nav-number">1.4.</span> <span class="nav-text">协调节点（Coordinator Nodes）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E6%A0%BC%E5%BC%8F"><span class="nav-number">2.</span> <span class="nav-text">存储格式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%A8%E4%BA%8E%E8%BF%87%E6%BB%A4%E6%95%B0%E6%8D%AE%E7%9A%84%E7%B4%A2%E5%BC%95"><span class="nav-number">2.1.</span> <span class="nav-text">用于过滤数据的索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E"><span class="nav-number">2.2.</span> <span class="nav-text">存储引擎</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2API"><span class="nav-number">3.</span> <span class="nav-text">查询API</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

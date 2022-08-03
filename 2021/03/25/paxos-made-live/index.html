@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Paxos Made Live - An Engineering Perspective  Chubby的第一个版本基于一个第三方可容错的商业数据库（下文称为3DB），它的replication有很多bug，并没有基于任何已有证明的算法，也无法证明其正确性。最终Chubby将3DB替换为了基于Paxos的实现。 作者在实现Paxos的过程中，发现这个工作并不trivial：  描述Paxo">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Paxos Made Live - An Engineering Perspective">
+<meta property="og:url" content="http://fuzhe1989.github.io/2021/03/25/paxos-made-live/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Paxos Made Live - An Engineering Perspective  Chubby的第一个版本基于一个第三方可容错的商业数据库（下文称为3DB），它的replication有很多bug，并没有基于任何已有证明的算法，也无法证明其正确性。最终Chubby将3DB替换为了基于Paxos的实现。 作者在实现Paxos的过程中，发现这个工作并不trivial：  描述Paxo">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/paxos-made-live-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2021-03/paxos-made-live-02.png">
+<meta property="article:published_time" content="2021-03-25T07:38:11.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.658Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="笔记">
+<meta property="article:tag" content="Paxos">
+<meta property="article:tag" content="Consensus">
+<meta property="article:tag" content="Google">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2021-03/paxos-made-live-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2021/03/25/paxos-made-live/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Paxos Made Live - An Engineering Perspective | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/25/paxos-made-live/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Paxos Made Live - An Engineering Perspective
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-25 15:38:11" itemprop="dateCreated datePublished" datetime="2021-03-25T15:38:11+08:00">2021-03-25</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1281100.1281103">Paxos Made Live - An Engineering Perspective</a></p>
+</blockquote>
+<p><a href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems">Chubby</a>的第一个版本基于一个第三方可容错的商业数据库（下文称为3DB），它的replication有很多bug，并没有基于任何已有证明的算法，也无法证明其正确性。最终Chubby将3DB替换为了基于Paxos的实现。</p>
+<p>作者在实现Paxos的过程中，发现这个工作并不trivial：</p>
+<ul>
+<li>描述Paxos的伪代码只要一页就够了，但作者的C++实现多达几千行。膨胀的原因是实际的生产系统需要的很多特性和优化是原paper中没有的。</li>
+<li>社区习惯于证明篇幅短的算法（一页伪代码）的正确性，但其证明方法难以扩展到几千行代码的规模，导致作者必须使用不同的广域来证明其实现的正确。</li>
+<li>容错算法只能处理一个精心选择的固定集合中的错误，而真实世界有着多得多的错误类型，包括了算法本身的错误、实现的错误、操作错误。</li>
+<li>真实系统很少能有精确的spec，甚至在实现过程中还会修改spec，就需要实现本身具有可塑性，也许就会有实现“误解”了spec导致的错误。</li>
+</ul>
+<p>这篇文章就在讲作者将Paxos从理论搬到实际的过程中的一些挑战。</p>
+<span id="more"></span>
+
+<h2 id="Architecture-Outline"><a href="#Architecture-Outline" class="headerlink" title="Architecture Outline"></a>Architecture Outline</h2><p><img src="/images/2021-03/paxos-made-live-01.png"></p>
+<p>在Chubby的架构中，Paxos用来构建最底层的log，有意地与上层的DB分离，这样log层可以给其它系统复用。</p>
+<p><img src="/images/2021-03/paxos-made-live-02.png"></p>
+<p>log层的API如上图。一旦一个值submit了，client在各个replica上设置的callback会被触发，并得知submit的值。</p>
+<h2 id="On-Paxos"><a href="#On-Paxos" class="headerlink" title="On Paxos"></a>On Paxos</h2><h3 id="Paxos-Basics"><a href="#Paxos-Basics" class="headerlink" title="Paxos Basics"></a>Paxos Basics</h3><p>基本的Paxos算法包含三个阶段：</p>
+<ol>
+<li>选出coordinator。</li>
+<li>coordinator选出一个值，将其包含进一个accept消息，广播给其它replica。其它replica可以回复acknowledge或reject。</li>
+<li>一旦多数replica回复了acknowledge，共识达成，coordinator会广播一个commit消息。</li>
+</ol>
+<p>有可能出现以下情况，多个replica都认为自己是coordinator，且选出不同的值。为了保证仍然能达成共识，有以下两种机制：</p>
+<ol>
+<li>连续的coordinator之间有序。</li>
+<li>限制每个coordinator对值的选择。</li>
+</ol>
+<p>每个coordinator有自己的sequence number（或称term）来保证顺序。一个replica想要成为coordinator时，它需要产生一个大于已知所有sequence number的新number并广播包含这个number的propose消息，其它replica的回复称为promise（前面的阶段1）。</p>
+<p>达成共识的值就不能再被修改。因此Paxos需要保证后续coordinator仍然选出相同的值，做法是replica的promise消息中包含它见过的最新的值和sequence number，新的coordinator会使用所有回复中最新的值。如果所有回复中都没有值，新coordinator才可以自由选择值。</p>
+<h3 id="Multi-Paxos"><a href="#Multi-Paxos" class="headerlink" title="Multi-Paxos"></a>Multi-Paxos</h3><p>基本的Paxos算法只能选出一个值，当需要在一系统值上应用Paxos时，我们可以针对每个值单独运行一个Paxos实例，称为Multi-Paxos。</p>
+<p>Multi-Paxos要求每个replica在本地持久化自己的状态，trivial的实现需要有5组同步写（propose、promise、accept、acknowledge、commit）。</p>
+<p>一种常见的优化是将多个Paxos实例串起来，如coordinator没有变化则可以省略propose（不影响正确性，replica仍然可以试图成为coordinator）。因此Multi-Paxos中会有一个长时间的coordinator称为master，这样每个Paxos实例中每个replica只需要写一次盘，其中master是在发出accept之后，其它replica则是在回复acknowledge之前（上一轮的commit合并进下一轮的accept&#x2F;acknowledge写）。</p>
+<p>另一种优化是批量写，一轮Paxos处理多个值。</p>
+<h2 id="Algorithmic-Challenges"><a href="#Algorithmic-Challenges" class="headerlink" title="Algorithmic Challenges"></a>Algorithmic Challenges</h2><p>实现Multi-Paxos需要很多特别的处理，一部分源自现实世界的复杂性（如磁盘错误、资源有限），一部分源自新的需求（如master lease）。这节介绍了一些需要加到Paxos算法中的机制。</p>
+<h3 id="Handle-disk-corruption"><a href="#Handle-disk-corruption" class="headerlink" title="Handle disk corruption"></a>Handle disk corruption</h3><p>每个replica都要定期检查数据完整性。一旦数据损坏，replica就可能会食言（改变已经commit的决定），违背了Paxos的核心假设。</p>
+<p>数据损坏包括了文件内容损坏和文件不可见。前者通过checksum解决（但检查不出文件状态回退，此时checksum正常）。后者需要与一个空的新replica区分开，做法是在GFS上做标记。</p>
+<p>当replica发现磁盘损坏后，它会以一个无投票权的身份加入Paxos组，接着开始追数据，直到追到它开始这次追赶时的位置，再恢复为正常成员。这样保证了replica不会在状态丢失时做出食言的决定。</p>
+<p>这种机制还允许下面这个优化：既然Paxos能处理磁盘错误，某些情况下可以省掉Paxos过程中的同步写（有点类似于<a href="/2021/03/12/an-integrated-approach-to-recovery-and-high-availability-in-an-updatable-distributed-data-warehouse">HARBOR</a>的思路）。</p>
+<h3 id="Master-leases"><a href="#Master-leases" class="headerlink" title="Master leases"></a>Master leases</h3><p>在基本的Paxos算法中，读数据需要运行一个Paxos实例，以确保读到最新状态（其它replica已经选出了新的master）。</p>
+<p>master lease的思路是master会维护自己的一个lease，只要lease不过期，在服务读请求时master就可以直接返回本地状态，而不用运行一遍完整的Paxos。</p>
+<p>作者的实现是每个replica会在每轮Paxos中隐式授予master lease，在lease过期前拒绝掉其它replica想成为master的proposal。master端有一个比lease更短的timeout，会定期刷新lease。（完全依赖lease timeout可能有安全隐患，参见<a target="_blank" rel="noopener" href="http://mysql.taobao.org/monthly/2018/10/07/">关于一致性协议和分布式锁</a>）。</p>
+<p>master lease还能避免出现两个replica反复争抢成为master的情况。另外Chubby中master还会定期运行一轮完整的Paxos来提升sequence number，进一步减小出现这种情况的概率。</p>
+<p>另外replica也可以有lease（lease期间集群保证没有写请求？），这样它也可以服务读请求。</p>
+<h3 id="Epoch-numbers"><a href="#Epoch-numbers" class="headerlink" title="Epoch numbers"></a>Epoch numbers</h3><p>从Chubby的master开始服务写请求，到数据真正落盘，期间master可能已经丧失（过）身份了。解法是引入epoch number，所有写都变成了针对epoch的条件写（和sequence number的区别在于哪？）。</p>
+<h3 id="Group-membership"><a href="#Group-membership" class="headerlink" title="Group membership"></a>Group membership</h3><p>成员变更本身可以通过一轮Paxos来实现，作者遇到的障碍是原paper中没有明确提到这一点，也没有给出正确性证明。（然而正确且高效的成员变更并不那么trivial）</p>
+<h3 id="Snapshots"><a href="#Snapshots" class="headerlink" title="Snapshots"></a>Snapshots</h3><p>Paxos的log在理论上是可以无限长的，需要有snapshot来避免这种情况。注意Paxos框架本身是与存储结构解耦的。</p>
+<p>一种看起来很直接的实现是每个replica自己维护snapshot，完成snapshot后就通知Paxos清理掉无用的log，在恢复的时候使用最近的snapshot，之后再走正常的Paxos恢复流程。</p>
+<p>但这种实现就需要保持log与snapshot这两种状态的一致，其中log完全在Paxos的控制中，但snapshot不是。以下是一些作者觉得有意思的点：</p>
+<ul>
+<li>snapshot需要有log的信息，称为snapshot handle。Chubby在handle中记录了Paxos的instance number（和sequence number的关系是？）和成员列表。</li>
+<li>snapshot过程中log不能停写，因此Chubby的snapshot过程分为三段，先记录snapshot handle，再开始生成snapshot（需要注意数据结构的并发访问），最后将snapshot handle告知给框架。</li>
+<li>snapshot可能失败，此时应用不会去通知框架。应用甚至可以同时生成多个snapshot。</li>
+<li>追赶阶段，落后的replica可以直接使用其它replica的snapshot。领先的snapshot甚至可以为这次追赶生成一个snapshot。</li>
+<li>需要有机制能定位snapshot，比如通过GFS。</li>
+</ul>
+<h3 id="Database-transactions"><a href="#Database-transactions" class="headerlink" title="Database transactions"></a>Database transactions</h3><p>Chubby实现了一种MultiOp，可以在条件满足时原子执行若干个操作。一个MultiOp包含三类元素：</p>
+<ul>
+<li>一组guard，每个都是针对单个值的test，guard的值是所有test的<strong>与</strong>。</li>
+<li>一组t_op，每个都是针对单个值的insert&#x2F;delete&#x2F;lookup，只有当guard为真时执行。</li>
+<li>一组f_op，类似于t_op，只有当guard为假时执行。</li>
+</ul>
+<h2 id="Software-Engineering"><a href="#Software-Engineering" class="headerlink" title="Software Engineering"></a>Software Engineering</h2><p>这部分主要讲工程上实现Paxos这样的共识算法需要注意什么。</p>
+<p>第一个是算法要容易被正确表达，伪代码也行。作者发明了一种用于描述状态机的语言，可以翻译为C++代码。这样算法的检验就容易多了，只需要关注spec本身，以及翻译过程是否正确。检验过的spec就可以用来做test。作者举了个例子，一开始Multi-Paxos不允许离开group的成员再加入，这样避免断断续续的错误。但后来发现这种情况比预想的要普遍得多，需要修改算法本身来支持重新加入。有了清晰的spec，整个修改只花了1个小时（test改了3天）。</p>
+<p>第二个是要在运行期做一致性检查。比如master会定期将自己的checksum发给各个replica（加入log流？）。作者遇到过三次DB的不一致：</p>
+<ul>
+<li>第一次是误操作。</li>
+<li>第二次没找到合理解释，回放有问题的replica的log发现是没问题的，那可能是有硬件的bit翻转。</li>
+<li>第三次怀疑是引入的其它代码的非法内存访问导致的。为此作者为checksum增加了一个DB做double check。</li>
+</ul>
+<p>第三个是测试。Chubby从一开始就被设计为可测试的，之后积累了庞大的测试case。作者这里介绍了两种长时间随机操作的test，每个都可以运行在Safety（校验一致性，可以没进度）或Liveness（一致且有进度）模式。</p>
+<p>第一个test针对log。它针对随机数量replica执行随机的操作序列，其中包括网络打满、消息延迟、超时、进程崩溃与恢复、文件损坏、交错调度等。随机数seed是保存好的，保证相同的操作序列可以得到相同的结果（单线程）。</p>
+<p>第二个test测试Chubby在底层系统和硬件错误时的稳健性。</p>
+<p>（类似于Chaos Engineering）</p>
+<p>作者发现一个有意思的点，容错系统被设计为会自动掩盖问题，这给发现bug带来了困难。</p>
+<p>第四个是并发。test很重要的特性是要能复现，就需要排除并发的干扰。但真实系统就是并发的，单线程的test无法测试真实系统。这种矛盾似乎没有好的解法。</p>
+<h2 id="Unexpected-Failures"><a href="#Unexpected-Failures" class="headerlink" title="Unexpected Failures"></a>Unexpected Failures</h2><p>作者遇到的非预期的错误：</p>
+<ul>
+<li>新的Chubby的线程数是旧Chubby的10倍，但上线后没有能处理更多请求，worker线程还会阻塞其它关键线程。在回滚过程中，因为文档不清晰，SRE的操作不正确，丢失了15小时的数据。</li>
+<li>几个月后再次尝试升级Chubby时，因为没有清理掉上次升级留下的文件，升级又失败了，还因为使用了一个旧的snapshot，丢失了30分钟的数据。</li>
+<li>接下来作者发现了replica在失去master身份又成为master后，之前的操作没有失败，与预期不符。之后引入了epoch number。</li>
+<li>之后又通过runtime check发现了某个replica的checksum与其它replica不一致。</li>
+<li>从旧Chubby到新的基于Paxos的Chubby的迁移脚本多次失败，其中一次的原因是软件包配置不对。</li>
+<li>Linux2.4内核的fsync有bug，会将其它文件的数据也刷下去，执行时间可能很长。workaround是让大文件的flush更频繁（每个chunk flush一次），牺牲大文件的写性能来保证log的写性能。</li>
+</ul>
+<h2 id="Summary-and-Open-Problems"><a href="#Summary-and-Open-Problems" class="headerlink" title="Summary and Open Problems"></a>Summary and Open Problems</h2><ul>
+<li>Paxos算法与真实系统之间有着巨大的gap，工程师需要对协议做许多微小的扩展，而这导致了真实系统总是基于一个未经证明的协议。</li>
+<li>社区还没有工具能让实现一个容错算法变得容易。</li>
+<li>社区在test方面的关注不够。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%AC%94%E8%AE%B0/" rel="tag"># 笔记</a>
+              <a href="/tags/Paxos/" rel="tag"># Paxos</a>
+              <a href="/tags/Consensus/" rel="tag"># Consensus</a>
+              <a href="/tags/Google/" rel="tag"># Google</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/16/consensus-on-transaction-commit/" rel="prev" title="[笔记] Consensus on Transaction Commit">
+      <i class="fa fa-chevron-left"></i> [笔记] Consensus on Transaction Commit
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/25/weaving-relations-for-cache-performance/" rel="next" title="[笔记] Weaving Relations for Cache Performance">
+      [笔记] Weaving Relations for Cache Performance <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Architecture-Outline"><span class="nav-number">1.</span> <span class="nav-text">Architecture Outline</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#On-Paxos"><span class="nav-number">2.</span> <span class="nav-text">On Paxos</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Paxos-Basics"><span class="nav-number">2.1.</span> <span class="nav-text">Paxos Basics</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Multi-Paxos"><span class="nav-number">2.2.</span> <span class="nav-text">Multi-Paxos</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Algorithmic-Challenges"><span class="nav-number">3.</span> <span class="nav-text">Algorithmic Challenges</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Handle-disk-corruption"><span class="nav-number">3.1.</span> <span class="nav-text">Handle disk corruption</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Master-leases"><span class="nav-number">3.2.</span> <span class="nav-text">Master leases</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Epoch-numbers"><span class="nav-number">3.3.</span> <span class="nav-text">Epoch numbers</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Group-membership"><span class="nav-number">3.4.</span> <span class="nav-text">Group membership</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Snapshots"><span class="nav-number">3.5.</span> <span class="nav-text">Snapshots</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Database-transactions"><span class="nav-number">3.6.</span> <span class="nav-text">Database transactions</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Software-Engineering"><span class="nav-number">4.</span> <span class="nav-text">Software Engineering</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Unexpected-Failures"><span class="nav-number">5.</span> <span class="nav-text">Unexpected Failures</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Summary-and-Open-Problems"><span class="nav-number">6.</span> <span class="nav-text">Summary and Open Problems</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

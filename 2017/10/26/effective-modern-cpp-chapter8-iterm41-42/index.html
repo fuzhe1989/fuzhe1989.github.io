@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="本章介绍一种通用技术（传值调用）和一种通用特性（原地构造），它们都受到多种因素的影响，作者能给的建议只是“考虑用一下”，实践上要根据具体情况来定。 Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值有些函数参数就是要被复制的： 12345678910111213class Widget &amp;#123;public:    void addName(const std::stri">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Effective Modern C++ 笔记 Chapter8: 杂项 (Item 41-42)">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="本章介绍一种通用技术（传值调用）和一种通用特性（原地构造），它们都受到多种因素的影响，作者能给的建议只是“考虑用一下”，实践上要根据具体情况来定。 Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值有些函数参数就是要被复制的： 12345678910111213class Widget &amp;#123;public:    void addName(const std::stri">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-10-26T15:24:18.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.655Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="Effective Modern C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>Effective Modern C++ 笔记 Chapter8: 杂项 (Item 41-42) | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Effective Modern C++ 笔记 Chapter8: 杂项 (Item 41-42)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-10-26 23:24:18" itemprop="dateCreated datePublished" datetime="2017-10-26T23:24:18+08:00">2017-10-26</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本章介绍一种通用技术（传值调用）和一种通用特性（原地构造），它们都受到多种因素的影响，作者能给的建议只是“考虑用一下”，实践上要根据具体情况来定。</p>
+<h2 id="Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值"><a href="#Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值" class="headerlink" title="Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值"></a>Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值</h2><p>有些函数参数就是要被复制的：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addName</span><span class="params">(<span class="type">const</span> std::string&amp; newName)</span> </span>&#123;</span><br><span class="line">        names.<span class="built_in">push_back</span>(newName);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addName</span><span class="params">(std::string&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        names.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(newName));</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    std::vector&lt;std::string&gt; names;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>上面的两个函数一个处理左值，一个处理右值，但实际上它们的逻辑都是一样的，但我们写了两个函数，两个实现。</p>
+<p>假如你想用普适引用来代替上面两个函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        names.<span class="built_in">push_back</span>(std::forward&lt;T&gt;(newName));</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>代码省掉了一份，但又导致了其它问题。作为模板函数，<code>addName</code>需要放到头文件里。而且它不一定只有两个实例化版本（左值和右值），所有可以用于构造<code>std::string</code>的类型都可能会实例化一个版本（参见Item25）。同时，还有一些参数类型没办法使用普适引用（参见Item30）。如果调用方传递错类型，编译错误信息会非常恐怖（参见Item27）。</p>
+<p>一种方法可以让我们只写一个函数，且没有普适引用的各种问题：参数直接传值，不使用引用：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addname</span><span class="params">(std::string newName)</span> </span>&#123;</span><br><span class="line">        names.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(newName));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这个版本中，我们知道：</p>
+<ol>
+<li><code>newName</code>与实参没有关系，因此如何修改<code>newName</code>都不会影响到实参。</li>
+<li>这是<code>newName</code>最后一次被使用，因此移动它不会影响到后面程序的运行。</li>
+</ol>
+<p>我们只需要写一个函数，因此：</p>
+<ol>
+<li>避免了代码重复，包括源代码和目标代码。</li>
+<li>没用普适引用，因此不会污染头文件，不会导致奇怪的运行失败或编译错误。</li>
+</ol>
+<p>但它的开销如何？</p>
+<p>当实参是左值时，实参到形参<code>newName</code>会有一次复制。但当实参是右值时，<code>newName</code>的构造会使用移动构造函数，因此它的构造开销是一次移动。后面构造<code>names</code>中的元素时，无论实参是左值还是右值，都是一次移动。</p>
+<p>因此上面的方法中，当实参是左值时，开销是一次复制+一次移动；当实参是右值时，开销是两次移动。对比原来的重载版本，当实参是左值时，开销是一次复制；当实参是右值时，开销是一次移动。因此传值方法会比重载方法多一次移动的开销。</p>
+<p>对于普适引用版本，情况有点复杂。当<code>T</code>是可以用于构造<code>std::string</code>时，普适引用在实参到形参中不会有对象构造，而是直接使用实参去构造<code>names</code>中的元素。本节我们不考虑这种情况，只假设实参是<code>std::string</code>，那么普适引用版本的开销与重载版本相同。</p>
+<p>回头看一下标题，“对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值”：</p>
+<ol>
+<li><p>你只能是考虑要不要用传值方法。它确实有很多优点，但它也确实比其它版本多一次移动的开销。一些场景下（后面会讨论），这次开销不可忽视。</p>
+</li>
+<li><p>只能对可复制的参数使用传值方法。对于只能移动的类型，我们只能移动构造形参，就不存在需要写两个重载版本的问题，也就不需要使用传值方法了：直接传右值引用多简单。</p>
+</li>
+<li><p>传值方法只适用于“移动非常廉价”的类型。</p>
+</li>
+<li><p>只有当参数的复制不可避免时，才需要考虑传值方法。假如有某个分支下我们不需要复制参数，那么重载版本就不需要复制参数，而传值版本在调用那一刻已经复制完了，没办法省掉。</p>
+ <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addName</span><span class="params">(std::string newName)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> ((newName.<span class="built_in">length</span>() &gt;= minLen) &amp;&amp; (newName.<span class="built_in">length</span>() &lt;= maxLen)) &#123;</span><br><span class="line">            names.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(newName));</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p>即使上面三个条件都满足，也有场景不适用于传值方法。我们说复制时，不光是复制构造，还有复制赋值。考虑到这点，开销分析就更复杂了。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Password</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Password</span><span class="params">(std::string pwd)</span></span></span><br><span class="line"><span class="function">        : text(std::move(pwd)) &#123;</span>&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">changeTo</span><span class="params">(std::string newPwd)</span> </span>&#123;</span><br><span class="line">        text = std::<span class="built_in">move</span>(newPwd);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>构造<code>Password</code>显然是可以用传值方法的：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::string <span class="title">initPwd</span><span class="params">(<span class="string">&quot;Supercalifragilisticexpialidocious&quot;</span>)</span></span>;</span><br><span class="line"><span class="function">Password <span class="title">p</span><span class="params">(initPwd)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>但在调用<code>changeTo</code>时：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::string newPassword = <span class="string">&quot;Beware the Jabberwock&quot;</span>;</span><br><span class="line">p.<span class="built_in">changeTo</span>(newPassword);</span><br></pre></td></tr></table></figure>
+
+<p><code>newPassword</code>是左值，因此<code>newPwd</code>要进行复制构造，这里会分配内存。之后<code>newPwd</code>移动赋值给<code>text</code>时，<code>text</code>会释放自己原有的内存块，转而使用<code>newPwd</code>持有的内存块。因此<code>changeTo</code>有两次内存操作，一次分配，一次释放。</p>
+<p>但我们这个例子中，旧密码比新密码长，因此如果我们使用重载方法，就不会有内存分配或释放（直接复制到旧密码的内存块上）：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Password::ChangeTo</span><span class="params">(<span class="type">const</span> std::string&amp; newPwd)</span> </span>&#123;</span><br><span class="line">    text = newPwd;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因此在这个例子中，传值版本比重载版本的开销多了两次内存操作，很可能比字符串的移动开销大一个数量级。</p>
+<p>但在旧密码比新密码短的例子中，重载版本也没办法避免掉两次内存操作，这时传值方法的优势又回来了。</p>
+<p>以上分析只针对实参为左值的情况，当实参为右值时，移动总是更好的。</p>
+<p>由此可以看出，当有赋值时，可能影响结论的因素太多了，比如<code>Password</code>这个例子中<code>std::string</code>是否使用了SSO优化也会影响我们的结论。</p>
+<p>实践中通常采用“有罪推定”原则，即优先使用重载方法或普适引用方法，直到传值方法显示出它的优势。对于那些对性能有极致要求的软件，传值方法就不太合适了。首先，多出的一次移动的开销可能很重要；其次，很难确定到底多了几次移动。假设我们构造链路上有N层，有可能每层的构造都使用了传值方法，看起来简单的一次构造实际上多了N次移动的开销。而且我们还很难发现这件事。</p>
+<p>传值方法的另一个问题，是当有继承的时候，传值可能引发“切片问题”。当形参是基类而实参是派生类型时，实参到形参的构造会丢掉派生类型多出的部分，最终只得到一个基类对象。而传引用就不会有这个问题。这也是C++98中传值不被接受的一个原因。</p>
+<h2 id="Item42-考虑用原地构造替代插入"><a href="#Item42-考虑用原地构造替代插入" class="headerlink" title="Item42: 考虑用原地构造替代插入"></a>Item42: 考虑用原地构造替代插入</h2><p>假设我们有一个容器，元素类型是<code>std::string</code>。当我们向这个容器插入一个新元素时，新元素的类型是什么？直觉告诉我们，新元素的类型就是<code>std::string</code>。</p>
+<p>但直觉不总是对的。看下面的代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;std::string&gt; vs;</span><br><span class="line">vs.<span class="built_in">push_back</span>(<span class="string">&quot;xyzzy&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>这里，我们插入的新元素类型不是<code>std::string</code>，而是<code>char[6]</code>或<code>char*</code>。<code>std::vector</code>有两个版本的<code>push_back</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T, <span class="keyword">class</span> <span class="title class_">Allocator</span> = allocator&lt;T&gt;&gt;</span><br><span class="line"><span class="keyword">class</span> vector &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="type">void</span> <span class="built_in">push_back</span>(<span class="type">const</span> T&amp; x);</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">push_back</span><span class="params">(T&amp;&amp; x)</span></span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>当编译器发现实参类型与形参类型不匹配时，它会生成一些代码，构造一个临时的<code>std::string</code>对象，效果类似于：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vs.<span class="built_in">push_back</span>(std::<span class="built_in">string</span>(<span class="string">&quot;xyzzy&quot;</span>));</span><br></pre></td></tr></table></figure>
+
+<p>整个过程为：</p>
+<ol>
+<li>构造临时对象。</li>
+<li><code>std::vector</code>分配空间给新元素。</li>
+<li>将临时对象复制到新的空间上。</li>
+<li>析构临时对象。</li>
+</ol>
+<p>于是这里偷偷的多了一次对象的构造和析构。另外还有一次临时对象的复制。当我们很关心性能时，这些额外开销是不可忽视的。</p>
+<p>C++11新增的<code>emplace_back</code>方法就可以避免这个问题：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">vs.<span class="built_in">emplace_back</span>(<span class="string">&quot;xyzzy&quot;</span>);</span><br><span class="line">vs.<span class="built_in">emplace_back</span>(<span class="number">50</span>, <span class="string">&#x27;x&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>它会先分配空间，再在新空间上使用传入参数直接构造出<code>std::string</code>。每个支持<code>push_back</code>的容器也都支持<code>emplace_back</code>，支持<code>push_front</code>的容器也都支持<code>emplace_front</code>，支持<code>insert</code>的容器也都支持<code>emplace</code>。</p>
+<p>一般来说insert和emplace的效果是完全相同的，同时<code>emplace</code>还省掉了临时对象的构造和析构，那么还有什么情况下我们不用emplace呢？</p>
+<p>目前的C++标准库实现中，既有emplace比insert快的场景，也有emplace比insert慢的场景。这些场景很难列举，取决于传入的参数类型、使用的容器、新元素所处的位置、元素的构造函数的异常安全性，以及对于map和set类容器，要插入的元素是否已经存在等因素。因此在决定使用insert还是emplace前，先测一下性能。</p>
+<p>当然也有些启发式的方法来判断emplace适用于哪些场景。以下条件如果为真，emplace就很可能比insert性能更好：</p>
+<ul>
+<li><p>新元素在容器内直接构造，而不是先构造再赋值。</p>
+<p>  在前面的例子中，我们要在<code>vs</code>的尾部新增一个元素，显然这里之前不存在对象，我们只能构造一个对象。emplace此时就比较有优势。但下面这个例子中：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;std::string&gt; vs;</span><br><span class="line">...</span><br><span class="line">vs.<span class="built_in">emplace</span>(vs.<span class="built_in">begin</span>(), <span class="string">&quot;xyzzy&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>  我们要在<code>vs</code>的头部新增一个对象。大多数实现会先用<code>&quot;&quot;xyzzy&quot;</code>构造出一个临时的<code>std::string</code>，再移动赋值给目标对象。这样emplace相比insert的优势就没有了。</p>
+<p>  当然，这取决于我们用的实现。但此时启发式方法还是有用的。理论上基于节点的容器都会构造新元素，而大多数STL容器都是基于节点的。只有几个容器不基于节点：<code>std::vector</code>、<code>std::deque</code>、<code>std::string</code>（<code>std::array</code>基于节点，但它没有emplace和insert类的方法）。当你明确知道新元素会被构造出来时，就可以毫不犹豫的使用emplace。这三个容器的<code>emplace_back</code>都是推荐用的，对于<code>std::deque</code>来说，<code>emplace_front</code>也推荐使用。</p>
+</li>
+<li><p>实参类型与容器的元素类型不同。（解释略）</p>
+</li>
+<li><p>容器不会因重复元素而拒绝插入。这里说的是对于<code>std::set</code>或<code>std::map</code>这样的容器，在插入时需要比较，那么就需要把实参先构造为一个临时对象。这样emplace的优势就没有了。</p>
+</li>
+</ul>
+<p>下面两次调用就满足上面的条件：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">vs.<span class="built_in">emplace_back</span>(<span class="string">&quot;xyzzy&quot;</span>);</span><br><span class="line">vs.<span class="built_in">emplace_back</span>(<span class="number">50</span>, <span class="string">&#x27;x&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>在决定使用emplace后，有两个问题值得考虑。第一个是资源管理的问题。假设你有一个容器：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">std::list&lt;std::shared_ptr&lt;Widget&gt;&gt; ptrs;</span><br></pre></td></tr></table></figure>
+
+<p><code>Widget</code>需要的自定义销毁函数是：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">killWidget</span><span class="params">(Widget* pWidget)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>根据Item21，这种情况下我们没办法用<code>std::make_shared</code>了。insert版本是：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ptrs.<span class="built_in">push_back</span>(std::<span class="built_in">shared_ptr</span>&lt;Widget&gt;(<span class="keyword">new</span> Widget, killWidget));</span><br></pre></td></tr></table></figure>
+
+<p>或：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ptrs.<span class="built_in">push_back</span>(&#123;<span class="keyword">new</span> Widget, killWidget&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>无论哪种情况，都要构造出一个临时对象。这不就是emplace能避免的吗？</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ptrs.<span class="built_in">emplace_back</span>(<span class="keyword">new</span> Widget, killWidget);</span><br></pre></td></tr></table></figure>
+
+<p>但注意，临时对象带来的好处远比它的构造和析构成本要大得多。考虑一种情况：</p>
+<ol>
+<li>我们构造了一个临时对象<code>temp</code>，持有<code>new Widget</code>的结果。</li>
+<li>容器扩张时抛了个异常。</li>
+<li>异常传播到外层，<code>temp</code>被销毁，<code>Widget*</code>被释放。</li>
+</ol>
+<p>而emplace版本则是：</p>
+<ol>
+<li><code>new Widget</code>的结果，一个裸指针，传进了<code>emplace_back</code>函数内。</li>
+<li>容器扩张时抛了个异常。</li>
+<li>没有智能指针持有前面的裸指针，内存泄漏。</li>
+</ol>
+<p>类似的问题也会出现在每个RAII类中。将裸指针（或其它未受保护的资源）通过完美转发的方式传递进emplace函数后，在RAII对象构造之前，有个窗口期。正确的方式是：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::shared_ptr&lt;Widget&gt; <span class="title">spw</span><span class="params">(<span class="keyword">new</span> Widget, killWidget)</span></span>; </span><br><span class="line">ptrs.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(spw));</span><br></pre></td></tr></table></figure>
+
+<p>或：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::shared_ptr&lt;Widget&gt; <span class="title">spw</span><span class="params">(<span class="keyword">new</span> Widget, killWidget)</span></span>;</span><br><span class="line">ptrs.<span class="built_in">emplace_back</span>(std::<span class="built_in">move</span>(spw));</span><br></pre></td></tr></table></figure>
+
+<p>无论哪种方式都要先构造对象，此时emplace和insert就没什么区别了。</p>
+<p>第二个问题是emplace与<code>explicit</code>构造函数的相互作用。想象你有一个正则表达式的容器：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;std::regex&gt; regexes;</span><br></pre></td></tr></table></figure>
+
+<p>有一天你写了这么一行代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">regexes.<span class="built_in">emplace_back</span>(<span class="literal">nullptr</span>);</span><br></pre></td></tr></table></figure>
+
+<p>然后编译器居然不报错！<code>nullptr</code>怎么可能是正则表达式呢？</p>
+<p><code>std::regex r = nullptr</code>是没办法编译通过的。而<code>regexes.push_back(nullptr)</code>也是非法的。</p>
+<p>问题在于<code>std::regex</code>有一个接受<code>const char*</code>的析构函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::regex <span class="title">upperCaseWord</span><span class="params">(<span class="string">&quot;[A-Z]+&quot;</span>)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>但它是<code>explicit</code>的，因此下面这么用会报错：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::regex r = <span class="literal">nullptr</span>;</span><br><span class="line">regexes.<span class="built_in">push_back</span>(<span class="literal">nullptr</span>);</span><br></pre></td></tr></table></figure>
+
+<p>但显式调用构造函数是可以的：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::regex <span class="title">r</span><span class="params">(<span class="literal">nullptr</span>)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<p>不幸的是emplace函数中就是这么构造对象的，能编译，但运行结果未定义。</p>
+<p>下面两种很类似的构造方式，但结果不同：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::regex r1 = <span class="literal">nullptr</span>;          <span class="comment">// Error</span></span><br><span class="line"><span class="function">std::regex <span class="title">r2</span><span class="params">(<span class="literal">nullptr</span>)</span></span>;           <span class="comment">// OK</span></span><br></pre></td></tr></table></figure>
+
+<p>第一种是复制初始化，第二种是直接初始化。复制初始化不允许使用<code>explicit</code>构造函数，而直接初始化则可以。emplace函数中执行的是对象的直接初始化，而insert函数中则是复制初始化。</p>
+<p>因此当你使用emplace的时候，注意看一下你传递的类型对不对，因为它会在你没注意到的时候绕开<code>explicit</code>的限制，然后制造一个大新闻。</p>
+<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
+<li><a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Chapter1 类型推断 (Item 1-4)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">Chapter2 auto (Item 5-6)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">Chapter3 现代C++（Item 7-10)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm11-14/">Chapter3 现代C++（Item 11-14)</a></li>
+<li><a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/">Chapter3 现代C++（Item 15-17)</a></li>
+<li><a href="/2017/07/27/effective-modern-cpp-chapter4-iterm18-22/">Chapter4 智能指针 (Item 18-22)</a></li>
+<li><a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">Chapter5 右值引用、移动语义、完美转发（Item 23-26)</a></li>
+<li><a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Chapter5 右值引用、移动语义、完美转发（Item 27-30)</a></li>
+<li><a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">Chapter6: Lamba表达式 (Item 31-34)</a></li>
+<li><a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/">Chapter7: 并发API (Item 35-37)</a></li>
+<li><a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">Chapter7: 并发API (Item 38-40)</a></li>
+<li><a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">Chapter8: 杂项 (Item 41-42)</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+              <a href="/tags/Effective-Modern-C/" rel="tag"># Effective Modern C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/" rel="prev" title="Effective Modern C++ 笔记 Chapter 7: 并发API (Item38-40)">
+      <i class="fa fa-chevron-left"></i> Effective Modern C++ 笔记 Chapter 7: 并发API (Item38-40)
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/10/29/cpp-type-erasure/" rel="next" title="C++: Type Erasure">
+      C++: Type Erasure <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Item41%EF%BC%9A%E5%AF%B9%E4%BA%8E%E5%8F%AF%E5%A4%8D%E5%88%B6%E7%9A%84%E3%80%81%E7%A7%BB%E5%8A%A8%E9%9D%9E%E5%B8%B8%E5%BB%89%E4%BB%B7%E3%80%81%E6%80%BB%E6%98%AF%E5%A4%8D%E5%88%B6%E7%9A%84%E5%8F%82%E6%95%B0%EF%BC%8C%E8%80%83%E8%99%91%E8%B0%83%E7%94%A8%E6%97%B6%E4%BC%A0%E5%80%BC"><span class="nav-number">1.</span> <span class="nav-text">Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Item42-%E8%80%83%E8%99%91%E7%94%A8%E5%8E%9F%E5%9C%B0%E6%9E%84%E9%80%A0%E6%9B%BF%E4%BB%A3%E6%8F%92%E5%85%A5"><span class="nav-number">2.</span> <span class="nav-text">Item42: 考虑用原地构造替代插入</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E5%BD%95"><span class="nav-number">3.</span> <span class="nav-text">目录</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

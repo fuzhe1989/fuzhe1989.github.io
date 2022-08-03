@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="Type Erasure，直译就是“类型擦除”。什么时候需要擦除类型？当我们想令一些代码具备多态性质时，我们往往没办法保留对象本身的类型，而需要用一种通用的类型去使用它们，这个时候，就需要擦除对象原有的类型。 Type Erasure的几种形式void*在C语言中，很多通用算法函数都会使用void*作为参数类型，比如qsort，它的原型是： 1void qsort (void* base, siz">
+<meta property="og:type" content="article">
+<meta property="og:title" content="C++: Type Erasure">
+<meta property="og:url" content="http://fuzhe1989.github.io/2017/10/29/cpp-type-erasure/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="Type Erasure，直译就是“类型擦除”。什么时候需要擦除类型？当我们想令一些代码具备多态性质时，我们往往没办法保留对象本身的类型，而需要用一种通用的类型去使用它们，这个时候，就需要擦除对象原有的类型。 Type Erasure的几种形式void*在C语言中，很多通用算法函数都会使用void*作为参数类型，比如qsort，它的原型是： 1void qsort (void* base, siz">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2017-10-29T09:26:20.000Z">
+<meta property="article:modified_time" content="2022-07-26T00:01:50.652Z">
+<meta property="article:author" content="Fu Zhe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2017/10/29/cpp-type-erasure/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>C++: Type Erasure | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/10/29/cpp-type-erasure/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          C++: Type Erasure
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-10-29 17:26:20" itemprop="dateCreated datePublished" datetime="2017-10-29T17:26:20+08:00">2017-10-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Type Erasure，直译就是“类型擦除”。什么时候需要擦除类型？当我们想令一些代码具备多态性质时，我们往往没办法保留对象本身的类型，而需要用一种通用的类型去使用它们，这个时候，就需要擦除对象原有的类型。</p>
+<h1 id="Type-Erasure的几种形式"><a href="#Type-Erasure的几种形式" class="headerlink" title="Type Erasure的几种形式"></a>Type Erasure的几种形式</h1><h2 id="void"><a href="#void" class="headerlink" title="void*"></a><code>void*</code></h2><p>在C语言中，很多通用算法函数都会使用<code>void*</code>作为参数类型，比如<code>qsort</code>，它的原型是：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">qsort</span> <span class="params">(<span class="type">void</span>* base, <span class="type">size_t</span> num, <span class="type">size_t</span> size, <span class="type">int</span> (*compare)(<span class="type">const</span> <span class="type">void</span>*,<span class="type">const</span> <span class="type">void</span>*))</span>;</span><br></pre></td></tr></table></figure>
+
+<p>为了使<code>qsort</code>有处理多种类型的能力，它只能把参数类型设为<code>void*</code>，这样我们可以用同一个<code>qsort</code>函数，处理各种各样的类型。代价就是对象原有的类型被擦除了，我们只能看到<code>void*</code>。</p>
+<p>这种方法的缺点是，它不能保证类型安全。当我们擦除了一个对象的类型后，总会在某个时刻需要把它再找回来的。在<code>qsort</code>中，我们总是需要能拿到对象的正确类型的，才能进行正确的排序。而这个工作是通过<code>compare</code>完成的：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">int_compare</span><span class="params">(<span class="type">const</span> <span class="type">void</span>* a, <span class="type">const</span> <span class="type">void</span>* b)</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> *(<span class="type">const</span> <span class="type">int</span>*)a - *(<span class="type">const</span> <span class="type">int</span>*)b;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">str_compare</span><span class="params">(<span class="type">const</span> <span class="type">void</span>* a, <span class="type">const</span> <span class="type">void</span>* b)</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">strcmp</span>((<span class="type">const</span> <span class="type">char</span>*)a, (<span class="type">const</span> <span class="type">char</span>*)b);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>假设我们传递了错误的<code>compare</code>，谁能知道这件事？编译器不知道，因为你把类型擦除掉了。你自己也不知道，因为代码就是你写的。测试程序可能知道，也可能不知道，因为这个时候程序的行为是未定义的。</p>
+<h2 id="继承"><a href="#继承" class="headerlink" title="继承"></a>继承</h2><p>在面向对象语言中，继承是最常见的Type Erasure。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">interface</span> <span class="title class_">Counter</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">Increase</span><span class="params">(<span class="type">int</span> v)</span>;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">Decrease</span><span class="params">(<span class="type">int</span> v)</span>;</span><br><span class="line">    <span class="keyword">public</span> <span class="type">int</span> <span class="title function_">Value</span><span class="params">()</span>;</span><br><span class="line">&#125;;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Test</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">down</span><span class="params">(Counter c)</span> &#123;</span><br><span class="line">        <span class="type">int</span> <span class="variable">count</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> <span class="variable">oldValue</span> <span class="operator">=</span> c.Value();</span><br><span class="line">        <span class="keyword">while</span> (c.Value() != <span class="number">0</span>) &#123;</span><br><span class="line">            c.Decrease(<span class="number">1</span>);</span><br><span class="line">            count++;</span><br><span class="line">        &#125;</span><br><span class="line">        Assert.assertEqual(count, oldValue);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>在<code>Test.down</code>中，我们只知道<code>c</code>的类型是<code>Counter</code>，但不知道它是哪个实现类型，这里它的类型就被擦除了。</p>
+<p>继承当然是比<code>void*</code>要好的，因为我们操作对象时调用的是对象具体的实现API，换句话说，我们只擦除了调用处对象的类型，实际上它并没有丢掉自己的类型，也保证了类型安全性。</p>
+<p>继承的问题在于，它的侵入性，即它要求每个实现类型都继承自某个基类。在很多情况下，这是很难做到的，或者是很别扭的。</p>
+<p>比如说<code>RedApple</code>，一个红色的苹果，当我们想使用“红色”这个泛型概念时，它需要实现<code>Red</code>这个接口；而当我们想使用“苹果”这个概念时，它又需要实现<code>Apple</code>这个接口。某天当我们想使用“类球形”这个概念时，它又要实现<code>RoundLike</code>接口吗？</p>
+<p>当接口一个又一个的出现时，有人会说，干脆我们到处传递<code>Object</code>吧，用的时候再down_cast成具体的类型。于是我们又回到了<code>void*</code>的时代。</p>
+<p>尤其是，有些类型我们是没有办法改的，比如三方库中定义的类型，比如内置类型。这些情况下，继承就无能为力了。</p>
+<h2 id="Duck-Typing和Template"><a href="#Duck-Typing和Template" class="headerlink" title="Duck Typing和Template"></a>Duck Typing和Template</h2><p>如果一个东西，走路像鸭子，叫声也像鸭子，那么它就是鸭子。换句话说，如果一个东西，满足我们对鸭子的所有要求，那么它就是鸭子。如果一个<code>T</code>，满足我们对<code>X</code>的所有要求，那么它就是<code>X</code>。这就是duck typing，即鸭子类型。</p>
+<p>Python中大量应用了duck typing：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">RedApple</span>:</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">color</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&#x27;red&#x27;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">round_like</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">map_by_color</span>(<span class="params">items</span>):</span><br><span class="line">    ret = defaultdict(<span class="built_in">list</span>)</span><br><span class="line">    <span class="keyword">for</span> item <span class="keyword">in</span> items:</span><br><span class="line">        ret[item.color()].append(item)</span><br><span class="line">    <span class="keyword">return</span> ret</span><br><span class="line"></span><br><span class="line">color_map = map_by_color([..., RedApple(), ...])</span><br></pre></td></tr></table></figure>
+
+<p>在<code>map_by_color</code>中，我们对<code>items</code>有两项要求：</p>
+<ol>
+<li>可遍历。</li>
+<li>其中每个元素都有<code>color</code>方法。</li>
+</ol>
+<p>但不要求<code>items</code>或其中每个<code>item</code>继承自哪个特定的接口。</p>
+<p>这也是Type Erasure，但明显比继承来得更自由。当然自由都是有代价的，duck typing的代价就是它的运行时性能损失。Python中每个对象都会保留自己的类型信息，在调用时进行动态绑定。Go的<code>interface</code>有着类似的用法，也有着类似的优缺点。</p>
+<p>C++的模板也是一种duck typing：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> C&gt;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">CountByColor</span><span class="params">(<span class="type">const</span> C&amp; container, Color color)</span> </span>&#123;</span><br><span class="line">    <span class="type">int</span> count = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; item: container) &#123;</span><br><span class="line">        <span class="keyword">if</span> (item.<span class="built_in">Color</span>() == color) &#123;</span><br><span class="line">            ++count;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> count;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里面有个模板参数<code>C</code>，我们对它的要求是：</p>
+<ol>
+<li>可遍历，具体来说是支持<code>begin(container)</code>和<code>end(container)</code>两种API。</li>
+<li>遍历出来的每个元素有<code>T Color() const</code>方法，且<code>T</code>与<code>Color</code>类型有合适的<code>operator==</code>函数存在。</li>
+</ol>
+<p>所有满足这个条件的<code>C</code>都可以作为<code>CountByColor</code>的参数类型。</p>
+<p>当然C++的模板与Python的duck typing还是有很大区别的，因为它并没有真的擦除掉元素类型：<code>C</code>是<code>CountByColor</code>原型的一部分。这样我们其实一直都保留着元素的具体类型信息，好处：</p>
+<ol>
+<li>完整的类型安全性，没有任何环节丢掉了类型信息。</li>
+<li>因此不需要动态绑定，所有环节都是静态的，没有运行时性能损失。</li>
+</ol>
+<p>但也有坏处：</p>
+<ol>
+<li>模板类型会作为模板函数或模板类的原型的一部分，即<code>vector&lt;int&gt;</code>和<code>vector&lt;double&gt;</code>是两个类型，没办法用一个类型来表示，也就没办法实现出上面Python例子中的<code>map_by_color</code>函数。</li>
+<li>每次用不同的参数类型来实例化模板时，都会新生成一份代码，导致编译出来的二进制文件很大。</li>
+</ol>
+<h2 id="C-中结合继承与Template的Type-Erasure"><a href="#C-中结合继承与Template的Type-Erasure" class="headerlink" title="C++中结合继承与Template的Type Erasure"></a>C++中结合继承与Template的Type Erasure</h2><p>在C++中我们可以结合继承与Template，实现出一种Type Erasure，它既有duck typing的优点，又可以将不同类型用同一种类型表示。</p>
+<p>假设我们现在要重新设计上面的<code>Counter</code>接口，首先我们定义一个内部的基类，<code>Counter</code>的每个方法都对应它的一个虚函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">CounterBase</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~CounterBase &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">Increase</span><span class="params">(<span class="type">int</span> v)</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">Decrease</span><span class="params">(<span class="type">int</span> v)</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">int</span> <span class="title">Count</span><span class="params">()</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>接下来我们使用模板实现一个通用的子类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">CounterImpl</span>: <span class="keyword">public</span> CounterBase &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">CounterImpl</span><span class="params">(T t)</span>: mImpl(std::move(t)) &#123;</span>&#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Increase</span><span class="params">(<span class="type">int</span> v)</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        mImpl.<span class="built_in">Increase</span>(v);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Decrease</span><span class="params">(<span class="type">int</span> v)</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        mImpl.<span class="built_in">Decrease</span>(v);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">Count</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> mImpl.<span class="built_in">Count</span>();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    T mImpl;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>最后我们还要定义一个<code>Counter</code>类型，但它不需要有任何的虚函数，也不需要作为任何类型的基类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Counter</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="built_in">Counter</span>(T t): <span class="built_in">mPtr</span>(<span class="keyword">new</span> <span class="built_in">CounterImpl</span>(std::forward&lt;T&gt;(t))) &#123;&#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Increase</span><span class="params">(<span class="type">int</span> v)</span> </span>&#123;</span><br><span class="line">        mPtr-&gt;<span class="built_in">Increase</span>(v);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Decrease</span><span class="params">(<span class="type">int</span> v)</span> </span>&#123;</span><br><span class="line">        mPtr-&gt;<span class="built_in">Decrease</span>(v);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">Count</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> mPtr-&gt;<span class="built_in">Count</span>();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    std::unique_ptr&lt;CounterBase&gt; mPtr;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>然后我们就可以使用<code>Counter</code>来表示所有满足条件的类型了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">Counter <span class="title">c1</span><span class="params">(ClassA&#123;&#125;)</span></span>;</span><br><span class="line"><span class="function">Counter <span class="title">c2</span><span class="params">(ClassB&#123;<span class="number">5</span>&#125;)</span></span>;</span><br><span class="line">Counter c3 = ClassC&#123;<span class="number">3</span>, <span class="number">6</span>&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>对于没有<code>Increase</code>、<code>Decrease</code>、<code>Count</code>接口的类型，比如内置类型<code>int</code>，我们还可以特化模板来满足要求：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">CounterImpl</span>&lt;<span class="type">int</span>&gt;: <span class="keyword">public</span> CounterBase &#123;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">CounterImpl</span><span class="params">(<span class="type">int</span> v)</span>: mValue(v) &#123;</span>&#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Increase</span><span class="params">(<span class="type">int</span> v)</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        mValue += v;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Decrease</span><span class="params">(<span class="type">int</span> v)</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        mValue -= v;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">Count</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> mValue;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">int</span> mValue;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>然后我们就可以写：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Counter c = <span class="number">5</span>;</span><br></pre></td></tr></table></figure>
+
+<p>是不是很赞？</p>
+<h1 id="C-中Type-Erasure的例子"><a href="#C-中Type-Erasure的例子" class="headerlink" title="C++中Type Erasure的例子"></a>C++中Type Erasure的例子</h1><h2 id="std-shared-ptr"><a href="#std-shared-ptr" class="headerlink" title="std::shared_ptr"></a>std::shared_ptr</h2><p>我们知道<code>std::shared_ptr</code>的Deleter不是<code>std::shared_ptr</code>类型的一部分（参见<a href="/2017/05/19/cpp-different-role-of-deleter-in-unique-ptr-and-shared-ptr/">为什么unique_ptr的Deleter是模板类型参数，而shared_ptr的Deleter不是</a>），这给使用者带来了很多好处（相比<code>std::unique_ptr</code>）：</p>
+<ul>
+<li>对于<code>std::shared_ptr&lt;T&gt;</code>，使用者不需要知道<code>T</code>的完整类型（当然创建者需要）。</li>
+<li>两个<code>std::shared_ptr&lt;T&gt;</code>对象类型相同，可以相互赋值，即使它们的Deleter类型不同。</li>
+<li>销毁<code>T</code>使用的Deleter永远是来自创建<code>std::shared_ptr</code>的编译单元，跨DLL和so使用时不会有销毁问题。</li>
+</ul>
+<p>它的秘诀就是Type Erasure。参考clang的实现，<code>std::shared_ptr</code>只有两个成员变量：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> _Tp&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">shared_ptr</span> &#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    _Tp* __ptr__;</span><br><span class="line">    __shared_weak_count* __cntrl__;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>__shared_weak_count</code>的定义为：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">__shared_weak_count</span>;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到不包含Deleter的类型。实际上构造的类型是它的子类<code>__shared_ptr_pointer</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">_Tp</span>, <span class="keyword">class</span> <span class="title class_">_Dp</span>, <span class="keyword">class</span> <span class="title class_">_Alloc</span>&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">__shared_ptr_pointer</span>: <span class="keyword">public</span> __shared_weak_count;</span><br></pre></td></tr></table></figure>
+
+<p>具体的实现略。可以看到这里就使用了我们上面提到的继承与Template结合的方法。</p>
+<h2 id="std-function"><a href="#std-function" class="headerlink" title="std::function"></a>std::function</h2><p><code>std::function</code>中使用了一个基类<code>__base</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span>&lt;<span class="keyword">class</span> <span class="title class_">_Rp</span>, <span class="keyword">class</span> ..._ArgTypes&gt;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">__base</span>&lt;_Rp(_ArgTypes...)&gt; &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> _Rp <span class="title">operator</span><span class="params">()</span><span class="params">(_ArgTypes&amp;&amp; ...)</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>同样地，具体的子类通过模板来保留类型信息，而通过基类来实现统一的存储与调用。</p>
+<h2 id="boost-any"><a href="#boost-any" class="headerlink" title="boost::any"></a>boost::any</h2><p><code>boost::any</code>是非常典型的应用了Type Erasure方法的类型。它允许你用一种类型来保存任何类型的对象，且通过<code>type_info</code>方法返回具体的对象类型。这样我们可以使用一个<code>boost::any</code>的容器保存任意类型的对象。它的实现很短，只有313行，很值得看一下。</p>
+<h2 id="std-any"><a href="#std-any" class="headerlink" title="std::any"></a>std::any</h2><p><code>std::any</code>是C++17引入的新类型，与<code>boost::any</code>的接口几乎完全相同，区别在于，它使用了SBO(Small Buffer Optimization)方法，可以把小对象直接构造在类型内部，性能更好。</p>
+<h2 id="基于Type-Erasure实现Unified-Call-Syntax"><a href="#基于Type-Erasure实现Unified-Call-Syntax" class="headerlink" title="基于Type Erasure实现Unified Call Syntax"></a>基于Type Erasure实现Unified Call Syntax</h2><p>假设我们想实现一个接口类型<code>Fooable</code>，它有一个方法<code>foo</code>，使得<code>Fooable::foo</code>和<code>foo(Fooable)</code>都可以用来表示<code>T::foo</code>和<code>foo(T)</code>两种调用方式，即：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Member</span> &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">foo</span><span class="params">()</span></span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">NonMember</span>&#123;&#125;;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">foo</span><span class="params">(<span class="type">const</span> NonMember&amp;)</span></span>;</span><br><span class="line"></span><br><span class="line">Fooable member_erased &#123;Member&#123;&#125;&#125;;</span><br><span class="line"><span class="built_in">foo</span>(member_erased);</span><br><span class="line">member_erased.<span class="built_in">foo</span>();</span><br><span class="line"></span><br><span class="line">Fooable non_member_erased &#123;non_member&#123;&#125;&#125;;</span><br><span class="line"><span class="built_in">foo</span>(non_member_erased);</span><br><span class="line">non_member_erased.<span class="built_in">foo</span>();</span><br></pre></td></tr></table></figure>
+
+<p>第一步我们先定义基类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Storage</span> &#123;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">call</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>第二步定义模板子类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T, <span class="type">bool</span> HasMemberFoo = has_member_foo&lt;T&gt;::value&gt;</span><br><span class="line"><span class="keyword">struct</span> StorageImpl: Storage &#123;</span><br><span class="line">   T <span class="type">m_t</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="built_in">StorageImpl</span> (T t): <span class="type">m_t</span> &#123;std::<span class="built_in">move</span>(t)&#125; &#123;&#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">call</span><span class="params">()</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        <span class="type">m_t</span>.<span class="built_in">foo</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>has_member_foo</code>是用来判断<code>T::foo</code>是否存在的辅助类型：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T, <span class="keyword">typename</span> = <span class="type">void</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> has_member_foo: std::false_type&#123;&#125;;</span><br><span class="line">    </span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">has_member_foo</span>&lt;T, std::<span class="type">void_t</span>&lt;<span class="keyword">decltype</span>(std::<span class="built_in">declval</span>&lt;T&gt;().<span class="built_in">foo</span>())&gt;&gt; : std::true_type&#123;&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>当<code>T::foo()</code>是个合法的表达式时，<code>has_member_foo&lt;T&gt;::value</code>就是<code>true</code>，否则就是<code>false</code>。</p>
+<p>然后我们为<code>false</code>准备一个特化版本：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">StorageImpl</span>&lt;T, <span class="literal">false</span>&gt; : Storage &#123;</span><br><span class="line">    T <span class="type">m_t</span>;</span><br><span class="line">        </span><br><span class="line">    <span class="built_in">StorageImpl</span> (T t) : <span class="type">m_t</span> &#123;std::<span class="built_in">move</span>(t)&#125; &#123;&#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">call</span><span class="params">()</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        <span class="built_in">foo</span>(<span class="type">m_t</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>最后实现<code>Fooable</code>类型：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Fooable</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="built_in">Fooable</span> (T t) </span><br><span class="line">        : m_storage &#123;std::make_unique&lt;StorageImpl&lt;T&gt;&gt;(std::<span class="built_in">move</span>(t))&#125;</span><br><span class="line">    &#123;&#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">foo</span><span class="params">()</span> </span>&#123; m_storage-&gt;<span class="built_in">call</span>(); &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    std::unique_ptr&lt;Storage&gt; m_storage;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">foo</span><span class="params">(Fooable&amp; f)</span> </span>&#123; f-&gt;<span class="built_in">foo</span>(); &#125;</span><br></pre></td></tr></table></figure>
+
+<h1 id="什么时候使用Type-Erasure"><a href="#什么时候使用Type-Erasure" class="headerlink" title="什么时候使用Type Erasure"></a>什么时候使用Type Erasure</h1><p>简单来说，如果你有下面两个需求，你可能是需要Type Erasure的：</p>
+<ul>
+<li>你需要用同一种方式处理不同的类型。</li>
+<li>你需要用同一种类型或容器保存不同类型的对象。</li>
+</ul>
+<p>然而在很多情况下，你可能只需要用<code>std::shared_ptr</code>或<code>std::function</code>就能达到这个目的，这个时候就不需要自己实现Type Erasure了。</p>
+<h1 id="相关文档"><a href="#相关文档" class="headerlink" title="相关文档"></a>相关文档</h1><ul>
+<li><a target="_blank" rel="noopener" href="http://www.cplusplus.com/articles/oz18T05o/">C++ type erasure</a></li>
+<li><a target="_blank" rel="noopener" href="https://en.wikibooks.org/wiki/More_C%2B%2B_Idioms/Type_Erasure">More C++ Idioms&#x2F;Type Erasure</a></li>
+<li><a target="_blank" rel="noopener" href="http://davekilian.com/cpp-type-erasure.html">C++ ‘Type Erasure’ Explained</a></li>
+<li><a target="_blank" rel="noopener" href="http://aherrmann.github.io/programming/2014/10/19/type-erasure-with-merged-concepts/">Type Erasure with Merged Concepts</a></li>
+<li><a target="_blank" rel="noopener" href="http://nullprogram.com/blog/2014/04/01/">Duck Typing vs. Type Erasure</a></li>
+<li><a target="_blank" rel="noopener" href="https://akrzemi1.wordpress.com/2013/11/18/type-erasure-part-i/">Type erasure — Part I</a></li>
+<li><a target="_blank" rel="noopener" href="https://akrzemi1.wordpress.com/2013/12/06/type-erasure-part-ii/">Type erasure — Part II</a></li>
+<li><a target="_blank" rel="noopener" href="https://akrzemi1.wordpress.com/2013/12/11/type-erasure-part-iii/">Type erasure — Part III</a></li>
+<li><a target="_blank" rel="noopener" href="https://akrzemi1.wordpress.com/2014/01/13/type-erasure-part-iv/">Type erasure — Part IV</a></li>
+<li><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/5450159/type-erasure-techniques">Type erasure techniques</a></li>
+<li><a target="_blank" rel="noopener" href="https://a4z.bitbucket.io/blog/2017/01/11/exterm_typererasure-using-std::function.html">Extreme type erasure via std::function</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/" rel="prev" title="Effective Modern C++ 笔记 Chapter8: 杂项 (Item 41-42)">
+      <i class="fa fa-chevron-left"></i> Effective Modern C++ 笔记 Chapter8: 杂项 (Item 41-42)
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2017/11/07/persistent-data-structure/" rel="next" title="Persistent Data Structure">
+      Persistent Data Structure <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Type-Erasure%E7%9A%84%E5%87%A0%E7%A7%8D%E5%BD%A2%E5%BC%8F"><span class="nav-number">1.</span> <span class="nav-text">Type Erasure的几种形式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#void"><span class="nav-number">1.1.</span> <span class="nav-text">void*</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%A7%E6%89%BF"><span class="nav-number">1.2.</span> <span class="nav-text">继承</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Duck-Typing%E5%92%8CTemplate"><span class="nav-number">1.3.</span> <span class="nav-text">Duck Typing和Template</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#C-%E4%B8%AD%E7%BB%93%E5%90%88%E7%BB%A7%E6%89%BF%E4%B8%8ETemplate%E7%9A%84Type-Erasure"><span class="nav-number">1.4.</span> <span class="nav-text">C++中结合继承与Template的Type Erasure</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#C-%E4%B8%ADType-Erasure%E7%9A%84%E4%BE%8B%E5%AD%90"><span class="nav-number">2.</span> <span class="nav-text">C++中Type Erasure的例子</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#std-shared-ptr"><span class="nav-number">2.1.</span> <span class="nav-text">std::shared_ptr</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#std-function"><span class="nav-number">2.2.</span> <span class="nav-text">std::function</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#boost-any"><span class="nav-number">2.3.</span> <span class="nav-text">boost::any</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#std-any"><span class="nav-number">2.4.</span> <span class="nav-text">std::any</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8EType-Erasure%E5%AE%9E%E7%8E%B0Unified-Call-Syntax"><span class="nav-number">2.5.</span> <span class="nav-text">基于Type Erasure实现Unified Call Syntax</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%97%B6%E5%80%99%E4%BD%BF%E7%94%A8Type-Erasure"><span class="nav-number">3.</span> <span class="nav-text">什么时候使用Type Erasure</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%9B%B8%E5%85%B3%E6%96%87%E6%A1%A3"><span class="nav-number">4.</span> <span class="nav-text">相关文档</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
