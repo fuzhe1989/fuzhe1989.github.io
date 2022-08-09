@@ -8,7 +8,7 @@ tags:
 
 C++20 coroutine 有一个严重的 [bug](https://github.com/llvm/llvm-project/issues/56671)，且这个 bug 本质上来源于 C++ 标准不完善：在分配 coroutine frame 时，没有严格按 alignment 要求。目前看起来 gcc 与 clang 都中招了，只有 msvc 似乎没问题。
 
-本文记录了我是如何被这个 bug 消耗掉了两天光明。
+本文记录了我是如何被这个 bug 消耗掉了~~两~~三天光明。
 
 <!--more-->
 
