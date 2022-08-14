@@ -81,7 +81,7 @@ for (int iTimes1234 = 0; iTimes1234 < 100 * 1234; i += 1234)
 
 帮助编译器进行优化的要点就是保证它能获得尽可能多地信息，从而做出正确的优化决定。其中一个信息源就是你的代码：编译器能看到的代码越多，能做的决定越优。另一个信息源是你用的编译器配置：告诉编译器准确的目标CPU架构就能带来大不同。当然，编译器拥有的信息越多，编译时间越长，因此这里还要保持平衡。
 
-我们看个例子，统计一个`vector`中通过测试的元素个数（GCC -O3编译，https://godbolt.org/z/acm19_count1）：
+我们看个例子，统计一个`vector`中通过测试的元素个数（GCC -O3编译，[godbolt](https://godbolt.org/z/acm19_count1)）：
 
 ```cpp
 int count(const vector<int> &vec)
@@ -133,7 +133,7 @@ vector不直接存储它的大小，而是依赖`begin()`和`end()`的差值计�
 
 编译器每次循环都会重新载入`begin()`和`end()`指针，这可能令人惊讶，事实上它每次还会重新去拿`size()`。但编译器必须这么做：它不知道`testFunc()`会做什么，必须假设最坏情况。也就是，它必须假设调用`testFunc()`可能导致`vec`被修改。因为以下原因，这里`const`引用不会开启进一步的优化：`testFunc()`可能持有`vec`的非`const`引用，或者`testFunc()`会使用`const_cast`。
 
-但如果编译器能看到`testFunc()`的函数体，因此得知它不会修改`vec`，故事就很不一样了（https://godbolt.org/z/acm19_count2）：
+但如果编译器能看到`testFunc()`的函数体，因此得知它不会修改`vec`，故事就很不一样了（[godbolt](https://godbolt.org/z/acm19_count2)）：
 
 ```assembly
 .L6:
@@ -152,7 +152,7 @@ vector不直接存储它的大小，而是依赖`begin()`和`end()`的差值计�
 
 另一个不暴露函数体就能启用这一优化的方法是标记`testFunc`为`[[gnu:pure]]`（另一个语言扩展）。它是向编译器保证这是个纯函数——功能只与它的参数有关，不带任何副作用。
 
-有趣的是，第一个例子中如果我们使用`range-for`，编译器就算不知道`testFunc`会不会修改`vec`，也会生成优化版本的汇编代码（https://godbolt.org/z/acm19_count3）。这是因为`range-for`被定义为了将`begin()`和`end()`保存到局部变量的代码变换：
+有趣的是，第一个例子中如果我们使用`range-for`，编译器就算不知道`testFunc`会不会修改`vec`，也会生成优化版本的汇编代码（[godbolt](https://godbolt.org/z/acm19_count3)）。这是因为`range-for`被定义为了将`begin()`和`end()`保存到局部变量的代码变换：
 
 ```cpp
 for (auto val : vec)
@@ -176,7 +176,7 @@ for (auto val : vec)
 }
 ```
 
-考虑各种因素，如果你需要裸写循环，推荐使用现代的`range-for`：它在编译器看不到函数体时也能生成优化代码，且更清晰。但更好的方法是用STL的`count_if`完成所有工作：编译器也会生成优化代码（https://godbolt.org/z/acm19_count4）。
+考虑各种因素，如果你需要裸写循环，推荐使用现代的`range-for`：它在编译器看不到函数体时也能生成优化代码，且更清晰。但更好的方法是用STL的`count_if`完成所有工作：编译器也会生成优化代码（[godbolt](https://godbolt.org/z/acm19_count4)）。
 
 在传统的一次一个编译单元的编译模型下，函数调用处通常看不到函数体，只能看到函数声明。LTO（链接时优化，也称作LTCG，链接时代码生成）允许编译器看到跨编译单元的代码。在LTO中，单个编译单元会被编译为中间代码，而不是机器码。在链接时——整个程序（或动态链接库）都可见时——再去生成机器码。编译器可以利用这点跨编译单元内联，或至少能知道被调用的函数有没有副作用，从而进行优化。
 
@@ -203,7 +203,7 @@ unsigned divideByThree(unsigned x)
 }
 ```
 
-幸运的是编译器又一次站在了你身后。这段代码被编译为（https://godbolt.org/z/acm19_div3）：
+幸运的是编译器又一次站在了你身后。这段代码被编译为（[godbolt](https://godbolt.org/z/acm19_div3)）：
 
 ```assembly
 divideByThree(unsigned int):
@@ -214,7 +214,7 @@ divideByThree(unsigned int):
   ret
 ```
 
-其中看不到除法指令。只是一次移位，以及乘一个奇怪的巨大的常数：输入的32位无符号整数乘上`0xaaaaaaab`，结果是一个64位整数，再右移33位。编译器将除法替换为了更廉价的定点乘法逆运算。这里的定点是33位，常数是这种形式下的1/3（实际是0.33333333337213844）。编译器有种算法来决定合适的定点和常数值，同时在输入范围内以相同的精度保留与真正的除法运算相同的四舍五入。有时这需要一些额外的运算——例如除以1023（https://godbolt.org/z/acm19_div1023）：
+其中看不到除法指令。只是一次移位，以及乘一个奇怪的巨大的常数：输入的32位无符号整数乘上`0xaaaaaaab`，结果是一个64位整数，再右移33位。编译器将除法替换为了更廉价的定点乘法逆运算。这里的定点是33位，常数是这种形式下的1/3（实际是0.33333333337213844）。编译器有种算法来决定合适的定点和常数值，同时在输入范围内以相同的精度保留与真正的除法运算相同的四舍五入。有时这需要一些额外的运算——例如除以1023（[godbolt](https://godbolt.org/z/acm19_div1023)）：
 
 ```assembly
 divideBy1023(unsigned int):
@@ -256,7 +256,7 @@ size_t reduce(size_t hash, int bucketCountIndex) {
 
 这样编译器对于所有可能的hash-map大小都能产生完美的取余代码，仅有的额外开销就是`switch`中的分派代码。
 
-gcc9有一个技巧来检查是否可被非2的幂整除（https://godbolt.org/z/acm19_multof3）：
+gcc9有一个技巧来检查是否可被非2的幂整除（[godbolt](https://godbolt.org/z/acm19_multof3)）：
 
 ```cpp
 bool divisibleBy3(unsigned x)
@@ -298,7 +298,7 @@ int countSetBits(unsigned a)
 
 值得注意的是其中的位运算技巧`a &= (a - 1)`，它会清除最低位的1。在纸上证明这一点很有意思，试一下吧。
 
-目标架构是Haswell时，gcc8.2会产生这样的汇编（https://godbolt.org/z/acm19_bits）：
+目标架构是Haswell时，gcc8.2会产生这样的汇编（[godbolt](https://godbolt.org/z/acm19_bits)）：
 
 ```assembly
 countSetBits(unsigned int):
@@ -355,7 +355,7 @@ bool isWhitespace(char c)
 }
 ```
 
-我本能地以为生成的代码会充满比较和分支，但Clang和gcc都用了一个技巧令这段代码非常高效。下面是gcc9.1的输出（https://godbolt.org/z/acm19_conds）：
+我本能地以为生成的代码会充满比较和分支，但Clang和gcc都用了一个技巧令这段代码非常高效。下面是gcc9.1的输出（[godbolt](https://godbolt.org/z/acm19_conds)）：
 
 ```assembly
 isWhitespace(char):
@@ -409,7 +409,7 @@ int sumSquared(const vector<int> &v)
 }
 ```
 
-转化后的核心循环长这样（https://godbolt.org/z/acm19_sum）：
+转化后的核心循环长这样（[godbolt](https://godbolt.org/z/acm19_sum)）：
 
 ```assembly
 .loop:
@@ -447,7 +447,7 @@ res = res_[0] + res_[1]
 
 这要依赖于一个事实，将总和分成若干个部分和，最终再加起来，等效于按顺序累加。显然对于整数这是对的，但对于浮点数就不一定了。浮点数是不可结合的：`(a+b)+c`不等价于`a+(b+c)`，因为浮点加法的结果精度依赖于两个输入的相对量级。
 
-这就意味着，很不幸，将`vector<int>`改为`vector<float>`得不到你想要的代码。编译器可以用一些向量指令（它可以一次算8个值的平方），但必须按顺序累加这些值（https://godbolt.org/z/acm19_sumf）：
+这就意味着，很不幸，将`vector<int>`改为`vector<float>`得不到你想要的代码。编译器可以用一些向量指令（它可以一次算8个值的平方），但必须按顺序累加这些值（[godbolt](https://godbolt.org/z/acm19_sumf)）：
 
 ```assembly
 .loop:
@@ -476,7 +476,7 @@ res = res_[0] + res_[1]
   jne .loop                         ; if not, keep going
 ```
 
-不幸的是还没有简单的方法绕过这个限制。如果你保证这种情况下加法的顺序不重要，你可以启用gcc的一个危险的（但名字很有趣）标志：`-funsafe-math-optimizations`。这样gcc就能生成漂亮的内循环了（https://godbolt.org/z/acm19_sumf_unsafe）：
+不幸的是还没有简单的方法绕过这个限制。如果你保证这种情况下加法的顺序不重要，你可以启用gcc的一个危险的（但名字很有趣）标志：`-funsafe-math-optimizations`。这样gcc就能生成漂亮的内循环了（[godbolt](https://godbolt.org/z/acm19_sumf_unsafe)）：
 
 ```assembly
 .loop:
@@ -504,7 +504,7 @@ int sumToX(int x)
 }
 ```
 
-gcc会很直接地翻译这些代码，配上合适的设置后它就会像上面一样用上向量指令。而Clang会生成下面这样的代码（https://godbolt.org/z/acm19_sum_up）：
+gcc会很直接地翻译这些代码，配上合适的设置后它就会像上面一样用上向量指令。而Clang会生成下面这样的代码（[godbolt](https://godbolt.org/z/acm19_sum_up)）：
 
 ```assembly
 sumToX(int): # @sumToX(int)
@@ -538,7 +538,7 @@ x * (x - 1) / 2
 
 进一步的试验显示Clang聪明到能优化很多种类似的循环。Clang和gcc追踪循环变量的方式都能做这类优化，但只有Clang选择生成这种封闭形式的代码。但它不保证总是降低工作量：对于很小的`x`，封闭形式的开销也许比直接循环要大。Krister Walfridsson在[他的博客](https://kristerw.blogspot.com/2019/04/how-llvm-optimizes-geometric-sums.html)中详细介绍了如何实现这种优化。
 
-同样值得注意的是，为了做这种优化，编译器可能要依赖于“有符号整数溢出是未定义行为”。这样它就能假设你的代码不会传入可能会使结果溢出（这个例子中是65536）的`x`。如果Clang不能做这个假设，有时候它没办法找到封闭形式的解（https://godbolt.org/z/acm19_sum_fail）。
+同样值得注意的是，为了做这种优化，编译器可能要依赖于“有符号整数溢出是未定义行为”。这样它就能假设你的代码不会传入可能会使结果溢出（这个例子中是65536）的`x`。如果Clang不能做这个假设，有时候它没办法找到封闭形式的解（[godbolt](https://godbolt.org/z/acm19_sum_fail)）。
 
 ### 去虚拟化
 
@@ -564,9 +564,9 @@ int sumTransformed(const vector<int> &v,
 }
 ```
 
-显然现在它还没有多态。快速用编译器跑一下可以看到它生成了相同的高度向量化的汇编（https://godbolt.org/z/acm19_poly1）。
+显然现在它还没有多态。快速用编译器跑一下可以看到它生成了相同的高度向量化的汇编（[godbolt](https://godbolt.org/z/acm19_poly1)）。
 
-现在我们为`int operator()`加上`virtual`，就会得到一个慢得多的实现，被填进了间接调用，对吧？当然，有点（https://godbolt.org/z/acm19_poly2）。生成的代码要比之前更多，但核心循环可能会让你想不到：
+现在我们为`int operator()`加上`virtual`，就会得到一个慢得多的实现，被填进了间接调用，对吧？当然，有点（[godbolt](https://godbolt.org/z/acm19_poly2)）。生成的代码要比之前更多，但核心循环可能会让你想不到：
 
 ```assembly
   ; rdx points to the vtable
@@ -595,7 +595,7 @@ int sumTransformed(const vector<int> &v,
 
 在我用的编译器中，gcc是仅有的这么做的一个，但Clang正在重构它的类型系统，从而更多利用上这类优化。
 
-C++11增加了`final`限定符以允许标记类和虚函数不可重写。这就给了编译器更多的关于哪些方法能受益于这类优化的信息了，在某些情况下甚至允许编译器完全避免虚函数调用（https://godbolt.org/z/acm19_poly3）。即使没有`final`，有时分析阶段也能证明代码中用到的是特定的具体类（https://godbolt.org/z/acm19_poly4）。这类静态去虚拟化操作能带来明显的性能提升。
+C++11增加了`final`限定符以允许标记类和虚函数不可重写。这就给了编译器更多的关于哪些方法能受益于这类优化的信息了，在某些情况下甚至允许编译器完全避免虚函数调用（[godbolt](https://godbolt.org/z/acm19_poly3)）。即使没有`final`，有时分析阶段也能证明代码中用到的是特定的具体类（[godbolt](https://godbolt.org/z/acm19_poly4)）。这类静态去虚拟化操作能带来明显的性能提升。
 
 ## 结论
 
