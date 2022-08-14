@@ -195,6 +195,480 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/23/cpp-object-model-ctor-dtor/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/03/23/cpp-object-model-ctor-dtor/" class="post-title-link" itemprop="url">C++对象模型（五）构造与析构</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-23 00:23:16" itemprop="dateCreated datePublished" datetime="2018-03-23T00:23:16+08:00">2018-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>C++里类有4种特殊的成员函数：</p>
+<ul>
+<li>构造函数。</li>
+<li>析构函数。</li>
+<li>复制函数，包括复制构造函数和复制赋值函数。</li>
+<li>移动函数，包括移动构造函数和移动赋值函数。</li>
+</ul>
+<p>这些函数的特点是：有些时候，编译器会帮你生成这些函数；有些时候，编译器又会拒绝生成这些函数；还有些时候，编译器还会往你自己写的特殊函数中添加操作。鉴于这些特殊函数的重要性，我们有必要好好了解一下它们背后的故事。</p>
+<p>本文介绍的是前两类，构造函数和析构函数。</p>
+<p>注1：本文环境为Ubuntu 16.04，gcc5.4.0，使用c++14标准。<br>注2：本文大量内容来自<a target="_blank" rel="noopener" href="https://book.douban.com/subject/10427315/">《深入探索C++对象模型》</a>。</p>
+<h1 id="构造函数"><a href="#构造函数" class="headerlink" title="构造函数"></a>构造函数</h1><h2 id="什么类没有构造函数"><a href="#什么类没有构造函数" class="headerlink" title="什么类没有构造函数"></a>什么类没有构造函数</h2><p>我们知道构造函数是一种非常重要的函数，也是C++诞生的一个主要原因。那么，第一个问题，每个类都有构造函数吗？</p>
+<p>对于下面这个平凡类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Trivial</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int64_t</span> y;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Trivial t;</span><br><span class="line">    t.x = <span class="number">1</span>;</span><br><span class="line">    t.y = <span class="number">2</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>main</code>函数对应的汇编指令为（未开任何优化）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">00000000004006b6 &lt;main&gt;:</span><br><span class="line">  4006b6:   55                      push   %rbp</span><br><span class="line">  4006b7:   48 89 e5                mov    %rsp,%rbp</span><br><span class="line">  4006ba:   48 c7 45 f0 01 00 00    movq   $0x1,-0x10(%rbp)</span><br><span class="line">  4006c1:   00</span><br><span class="line">  4006c2:   48 c7 45 f8 02 00 00    movq   $0x2,-0x8(%rbp)</span><br><span class="line">  4006c9:   00</span><br><span class="line">  4006ca:   b8 00 00 00 00          mov    $0x0,%eax</span><br><span class="line">  4006cf:   5d                      pop    %rbp</span><br><span class="line">  4006d0:   c3                      retq</span><br></pre></td></tr></table></figure>
+
+<p>没有<code>Trivial</code>的构造函数的影子。整个binary中也找不到<code>Trivial</code>的构造函数。</p>
+<p>事实上，平凡类就是没有构造函数的，或者说编译器会为它生成一个<strong>trivial</strong>的构造函数。而一个trivial的构造函数就类似于C中struct的初始化：什么都不做。因此编译器实际上不会为平凡类生成构造函数。而平凡类不允许有自定义的构造函数，结论就是平凡类就不可能有构造函数。</p>
+<p>然而有一种情况下，编译器还真会给平凡类生成一个构造函数，那就是显式声明一个<code>= default</code>的构造函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Trivial</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int64_t</span> y;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">Trivial</span>() = <span class="keyword">default</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">00000000004009e8 &lt;_ZN7TrivialC1Ev&gt;:</span><br><span class="line">  4009e8:   55                      push   %rbp</span><br><span class="line">  4009e9:   48 89 e5                mov    %rsp,%rbp</span><br><span class="line">  4009ec:   48 89 7d f8             mov    %rdi,-0x8(%rbp)</span><br><span class="line">  4009f0:   90                      nop</span><br><span class="line">  4009f1:   5d                      pop    %rbp</span><br><span class="line">  4009f2:   c3                      retq</span><br><span class="line">  4009f3:   66 2e 0f 1f 84 00 00    nopw   %cs:0x0(%rax,%rax,1)</span><br><span class="line">  4009fa:   00 00 00</span><br><span class="line">  4009fd:   0f 1f 00                nopl   (%rax)</span><br></pre></td></tr></table></figure>
+
+<p>虽然这个函数里明显什么事情都没做，但它确实存在了。</p>
+<p>当然，加上“-O2”你会发现，它又没了。</p>
+<p>实际上，所有没有自定义构造函数的，满足bitwise语义的类，都可能没有构造函数。这个范围会比平凡类大一些。</p>
+<h2 id="编译器生成默认构造函数的条件"><a href="#编译器生成默认构造函数的条件" class="headerlink" title="编译器生成默认构造函数的条件"></a>编译器生成默认构造函数的条件</h2><p>第二个问题，编译器什么时候会为一个类生成一个默认构造函数？</p>
+<p>编译器只会在<strong>必要</strong>的时候为一个类生成默认构造函数。所谓必要，指：</p>
+<ul>
+<li>这个类没有自定义的构造函数或声明默认构造函数为<code>= default</code>，且</li>
+<li>没有用<code>= delete</code>删除默认构造函数，且</li>
+<li>代码中调用到了这个类的默认构造函数。</li>
+</ul>
+<p>第一个条件很好理解，C++的编译器是充分相信程序员的，如果一个程序员写了随便一个构造函数，编译器会尊重Ta，不再为其生成默认构造函数。</p>
+<p>第二个条件是指，编译器不会在看到这个类的定义时就为其生成一个默认构造函数，而是会推迟这个生成时机，直到有代码真的调用了才生成。</p>
+<p>然而，即使满足上面的条件，如果类中默认构造函数没有声明为<code>= default</code>，且编译器判断这个类可以bitwise构造，编译器仍然不会真的生成一个默认构造函数。</p>
+<h2 id="bitwise与memberwise"><a href="#bitwise与memberwise" class="headerlink" title="bitwise与memberwise"></a>bitwise与memberwise</h2><p>当我们说到构造函数时，一个不得不提的概念是bitwise与memberwise。实际上这两个概念更多的是用来描述拷贝，但在构造上也有着类似的效果。</p>
+<p>一个类型，如果满足：</p>
+<ul>
+<li>是标量类型，或</li>
+<li>是自定义类型，且满足：<ul>
+<li>没有虚函数。</li>
+<li>没有虚基类。</li>
+<li>没有不符合bitwise语义的非静态成员变量。</li>
+<li>没有不符合bitwise语义的基类。</li>
+<li>没有自定义的构造函数。</li>
+</ul>
+</li>
+</ul>
+<p>那它就满足bitwise构造的条件，即它在构造时没有任何特殊的操作（除了给它分配内存外），它的默认构造函数就是trivial的，实际上编译器不会真的生成这个函数。</p>
+<p>而反过来，不满足这个条件的类，它就需要依次初始化每个成员，即是memberwise。</p>
+<p>trivial的构造函数要比自定义的构造函数低很多（什么都不做），但它伤害到了正确性，即类的成员是没有一个可预期的初始值的的。从这个角度讲，即使是满足上面条件的类，我们也不应放任编译器选择trivial的默认构造函数，而应该自己定义一个正确初始化每个成员值的默认构造函数。当然，如果你要定义一个POD类型的话，除外。</p>
+<h2 id="构造函数的内容"><a href="#构造函数的内容" class="headerlink" title="构造函数的内容"></a>构造函数的内容</h2><p>一个构造函数有哪些内容？比如，对于一个有着两个基类A和B的有虚函数的类型C，它的构造函数需要完成以下工作：</p>
+<ul>
+<li>初始化基类A。</li>
+<li>初始化基类B。</li>
+<li>确保虚表指针指向正确的位置。</li>
+<li>初始化每个成员。</li>
+<li>依次调用构造函数体中的语句。</li>
+</ul>
+<p>很显然，C要先完成A和B的构造，才能保证C自己的构造过程开始时，它已经“is a”A和B的对象。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">A</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> x;</span><br><span class="line">    <span class="built_in">A</span>() &#123;</span><br><span class="line">        x = <span class="number">5</span>;</span><br><span class="line">        <span class="built_in">F</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">A</span>() &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">B</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line">    <span class="built_in">B</span>() &#123;</span><br><span class="line">        y = <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">B</span>() &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">C</span>: <span class="keyword">public</span> A, <span class="keyword">public</span> B &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line">    <span class="built_in">C</span>(): <span class="built_in">z</span>(<span class="number">3</span>) &#123;&#125;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; z &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，在<code>A::A</code>中我们调用了一个虚函数<code>F</code>，假如整个过程发生在C的构造中，它调用的是哪个<code>F</code>？<code>A::F</code>还是<code>C::F</code>？</p>
+<p>我们知道，在C去构造它的A的子对象时，它自己的成员都还没有初始化，那么此时去调用<code>C::F</code>显然是不合理的。因此我们有一个结论：构造函数中虚函数没有动态绑定，只有静态绑定。</p>
+<p>《深入探索C++对象模型》中提到，当时的编译器在初始化基类子对象时，是通过将虚表指针指向基类的虚表，来实现一种伪的静态绑定。这么做的理由是不区别对待构造函数与其它函数。但这显然会伤害到效率。因此现代的编译器都会区别对待构造函数，真的静态绑定其中每个成员变量的调用。</p>
+<p>通常我们会显式的把基类的构造写到派生类的初始化列表中。但即使不这么做，编译器也会将基类子对象的构造插到派生类的每个构造函数的开头，当然这要求基类有一个默认构造函数，或编译器能为其生成一个默认构造函数。</p>
+<p>OK，在成功地构造完基类子对象后，C开始忙自己的构造了。</p>
+<p>首先，如果C有虚表，那么要把虚表设置到正确地位置上。</p>
+<p>之后开始按<strong>声明</strong>顺序依次构造C的每个非静态成员变量。</p>
+<p>这里的“声明”要加粗，是因为如果忽略这一点，我们很可能会得到一个编译器的警告。</p>
+<p>在这个阶段，每个非静态成员变量的初始值可能会来自三个地方：</p>
+<ul>
+<li>初始化列表中的表达式。</li>
+<li>成员初始化式（C++11新增）中的表达式。</li>
+<li>该成员的默认构造函数（如果非trivial）。</li>
+</ul>
+<p>其优先级依次下降。其中最后一项不涉及顺序，而前两项都可能会涉及到不同成员变量间的构造顺序。</p>
+<p>对于下面这个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    <span class="type">int</span> x;</span><br><span class="line">    <span class="type">int</span> y = z + <span class="number">2</span>;</span><br><span class="line">    <span class="type">int</span> z;</span><br><span class="line">    <span class="built_in">S</span>(): <span class="built_in">z</span>(<span class="number">0</span>), <span class="built_in">x</span>(y + <span class="number">1</span>) &#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>当我们构造出一个<code>S</code>的对象时，会发现它的<code>x</code>和<code>y</code>两个成员的值是未初始化的！这就是因为，<code>x</code>依赖了它后面声明的<code>y</code>，而<code>y</code>依赖了它后面声明的<code>z</code>，导致当它们进行初始化时，依赖的值都还没有初始化，自然会得到一个错误的值。</p>
+<p>OK，初始化列表结束后，此时c已经是一个合法的，所有成员和函数都可用的C对象了。接下来要执行的就是构造函数体本身了。</p>
+<p>这里有一个值得注意的点。执行到构造函数体前，类的所有成员变量都已经初始化过了，如果我们在构造函数体中再对其进行赋值，大概率浪费了前面的初始化：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    std::string name;</span><br><span class="line">    <span class="built_in">S</span>(<span class="type">const</span> std::string&amp; s) &#123;</span><br><span class="line">        name = s;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，在整个构造过程中，<code>name</code>执行了一次默认构造函数，和一次赋值。而如果将这次赋值放到初始化列表中：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    std::string name;</span><br><span class="line">    <span class="built_in">S</span>(<span class="type">const</span> std::string&amp; s): <span class="built_in">name</span>(s) &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>name</code>就只执行了一次复制构造函数。对于很多类型来说，后者的好处还是很明显的。</p>
+<h2 id="单参数构造函数要声明为explicit"><a href="#单参数构造函数要声明为explicit" class="headerlink" title="单参数构造函数要声明为explicit"></a>单参数构造函数要声明为<code>explicit</code></h2><p>某种说法认为C++不是强类型语言，因为它允许类型间的隐式转换。C++中的隐式转换有一部分是因为要兼容C而背的包袱，导致整型的重载无比混乱。而另一部分隐式转换就是C++自己设计的问题了。</p>
+<p>在某些场景下，C++的隐式转换是很有用的，但在很可能多得多的场景下，如果滥用隐式转换，就会带来潜在的问题。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    std::vector&lt;std::string&gt; v;</span><br><span class="line">    <span class="built_in">S</span>(<span class="type">int</span> x): <span class="built_in">v</span>(x, <span class="string">&quot;aaa&quot;</span>) &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">const</span> S&amp; s)</span> </span>&#123;</span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;v.size:&quot;</span> &lt;&lt; s.v.<span class="built_in">size</span>() &lt;&lt; std::endl;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="built_in">Func</span>(<span class="number">100</span>); <span class="comment">// oops!</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，<code>Func</code>实际只接受<code>const S&amp;</code>类型的参数，但我们搞错了，传进去了100。我们预期的结果当然是编译器报错，找不到<code>Func(int)</code>，但实际呢？程序编译通过，成功运行，结果是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">v.size:100</span><br></pre></td></tr></table></figure>
+
+<p>发生了什么？隐式转换。编译器看到<code>Func(100)</code>时，它首先会去找<code>Func</code>，只找到了<code>Func(const S&amp;)</code>，没找到<code>Func(int)</code>。于是编译器会找有没有哪种隐式转换，允许将一个<code>int</code>转换为<code>S</code>，还真有，<code>S</code>正好有个构造函数是<code>S(int)</code>！于是编译器这里就执行了<code>S</code>的构造函数，构造出一个有着100个元素的对象。</p>
+<p>怎么避免上面的场景发生？我们就要想办法禁止<code>int</code>到<code>S</code>的隐式转换，而<code>explicit</code>就是这个作用。当它被用来修饰一个单参数的构造函数时，就会阻止编译器产生一种隐式转换的关系：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">S</span> &#123;</span><br><span class="line">    std::vector&lt;std::string&gt; v;</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">S</span><span class="params">(<span class="type">int</span> x)</span>: v(x, <span class="string">&quot;aaa&quot;</span>) &#123;</span>&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>然而当我们真的想将<code>int</code>转换为<code>S</code>时，该怎么办？两种方法：</p>
+<ul>
+<li>显式构造：<code>Func(S(100))</code>。</li>
+<li>static_cast：<code>Func(static_cast&lt;S&gt;(100))</code>。</li>
+</ul>
+<h2 id="全局变量的初始化不要依赖其它编译单元的全局变量"><a href="#全局变量的初始化不要依赖其它编译单元的全局变量" class="headerlink" title="全局变量的初始化不要依赖其它编译单元的全局变量"></a>全局变量的初始化不要依赖其它编译单元的全局变量</h2><p>这句话有两个前提：</p>
+<ul>
+<li>全局变量的初始化发生在<code>main</code>函数之前，串行进行。</li>
+<li>不同的实现文件（.cpp或.cc）属于不同的编译单元，而不同编译单元的全局变量的初始化顺序在链接时由链接器决定。</li>
+</ul>
+<p>这就导致了一个类似于上面构造函数初始化列表的顺序问题，且它没有一个确定的顺序。</p>
+<p>因此，如果一个全局变量在初始化时依赖了另一个编译单元的全局变量，很可能你会发现前者初始化时后者还没有初始化。</p>
+<p>这里的全局变量也包括类的静态成员变量。</p>
+<p>那么，如果真有这种全局变量的初始值依赖于其它变量，该怎么做呢：</p>
+<ul>
+<li><p>相同编译单元的全局变量的初始化顺序是确定的，可依赖的。</p>
+</li>
+<li><p>如果必须跨编译单元依赖，那么把被依赖的变量放到一个函数里作为static变量。标准规定了函数中的static变量其初始化是在第一次调用时（运行到此行时），这是确定的，可依赖的：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// a.cpp</span></span><br><span class="line"><span class="function">TypeA <span class="title">gX</span><span class="params">(SomeFunc())</span></span>;</span><br><span class="line"><span class="comment">// b.h</span></span><br><span class="line"><span class="function"><span class="type">const</span> TypeB&amp; <span class="title">SomeFunc</span><span class="params">()</span></span>;</span><br><span class="line"><span class="comment">// b.cpp</span></span><br><span class="line"><span class="function"><span class="type">const</span> TypeB&amp; <span class="title">SomeFunc</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">static</span> TypeB b;</span><br><span class="line">    <span class="keyword">return</span> b;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>  别担心这里构造static变量没加锁，C++11后标准中规定了这种构造是线程安全的。</p>
+</li>
+</ul>
+<h1 id="析构函数"><a href="#析构函数" class="headerlink" title="析构函数"></a>析构函数</h1><h2 id="编译器生成析构函数的条件"><a href="#编译器生成析构函数的条件" class="headerlink" title="编译器生成析构函数的条件"></a>编译器生成析构函数的条件</h2><p>与默认构造函数类似，编译器为一个类生成析构函数的条件为：</p>
+<ul>
+<li>这个类没有自定义的析构函数或声明析构函数为<code>= default</code>，且</li>
+<li>没有用<code>= delete</code>删除析构函数，且</li>
+<li>代码中调用到了这个类的析构函数。</li>
+</ul>
+<p>同样地，如果一个类符合bitwise析构的标准，编译器为它生成的析构函数就是trivial的，就是可以忽略的，此时这个类就没有析构函数了。</p>
+<h2 id="析构函数的内容"><a href="#析构函数的内容" class="headerlink" title="析构函数的内容"></a>析构函数的内容</h2><p>析构函数实际就是构造函数的逆过程。参考前面的类C，它的析构函数有以下内容：</p>
+<ul>
+<li>依次调用析构函数体中的语句。</li>
+<li>按<strong>声明</strong>逆序调用每个成员变量的析构函数。</li>
+<li>按<strong>声明</strong>逆序调用每个基类子对象的析构函数。</li>
+</ul>
+<p>同样地，析构函数中也会遇到虚函数的绑定问题。与构造函数类型，所有出现在析构函数中的虚函数，都是静态绑定，因为在析构基类子对象时，派生类自己的成员已经都析构掉了，此时再调用派生类改写的方法大概率会出问题。</p>
+<h2 id="有虚函数的类也需要一个虚析构函数的定义"><a href="#有虚函数的类也需要一个虚析构函数的定义" class="headerlink" title="有虚函数的类也需要一个虚析构函数的定义"></a>有虚函数的类也需要一个虚析构函数的定义</h2><p>这里有两个值得注意的点。</p>
+<p>第一个，一个类有虚函数，但析构函数不是虚函数，会有大问题的。我们为一个类增加虚函数时，一定是准备实现运行期多态的（否则声明虚函数干什么）。而我们知道运行期多态是要靠基类的指针和引用来触发的。对于下面的例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    ~<span class="built_in">Base</span>() &#123;</span><br><span class="line">        std::cout &lt;&lt; <span class="string">&quot;~Base&quot;</span> &lt;&lt; std::endl;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    ~<span class="built_in">Derived</span>() &#123;</span><br><span class="line">        std::cout &lt;&lt; <span class="string">&quot;~Derived&quot;</span> &lt;&lt; std::endl;</span><br><span class="line">    &#125;</span><br><span class="line">    std::string name;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Base* p = <span class="keyword">new</span> Derived;</span><br><span class="line">    <span class="keyword">delete</span> p;  <span class="comment">// oops!</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">~Base</span><br></pre></td></tr></table></figure>
+
+<p>没有调用真正类型的析构函数，是个大问题！尤其是，<code>Derived::name</code>也没有被析构，出现了内存泄漏！</p>
+<p>因此，第一个结论：有虚函数的类，一定要有虚的析构函数。</p>
+<p>第二个值得注意的点，纯虚基类，析构函数也要有定义，不能是纯虚函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() = <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它的问题在于，它的所有派生类在析构时都会调用到<code>Base</code>的析构函数，然而发现这个函数没有定义！编译会因此失败。</p>
+<p>因此，第二个结论：不能有纯虚的析构函数，也不能禁止生成析构函数（通过声明为<code>= delete</code>或声明为private却不给定义），一定要给析构函数一个定义（或等待编译器为你生成一个）。</p>
+<h2 id="变量的析构时间"><a href="#变量的析构时间" class="headerlink" title="变量的析构时间"></a>变量的析构时间</h2><p>标准规定了一个local变量的析构时间是在它出scope时，这个规则很简单，但有些特殊场景还是要单独说一下：</p>
+<ul>
+<li><p>全局变量、静态变量的构造时间是在<code>main</code>函数以前，而析构时间则是在<code>main</code>函数以后。同样地，不同编译单元间全局&#x2F;静态变量的析构函数也是不确定的。</p>
+</li>
+<li><p>临时变量的析构时间为代码中其所在的最外层表达式执行完成后，即：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">const</span> <span class="type">char</span>* s = <span class="built_in">getStringObject</span>().<span class="built_in">c_str</span>();</span><br><span class="line"><span class="comment">// temp obj destructs here and s becomes danling!</span></span><br></pre></td></tr></table></figure>
+
+<p>  这里<code>getStringObject()</code>会返回一个临时的<code>std::string</code>对象，这个对象的生命期会直到完成<code>s</code>的赋值后，下一行调用开始前。</p>
+</li>
+<li><p>但被赋值给const引用的临时变量，其生命期会与这个const引用保持一致，直到这个引用出scope才析构：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="type">const</span> std::string&amp; s = <span class="built_in">getStringObject</span>();</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125; <span class="comment">// temp obj destructs here</span></span><br></pre></td></tr></table></figure></li>
+<li><p>如果<code>goto</code>跳回到函数前面，则这段代码中定义的变量都会被析构：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">RETRY:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::vector&lt;<span class="type">int</span>&gt; v;</span><br><span class="line">    <span class="keyword">goto</span> RETRY; <span class="comment">// name and v will be destructed.</span></span><br></pre></td></tr></table></figure></li>
+<li><p>存在短路逻辑的表达式中，编译器需要插入一些代码才能确定临时对象的析构时间：</p>
+  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> ((s + t) || (u + v)) &#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>  这里面<code>s + t</code>会产生临时对象，但<code>u + v</code>只能说<strong>可能</strong>产生临时对象，因为如果表达式被短路，根本走不到后半截，就不会产生这个临时对象，那么这个临时对象也就不需要被析构。编译期怎么会知道这个表达式会不会被短路呢？因此编译器需要插入一些代码来产生不同分支。这也稍稍增加了些运行期的开销。</p>
+</li>
+</ul>
+<p>当一个函数有着很多出口时，想决定一个local变量的scope就变困难了，编译器需要在每个可能<code>return</code>的地方都加上一些用于析构已经存在的变量，这也会增大binary的体积。</p>
+<h2 id="不要手动调用local变量的析构函数"><a href="#不要手动调用local变量的析构函数" class="headerlink" title="不要手动调用local变量的析构函数"></a>不要手动调用local变量的析构函数</h2><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int</span> j;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">f</span><span class="params">()</span></span>;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">func</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Base b;</span><br><span class="line">    b.<span class="built_in">f</span>();</span><br><span class="line">    b.~<span class="built_in">Base</span>();</span><br><span class="line">    <span class="keyword">new</span>(&amp;b) Derived;</span><br><span class="line">    b.<span class="built_in">f</span>();            <span class="comment">// which f?</span></span><br><span class="line">&#125; <span class="comment">// which dtor?</span></span><br></pre></td></tr></table></figure>
+
+<p>上面是一个很tricky的例子，我们手动调用了<code>b</code>的析构函数，又在其原地构造了一个派生类对象。此时再调用<code>f</code>，调用的会是哪个版本？出scope时，调用的是谁的析构函数？</p>
+<p>实际这都是未定义的问题，编译器很可能不会按我们的想法去实现。因此结论就是不要这么用。</p>
+<h1 id="异常场景"><a href="#异常场景" class="headerlink" title="异常场景"></a>异常场景</h1><p>当有了异常之后，构造函数和析构函数就更复杂了：</p>
+<ul>
+<li>构造函数抛了异常后，已经构造完的基类子对象和成员变量要析构，但未构造的成员不要析构，因此编译器需要插入大量代码。</li>
+<li>构造函数如果在进入函数体之前抛异常，此时对象本身还不完整（有成员未构造完），那么就不能执行析构函数。</li>
+<li>异常会导致函数栈unwind，期间每个还存活的对象都要析构，同样需要插入大量代码。</li>
+<li>异常还可能会被catch住，此时unwind停止，不再析构存活对象，又要做一些判断。</li>
+<li>当异常未被catch住时，如果unwind导致的析构抛了异常，同时存在两个异常会导致程序crash。</li>
+</ul>
+<p>因此异常是一种比较昂贵的特性，想实现好异常安全也不那么容易，比如STL容器为了保证修改时的异常安全，做了非常多的事情。</p>
+<p>但辩证的看，异常本身还是一种很有用的特性，至少我是支持使用异常的，只要知道上面这些开销，尽量避免错误的使用就好了。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/18/cpp-object-model-inheritance-and-polymorphism/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/03/18/cpp-object-model-inheritance-and-polymorphism/" class="post-title-link" itemprop="url">C++对象模型（四）继承与多态</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-03-18 23:21:14" itemprop="dateCreated datePublished" datetime="2018-03-18T23:21:14+08:00">2018-03-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>当C++刚刚问世时，它的两大卖点是：</p>
+<ul>
+<li>与C兼容。</li>
+<li>面向对象。</li>
+</ul>
+<p>而说到面向对象时，就绕不开多态。说到多态，就绕不开继承。</p>
+<p>所谓多态，即同样的代码，不同的行为。根据这种行为差异的发生时机，我们把多态分成了编译时多态和运行时多态。继承能实现的就是运行时多态。</p>
+<p>本文想讨论的是C++为继承和运行时多态准备了什么样的对象模型</p>
+<ul>
+<li>注1：本文中的“多态”特指“运行时多态”。</li>
+<li>注2：本文不讨论虚继承及其背后的对象模型。</li>
+<li>注3：本文主要内容来自<a target="_blank" rel="noopener" href="https://book.douban.com/subject/10427315/">《深入探索C++对象模型》</a>。</li>
+</ul>
+<h1 id="对象模型"><a href="#对象模型" class="headerlink" title="对象模型"></a>对象模型</h1><h2 id="简单对象模型"><a href="#简单对象模型" class="headerlink" title="简单对象模型"></a>简单对象模型</h2><p>第一种模型十分简单，每个对象就是一个表格，其中每个slot按成员的声明顺序指向对应的成员，包括成员函数与成员变量。</p>
+<p>即对于下面的类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="built_in">Base</span>();</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">F</span><span class="params">()</span></span>;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">int</span> <span class="title">G</span><span class="params">()</span> <span class="type">const</span></span>;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">H</span><span class="params">()</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>它的一个对象为：</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_one_member_one_slot.png" alt="one slot per member"></p>
+<p>这个模型是为了尽量降低C++编译器的设计复杂度，这样我们不需要知道每个成员的大小，只要知道成员的数量，就能计算出对象本身需要占的空间了。每个成员都有着固定的偏移量，因此如果要实现多态，只要改变这个slot对应的函数地址即可。实际我们可以看到，这个模型下每个函数都可以是虚函数，即派生类可以改写基类的任何函数。</p>
+<p>它的缺点也很明显：不与C的struct兼容；访问成员需要至少一次间接寻址，开销大。</p>
+<p>没有哪个编译器真的采用了这个模型，但它的思想，即每个成员对应一个slot，被吸收到了“指向成员的指针”中。</p>
+<h2 id="双表格对象模型"><a href="#双表格对象模型" class="headerlink" title="双表格对象模型"></a>双表格对象模型</h2><p>第二种模型使用了两个表格，一个对应成员函数，一个对应成员变量，而对象内则只有指向这两个表格的指针。</p>
+<p>对于上面的<code>Base</code>类，新的对象模型为：</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_double_table.png" alt="double_table"></p>
+<p>这个模型的好处是令所有对象都有着相同的大小和表现形式。它也是一种停留在理论中的模型，但“函数表格”这一思想却启发了后面的虚表模型。</p>
+<h2 id="虚表对象模型"><a href="#虚表对象模型" class="headerlink" title="虚表对象模型"></a>虚表对象模型</h2><p>Stroustrup在设计C++时的一个理念就是，让用户不使用的特性零开销。C++的class就体现了这一点。</p>
+<p>从演化路径来看，从C的struct到C++的class，大致过程为：</p>
+<p>纯数据的结构体 -&gt; 数据+操作的抽象数据类型 -&gt; 能表现多态的类型。</p>
+<p>参考之前的文章，我们可以看到：</p>
+<ul>
+<li>纯数据的结构体，对应C++中的标准布局类，其相比C的struct没有任何额外开销。</li>
+<li>抽象数据类型（ADT），对应C++中的无虚函数的class，其成员变量均有着固定的偏移，与纯结构体相比无额外开销；其成员函数不占用对象本身体积，且调用一个成员函数与调用一个全局函数相比也无额外开销。</li>
+</ul>
+<p>现在到了最后一种，当class需要能支持多态，我们该如何设计，来保证上面这两种使用方式不受影响？</p>
+<p>Stroustrup选择了一种折衷的方案，即：</p>
+<ul>
+<li>每个有虚函数的类型对应一个表格，称为虚表，其中每个slot对应一个虚函数的实际地址。另外虚表的第0个slot指向了这个类型的<code>type_info</code>，用于RTTI。</li>
+<li>有虚函数的对象内会增加一个指向虚表的指针，这样在运行时可以通过虚表跳转来实现多态。</li>
+</ul>
+<p>对于上面的<code>Base</code>类，虚表对象模型为：</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_vtpr.png" alt="vtpr"></p>
+<p>当我们不向class中增加虚函数时，编译器不会生成虚表，也不会向对象内增加一个虚表指针，一切都和原来一样。当我们加入虚函数，编译器才会为了这种运行时特性而做上述工作。</p>
+<p>之所以不把虚表直接放到对象中，是为了避免对象体积太大，因此我们宁愿多一次虚表指针的跳转。</p>
+<p>这个模型下每个成员变量就在对象中，因此在定义类时我们要能看到每个成员变量的布局，知道它的大小，因此无论哪个成员变量发生了变化，我们都要重新编译、链接。这是为了运行效率而付出的代价。</p>
+<p>标准中并没有规定编译器一定要这么实现，但目前几乎所有编译器都采用了这种虚表模型，且几乎都选择了把虚表指针放到对象头部（而CFront则放到尾部）。</p>
+<h3 id="虚表"><a href="#虚表" class="headerlink" title="虚表"></a>虚表</h3><p>以下内容参考GCC的实现，部分脑补，总之理论上是个可以工作的模型。</p>
+<p>每个有虚函数的类都对应着一个单独的虚表，而这个类的所有对象中只有指向它的指针。</p>
+<p>非派生类型的虚表长度为N+2，其中N为虚函数的个数，按虚函数声明顺序对应，另外的2则分别为第0个位置的<code>type_info*</code>，和最后一个位置的<code>NULL</code>。</p>
+<p>派生类型的虚表长度为S0+S1+…+N+1，其中S0、S1等分别为其第0个基类、第1个基类等的虚表长度，N为该派生类型自己增加的虚函数数量，1是最后一个位置的<code>NULL</code>（如果N不为0的话）。按上一条，S0、S1的长度是N0+2、N1+2，已经包含了<code>type_info*</code>和<code>NULL</code>，因此派生类的虚表中有K个<code>type_info*</code>，且都指向派生类自己的<code>type_info</code>，这里K是其基类数量。</p>
+<p>因此派生类的虚表取不同的偏移，就可以得到与其某个基类完全兼容的虚表，但其中每个slot指向的函数则可能是派生类自己的实现。</p>
+<h2 id="单继承下的对象模型"><a href="#单继承下的对象模型" class="headerlink" title="单继承下的对象模型"></a>单继承下的对象模型</h2><p>从前文中我们知道派生类对象中会有一个基类的子对象，而标准规定了这个基类子对象要“有其完整原样性”，即与一个独立的基类对象有着完全相同的性质。</p>
+<p>编译器要首先保证这一点，再去安排派生类对象自己的成员。标准未规定基类子对象在派生类对象中该处于什么位置，但几乎所有编译器都将基类子对象放到了派生类对象的头部。</p>
+<h3 id="无虚函数"><a href="#无虚函数" class="headerlink" title="无虚函数"></a>无虚函数</h3><p>当基类与派生类均无虚函数时，也就意味着派生类对象中不需要有虚表。此时的派生类对象的内存布局见<a href="/2018/03/11/cpp-object-model-struct/#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E4%B8%80%E4%B8%AA%E6%97%A0%E8%99%9A%E5%87%BD%E6%95%B0%E7%9A%84%E9%9D%9E%E8%99%9A%E7%BB%A7%E6%89%BF%E5%9F%BA%E7%B1%BB">为struct添加一个无虚函数的非虚继承基类</a>。</p>
+<p>这种继承有一个很不一样的地方：它没有产生多态。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Print</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;Base&quot;</span> &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span> &#123;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">Print</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;Derived&quot;</span> &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(<span class="type">const</span> Base&amp; b)</span> </span>&#123;</span><br><span class="line">    b.<span class="built_in">Print</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，当我们在<code>Func</code>中调用<code>b.Print()</code>时，编译器知道<code>Base::Print</code>不是虚函数，也就意味着它不可能被任何派生类改写，因此编译器会直接将其绑定到<code>Base::Print</code>上，即<code>Func</code>的运行时行为在编译时已经确定了。</p>
+<h3 id="基类有虚函数"><a href="#基类有虚函数" class="headerlink" title="基类有虚函数"></a>基类有虚函数</h3><p>当基类有虚函数时，意味着派生类也有虚函数，即派生类对象与其中的基类子对象都需要有一个虚表指针，且要指向正确的虚表。</p>
+<p>前面我们介绍虚表的时候提到，对派生类的虚表加上不同的偏移量，就能得到与其每个基类虚表完全兼容的虚表，其中第0个基类的偏移量就是0。因此单继承下，派生类对象中也不需要有多个虚表指针，只要头部放置一个虚表指针，就可以同时满足基类子对象与派生类对象的需求。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">Base</span>() &#123;&#125;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line"></span><br><span class="line">    ~<span class="built_in">Derived</span>() <span class="keyword">override</span> &#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Derived d;</span><br><span class="line">    Base&amp; b = d;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;sizeof(Base):%d sizeof(Derived):%d &amp;d:%x &amp;b:%x\n&quot;</span>, <span class="built_in">sizeof</span>(Base), <span class="built_in">sizeof</span>(Derived), &amp;d, &amp;b);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sizeof(Base):24 sizeof(Derived):24 &amp;d:edcc4968 &amp;b:edcc4968</span><br></pre></td></tr></table></figure>
+
+<p>此时<code>Derived</code>对象长成这样：</p>
+<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_single_inherit.png" alt="single"></p>
+<p>可以看到：</p>
+<ul>
+<li>基类子对象的偏移确实是0，说明它与派生类对象共享了虚表指针。</li>
+<li>基类子对象与派生类自己的成员之间没有加padding，这与标准布局差别很大，更紧凑了。实际上标准没有对非标准布局有任何明确规定，且对于有虚函数的类型，直接bitwise操作本身就是未定义行为，因此编译器就可以自由选择一种比较紧凑的布局，而不需要担心我们直接操作基类子对象时把派生类的成员变量给破坏了。</li>
+</ul>
+<h3 id="基类无虚函数，派生类有虚函数"><a href="#基类无虚函数，派生类有虚函数" class="headerlink" title="基类无虚函数，派生类有虚函数"></a>基类无虚函数，派生类有虚函数</h3><p>如果基类没有虚函数，那么基类子对象就不需要有虚表指针；派生类有虚函数，那么派生类对象就需要有虚表指针。因此派生类对象内还是需要一个虚表指针。</p>
+<p>GCC的实现是仍然把虚表指针放到派生类对象头部，而基类子对象在其后，此时基类子对象有一个指针的偏移。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sizeof(Base):16 sizeof(Derived):32 &amp;d:e1855960 &amp;b:e1855968</span><br></pre></td></tr></table></figure>
+
+<p>此时<code>Derived</code>对象长成这样：<br><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_single_base_nonvirtual.png" alt="base_non_virtual"></p>
+<p>可以看到：</p>
+<ul>
+<li>基类子对象的偏移量为8。</li>
+<li>基类子对象后加了padding。此时基类是平凡类，是有可能被人直接以bitwise的方式操作，不加padding就会有危险。</li>
+</ul>
+<h2 id="多继承下的多对象模型"><a href="#多继承下的多对象模型" class="headerlink" title="多继承下的多对象模型"></a>多继承下的多对象模型</h2><p>当派生类有多个基类时，每个基类自身可能有虚函数，可能没有。对于有虚函数的基类，派生类对象需要为其准备一个虚表指针。对于没有虚函数的基类，则不需要有虚表指针。</p>
+<p>如果第0个基类是有虚函数的，那么派生类对象就可以与其共享虚表指针。因此GCC会将其第一个有虚函数的基类子对象放到派生类对象的头部，从而节省一个虚表指针。</p>
+<p>而后面的基类则因为其虚表在派生类虚表中的偏移量不为0，无法共享虚表指针。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base1</span> &#123;</span><br><span class="line">    <span class="type">int64_t</span> x;</span><br><span class="line">    <span class="type">int32_t</span> y;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">F</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Base2</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base1, <span class="keyword">public</span> Base2 &#123;</span><br><span class="line">    <span class="type">int32_t</span> r;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sizeof(Base1):24 sizeof(Base2):4 sizeof(Derived):32 &amp;d:e5fe3960 &amp;b1:e5fe3960 &amp;b2:e5fe3974</span><br></pre></td></tr></table></figure>
+
+<p>即使我们把<code>public Base1, public Base2</code>换成<code>public Base2, public Base1</code>，结果也没有任何变化。</p>
+<p>此时<code>Derived</code>对象长成这样：<br><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_one_virtual_one_nonvirtual.png"></p>
+<p>而当我们为<code>Base2</code>也添加一个虚函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">Base2</span> &#123;</span><br><span class="line">    <span class="type">int32_t</span> z;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">void</span> <span class="title">G</span><span class="params">()</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">Derived</span>: <span class="keyword">public</span> Base1, <span class="keyword">public</span> Base2 &#123;</span><br><span class="line">    <span class="type">int32_t</span> r;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">G</span><span class="params">()</span> <span class="keyword">override</span> </span>&#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>结果为：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sizeof(Base1):24 sizeof(Base2):16 sizeof(Derived):40 &amp;d:e2c5d958 &amp;b1:e2c5d958 &amp;b2:e2c5d970</span><br></pre></td></tr></table></figure>
+
+<p>此时<code>Derived</code>对象长成这样：<br><img src="http://7xipsa.com1.z0.glb.clouddn.com/cpp_object_model_both_virtual.png"></p>
+<p>可以看到：</p>
+<ul>
+<li>每个基类子对象都有自己的虚表指针。其中第0个基类子对象的虚表指针与派生类对象本身是共享的。</li>
+<li>但两个虚表指针实际都指向派生类自己的虚表，只不过指向的位置不同。</li>
+<li>除了第0个基类子对象，其它基类子对象的偏移量都不是0。</li>
+</ul>
+<h1 id="指向成员的指针"><a href="#指向成员的指针" class="headerlink" title="指向成员的指针"></a>指向成员的指针</h1><p>C++中有一类指针比较特殊，它们是指向类型成员的指针，比如上例中的<code>&amp;Derived::x</code>、<code>&amp;Derived::G</code>等，它们的类型分别是<code>int64_t Base1::*</code>和<code>void (Derived::*)()</code>。这些指针是不能单独使用的，必须要通过一个对应类型的对象来解引用，例如：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Derived d;</span><br><span class="line">d.x = <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">auto</span> px = &amp;Derived::x;</span><br><span class="line">d.*px = <span class="number">2</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">auto</span> pf = &amp;Derived::F;</span><br><span class="line"><span class="type">int</span> ret = d.*<span class="built_in">pf</span>();</span><br></pre></td></tr></table></figure>
+
+<p>这里我们已经能感觉到它们的不一样了。</p>
+<p>指向成员的指针，真的是指针吗？</p>
+<p>是指针，但与普通的指针不一样：</p>
+<ul>
+<li>不能转换为<code>void*</code>或<code>intptr_t</code>等类型。</li>
+<li>与普通指针的大小不一定相同，比如在我的环境（64位clang）下，<code>&amp;Derived::x</code>是8字节，而<code>&amp;Derived::F</code>则是16字节。</li>
+<li>其值不一定表示地址。</li>
+</ul>
+<p>对于第三条，大致有以下规则：</p>
+<ul>
+<li>指向成员变量的指针，其值为该变量在对象内的偏移量，比如<code>&amp;Derived::x</code>就是8，而<code>&amp;Base1::x</code>则是0，这样我们能通过一个对象直接寻址到这个变量。</li>
+<li>指向非虚成员函数的指针，其大小仍是16字节（我的环境中），但其值真的是这个函数的入口地址，而不是偏移量。</li>
+<li>指向虚的成员函数的指针，其值是该函数在该类型的虚表中的偏移量。我们知道虚表的第0位不是虚函数，因此任何指向虚函数的合法指针都不可能是0，通过这一点我们也保证了，如果一个指向虚函数的成员指针为0，那么它一定是空指针。</li>
+</ul>
+<p>实际上指向成员函数的指针占两个普通指针的长度，其中就包含了一些辅助信息，来帮助我们在运行时无论遇到虚函数指针还是非虚函数指针，都能正确跳转。</p>
+<h1 id="static-cast、dynamic-cast、reinterpret-cast"><a href="#static-cast、dynamic-cast、reinterpret-cast" class="headerlink" title="static_cast、dynamic_cast、reinterpret_cast"></a><code>static_cast</code>、<code>dynamic_cast</code>、<code>reinterpret_cast</code></h1><p>对于基类和派生类，我们有两种cast，分别是down-cast与up-cast，即基类-&gt;派生类和派生类-&gt;基类。</p>
+<h2 id="up-cast"><a href="#up-cast" class="headerlink" title="up-cast"></a>up-cast</h2><p>up-cast通常不需要我们显式调用，因为这就是多态正常的使用方式：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Func</span><span class="params">(Base&amp; b)</span> </span>&#123;</span><br><span class="line">    b.<span class="built_in">F</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Derived d;</span><br><span class="line">    <span class="built_in">Func</span>(d);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里我们把<code>Derived&amp;</code>传给<code>Func</code>，后者看到的却是一个<code>Base&amp;</code>，这里就是发生了up-cast，也是一次隐式转换。如果在某个地方，我们要显式做up-cast，就要使用<code>static_cast</code>了。</p>
+<p>重点来了：当编译器做up-cast时，它会根据基类子对象在派生类对象中的偏移量，修改对应指针的值。即当代码里写</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Base* pb = pd;</span><br></pre></td></tr></table></figure>
+
+<p>时，实际发生的是（假设翻译成C）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span>* p = pd;</span><br><span class="line">Base* pb = (Base*)(p == <span class="number">0</span>? <span class="number">0</span>: p + offset);</span><br></pre></td></tr></table></figure>
+
+<p>因此每次up-cast都会有一次分支。而对于基类无虚函数派生类有虚函数，以及多基类场景下，我们都能看到地址发生了变化。</p>
+<p>C++标准保证了即使我们使用C风格的转换（即<code>(Base*)pd</code>），编译器也会在其上进行正确的偏移。</p>
+<p>而如果我们使用<code>interpret_cast</code>就得不到正确的结果了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Derived d;</span><br><span class="line">Base2* x = &amp;d;</span><br><span class="line">Base2* y = <span class="built_in">reinterpret_cast</span>&lt;Base2*&gt;(&amp;d);</span><br><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;x:%p y:%p\n&quot;</span>, x, y);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">x:0x7ffee7990968 y:0x7ffee7990950</span><br></pre></td></tr></table></figure>
+
+<p>在我的环境中，这里还有个warning，提醒我换成<code>static_cast</code>。</p>
+<p>因此结论是：如果要做up-cast，一定不能用<code>reinterpret_cast</code>，要用<code>static_cast</code>，最差也要用C风格的转换。</p>
+<h2 id="down-cast"><a href="#down-cast" class="headerlink" title="down-cast"></a>down-cast</h2><p>而down-cast就是基类指针转派生类指针。这里正确的做法是使用<code>dynamic_cast</code>，它会做以下事情：</p>
+<ul>
+<li>通过基类指针找到其虚表。</li>
+<li>从虚表的第0位找到<code>type_info*</code>。</li>
+<li>对比<code>type_info*</code>与目标类型，如果无法转换，则返回<code>nullptr</code>。</li>
+<li>根据基类子对象在派生类对象中的偏移，计算出派生类指针并返回。</li>
+</ul>
+<p>而有些人会使用<code>static_cast</code>或C风格的转换来做down-cast。它们的问题都在于：不会做前三步的检查，只会做最后一步。</p>
+<p>这就导致了，如果转换失败，<code>dynamic_cast</code>会返回<code>nullptr</code>，而<code>static_cast</code>或C风格转换则只会返回一个看似正确地减去了偏移量，实际指向了不知道哪里的派生类指针。</p>
+<p>当然，<code>reinterpret_cast</code>就更不对了：它连偏移量都不会算。</p>
+<h1 id="警惕Slicing"><a href="#警惕Slicing" class="headerlink" title="警惕Slicing"></a>警惕Slicing</h1><p>在<a href="/2018/03/11/cpp-object-model-struct/#%E4%B8%BAstruct%E6%B7%BB%E5%8A%A0%E8%99%9A%E6%88%90%E5%91%98%E5%87%BD%E6%95%B0">为struct添加虚成员函数</a>中我们提到，只有通过引用或指针调用虚函数，编译器才会走虚表，才会有多态。实际上，为了与C兼容，保证运行效率，标准规定了这一点。因此直接操作对象时，我们只能得到确定的结果，而不是预期中的运行时多态。</p>
+<p>这里有一个陷阱：当我们用派生类对象去赋值或初始化一个基类对象时，派生类的信息会被抹掉，最终我们仅仅得到一个基类对象。这种现象叫Slicing。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Derived d;</span><br><span class="line">Base2 b2 = d;</span><br><span class="line">b2.<span class="built_in">G</span>();</span><br></pre></td></tr></table></figure>
+
+<p>也许我们预期<code>b2.G()</code>会调用<code>Derived::G</code>，但实际此时<code>b2</code>完完全全就是<code>Base2</code>的对象，因此它只会调用<code>Base2::G</code>。</p>
+<p>这么做的原因是，<code>b2</code>是一个栈上对象，给它分配的空间就只有<code>sizeof(Base2)</code>这么多，因此它只能是一个<code>Base2</code>对象，而无法是派生类的对象。</p>
+<p>这也是一个函数传递要传指针或引用的理由（除了开销与启用多态外），避免Slicing。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/17/redis-on-the-respberry-pi/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1571,410 +2045,11 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/" class="post-title-link" itemprop="url">Effective Modern C++ 笔记 Chapter8: 杂项 (Item 41-42)</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2017-10-26 23:24:18" itemprop="dateCreated datePublished" datetime="2017-10-26T23:24:18+08:00">2017-10-26</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>本章介绍一种通用技术（传值调用）和一种通用特性（原地构造），它们都受到多种因素的影响，作者能给的建议只是“考虑用一下”，实践上要根据具体情况来定。</p>
-<h2 id="Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值"><a href="#Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值" class="headerlink" title="Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值"></a>Item41：对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值</h2><p>有些函数参数就是要被复制的：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addName</span><span class="params">(<span class="type">const</span> std::string&amp; newName)</span> </span>&#123;</span><br><span class="line">        names.<span class="built_in">push_back</span>(newName);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addName</span><span class="params">(std::string&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        names.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(newName));</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    std::vector&lt;std::string&gt; names;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>上面的两个函数一个处理左值，一个处理右值，但实际上它们的逻辑都是一样的，但我们写了两个函数，两个实现。</p>
-<p>假如你想用普适引用来代替上面两个函数：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        names.<span class="built_in">push_back</span>(std::forward&lt;T&gt;(newName));</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>代码省掉了一份，但又导致了其它问题。作为模板函数，<code>addName</code>需要放到头文件里。而且它不一定只有两个实例化版本（左值和右值），所有可以用于构造<code>std::string</code>的类型都可能会实例化一个版本（参见Item25）。同时，还有一些参数类型没办法使用普适引用（参见Item30）。如果调用方传递错类型，编译错误信息会非常恐怖（参见Item27）。</p>
-<p>一种方法可以让我们只写一个函数，且没有普适引用的各种问题：参数直接传值，不使用引用：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addname</span><span class="params">(std::string newName)</span> </span>&#123;</span><br><span class="line">        names.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(newName));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>这个版本中，我们知道：</p>
-<ol>
-<li><code>newName</code>与实参没有关系，因此如何修改<code>newName</code>都不会影响到实参。</li>
-<li>这是<code>newName</code>最后一次被使用，因此移动它不会影响到后面程序的运行。</li>
-</ol>
-<p>我们只需要写一个函数，因此：</p>
-<ol>
-<li>避免了代码重复，包括源代码和目标代码。</li>
-<li>没用普适引用，因此不会污染头文件，不会导致奇怪的运行失败或编译错误。</li>
-</ol>
-<p>但它的开销如何？</p>
-<p>当实参是左值时，实参到形参<code>newName</code>会有一次复制。但当实参是右值时，<code>newName</code>的构造会使用移动构造函数，因此它的构造开销是一次移动。后面构造<code>names</code>中的元素时，无论实参是左值还是右值，都是一次移动。</p>
-<p>因此上面的方法中，当实参是左值时，开销是一次复制+一次移动；当实参是右值时，开销是两次移动。对比原来的重载版本，当实参是左值时，开销是一次复制；当实参是右值时，开销是一次移动。因此传值方法会比重载方法多一次移动的开销。</p>
-<p>对于普适引用版本，情况有点复杂。当<code>T</code>是可以用于构造<code>std::string</code>时，普适引用在实参到形参中不会有对象构造，而是直接使用实参去构造<code>names</code>中的元素。本节我们不考虑这种情况，只假设实参是<code>std::string</code>，那么普适引用版本的开销与重载版本相同。</p>
-<p>回头看一下标题，“对于可复制的、移动非常廉价、总是复制的参数，考虑调用时传值”：</p>
-<ol>
-<li><p>你只能是考虑要不要用传值方法。它确实有很多优点，但它也确实比其它版本多一次移动的开销。一些场景下（后面会讨论），这次开销不可忽视。</p>
-</li>
-<li><p>只能对可复制的参数使用传值方法。对于只能移动的类型，我们只能移动构造形参，就不存在需要写两个重载版本的问题，也就不需要使用传值方法了：直接传右值引用多简单。</p>
-</li>
-<li><p>传值方法只适用于“移动非常廉价”的类型。</p>
-</li>
-<li><p>只有当参数的复制不可避免时，才需要考虑传值方法。假如有某个分支下我们不需要复制参数，那么重载版本就不需要复制参数，而传值版本在调用那一刻已经复制完了，没办法省掉。</p>
- <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addName</span><span class="params">(std::string newName)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> ((newName.<span class="built_in">length</span>() &gt;= minLen) &amp;&amp; (newName.<span class="built_in">length</span>() &lt;= maxLen)) &#123;</span><br><span class="line">            names.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(newName));</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure></li>
-</ol>
-<p>即使上面三个条件都满足，也有场景不适用于传值方法。我们说复制时，不光是复制构造，还有复制赋值。考虑到这点，开销分析就更复杂了。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Password</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Password</span><span class="params">(std::string pwd)</span></span></span><br><span class="line"><span class="function">        : text(std::move(pwd)) &#123;</span>&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">changeTo</span><span class="params">(std::string newPwd)</span> </span>&#123;</span><br><span class="line">        text = std::<span class="built_in">move</span>(newPwd);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>构造<code>Password</code>显然是可以用传值方法的：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::string <span class="title">initPwd</span><span class="params">(<span class="string">&quot;Supercalifragilisticexpialidocious&quot;</span>)</span></span>;</span><br><span class="line"><span class="function">Password <span class="title">p</span><span class="params">(initPwd)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>但在调用<code>changeTo</code>时：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::string newPassword = <span class="string">&quot;Beware the Jabberwock&quot;</span>;</span><br><span class="line">p.<span class="built_in">changeTo</span>(newPassword);</span><br></pre></td></tr></table></figure>
-
-<p><code>newPassword</code>是左值，因此<code>newPwd</code>要进行复制构造，这里会分配内存。之后<code>newPwd</code>移动赋值给<code>text</code>时，<code>text</code>会释放自己原有的内存块，转而使用<code>newPwd</code>持有的内存块。因此<code>changeTo</code>有两次内存操作，一次分配，一次释放。</p>
-<p>但我们这个例子中，旧密码比新密码长，因此如果我们使用重载方法，就不会有内存分配或释放（直接复制到旧密码的内存块上）：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">Password::ChangeTo</span><span class="params">(<span class="type">const</span> std::string&amp; newPwd)</span> </span>&#123;</span><br><span class="line">    text = newPwd;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>因此在这个例子中，传值版本比重载版本的开销多了两次内存操作，很可能比字符串的移动开销大一个数量级。</p>
-<p>但在旧密码比新密码短的例子中，重载版本也没办法避免掉两次内存操作，这时传值方法的优势又回来了。</p>
-<p>以上分析只针对实参为左值的情况，当实参为右值时，移动总是更好的。</p>
-<p>由此可以看出，当有赋值时，可能影响结论的因素太多了，比如<code>Password</code>这个例子中<code>std::string</code>是否使用了SSO优化也会影响我们的结论。</p>
-<p>实践中通常采用“有罪推定”原则，即优先使用重载方法或普适引用方法，直到传值方法显示出它的优势。对于那些对性能有极致要求的软件，传值方法就不太合适了。首先，多出的一次移动的开销可能很重要；其次，很难确定到底多了几次移动。假设我们构造链路上有N层，有可能每层的构造都使用了传值方法，看起来简单的一次构造实际上多了N次移动的开销。而且我们还很难发现这件事。</p>
-<p>传值方法的另一个问题，是当有继承的时候，传值可能引发“切片问题”。当形参是基类而实参是派生类型时，实参到形参的构造会丢掉派生类型多出的部分，最终只得到一个基类对象。而传引用就不会有这个问题。这也是C++98中传值不被接受的一个原因。</p>
-<h2 id="Item42-考虑用原地构造替代插入"><a href="#Item42-考虑用原地构造替代插入" class="headerlink" title="Item42: 考虑用原地构造替代插入"></a>Item42: 考虑用原地构造替代插入</h2><p>假设我们有一个容器，元素类型是<code>std::string</code>。当我们向这个容器插入一个新元素时，新元素的类型是什么？直觉告诉我们，新元素的类型就是<code>std::string</code>。</p>
-<p>但直觉不总是对的。看下面的代码：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;std::string&gt; vs;</span><br><span class="line">vs.<span class="built_in">push_back</span>(<span class="string">&quot;xyzzy&quot;</span>);</span><br></pre></td></tr></table></figure>
-
-<p>这里，我们插入的新元素类型不是<code>std::string</code>，而是<code>char[6]</code>或<code>char*</code>。<code>std::vector</code>有两个版本的<code>push_back</code>：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T, <span class="keyword">class</span> <span class="title class_">Allocator</span> = allocator&lt;T&gt;&gt;</span><br><span class="line"><span class="keyword">class</span> vector &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="type">void</span> <span class="built_in">push_back</span>(<span class="type">const</span> T&amp; x);</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">push_back</span><span class="params">(T&amp;&amp; x)</span></span>;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>当编译器发现实参类型与形参类型不匹配时，它会生成一些代码，构造一个临时的<code>std::string</code>对象，效果类似于：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vs.<span class="built_in">push_back</span>(std::<span class="built_in">string</span>(<span class="string">&quot;xyzzy&quot;</span>));</span><br></pre></td></tr></table></figure>
-
-<p>整个过程为：</p>
-<ol>
-<li>构造临时对象。</li>
-<li><code>std::vector</code>分配空间给新元素。</li>
-<li>将临时对象复制到新的空间上。</li>
-<li>析构临时对象。</li>
-</ol>
-<p>于是这里偷偷的多了一次对象的构造和析构。另外还有一次临时对象的复制。当我们很关心性能时，这些额外开销是不可忽视的。</p>
-<p>C++11新增的<code>emplace_back</code>方法就可以避免这个问题：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">vs.<span class="built_in">emplace_back</span>(<span class="string">&quot;xyzzy&quot;</span>);</span><br><span class="line">vs.<span class="built_in">emplace_back</span>(<span class="number">50</span>, <span class="string">&#x27;x&#x27;</span>);</span><br></pre></td></tr></table></figure>
-
-<p>它会先分配空间，再在新空间上使用传入参数直接构造出<code>std::string</code>。每个支持<code>push_back</code>的容器也都支持<code>emplace_back</code>，支持<code>push_front</code>的容器也都支持<code>emplace_front</code>，支持<code>insert</code>的容器也都支持<code>emplace</code>。</p>
-<p>一般来说insert和emplace的效果是完全相同的，同时<code>emplace</code>还省掉了临时对象的构造和析构，那么还有什么情况下我们不用emplace呢？</p>
-<p>目前的C++标准库实现中，既有emplace比insert快的场景，也有emplace比insert慢的场景。这些场景很难列举，取决于传入的参数类型、使用的容器、新元素所处的位置、元素的构造函数的异常安全性，以及对于map和set类容器，要插入的元素是否已经存在等因素。因此在决定使用insert还是emplace前，先测一下性能。</p>
-<p>当然也有些启发式的方法来判断emplace适用于哪些场景。以下条件如果为真，emplace就很可能比insert性能更好：</p>
-<ul>
-<li><p>新元素在容器内直接构造，而不是先构造再赋值。</p>
-<p>  在前面的例子中，我们要在<code>vs</code>的尾部新增一个元素，显然这里之前不存在对象，我们只能构造一个对象。emplace此时就比较有优势。但下面这个例子中：</p>
-  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;std::string&gt; vs;</span><br><span class="line">...</span><br><span class="line">vs.<span class="built_in">emplace</span>(vs.<span class="built_in">begin</span>(), <span class="string">&quot;xyzzy&quot;</span>);</span><br></pre></td></tr></table></figure>
-
-<p>  我们要在<code>vs</code>的头部新增一个对象。大多数实现会先用<code>&quot;&quot;xyzzy&quot;</code>构造出一个临时的<code>std::string</code>，再移动赋值给目标对象。这样emplace相比insert的优势就没有了。</p>
-<p>  当然，这取决于我们用的实现。但此时启发式方法还是有用的。理论上基于节点的容器都会构造新元素，而大多数STL容器都是基于节点的。只有几个容器不基于节点：<code>std::vector</code>、<code>std::deque</code>、<code>std::string</code>（<code>std::array</code>基于节点，但它没有emplace和insert类的方法）。当你明确知道新元素会被构造出来时，就可以毫不犹豫的使用emplace。这三个容器的<code>emplace_back</code>都是推荐用的，对于<code>std::deque</code>来说，<code>emplace_front</code>也推荐使用。</p>
-</li>
-<li><p>实参类型与容器的元素类型不同。（解释略）</p>
-</li>
-<li><p>容器不会因重复元素而拒绝插入。这里说的是对于<code>std::set</code>或<code>std::map</code>这样的容器，在插入时需要比较，那么就需要把实参先构造为一个临时对象。这样emplace的优势就没有了。</p>
-</li>
-</ul>
-<p>下面两次调用就满足上面的条件：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">vs.<span class="built_in">emplace_back</span>(<span class="string">&quot;xyzzy&quot;</span>);</span><br><span class="line">vs.<span class="built_in">emplace_back</span>(<span class="number">50</span>, <span class="string">&#x27;x&#x27;</span>);</span><br></pre></td></tr></table></figure>
-
-<p>在决定使用emplace后，有两个问题值得考虑。第一个是资源管理的问题。假设你有一个容器：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">std::list&lt;std::shared_ptr&lt;Widget&gt;&gt; ptrs;</span><br></pre></td></tr></table></figure>
-
-<p><code>Widget</code>需要的自定义销毁函数是：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">killWidget</span><span class="params">(Widget* pWidget)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>根据Item21，这种情况下我们没办法用<code>std::make_shared</code>了。insert版本是：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ptrs.<span class="built_in">push_back</span>(std::<span class="built_in">shared_ptr</span>&lt;Widget&gt;(<span class="keyword">new</span> Widget, killWidget));</span><br></pre></td></tr></table></figure>
-
-<p>或：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ptrs.<span class="built_in">push_back</span>(&#123;<span class="keyword">new</span> Widget, killWidget&#125;);</span><br></pre></td></tr></table></figure>
-
-<p>无论哪种情况，都要构造出一个临时对象。这不就是emplace能避免的吗？</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ptrs.<span class="built_in">emplace_back</span>(<span class="keyword">new</span> Widget, killWidget);</span><br></pre></td></tr></table></figure>
-
-<p>但注意，临时对象带来的好处远比它的构造和析构成本要大得多。考虑一种情况：</p>
-<ol>
-<li>我们构造了一个临时对象<code>temp</code>，持有<code>new Widget</code>的结果。</li>
-<li>容器扩张时抛了个异常。</li>
-<li>异常传播到外层，<code>temp</code>被销毁，<code>Widget*</code>被释放。</li>
-</ol>
-<p>而emplace版本则是：</p>
-<ol>
-<li><code>new Widget</code>的结果，一个裸指针，传进了<code>emplace_back</code>函数内。</li>
-<li>容器扩张时抛了个异常。</li>
-<li>没有智能指针持有前面的裸指针，内存泄漏。</li>
-</ol>
-<p>类似的问题也会出现在每个RAII类中。将裸指针（或其它未受保护的资源）通过完美转发的方式传递进emplace函数后，在RAII对象构造之前，有个窗口期。正确的方式是：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::shared_ptr&lt;Widget&gt; <span class="title">spw</span><span class="params">(<span class="keyword">new</span> Widget, killWidget)</span></span>; </span><br><span class="line">ptrs.<span class="built_in">push_back</span>(std::<span class="built_in">move</span>(spw));</span><br></pre></td></tr></table></figure>
-
-<p>或：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::shared_ptr&lt;Widget&gt; <span class="title">spw</span><span class="params">(<span class="keyword">new</span> Widget, killWidget)</span></span>;</span><br><span class="line">ptrs.<span class="built_in">emplace_back</span>(std::<span class="built_in">move</span>(spw));</span><br></pre></td></tr></table></figure>
-
-<p>无论哪种方式都要先构造对象，此时emplace和insert就没什么区别了。</p>
-<p>第二个问题是emplace与<code>explicit</code>构造函数的相互作用。想象你有一个正则表达式的容器：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;std::regex&gt; regexes;</span><br></pre></td></tr></table></figure>
-
-<p>有一天你写了这么一行代码：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">regexes.<span class="built_in">emplace_back</span>(<span class="literal">nullptr</span>);</span><br></pre></td></tr></table></figure>
-
-<p>然后编译器居然不报错！<code>nullptr</code>怎么可能是正则表达式呢？</p>
-<p><code>std::regex r = nullptr</code>是没办法编译通过的。而<code>regexes.push_back(nullptr)</code>也是非法的。</p>
-<p>问题在于<code>std::regex</code>有一个接受<code>const char*</code>的析构函数：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::regex <span class="title">upperCaseWord</span><span class="params">(<span class="string">&quot;[A-Z]+&quot;</span>)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>但它是<code>explicit</code>的，因此下面这么用会报错：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::regex r = <span class="literal">nullptr</span>;</span><br><span class="line">regexes.<span class="built_in">push_back</span>(<span class="literal">nullptr</span>);</span><br></pre></td></tr></table></figure>
-
-<p>但显式调用构造函数是可以的：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::regex <span class="title">r</span><span class="params">(<span class="literal">nullptr</span>)</span></span>;</span><br></pre></td></tr></table></figure>
-
-<p>不幸的是emplace函数中就是这么构造对象的，能编译，但运行结果未定义。</p>
-<p>下面两种很类似的构造方式，但结果不同：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::regex r1 = <span class="literal">nullptr</span>;          <span class="comment">// Error</span></span><br><span class="line"><span class="function">std::regex <span class="title">r2</span><span class="params">(<span class="literal">nullptr</span>)</span></span>;           <span class="comment">// OK</span></span><br></pre></td></tr></table></figure>
-
-<p>第一种是复制初始化，第二种是直接初始化。复制初始化不允许使用<code>explicit</code>构造函数，而直接初始化则可以。emplace函数中执行的是对象的直接初始化，而insert函数中则是复制初始化。</p>
-<p>因此当你使用emplace的时候，注意看一下你传递的类型对不对，因为它会在你没注意到的时候绕开<code>explicit</code>的限制，然后制造一个大新闻。</p>
-<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
-<li><a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Chapter1 类型推断 (Item 1-4)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">Chapter2 auto (Item 5-6)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">Chapter3 现代C++（Item 7-10)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm11-14/">Chapter3 现代C++（Item 11-14)</a></li>
-<li><a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/">Chapter3 现代C++（Item 15-17)</a></li>
-<li><a href="/2017/07/27/effective-modern-cpp-chapter4-iterm18-22/">Chapter4 智能指针 (Item 18-22)</a></li>
-<li><a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">Chapter5 右值引用、移动语义、完美转发（Item 23-26)</a></li>
-<li><a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Chapter5 右值引用、移动语义、完美转发（Item 27-30)</a></li>
-<li><a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">Chapter6: Lamba表达式 (Item 31-34)</a></li>
-<li><a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/">Chapter7: 并发API (Item 35-37)</a></li>
-<li><a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">Chapter7: 并发API (Item 38-40)</a></li>
-<li><a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">Chapter8: 杂项 (Item 41-42)</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/" class="post-title-link" itemprop="url">Effective Modern C++ 笔记 Chapter 7: 并发API (Item38-40)</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2017-10-09 22:50:11" itemprop="dateCreated datePublished" datetime="2017-10-09T22:50:11+08:00">2017-10-09</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="Item38-知道线程句柄析构时的各种行为"><a href="#Item38-知道线程句柄析构时的各种行为" class="headerlink" title="Item38: 知道线程句柄析构时的各种行为"></a>Item38: 知道线程句柄析构时的各种行为</h2><p>上节介绍了可join的<code>std::thread</code>对应一个可运行的底层线程，而未推迟的future也可能对应一个OS线程。这里把它们都称为OS线程的句柄。</p>
-<p>很有趣的是，<code>std::thread</code>和future在析构的行为上非常不同。析构一个可join的<code>std::thread</code>会导致程序终止，而析构一个future有时像是做了隐式的<code>join</code>，有时像是做了隐式的<code>detach</code>，有时两者都不是。总之它不会导致程序终止。</p>
-<p>我们首先从这样一个发现开始：future就是执行者将结果返回给调用者的一个管道。执行者（通常是异步执行）将计算结果写到管道中（例如<code>std::promise</code>对象），调用者再通过future拿到结果。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">----------                                          ----------</span><br><span class="line">| Caller | &lt;--- future ------------ std::promise ---| Callee |</span><br><span class="line">----------                                          ----------</span><br></pre></td></tr></table></figure>
-
-<p>但结果保存在哪了？执行者可能在调用者调用<code>get</code>之前就结束了，所以结果一定不会在执行者对应的<code>std::promise</code>对象中，它会在执行者结束时析构掉。</p>
-<p>结果也不可能在future对象中，因为<code>std::future</code>有可能用来创建<code>std::shared_future</code>，然后被复制很多遍。如果结果在future中，那么结果也会被复制很多遍。我们知道有些结果类型是不能复制的，因此不可能在future对象中。</p>
-<p>那么答案就是结果保存在<code>std::promise</code>和future之外，且需要是可共享状态。C++标准中没有规定结果的类型，编译器可以自行实现。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">----------                ------------------                    ----------</span><br><span class="line">| Caller | &lt;--- future ---| Result(Shared) |--- std::promise ---| Callee |</span><br><span class="line">----------                ------------------                    ----------</span><br></pre></td></tr></table></figure>
-
-<p>与future关联的这个共享状态就决定了future的析构行为，尤其：</p>
-<ul>
-<li>对于通过<code>std::async</code>启动的未推迟的task，最后一个与之关联的future在析构时会阻塞，直到这个task完成。本质上，这个析构就是对task所在的线程调用了一次join。</li>
-<li>其它future的析构都只是简单的析构这个对象。这些析构就是对底层线程调用了detach。对于被推迟的task，当它关联的最后一个future析构后，这个task就永远不会被执行了。</li>
-</ul>
-<p>简单来说就是有一种正常行为和一个例外。正常行为就是future的析构只析构future对象，它既不会join也不会detach。而当以下条件都满足时，应用例外规则：</p>
-<ul>
-<li>future关联着由<code>std::async</code>创建的共享状态。</li>
-<li>task的启动策略是<code>std::launch::async</code>，包括调用<code>std::async</code>时显式指定该策略，也包括调用者使用了默认策略，而系统选择了该策略。</li>
-<li>它是最后一个关联共享状态的future。</li>
-</ul>
-<p>以上条件都满足时，future的析构会对底层线程调用join。</p>
-<p>为什么对于由<code>std::async</code>启动的未推迟的task会有这个例外？就我（Scott Meyers）所知，C++标准委员会想避免隐式detach引起的问题（见Item37），但又不想像对待可join的<code>std::thread</code>那样使用“程序终止”这么激进的策略，所以最终他们妥协了，决定隐式使用join。这个决定并不是毫无争议，一直有声音想在C++14中将这个行为废弃掉，但最终它还是保留了下来。</p>
-<p>future的API上没办法知道它是不是关联一个共享状态，因此没办法知道随便一个future的析构会不会阻塞。这导致了一些有趣的潜在状况：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;std::future&lt;<span class="type">void</span>&gt;&gt; futs; <span class="comment">// 析构时可能阻塞</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Widget</span> &#123;                       <span class="comment">// 析构时可能阻塞</span></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    ...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    std::shared_future&lt;<span class="type">double</span>&gt; fut;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>当然，如果你知道某个future肯定不满足例外条件，你就能确定它的析构不会阻塞。例如，当我们使用<code>std::packaged_task</code>时，它返回的future就不与<code>std::async</code>创建的共享状态相关联，因此我们可以确定这样的future的析构是不会阻塞的。</p>
-<blockquote>
-<p><code>std::packaged_task</code>与<code>std::function</code>类似，都是对某个callable的对象的包装。区别在于<code>std::packaged_task</code>会返回一个future。我们可以用<code>std::packaged_task</code>创建一个<code>std::thread</code>来运行callable对象，结果通过future得到。</p>
-</blockquote>
-<p>当然<code>std::packaged_task</code>也可以通过<code>std::async</code>来运行，但这样就没有理由用<code>std::packaged_task</code>了，直接用<code>std::async</code>更方便。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="function">std::packaged_task&lt;<span class="title">int</span><span class="params">()</span>&gt; <span class="title">pt</span><span class="params">(calcValue)</span></span>;</span><br><span class="line">    <span class="keyword">auto</span> fut = pt.<span class="built_in">get_future</span>();</span><br><span class="line">    <span class="function">std::thread <span class="title">t</span><span class="params">(std::move(pt))</span></span>;</span><br><span class="line">    ...                                        <span class="comment">// see below</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>“…”中对<code>t</code>可能的三种操作：</p>
-<ul>
-<li>没有对<code>t</code>作任何操作。这样结束时<code>t</code>还是可join的，导致程序终止。</li>
-<li>对<code>t</code>调用了join。这样<code>fut</code>析构时就不需要阻塞了。</li>
-<li>对<code>t</code>调用了detach。这样<code>fut</code>析构时也不需要调用detach了。</li>
-</ul>
-<p>结论就是，对于由<code>std::packaged_task</code>得到的future，你不需要怎么关心它的析构行为。</p>
-<h2 id="Item39-考虑用一个void-future来进行只运行一次的事件通信"><a href="#Item39-考虑用一个void-future来进行只运行一次的事件通信" class="headerlink" title="Item39: 考虑用一个void future来进行只运行一次的事件通信"></a>Item39: 考虑用一个void future来进行只运行一次的事件通信</h2><p>当需要进行事件通信时，一种显然的方式就是通过条件变量：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::condition_variable cv;</span><br><span class="line">std::mutex m;</span><br></pre></td></tr></table></figure>
-
-<p>通知方的代码很简单：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line">cv.<span class="built_in">notify_one</span>();</span><br></pre></td></tr></table></figure>
-
-<p>接收方的代码就有点复杂了：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">std::unique_lock&lt;std::mutex&gt; <span class="title">lk</span><span class="params">(m)</span></span>;</span><br><span class="line">    cv.<span class="built_in">wait</span>(lk);</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
-
-<p>上面的代码并不正确。首先，这种方法的味道（code smell）不好，就表示可能藏bug。这里的第一个问题在于，是否有必要使用<code>std::mutex</code>。<code>std::mutex</code>是用来保护共享状态的，但很有可能通知方和接收方并没有共享什么东西，那么这个<code>std::mutex</code>就只是为了条件变量才构造的，逻辑上并不需要它。</p>
-<p>即使用到了<code>std::mutex</code>，仍然有两个问题：</p>
-<ul>
-<li>条件变量不能保存通知状态，因此如果通知方在接收方开始<code>wait</code>前就调用了<code>notify_one</code>，接收方就会hang在那。</li>
-<li>条件变量的<code>wait</code>有可能在条件并不满足（未通知）时结束（假醒），因此需要有办法知道我们等待的条件是否真的满足了。接收方自己当然没办法知道这个事情（否则它就不需要条件变量了）。</li>
-</ul>
-<p>以上两个问题的一种解法是使用一个共享状态，而不是条件变量：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::atmoic&lt;<span class="type">bool</span>&gt; <span class="title">flag</span><span class="params">(<span class="literal">false</span>)</span></span>;</span><br><span class="line"><span class="comment">// 通知方</span></span><br><span class="line">...</span><br><span class="line">flag = <span class="literal">true</span>;</span><br><span class="line"><span class="comment">// 接收方</span></span><br><span class="line">...</span><br><span class="line"><span class="keyword">while</span> (!flag) &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这种方法的好处是不需要mutex，能保存通知状态，不需要处理假醒。但它的问题在于接收方在阻塞时需要不停的查询状态，CPU开销很大。</p>
-<p>可以把共享状态与条件变量结合起来使用：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">std::condition_variable cv;</span><br><span class="line">std::mutex m;</span><br><span class="line"><span class="function"><span class="type">bool</span> <span class="title">flag</span><span class="params">(<span class="literal">false</span>)</span></span>;                   <span class="comment">// not std::atomic</span></span><br><span class="line"><span class="comment">// 通知方</span></span><br><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">std::lock_guard&lt;std::mutex&gt; <span class="title">g</span><span class="params">(m)</span></span>;</span><br><span class="line">    flag = <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line">cv.<span class="built_in">notify_one</span>();</span><br><span class="line"><span class="comment">// 接收方</span></span><br><span class="line">...</span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">std::unique_lock&lt;std::mutex&gt; <span class="title">lk</span><span class="params">(m)</span></span>;</span><br><span class="line">    cv.<span class="built_in">wait</span>(lk, [] &#123; <span class="keyword">return</span> flag; &#125;); <span class="comment">// use lambda to avoid spurious wakeups</span></span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
-
-<p>这种方法避免了我们讲到的几个问题，但它的设计不好：很多共享变量；两套机制来做同一件事；逻辑暴露在外，容易写错。简单来说就是这种方法不够干净。</p>
-<p>一种更干净的方法是接收方等待一个future，而通知方通过给这个future赋值来进行通知。Item38提到了<code>std::promise</code>代表了一个通信通道的发送端，而future则代表了接收端。这样的通道可以用于任何需要通信的场合。</p>
-<p>方案很简单，通知方要持有一个<code>std::promise</code>对象，而接收方持有对应的future。通知方通过调用<code>std::promise</code>的<code>set_value</code>来写入一条消息，接收方通过future的<code>wait</code>来等待消息。</p>
-<p>无论是<code>std::promise</code>、<code>std::future</code>还是<code>std::shared_future</code>都是模板类型，需要一个类型参数，也就是消息的类型。但我们只关心通知本身，不需要消息有类型，最合适的就是<code>void</code>。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">std::promise&lt;<span class="type">void</span>&gt; p;</span><br><span class="line"><span class="comment">// 通知方</span></span><br><span class="line">...</span><br><span class="line">p.<span class="built_in">set_value</span>();</span><br><span class="line"><span class="comment">// 接收方</span></span><br><span class="line">...</span><br><span class="line">p.<span class="built_in">get_future</span>().<span class="built_in">wait</span>();</span><br></pre></td></tr></table></figure>
-
-<p>没有mutex，没有条件变量，没有共享状态，没有假醒，是不是很完美？不完全是。Item38提到<code>std::promise</code>背后实际上有一个共享状态，就意味着它的构造包含着一次内存分配和释放的开销。</p>
-<p>而且，<code>std::promise</code>只能<strong>赋值一次</strong>。重复对<code>std::promise</code>的赋值是没有意义的，接收方感知不到。因此这条通信通道只能使用一次，这是与前述方案最大的区别。条件变量和共享状态总是可以重复利用的。</p>
-<p>“只有一次”的通信有时候也是很有用的。举个例子，有时候我们想创建一个被暂停的线程，需要等待一个事件后才开始工作，就可以用<code>std::promise</code>来实现：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">std::promise&lt;<span class="type">void</span>&gt; p;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">react</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">detect</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="function">std::thread <span class="title">t</span><span class="params">([] &#123;</span></span></span><br><span class="line"><span class="params"><span class="function">        p.get_future().wait();</span></span></span><br><span class="line"><span class="params"><span class="function">        react();</span></span></span><br><span class="line"><span class="params"><span class="function">    &#125;)</span></span>;</span><br><span class="line">    ...</span><br><span class="line">    p.<span class="built_in">set_value</span>();</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这里我们创建了一个暂停的线程，它会等待<code>p</code>被赋值后才执行<code>react</code>。需要一个暂停线程的地方很多，比如我们想避免线程创建的成本，比如想在线程真正工作前设置一下优先级什么的（<code>std::thread</code>没有这种接口，但我们可以通过<code>native_handle</code>获得OS线程的句柄来做这样的事情）。</p>
-<p>Item37中提到用<code>ThreadRAII</code>类来代替直接的<code>std::thread</code>会更好，我们改写一下：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">std::promise&lt;<span class="type">void</span>&gt; p;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">react</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">detect</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="function">ThreadRAII <span class="title">tr</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">        std::thread([] &#123;</span></span></span><br><span class="line"><span class="params"><span class="function">            p.get_future().wait();</span></span></span><br><span class="line"><span class="params"><span class="function">            react();</span></span></span><br><span class="line"><span class="params"><span class="function">        &#125;),</span></span></span><br><span class="line"><span class="params"><span class="function">        ThreadRAII::DtorAction::join</span></span></span><br><span class="line"><span class="params"><span class="function">    )</span></span>;</span><br><span class="line">    ...                              <span class="comment">// 注意这里</span></span><br><span class="line">    p.<span class="built_in">set_value</span>();</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>上面的代码有个问题：第一个“…”处如果抛了异常，<code>p</code>还没有赋值，因此<code>tr</code>还在阻塞中，因此它是可join的，因此<code>tr</code>析构会导致程序终止。</p>
-<p>这个问题有很多解法，这里就不赘述了。最后说一下如何把上面的通信过程由一对一改成一对多，即一个通知方唤醒多个接收方：把<code>std::future</code>换成<code>std::shared_future</code>即可。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">std::promise&lt;<span class="type">void</span>&gt; p;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">react</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">detect</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> sf = p.<span class="built_in">get_future</span>().<span class="built_in">share</span>();   <span class="comment">// std::shard_future</span></span><br><span class="line">    std::vector&lt;std::thread&gt; vt;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; threadForRun; ++i) &#123;</span><br><span class="line">        vt.<span class="built_in">emplace_back</span>(</span><br><span class="line">            std::<span class="built_in">thread</span>([sf] &#123;          <span class="comment">// 必须值捕获</span></span><br><span class="line">                sf.<span class="built_in">wait</span>();</span><br><span class="line">                <span class="built_in">react</span>();</span><br><span class="line">            &#125;)</span><br><span class="line">        );</span><br><span class="line">    &#125;</span><br><span class="line">    ...                              </span><br><span class="line">    p.<span class="built_in">set_value</span>();</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">auto</span>&amp; t: vt) &#123;</span><br><span class="line">        t.<span class="built_in">join</span>();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>注意各个线程持有的<code>std::shared_future</code>必须是值，不能是引用。</p>
-<h2 id="Item40-使用std-atomic应对并发，而用volatile访问特殊内存"><a href="#Item40-使用std-atomic应对并发，而用volatile访问特殊内存" class="headerlink" title="Item40: 使用std::atomic应对并发，而用volatile访问特殊内存"></a>Item40: 使用<code>std::atomic</code>应对并发，而用<code>volatile</code>访问特殊内存</h2><p>本节内容不重复了，大家都比较熟悉。简单列一下结论：</p>
-<ol>
-<li><code>std::atomic</code>是真正的原子操作，用于并发，但不能用于访问特殊内存（如硬件资源）。</li>
-<li><code>volatile</code>在某些语言中可以用于并发，但在C++中不能用于并发，它不保证原子的读写，也不保证指令的先后顺序。它的用途是访问上面说的特殊内存。</li>
-<li>可以结合起来，用于需要并发访问的特殊内存：<code>volatile std::atomic&lt;int&gt; vai</code>。</li>
-<li>访问<code>std::atomic</code>要比访问普通变量慢得多，它的内存屏障也会限制编译器的指令重排等优化，因此不要滥用<code>std::atomic</code>。</li>
-</ol>
-<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
-<li><a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Chapter1 类型推断 (Item 1-4)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">Chapter2 auto (Item 5-6)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">Chapter3 现代C++（Item 7-10)</a></li>
-<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm11-14/">Chapter3 现代C++（Item 11-14)</a></li>
-<li><a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/">Chapter3 现代C++（Item 15-17)</a></li>
-<li><a href="/2017/07/27/effective-modern-cpp-chapter4-iterm18-22/">Chapter4 智能指针 (Item 18-22)</a></li>
-<li><a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">Chapter5 右值引用、移动语义、完美转发（Item 23-26)</a></li>
-<li><a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Chapter5 右值引用、移动语义、完美转发（Item 27-30)</a></li>
-<li><a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">Chapter6: Lamba表达式 (Item 31-34)</a></li>
-<li><a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/">Chapter7: 并发API (Item 35-37)</a></li>
-<li><a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">Chapter7: 并发API (Item 38-40)</a></li>
-<li><a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">Chapter8: 杂项 (Item 41-42)</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/9/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><a class="page-number" href="/page/12/">12</a><a class="extend next" rel="next" href="/page/11/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/9/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/9/">9</a><span class="page-number current">10</span><a class="page-number" href="/page/11/">11</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/11/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -2043,7 +2118,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-count">122</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

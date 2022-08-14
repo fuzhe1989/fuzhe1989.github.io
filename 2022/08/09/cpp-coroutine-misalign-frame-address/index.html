@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="TL;DR C++20 coroutine 有一个严重的 bug，且这个 bug 本质上来源于 C++ 标准不完善：在分配 coroutine frame 时，没有严格按 alignment 要求。目前看起来 gcc 与 clang 都中招了，只有 msvc 似乎没问题。 本文记录了我是如何被这个 bug 消耗掉了两三天光明。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="记：C++20 coroutine 的诡异 bug 调查过程">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/08/09/cpp-coroutine-misalign-frame-address/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="TL;DR C++20 coroutine 有一个严重的 bug，且这个 bug 本质上来源于 C++ 标准不完善：在分配 coroutine frame 时，没有严格按 alignment 要求。目前看起来 gcc 与 clang 都中招了，只有 msvc 似乎没问题。 本文记录了我是如何被这个 bug 消耗掉了两三天光明。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-08/cpp-coroutine-bug-01.png">
+<meta property="article:published_time" content="2022-08-09T12:48:56.000Z">
+<meta property="article:modified_time" content="2022-08-12T13:09:19.892Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-08/cpp-coroutine-bug-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/08/09/cpp-coroutine-misalign-frame-address/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>记：C++20 coroutine 的诡异 bug 调查过程 | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/09/cpp-coroutine-misalign-frame-address/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          记：C++20 coroutine 的诡异 bug 调查过程
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-08-09 20:48:56" itemprop="dateCreated datePublished" datetime="2022-08-09T20:48:56+08:00">2022-08-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-08-12 21:09:19" itemprop="dateModified" datetime="2022-08-12T21:09:19+08:00">2022-08-12</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>TL;DR</strong></p>
+<p>C++20 coroutine 有一个严重的 <a target="_blank" rel="noopener" href="https://github.com/llvm/llvm-project/issues/56671">bug</a>，且这个 bug 本质上来源于 C++ 标准不完善：在分配 coroutine frame 时，没有严格按 alignment 要求。目前看起来 gcc 与 clang 都中招了，只有 msvc 似乎没问题。</p>
+<p>本文记录了我是如何被这个 bug 消耗掉了<del>两</del>三天光明。</p>
+<span id="more"></span>
+
+<h2 id="起"><a href="#起" class="headerlink" title="起"></a>起</h2><p>我们项目中使用了 clang + folly::coro。我有一个 benchmark 工具大概长这个样子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">folly::<span class="function">coro::Task&lt;<span class="type">void</span>&gt; <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Config config;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    IOWorker worker;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    Runners runners;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">co_await</span> runners.<span class="built_in">run</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    folly::coro::<span class="built_in">blockingWait</span>(<span class="built_in">run</span>());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>本来运行得很好。这天我需要拿它去给其他同学做个演示，就加了行输出，顺手 rebase 到 main（感恩 gitlab 的 zzzq），就坏事了：一运行就报错，说 <code>Config</code> 中的一个 <code>std::mutex</code> 默认构造时遇到了空指针。</p>
+<p>现场大概长这样：</p>
+<p><img src="/images/2022-08/cpp-coroutine-bug-01.png"></p>
+<p>看到这个报错位置的时候我是有点<code>地铁老人手机.jpg</code>的。</p>
+<p>一定是 rebase 惹的祸，main 的新代码有毒！</p>
+<h2 id="承"><a href="#承" class="headerlink" title="承"></a>承</h2><h3 id="怀疑-TDengine"><a href="#怀疑-TDengine" class="headerlink" title="怀疑 TDengine"></a>怀疑 TDengine</h3><p>查看了一下 main 的最新提交，只是引入了 TDengine，但我的工具没有用到它，只是被动链接了 TDengine client 的静态库。</p>
+<p>会不会是它的静态库改变了某些编译期行为呢？</p>
+<p>先搞清楚 <code>__GTHREAD_MUTEX_INIT</code> 是什么吧。我们虽然使用了 clang，但标准库还是用的 libstdc++，在这里 grep 找到它实际指向 <code>PTHREAD_MUTEX_INITIALIZER</code>，而后者是以宏的形式初始化一个 <code>pthread_mutex_t</code>。</p>
+<p>恰好，我们在 TDengine 代码中找到了它重新定义了这个宏：</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/taosdata/TDengine/blob/e8a6b6a5a1e4806ce29ca9f80fe7059eb9ab0730/deps/pthread/pthread.h#L699">#define PTHREAD_MUTEX_INITIALIZER</a></p>
+<p>会不会是这里不小心修改了标准库的行为，进而导致了进程 crash 呢？</p>
+<p>我们随后发现不是：</p>
+<ol>
+<li>初始化一个 c 的 struct 不会因为值而 crash。</li>
+<li>TDengine 的文件只会在非 posix 环境被用到。</li>
+<li>去掉 TDengine 的静态库仍然会 crash。</li>
+</ol>
+<h3 id="将-Config-移出-coroutine"><a href="#将-Config-移出-coroutine" class="headerlink" title="将 Config 移出 coroutine"></a>将 Config 移出 coroutine</h3><p>无论如何，在 coroutine 中初始化带有 <code>std::mutex</code> 的对象还是有点奇怪的（至少部分观点这么认为），那我们将它移出去构造好，再将引用传给 coroutine，看看会发生什么。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">folly::<span class="function">coro::Task&lt;<span class="type">void</span>&gt; <span class="title">run</span><span class="params">(Config &amp;config)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    IOWorker worker;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    Runners runners;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">co_await</span> runners.<span class="built_in">run</span>();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Config config;</span><br><span class="line">    folly::coro::<span class="built_in">blockingWait</span>(<span class="built_in">run</span>(config));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>果然，<code>Config</code> 不 crash 了，改在构造 <code>IOWorker</code> 时 crash 了……</p>
+<p>crash 的位置还是 <code>__GTHREAD_MUTEX_INIT</code>。</p>
+<h3 id="valgrind"><a href="#valgrind" class="headerlink" title="valgrind"></a>valgrind</h3><p>从最前面 crash 的 stack 来看，<code>this</code> 的值明显不对，会不会是内存写坏了？在老司机建议下，我们用 valgrind 跑了一下，一无所获。</p>
+<h3 id="builtin-return-address"><a href="#builtin-return-address" class="headerlink" title="__builtin_return_address"></a>__builtin_return_address</h3><p>重大突破（虽然事后证实是假象）：换用 gcc 之后 crash 消失了！</p>
+<p>我们在 crash 的 stacktrace 中找到了 coroutine::resume，看起来 <code>folly::coro::blockingWait</code> 一定会先 suspend 再 resume。会不会是 clang 的 resume 有 bug，它跳到了错误的地址？</p>
+<p>我们在 folly 代码中看到了 <code>__builtin_return_address</code>，未经证实，就觉得它是凶手。正好又搜到了这个答案：</p>
+<p><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/65638872/why-does-builtin-return-address-crash-in-clang">Why does __builtin_return_address crash in Clang?</a></p>
+<p>它里面说 clang 可能需要强制设置 <code>-fno-omit-frame-pointer</code> 来确保正确回溯 frame。我们的项目恰好没有显式设置这个 flag，加上试试。</p>
+<p>还是不行：</p>
+<ol>
+<li><code>__builtin_return_addres(0)</code> 不需要设置这个 flag 就可以正确工作。</li>
+<li>我们的进程并没有 crash 在 return 时，而是在 coroutine 运行时，本来就不该关注这里。</li>
+</ol>
+<h3 id="事情开始变得奇怪起来"><a href="#事情开始变得奇怪起来" class="headerlink" title="事情开始变得奇怪起来"></a>事情开始变得奇怪起来</h3><p>陷入困境，尤其是我们甚至不知道该给谁开 bug（folly 还是 clang？）。</p>
+<p>鉴于现场还比较复杂，我们开始着手简化现场，搞个最小化 case 出来。</p>
+<p>于是事情开始变得奇怪起来：注释掉 <code>run</code> 中的唯一的 <code>co_await</code> 之后，crash 消失了！但 <code>co_await</code> 明明是发生在 crash 的位置之后，也就是说注释掉后面代码会影响前面代码的行为。</p>
+<p>去掉了 <code>co_await</code> 之后 <code>run</code> 内部就不再有 suspend point 了，因此 clang 不会在内部为其产生 async stack frame（用于 resume）。这是一个非常关键的线索。</p>
+<p>顺着这个线索，我们发现即使 <code>co_await</code> 一个 dummy function，也会引入 crash。</p>
+<p>接下来，我们开始二分注释代码，立求将 <code>run</code> 简化到最小。</p>
+<h3 id="最小化-case-v1"><a href="#最小化-case-v1" class="headerlink" title="最小化 case v1"></a>最小化 case v1</h3><p>……最终，我们得到了这么一个 case：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">folly::<span class="function">coro::Task&lt;<span class="type">void</span>&gt; <span class="title">dummy</span><span class="params">()</span> </span>&#123; <span class="keyword">co_return</span>; &#125;</span><br><span class="line"></span><br><span class="line">folly::<span class="function">coro::Task&lt;<span class="type">void</span>&gt; <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="function">folly::CPUThreadPoolExecutor <span class="title">executor</span><span class="params">(<span class="number">1</span>)</span></span>;</span><br><span class="line">    <span class="function"><span class="keyword">co_await</span> <span class="title">dummy</span><span class="params">()</span></span>;</span><br><span class="line">    executor.<span class="built_in">add</span>([] &#123;&#125;); <span class="comment">// prevent `executor` from eliminated by compiler</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">TEST</span>(Test, Normal) &#123;</span><br><span class="line">    folly::coro::<span class="built_in">blockingWait</span>(<span class="built_in">run</span>());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看起来已经非常明显了，一定是 folly 或者 clang 中的一个的 bug。只是我们还不知道该给谁发 bug。</p>
+<h3 id="事情变得更加奇怪了"><a href="#事情变得更加奇怪了" class="headerlink" title="事情变得更加奇怪了"></a>事情变得更加奇怪了</h3><p>……还没完。</p>
+<p>我们发现，上面这个 gtest 行为非常奇怪：</p>
+<ol>
+<li><code>run --gtest_filter=&quot;Test.Normal&quot;</code> 会 crash。</li>
+<li><code>run --gtest_filter=&quot;Test.*&quot;</code> 不会 crash。</li>
+<li><code>run --gtest_filter=&quot;Test.Normal*&quot;</code> 不会 crash。</li>
+</ol>
+<h2 id="转"><a href="#转" class="headerlink" title="转"></a>转</h2><p>一个周末过去了，我们觉得还是应该把这个 bug 查清楚（关系到我们还能不能继续使用 coroutine），至少这不是随机 crash 吧。</p>
+<p>我们将 <code>CPUThreadPoolExecutor</code> 变成在堆上分配（<code>std::unique_ptr</code>）之后，crash 就消失了，进一步说明 crash 和 coroutine async frame 有关，一定是有某个东西在 coroutine 栈上分配就会导致 crash。</p>
+<p>接下来，我们将 <code>CPUThreadPoolExecutor</code> 的所有成员显式分配到栈上，二分排除，最终找到了最小化 case v2。</p>
+<h3 id="最小化-case-v2"><a href="#最小化-case-v2" class="headerlink" title="最小化 case v2"></a>最小化 case v2</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">folly::<span class="function">coro::Task&lt;<span class="type">void</span>&gt; <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">char</span> padding0[<span class="number">88</span>];</span><br><span class="line">    folly::LifoSem sem;</span><br><span class="line">    std::deque&lt;<span class="type">int</span>&gt; queue;</span><br><span class="line">    <span class="type">char</span> padding1[<span class="number">72</span>];</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">co_await</span> <span class="title">dummy</span><span class="params">()</span></span>;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最小化过程中我们为被排除掉的变量都申请了同样大小的栈内存。</p>
+<p>这已经和 <code>std::mutex</code> 没关系了，我们一开始的方向完全是错的！</p>
+<h3 id="定位到-alignment"><a href="#定位到-alignment" class="headerlink" title="定位到 alignment"></a>定位到 alignment</h3><p>仔细查看 <code>folly::LifoSem</code> 的实现，我们发现它是 cacheline 对齐的，但 stacktrace 显示它的地址不能被 64 整除。</p>
+<p>Wow，amazing，unbelivable。</p>
+<h2 id="合"><a href="#合" class="headerlink" title="合"></a>合</h2><p>隐约记得之前在怀疑 clang 的时候看过它的 open issues，里面有个似乎和 alignment 有关：</p>
+<p><a target="_blank" rel="noopener" href="https://github.com/llvm/llvm-project/issues/56671">Clang misaligns variables stored in coroutine frames</a></p>
+<p>它大概说的是：</p>
+<ol>
+<li>一个 coroutine function 里，如果 <code>co_await</code> 前面有变量需要 <code>alignment &gt; 8</code>，clang 不保证分配出来的 async stack frame 满足这个条件。</li>
+<li>这个 bug 不是 clang 自己的问题，它是严格按 std 标准实现的，是标准没有包含这项要求。</li>
+<li>2020 年已经有提案说这件事了（<a target="_blank" rel="noopener" href="https://wg21.link/p2014r0">wg21.link&#x2F;p2014r0</a>），但被人关了，今年又 reopen，看看能不能进 C++26（f**k）。</li>
+<li>如果 clang 自己做了扩展，需要应用自己的 <code>promise_type</code> 不会重载 <code>operator new</code>，否则 clang 也没办法介入。</li>
+</ol>
+<p>和我们遇到的情况，不能说一模一样吧，至少也是同一个 bug。</p>
+<p>这样，前面种种奇怪现象也都有了合理解释：编译期的 bug 导致了运行期异常，具体到 <code>operator new</code> 返回的地址是否对齐。</p>
+<p>终于水落石出了。但 coroutine 能不能安心继续用呢？我们知道 alignment 是非常常用的优化手段，尤其是 cacheline 对齐，coroutine 里也经常会这么定义一个变量。但这个 bug 的存在（尤其是它至少要存活到 2026 年），我们随时可能撞上诡异的 crash。</p>
+<p>幸好我不负责这个项目，不用我去头疼。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/" rel="prev" title="一种通过 skip cache 加速重复查询的方法">
+      <i class="fa fa-chevron-left"></i> 一种通过 skip cache 加速重复查询的方法
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/08/14/cpp-libcxx-function-copy-first-when-move-with-sso/" rel="next" title="记：不能依赖 std::function 的 move 函数清空 source">
+      记：不能依赖 std::function 的 move 函数清空 source <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B5%B7"><span class="nav-number">1.</span> <span class="nav-text">起</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%BF"><span class="nav-number">2.</span> <span class="nav-text">承</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%80%E7%96%91-TDengine"><span class="nav-number">2.1.</span> <span class="nav-text">怀疑 TDengine</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B0%86-Config-%E7%A7%BB%E5%87%BA-coroutine"><span class="nav-number">2.2.</span> <span class="nav-text">将 Config 移出 coroutine</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#valgrind"><span class="nav-number">2.3.</span> <span class="nav-text">valgrind</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#builtin-return-address"><span class="nav-number">2.4.</span> <span class="nav-text">__builtin_return_address</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8B%E6%83%85%E5%BC%80%E5%A7%8B%E5%8F%98%E5%BE%97%E5%A5%87%E6%80%AA%E8%B5%B7%E6%9D%A5"><span class="nav-number">2.5.</span> <span class="nav-text">事情开始变得奇怪起来</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%80%E5%B0%8F%E5%8C%96-case-v1"><span class="nav-number">2.6.</span> <span class="nav-text">最小化 case v1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8B%E6%83%85%E5%8F%98%E5%BE%97%E6%9B%B4%E5%8A%A0%E5%A5%87%E6%80%AA%E4%BA%86"><span class="nav-number">2.7.</span> <span class="nav-text">事情变得更加奇怪了</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BD%AC"><span class="nav-number">3.</span> <span class="nav-text">转</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%80%E5%B0%8F%E5%8C%96-case-v2"><span class="nav-number">3.1.</span> <span class="nav-text">最小化 case v2</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9A%E4%BD%8D%E5%88%B0-alignment"><span class="nav-number">3.2.</span> <span class="nav-text">定位到 alignment</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%88"><span class="nav-number">4.</span> <span class="nav-text">合</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">122</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

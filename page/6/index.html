@@ -195,6 +195,166 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/21/druid-a-real-time-analytical-data-store/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/21/druid-a-real-time-analytical-data-store/" class="post-title-link" itemprop="url">[笔记] Druid: A real-time analytical data store</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-21 23:21:11" itemprop="dateCreated datePublished" datetime="2020-11-21T23:21:11+08:00">2020-11-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2588555.2595631">Druid: A real-time analytical data store</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Druid是一种实时分析系统，它主要面向时序数据的复杂分析。Druid使用了lambda架构，使用实时节点来服务新数据，历史节点来服务历史数据，从而同时保证了查询效率、空间效率、数据可见性。Druid是存储计算分离架构，支持多种存储引擎，如HDFS、AWS S3等。</p>
+<p>Druid比较有价值的点是它的lambda架构、列存、倒排索引、良好的可伸缩性和高可用性。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/21/druid-a-real-time-analytical-data-store/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/21/f1-query-declarative-querying-at-scale/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/21/f1-query-declarative-querying-at-scale/" class="post-title-link" itemprop="url">[笔记] F1 query: declarative querying at scale</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-21 13:49:45" itemprop="dateCreated datePublished" datetime="2020-11-21T13:49:45+08:00">2020-11-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3229863.3229871">F1 query: declarative querying at scale</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>F1 query是一种federated query processing平台，它的特点是：</p>
+<ol>
+<li>计算存储分离。</li>
+<li>支持不同的存储引擎，如BigTable、Spanner、Mesa等，因此称为federated query processing。</li>
+<li>使用三种不同的模式处理不同规模的query：单节点模式处理短的实时query；分布式模式处理中等query；远程模式使用MapReduce处理大型query。</li>
+<li>使用启发式的query optimizer。</li>
+</ol>
+<p>这里面最有价值的部分就是它如何融合不同的数据源与处理模式。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/21/f1-query-declarative-querying-at-scale/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -851,177 +1011,11 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/" class="post-title-link" itemprop="url">[笔记] SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-11 18:18:37" itemprop="dateCreated datePublished" datetime="2020-10-11T18:18:37+08:00">2020-10-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="http://www.vldb.org/pvldb/vol1/1454166.pdf">SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>SCOPE是一种分布式批处理语言，将类SQL的脚本编译为可以运行在Cosmos平台上的分布式作业。</p>
-<p>它的特点：</p>
-<ul>
-<li>同时支持类SQL语法和分步的声明式语法。</li>
-<li>支持使用C#编写扩展类和脚本内直接调用C#表达式。</li>
-<li>支持导入已有的脚本，且可传递参数。</li>
-<li>编译期支持基于开销进行优化，重写执行计划；运行期也支持优化，比如按rack做预聚合。</li>
-</ul>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/" class="post-title-link" itemprop="url">[笔记] Dryad: Distributed Data-Parallel Programs from Sequential Building Blocks</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-11 15:25:21" itemprop="dateCreated datePublished" datetime="2020-10-11T15:25:21+08:00">2020-10-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://cse.buffalo.edu/~stevko/courses/cse704/fall10/papers/eurosys07.pdf">Dryad: Distributed Data-Parallel Programs from Sequential Building Blocks</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>Dryad是一个分布式批处理框架，相比MapReduce，它的特点是：</p>
-<ul>
-<li>支持多种operator组成的DAG，且支持组合多个DAG。</li>
-<li>DAG中多个顶点可以分配给一个进程。</li>
-<li>不同顶点间的消息传递不限于文件，还可以通过TCP和in-memory FIFO。</li>
-<li>支持按网络拓扑插入中间节点做部分聚合。</li>
-</ul>
-<p>Dryad属于是底层框架，用户真正用到的还是上面的框架，类似于MapReduce和Sawzall的关系。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/5/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/12/">12</a><a class="extend next" rel="next" href="/page/7/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/5/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/7/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1090,7 +1084,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">120</span>
+          <span class="site-state-item-count">122</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
