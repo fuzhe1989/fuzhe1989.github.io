@@ -51,7 +51,7 @@ log层的API如上图。一旦一个值submit了，client在各个replica上设�
 
 ### Multi-Paxos
 
-基本的Paxos算法只能选出一个值，当需要在一系统值上应用Paxos时，我们可以针对每个值单独运行一个Paxos实例，称为Multi-Paxos。
+基本的Paxos算法只能选出一个值，当需要在一系列值上应用Paxos时，我们可以针对每个值单独运行一个Paxos实例，称为Multi-Paxos。
 
 Multi-Paxos要求每个replica在本地持久化自己的状态，trivial的实现需要有5组同步写（propose、promise、accept、acknowledge、commit）。
 
