@@ -101,9 +101,15 @@ read cache 的结构见图 3，它由两个 latch-free 的结构组成：一个 
 
 TC Proxy 永远与 DC 部署在一起。TC 会定期将持久化好的 log 发给 TC Proxy（如果 TC 与 DC 在相同机器上，只会发送引用，避免拷贝）。
 
-注意 TC 向 TC Proxy 发送的 log 是包含未 committed 的事务的，因此 TC Proxy 需要维护 transaction table
+注意 TC 向 TC Proxy 发送的 log 是包含未 committed 的事务的，因此 TC Proxy 需要维护 transaction table。TC Proxy 会定期扫描自身的 log buffer，将所有确定 committed log records 写入 DC，剩余结果未知的 log records 则转移到一个 side buffer（预期很少），这样整个 log buffer 可以重用，效率更高。
 
+如前所述，Deuteronomy 只有 redo log，不需要读取旧值，因此 TC Proxy 只通过 upsert 向 DC 写入数据。这还允许 DC 中的 Bw-tree 直接向仍在磁盘上的 page 应用 delta（而不需要预先加载到 cache 中）。
 
+在配合 TC 回收 MVCC records 上，TC Proxy 会维护两个 LSN：
+- T-LSN：TC Proxy 已收到的最高 LSN。
+- O-LSN：DC 已连续持久化的最高 LSN。
+
+通过维护两个 LSN，我们可以确保长事务不会阻塞 gc：所有 LSN <= O_LSN 且 commit LSN <= T_LSN 的 MVCC records 都可以被 gc。
 
 [Deuteronomy]: /2021/04/22/deuteronomy-transaction-support-for-cloud-data/
 [LLAMA]: /2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/
