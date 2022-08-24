@@ -31,7 +31,7 @@ Deuteronomy 有三种组件：
 - Data Component（DC）：存储状态机。
 - TC Proxy：将 TC 的 committed transaction 发给 DC。
 
-Deuteronomy 的核心思想是 TC 与 DC 分离，这样就可以为多种不支持事务的 DC 增加事务能力。但它的[旧实现][Deuteronomy]严重制约了它的性能，尤其是当 DC 经过几次演进之后，使用了 Bw-tree、[LLAMA] 等高性能结构之后，原有的 TC 的性能就成为了瓶颈。
+Deuteronomy 的核心思想是 TC 与 DC 分离，这样就可以为多种不支持事务的 DC 增加事务能力。但它的[旧实现][Deuteronomy]严重制约了它的性能，尤其是当 DC 经过几次演进之后，使用了 [Bw-tree]、[LLAMA] 等高性能结构之后，原有的 TC 的性能就成为了瓶颈。
 
 这篇 paper 就是在讲如何重新设计实现三种组件，使其能充分发挥 DC 的高性能。
 
@@ -111,6 +111,36 @@ TC Proxy 永远与 DC 部署在一起。TC 会定期将持久化好的 log 发�
 
 通过维护两个 LSN，我们可以确保长事务不会阻塞 gc：所有 LSN <= O_LSN 且 commit LSN <= T_LSN 的 MVCC records 都可以被 gc。
 
+> commit LSN <= T_LSN 说明 TC Proxy 已知事务已 committed，可能是指此时可以放心去读 DC？
+
+## Supporting Mechanisms
+
+作者提到，他们一开始实现 latch-free 时，主要依赖 CAS（compare-and-swap） 操作，但后来换成了 FAA（fetch-and-add）。这也是这一领域的共识：尽量用总是成功的 FAA 替代可能冲突严重的 CAS，从而提升多核下的并发性能。
+
+具体到 buffer 的 offset 上，作者用低 32 位维护 offset，高 32 位维护当前活跃的 user count：每次 FAA 2^32 + SIZE 来修改 active user count。
+
+FAA 的结果如果超出 buffer capacity，说明这个 buffer 已经被 seal 了，不能再使用。那个恰好令它超过 capacity 的线程负责 flush buffer。其它发现 buffer 被 seal 的线程则尝试分配新 buffer（一次 CAS，只有一个能成功）。
+
+接下来是 epoch reclamation。[LLAMA] 和 [Bw-tree] 中已经介绍了 epoch reclamation 的实现。作者在这里又应用了 thread-local 来优化性能，减少争抢。
+
+具体实现：
+- 全局有一个 global epoch，一个固定长度的 buffer。
+- 每当 buffer size 超过阈值（比如 capacity/4）就会提升 global epoch。
+- 所有需要删除的对象和它所属的 epoch 一起打包扔进一个固定长度的 buffer。
+- 每个线程维护 thread-local 的 epoch，每个操作前复制 global epoch 到 tls，操作后将其设置为 NULL。
+- 维护一个 min tls epoch，每当 global epoch 提升或阻碍了 buffer 回收时就重新计算。
+
+这样昂贵的操作（计算 min tls epoch）和全局争抢（提升 global epoch）都被分摊了，主要路径只有很少的原子操作。
+
+线程管理方面 Deuternomy 主要考虑了 NUMA 和 cache 亲和性，尽量避免跨 NUMA 通信。另外 Deuternomy 使用了协程，且优化了内存分配，确保协程栈分配在栈上，而不是堆上。
+
+> 全文看完，感想：
+> - TC 和 DC 分离的思路是非常适合分布式环境的。比如 FoundationDB 就用了类似的思路实现了非常好的扩展性和性能。
+> - TC 本身看上去是个单点，如何确保它的高可用是个复杂的问题。
+> - MVCC 的粒度是 record，当数据量非常大的时候是个问题。不同领域可以考虑用不同的粒度，比如传统的 RDBMS 可以用 page，OLAP 可以用 chunk 或者 partition 等。这里不同粒度需要 TC 和 DC 共同确定。
+> - 大量读时，TC 本身可能成为瓶颈，在保证语义的前提下 bypass TC，直接访问 DC，可能是另一大优化。
+
 [Deuteronomy]: /2021/04/22/deuteronomy-transaction-support-for-cloud-data/
 [LLAMA]: /2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/
 [Hekaton]: /2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/
+[Bw-tree]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/bw-tree-icde2013-final.pdf
