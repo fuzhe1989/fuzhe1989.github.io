@@ -1,0 +1,28 @@
+slides:
+- 旧设计：将一行所有值拼成一个 value。对 interleaved table 不友好，导致 value 参差不齐。
+- strongly typed column store within a block
+- parent table and child table won't share blocks
+- one layer: between 1 and 4 files: recent/old and small/large
+- difference:
+    - row vs pax
+    - tagged vs typed
+    - decompress vs parse (vector encoding)
+    - key type: string vs typed
+    - new/old intermixed vs separated
+    - ARC cache
+- still lsm
+- scalar vectors
+    - uncompressed
+    - re-based (PFOR)
+    - dictionary (dictionary itself sorted)
+    - RLE (length, type, starting), also maintain a row-to-run map (run-index, start-position) for fast random access. TODO: what's the role of run-index?
+    - periodically sample for different vector types and discard those poorly compressed.
+- boolean vectors
+    - RLE (repeated of false starting and true starting pairs), also have row-to-run map.
+- string vectors
+    - dictionary, indeces are `RLVector<int32>`, dictionary itself keep uncompressed
+    - delta-zip hub vector. equal to previous (stored as boolean vector), hub strings (uncompressed), successor strings (compressed). TODO: not sure how successor strings are encoded.
+- non-key column data: just a vector. TODO: ?
+- large strings: stored in large files
+    - is large (boolean vector), small values (string vector), large value file columns: offset (int vector), compressed size (int vector), decompressed size delta (minus compressed size, int vector). note different columns needn't have the same length.
+- find (8, baz) in two key columns: find 8 and get an offset range, then find baz within this range.
