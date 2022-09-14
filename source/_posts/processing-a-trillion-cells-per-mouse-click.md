@@ -199,3 +199,4 @@ ZLIB 和 LZO。ZLIB 的压缩率很好，但解压太慢。LZO 的一个变种�
 为了避免单个 query 对 LRU cache 的冲击，PowerDrill 使用了类似于 ARC 的 cache。
 
 [C-Store]: /2020/08/13/c-store-a-column-oriented-dbms/
+[Dremel]: /2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/
