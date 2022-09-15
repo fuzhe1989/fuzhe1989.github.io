@@ -1,0 +1,113 @@
+---
+title:      "[笔记] Cache Craftiness for Fast Multicore Key-Value Storage"
+date:       2022-09-14 22:42:31
+tags:
+---
+
+> 原文：[Cache Craftiness for Fast Multicore Key-Value Storage](https://dl.acm.org/doi/pdf/10.1145/2168836.2168855)
+
+**TL;DR**
+
+大名鼎鼎的 Masstree。简短描述：
+1. 结合了 Trie-tree 与 B-tree，既提升了查询性能又控制了树的深度。
+1. 全局一棵树（而不是每个 core 一棵树）来解决负载不均衡的问题。
+1. 优化内存访问：cache-line 对齐 + prefetch。
+1. 写入只有 append 和 copy-on-write，对读友好。读路径只需要无锁访问+乐观锁检查读写冲突，不会有 cacheline 失效。
+1. 通过细粒度 spinlock 避免写写冲突。
+
+<!--more-->
+
+# Introduction
+
+开篇第一句话很酷：“Storage server performance matters”。无论什么系统，单机性能永远是非常关键的。毕竟最好的分布式系统就是不要分布（笑）。
+
+> 面向多核设计的一些关键因素：
+> 1. 通常读远多于写，因此优化读的性能要比优化写更关键。
+> 1. 锁不是万恶之源，争抢才是。纯粹的 lockfree 可能难以实现，实现了性能代价也可能很高。在需要原子更新/读取多值时，细粒度锁往往优于 lockfree。
+> 1. 从 memory-model 角度理解并发操作，避免使用过强的 coherence（如 serializable）。锁本身意味着 serializable，但如果 acquire/release 就能满足要求，那锁就是过强的。
+> 1. “不要共享”和“immutable”都是提升性能的利器。这往往意味着 copy-on-write 要出场了。lockfree 也经常需要结合 copy-on-write 才能实现。但此时需要仔细设计如何处理写写冲突。
+> 1. memory stall 已经成为了现代系统的一大性能瓶颈，充分利用 cache 以及 prefetch 是关键。前者意味着良好的数据结构设计，避免跨 cacheline 的原子操作，避免 false-sharing，利用空间局部性；后者则是在主动利用时间局部性。
+
+Masstree 其实也是一个 LSM-like 系统，亮点是它的 in-memory 结构。
+
+TODO
+
+# System interface
+
+Masstree 有一套典型的 key-value 接口：
+- get(k)
+- put(k, v)
+- remove(k)
+- getrange(k, n)
+
+其中前三个是原子的，getrange 不是。
+
+# Masstree
+
+Masstree 的特点：
+1. 多核之间共享（区别于不同核访问不同的树）。
+1. 并发结构。
+1. 结合了 B+tree 和 Trie-tree。
+
+Masstree 直面的三个挑战：
+1. 能高效支持多种 key 的分布，包括变长的二进制的 key，且之间可能有大量相同前缀。
+1. 为了保证高性能和扩展性，Masstree 必须支持细粒度并发，且读操作不能读到被写脏的共享数据。
+1. Masstree 的布局必须能支持 prefetch 和按 cacheline 对齐。
+
+后两点被作者称为“cache craftiness”。
+
+## Overview
+
+Masstree 的大结构是一棵 trie tree。
+
+ART 中提到 trie tree 相比其它 tree 结构的优点是：
+1. 天然的前缀压缩，不需要在叶子节点保存每个完整的 key，节省空间。
+1. 固定 fanout 的 trie tree 能节省 key 之间的比较开销。另外它按下标寻址的特点也天然适合实现 lockfree。
+
+Masstree 选择用 trie tree 的理由大体也是这样。但 trie tree 的一个问题是 fanout 很难确定：
+1. fanout 太小，树的深度太大，查询经历的节点太多，随机访问次数多，性能不高。
+1. fanout 太大，空间浪费严重。
+
+ART 的思路是设计多种 node 大小，加上前缀压缩和 lazy expansion 来降低空间浪费。
+
+Masstree 则使用了另一种思路：选择一个巨大的 fanout（2^64，8 字节），但使用 B+tree 来实现 trie node。这样混搭方案的优点：
+1. 逻辑上仍然是 trie tree，前缀压缩的优点仍然在。
+1. fanout 足够大，避免树太高。
+1. 物理上使用 B+tree，有效避免空间浪费。
+1. 此时 B+tree 面对的只是单个 trie node 的短 key（不超过 8 字节），可以将 key compare 实现得非常高效。
+
+![](/images/2022-09/masstree-01.png)
+
+可以看到 Masstree 逻辑上分成了若干层，每层都由多个 B+tree 组成。每个 B+tree 的叶子节点除了存储 key 和 value 外，还可能存储指向下一层 B+tree 的指针。
+
+另外 Masstree 中的 B+tree 内部不会 merge 节点，即 remove key 不会引起 key 的重排。这也是为了避免读路径加锁。
+
+Masstree 同样使用了 lazy expansion，即只在必要的时候创建新的 B+tree。比如一个 key “01234567AB”，长度已经超过了 8 字节，但只要没有其它 key 和它共享前缀 “01234567”，我们就没必须为了它单独创建一层 B+tree。
+
+Masstree 相比普通的 B+tree 的一个缺点是 range query 开销更大，一个是要重建 key，另一个是要遍历更多的 layer。
+
+## Layout
+
+![](/images/2022-09/masstree-02.png)
+
+Masstree 中 B+tree 每个节点的 fanout 是 15（精妙的设计），其中所的 border nodes（即 leaf nodes）组成链表以支持 remove 和 getrange。
+
+`keyslice` 是将长度最多为 8 的 key 编码为一个 `uint64`（需要保证顺序不变，不足用 0 补齐），这样直接用整数比较代替字符串比较来提升性能。
+
+注意上图中 border node 有 `keylen` 字段，但 interrior node 就没有了。直接用 `keyslice` 比较的话必须带上长度，否则无法区分原本就有的 0 和后补上的 0。但 Masstree 保证所有相同 `keyslice` 的 key 都位于相同的 border node 上，这样 interrior node 上就不需要保存 `keylen`，直接比较 `keyslice` 即可，进一步提升了性能。
+
+> 相同 `keyslice` 最多有 10 个不同的 key（长度 0-8，外加一个长度可能超过 8 的 key），而 B+tree 的 fanout 是 15，因此总是可以保证这些 key 都在相同的 border node 上。
+
+Masstree 在访问一个 node 之前会先 prefetch，这就允许 Masstree 使用更宽的 node 来降低树的高度。实践表明当 border node 能放进 4 个 cacheline 大小（256B）时性能最好，此时允许的 fanout 就是 15。
+
+## Nonconcurrent modification
+
+insert 可能造成自底向上的分裂，但 remove 不会合并节点，只有当某个节点因此变空的时候，整个节点一起删掉。这个过程也是自底向上的。
+
+所有 border node 之间维护一个双向链表，目的是加速 remove 和 getrange。后者只要求单向链表，但前者的实现依赖双向链表。
+
+Masstree 有个对尾插入的优化：如果一个 key 插入到当前 B+tree 的尾部（border node 没有 next），且当前 border node 已经满了，则它直接插入到新节点中，老节点的数据不移动。
+
+## Concurrency overview
+
+Masstree 中的并发控制本质上是 MVCC + 读路径乐观锁 + 写路径悲观锁。

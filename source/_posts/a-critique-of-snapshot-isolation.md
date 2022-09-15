@@ -28,7 +28,7 @@ tags:
 - SI的WW冲突超出了serializability的需要，即允许WW冲突也可以实现serializability。
 - 只需要检测RW冲突就可以满足serializability。
 
-作者随后提出了write snapshot isolation，只检测RW冲突（不需要处理WW冲突），如果一个事务读过的数据在提交前被其它事务修改了，这个事务就需要abort。
+作者随后提出了write snapshot isolation，只检测RW冲突（不需要处理WW冲突），如果一个事务读过的数据在提交前被其它事务修改了，这个事务就需要abort。
 
 作者预期WSI能达到SI同等的并发能力：
 1. WSI和SI都不会abort只读事务，而这就占据了大部分事务。
