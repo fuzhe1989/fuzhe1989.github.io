@@ -134,3 +134,38 @@ split 操作需要同时锁住三个 node：当前 node、parent、next。为了
 
 > 但使用 Masstree 的应用要自己控制好线程数量，尽量减少 context switch，毕竟使用了 spinlock。
 
+## Writer-reader coordination
+
+基本原则：
+1. 一次写操作开始前会修改 `version`，结束后再修改一次 `version`。
+1. 读操作开始前会读一次 `version`，结束后再读一次 `version`，如果两者不等，说明发生了脏读，需要重试。
+
+接下来的优化方向是：针对部分写操作避免修改 `version`；针对部分读操作避免重试。
+
+![](/images/2022-09/masstree-04.png)
+
+### Updates
+
+update 操作会修改已有的 value，需要保证这次修改是原子的。这样不会影响到读操作的正确性，因此也就不需要修改 `version`。但注意的是写请求不能直接删除一个值，需要用 epoch reclamation 等方法 lazy 回收。
+
+### Border inserts
+
+当插入一个值到 border node 上时，为了避免重排已有的 key-value，同时确保这次插入本身对读请求原子可见，Masstree 使用了一种非常巧妙的方法。
+
+每个节点的 key 和 value 数组都是 append-only 的，真正的顺序通过 `permutation` 字段体现。每个 node 的 fanout 是 15，每个元素用 4 位，这样一共是 60 位，再加上 4 位来表示当前有多少个元素，正好可以放进一个 uint64 中。
+
+完整的插入流程：
+1. 锁住 node
+1. load `permutation`
+1. 计算得到新的 `permutation`
+1. append 新的 key-value
+1. 原子写回新的 `permutation`。直到此时这次插入才对读请求可见。
+1. 释放锁
+
+这个过程不会出现脏读，因此也不需要修改 `version`。
+
+> `version` 中的 `vinsert` 不处理 border inserts
+
+### New layers
+
+Masstree 会在
