@@ -110,4 +110,27 @@ Masstree 有个对尾插入的优化：如果一个 key 插入到当前 B+tree �
 
 ## Concurrency overview
 
-Masstree 中的并发控制本质上是 MVCC + 读路径乐观锁 + 写路径悲观锁。
+Masstree 中的并发控制本质上是 MVCC + 读路径乐观锁 + 写路径悲观锁：
+1. 每个节点有一个 `version` 字段，读请求需要在读节点数据的前后分别获取一次 `version`，确保 `version` 不变，从而避免脏读。
+1. `version` 本身包含 lock 以及细粒度的状态信息，写路径通过悲观锁来解决冲突。
+
+其中比较困难的是保证 split 和 remove 时读请求仍然能正确地读到数据。
+
+## Writer-writer coordination
+
+![](/images/2022-09/masstree-03.png)
+
+所有对 node 的修改都需要先对 node 加锁，例外：
+- `parent` 是由 parent node 的锁保护。
+- `prev` 是由 prev sibling node 的锁保护。
+
+这样可以简化 split 时的状态管理：parent node 可以直接修改 children 的 `parent`；原有的 node 可以直接修改新 split 出来的 node 的 `prev`。
+
+split 操作需要同时锁住三个 node：当前 node、parent、next。为了避免死锁，加锁顺序永远是从左向右，从下向上。
+
+> 这个例子中是先锁 node，再锁 next，再锁 parent。
+
+作者表示曾经对比过不同的并发控制方式，最终决定使用这种细粒度 spinlock 方案。相比之下纯粹使用 CAS 并不会降低 cache 层面的一致性开销。
+
+> 但使用 Masstree 的应用要自己控制好线程数量，尽量减少 context switch，毕竟使用了 spinlock。
+
