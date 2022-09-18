@@ -98,6 +98,10 @@ Masstree 中 B+tree 每个节点的 fanout 是 15（精妙的设计），其中�
 
 > 相同 `keyslice` 最多有 10 个不同的 key（长度 0-8，外加一个长度可能超过 8 的 key），而 B+tree 的 fanout 是 15，因此总是可以保证这些 key 都在相同的 border node 上。
 
+每个 border node 上所有 key 超过 8 字节的部分都保存在 `keysuffixes` 中。根据情况它既可能是 inline 的，也可能指向另一块内存。合理设定 inline 大小能提升一些性能。（但不多，可能是因为超过 8 字节的 key 并没有那么多）
+
+所有 value 都保存在 `link_or_value` 中，其中是 value 还是指向下一级 B+tree 的指针是由 `keylen` 决定的。
+
 Masstree 在访问一个 node 之前会先 prefetch，这就允许 Masstree 使用更宽的 node 来降低树的高度。实践表明当 border node 能放进 4 个 cacheline 大小（256B）时性能最好，此时允许的 fanout 就是 15。
 
 ## Nonconcurrent modification
@@ -168,4 +172,40 @@ update 操作会修改已有的 value，需要保证这次修改是原子的。�
 
 ### New layers
 
-Masstree 会在
+Masstree 会将 layer 的创建推迟到 border node 上两个 key 冲突（回顾前面的 lazy expansion，如果两个 key 映射到相同的 keyslice 上，就意味着需要创建新的 layer 了）。
+
+因此，创建新 layer 必然意味着某个 border node 的 key 已经存在。针对一个 key 的操作都可以不修改 `version`。但这里有个特殊情况要处理：我们现在要将它对应的 value 替换为一个新的 B+tree。这就意味着我们要完成两项修改（`link_or_value` 和 `keylen`），不可能由一个原子操作完成。
+
+为了不修改 `version`（会导致对其它 key 的读操作重试），Masstree 这里引入了一个中间状态：首先将 `keylen` 修改为 `UNSTABLE`，接下来修改 `link_or_value`，之后再将 `kenlen` 修改为正确的值。读请求如果遇到了 `UNSTABLE` 需要自行重试。
+
+> 又是一个要尽量避免 context switch 的地方。
+
+### Splits
+
+重头戏来了。
+
+split 是对整个 node 的操作，因此需要修改 `version`（中的 `vsplit`），这样读操作就能意识到 split，避免脏读。这里的难点在于，修改是发生在写线程中，但检查是发生在读线程，需要正确处理，否则可能会有些修改生效了但没被读请求察觉。
+
+![](/images/2022-09/masstree-05.png)
+
+![](/images/2022-09/masstree-06.png)
+
+split 过程中会手递手（hand-over-hand）标记和加锁：节点会自底向上标记为 “splitting” 和加锁。同时读请求会自顶向下检查 `version`。
+
+考虑下面的中间节点 B 分裂出 B' 的场景：
+
+![](/images/2022-09/masstree-07.png)
+
+1. B 和 B' 标记为 splitting
+1. 包括 X 在内的一半子节点从 B 迁移到 B'
+1. A 被锁住，并标记为 inserting
+1. 将 B' 插入 A
+1. 增加 A 的 `vinsert`、B 和 B' 的 `vsplit`，并依次 unlock B，B'，A（按加锁顺序解锁）
+
+> 为什么不能按加锁的逆序解锁？似乎也没什么问题
+
+接下来作者探讨了 `findborder` 是如何与 `split` 配合保证正确性的。其核心思想就是与 hand-over-hand locking 相对应，`findborder` 中也要 hand-over-hand validate。对中间节点 A，要先获取 B/B'（取决于 `findborder` 的调用时机）的 `version`，再 double check A 并未处于 locked 状态，且这期间 A 并未发生分裂。因为是先获取 B/B' 的 `version`，且通过 `stableversion` 我们知道这个时候 B/B' 一定未处于 inserting 或 splitting 状态，因此此时要么 B/B' 在一次 split 开始前，那我们就可以继续往下走；要么在我们获取之后 B/B' 开始了一次 split，那接下来下一轮迭代时我们检查 B/B' 的 `version` 就会 fail。
+
+注意 Masstree 中 insert 总是原地重试，而 split 则会从 root 开始重试。一个因素是并发 split 比并发 insert 更为罕见，因此可以用开销大一些的实现方式。
+
+
