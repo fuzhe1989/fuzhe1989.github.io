@@ -1,6 +1,6 @@
 ---
 title:      "[笔记] Cache Craftiness for Fast Multicore Key-Value Storage"
-date:       2022-09-14 22:42:31
+date:       2022-09-19 09:00:39
 tags:
 ---
 
@@ -8,12 +8,7 @@ tags:
 
 **TL;DR**
 
-大名鼎鼎的 Masstree。简短描述：
-1. 结合了 Trie-tree 与 B-tree，既提升了查询性能又控制了树的深度。
-1. 全局一棵树（而不是每个 core 一棵树）来解决负载不均衡的问题。
-1. 优化内存访问：cache-line 对齐 + prefetch。
-1. 写入只有 append 和 copy-on-write，对读友好。读路径只需要无锁访问+乐观锁检查读写冲突，不会有 cacheline 失效。
-1. 通过细粒度 spinlock 避免写写冲突。
+大名鼎鼎的 Masstree。
 
 <!--more-->
 
@@ -206,6 +201,36 @@ split 过程中会手递手（hand-over-hand）标记和加锁：节点会自底
 
 接下来作者探讨了 `findborder` 是如何与 `split` 配合保证正确性的。其核心思想就是与 hand-over-hand locking 相对应，`findborder` 中也要 hand-over-hand validate。对中间节点 A，要先获取 B/B'（取决于 `findborder` 的调用时机）的 `version`，再 double check A 并未处于 locked 状态，且这期间 A 并未发生分裂。因为是先获取 B/B' 的 `version`，且通过 `stableversion` 我们知道这个时候 B/B' 一定未处于 inserting 或 splitting 状态，因此此时要么 B/B' 在一次 split 开始前，那我们就可以继续往下走；要么在我们获取之后 B/B' 开始了一次 split，那接下来下一轮迭代时我们检查 B/B' 的 `version` 就会 fail。
 
-注意 Masstree 中 insert 总是原地重试，而 split 则会从 root 开始重试。一个因素是并发 split 比并发 insert 更为罕见，因此可以用开销大一些的实现方式。
+注意 Masstree 中 insert 总是原地重试，而 split 则会从 root 开始重试。一个因素是并发 split 比并发 insert 更为罕见（fanout 为 15，因此 insert 频率是 split 的 15 倍），因此可以用开销大一些的实现方式。
 
+> 另一方面，insert 本身也要比 split 轻量很多，后者需要自底向上改变树的结构。
 
+![](/images/2022-09/masstree-08.png)
+
+Border node 的 split 主要靠 border nodes 之间的链表来处理，有以下不变量：
+1. 每个 B+tree 初始只有一个 border node，这个 border node 永远不会被删除，且永远是最左边的 border node（链表头）。
+1. 每个 border node 负责的范围是 [lowkey, highkey)，其中 lowkey 永远不变，highkey 会在 split 和 delete 时修改。
+
+> 注意一旦查找到达了某个 border node，就不再需要返回 root 进行重试了：顺着链表一路往下找就行了。
+
+### Removes
+
+Remove 需要注意的几点：
+1. 不会物理删除 key-value，只会修改 `permutation`。这一步不需要修改 `version`。
+1. 但下次 insert 重用已标记删除的位置时，需要修改 `vinsert` 以避免脏读。
+1. border node 变为空时会被整个删除，因此我们需要维护一个双向链表来实现 O(1) 的删除节点操作。
+1. 中间节点的删除操作也需要 hand-over-hand locking。
+1. 一个 B+tree 为空时可以删除整个树，但需要确保同时锁上自身和上层指向它的 border node。
+1. 所有删除操作都需要在 epoch reclamation 的保护下进行。
+
+## Values
+
+Masstree 中需要保证 value 具有原子修改能力。因此大多数情况下 Masstree 中的 value 都会指向一块单独分配的内存，修改时通过 copy-on-write，再替换这个指针。
+
+> 当然对于直接支持 atomic 的 value 就可以原地修改了。
+
+## Discussion
+
+Masstree 中 lookup 的 30% 的开销来自 node 内部的 key lookup。Masstree 现在是用线性查找，相比二分查找，它的时间复杂度会略高一些，但局部性更好。Masstree 的测试显示在 Intel 处理器上线性查找会快 5% 左右。
+
+另一个潜在优化是类似于 PLAM 的并行查找，通过重叠内存的 prefetch 来掩盖访问内存的延时，测试显示在 Intel 处理器上会提升多达 34% 的吞吐（但在 AMD 机器上没有什么效果）。
