@@ -43,5 +43,8 @@ memcached 本身只是单机的，Facebook 将其修改为可以支持 cluster�
 
 通常一个业务请求会对应很多次 cache 访问，比如作者的一份数据是平均 521 次 get（P95 是 1740 次）。在使用 memcached 集群后，这些 get 会根据某些 sharding 规则（实际是一致性 hashing）分散到不同的 memcached 节点。当集群规模增大后，这种 all-to-all 的通信模式会造成严重的拥塞。replication 可以缓解单点热点，但会降低内存的使用率。
 
-Facebook 的优化思路是从 client 入手。
+Facebook 的优化思路是从 client 入手：
+1. 将数据间的依赖关系梳理为 DAG，从而能并发 batch fetch 相互不依赖的数据（平均一个请求可以 fetch 24 个 item）。
+1. 完全由 client 端维护 router，从而避免 server 间的通信。
+1. 
 
