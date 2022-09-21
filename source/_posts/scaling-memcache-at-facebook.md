@@ -37,6 +37,8 @@ memcached 本身只是单机的，Facebook 将其修改为可以支持 cluster�
 1. 优化
 1. 一致性
 
+![](/images/2022-09/memcached-02.png)
+
 # In a Cluster: Latency and Load
 
 ## Reducing Latency
@@ -46,5 +48,16 @@ memcached 本身只是单机的，Facebook 将其修改为可以支持 cluster�
 Facebook 的优化思路是从 client 入手：
 1. 将数据间的依赖关系梳理为 DAG，从而能并发 batch fetch 相互不依赖的数据（平均一个请求可以 fetch 24 个 item）。
 1. 完全由 client 端维护 router，从而避免 server 间的通信。
-1. 
+1. client 通过 UDP 发送 get 请求，从而降低延时。数据显示在高峰期 0.25% 丢包率。set 和 remove 仍然走 TCP。
+
+    ![](/images/2022-09/memcached-03.png)
+1. client 端使用滑动窗口来控制发出的请求数量，避免 response 把机架或交换机的网络打满。滑动窗口的拥塞策略类似于 TCP，即快下降+慢上升。与 TCP 不同的是，滑动窗口针对进程的所有请求生效，而 TCP 则是针对某个 stream 生效。如下图可见，窗口太小，请求并发上不去；窗口太大，容易触发网络拥塞。
+
+    ![](/images/2022-09/memcached-04.png)
+
+## Reducing Load
+
+### Leases
+
+作者引入 lease 是为了解决两类问题：失效的 set；惊群。前者发生在多个 client 并发乱序 update 一个 key 时。后者发生在一个很热的 key 不停被写，因此不停被 invalidate，读请求不得不反复请求 DB。
 
