@@ -61,3 +61,6 @@ Facebook 的优化思路是从 client 入手：
 
 作者引入 lease 是为了解决两类问题：失效的 set；惊群。前者发生在多个 client 并发乱序 update 一个 key 时。后者发生在一个很热的 key 不停被写，因此不停被 invalidate，读请求不得不反复请求 DB。
 
+每个 memcached 实例可以为某个 key 生成一个 token 返回给 client，client 后续就可以带着这个 token 去更新对应的 key，从而避免并发更新。memcached 会在收到 invalidation 请求后令对应 key 的 token 失效。
+
+为了顺便解决惊群问题，作者对 lease 机制加了个小小的限制：每个 key 最多每 10s 生成一个 token。如果时间没到就有 client 在 cache miss 下请求 token，memcached 会返回一个特定的错误，让 client 等一会重试。通常这个时间内 lease owner 就有机会重新填充 cache，其它 client 下次请求时就会命中 cache 了。
