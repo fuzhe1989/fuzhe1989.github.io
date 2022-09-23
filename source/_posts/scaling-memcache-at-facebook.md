@@ -64,3 +64,14 @@ Facebook 的优化思路是从 client 入手：
 每个 memcached 实例可以为某个 key 生成一个 token 返回给 client，client 后续就可以带着这个 token 去更新对应的 key，从而避免并发更新。memcached 会在收到 invalidation 请求后令对应 key 的 token 失效。
 
 为了顺便解决惊群问题，作者对 lease 机制加了个小小的限制：每个 key 最多每 10s 生成一个 token。如果时间没到就有 client 在 cache miss 下请求 token，memcached 会返回一个特定的错误，让 client 等一会重试。通常这个时间内 lease owner 就有机会重新填充 cache，其它 client 下次请求时就会命中 cache 了。
+
+另一个优化是 memcached 在收到 invalidation 请求后，不立即删除对应的数据，而是暂存起来一小会。这期间一些对一致性要求不那么高的 client 可以使用 stale get 获取数据，而不至于直接把寒气传递给 DB（笑）。
+
+### Memcache Pools
+
+单独的 cache service 就要能承载不同的业务请求，但很多时间业务之间相互会打架，导致某些业务的 cache 命中率受影响。作者因此将整个 memcached 集群分成了若干个 pool，除了一个 default pool，其它的 pool 分别用于不同的 workload。比如可以有一个很小的 pool 用于那些访问频繁但 cache miss 代价不高的 key，另一个大的 pool 用于 cache miss 代价很高的 key。
+
+作者给的一个例子是更新频繁（high-churn）的 key 可能会挤走更新不频繁（low-churn）的 key，但后者可能仍然很有价值。分开到两个 pool 之后就能避免这种负面的相互影响。
+
+### Replication Within Pools
+
