@@ -75,3 +75,55 @@ Facebook 的优化思路是从 client 入手：
 
 ### Replication Within Pools
 
+replication 会被用于满足以下条件的 memcached pool：
+1. 业务会定期同时获取大量 key。
+1. 整个数据集可以放进一两台机器。
+1. 但压力远高于一台机器的承载能力。
+
+这种情况下 replication 要比继续做 sharding 更好。
+
+> 空间换负载均衡
+
+## Handling Failures
+
+memcached 一旦无法服务，DB 就很容易被压垮，导致严重的后果。
+
+如果整个 memcached 集群不可服务，所有请求都会被导到其它集群。
+
+范围很小的不可服务会被自动处理掉，但处理前出错可能已经持续长达几分钟了，足以导致严重的后果。因此集群中会预留一小部分（1%）机器，称为 Gutter，用于临时接管这种小范围的机器不可服务。
+
+client 如果收不到 response，就会假设目标 memcached 挂了，接着请求一台 Gutter 机器。如果再请求失败，就会查询 DB，再将 key-value 写到 Gutter 机器上。
+
+Gutter 机器会快速令 cache 失效，这样它就不用处理 invalidation 请求，能降低负载。代价是一定的数据不一致。
+
+这种方法不同于传统的 rehash data 的地方在于，rehash data 有扩大失败范围的风险。比如有 key 非常热的时候，它去哪，哪出问题。而使用 Gutter 就可以很好地将风险控制在指定的机器范围内。
+
+Gutter 的另一个好处是将那些访问失败的请求集中了起来，增加了它们后续命中的机会，也因此降低了 DB 的负载。
+
+# In a Region: Replication
+
+随着业务压力增长而无脑扩容反倒可能让问题恶化：
+1. 业务请求越多，热点 key 越热。
+1. 随着 memcached 节点增多，网络拥塞也会越来越严重。
+    > 另一个可能的点：n 个 client 与 m 个 server 之间可能的连接数是 n*m。
+
+作者的解法是将 memcached 加上业务 service 一起划成若干个 region 对应同一个 DB，好处：
+1. 异常情况的影响范围小（俗称爆炸范围小）
+1. 可使用不同的网络配置
+
+不同 region 对应同样的 DB，因此会有数据重复（即 replication），但分散了热点，允许不同的配置，这样用空间换取了其它好处。
+
+## Regional Invalidations
+
+在 region 化之后，数据可能同时存在于多个 region 上，当有 client 更新了对应的 key 之后，我们要能保证所有 region 的 cache 都能被正确 invalidate 掉。
+
+![](/images/2022-09/memcached-05.png)
+
+作者的做法是在每台 DB 上部署一个名为 mcsqueal 的 daemon，它会在事务提交之后，将其中被影响到的 cache keys 取出来，广播给所有业务集群。为了降低 invalidation 的发包速度，daemon 会聚合一组 invalidation 发给部署有 mcrouter 的业务机器，再由这些机器将请求转发给具体的 memcached。
+
+这种做法，相比于 web server 直接发送 invalidation 给 memcached，好处：
+1. mcsqueal 的聚合效果更好
+1. mcsqueal 有机会重发 invalidation（直接通过 DB 的 WAL）。
+
+## Regional Pools
+
