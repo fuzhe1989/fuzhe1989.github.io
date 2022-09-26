@@ -1,6 +1,6 @@
 ---
 title:      "[笔记] Scaling Memcache at Facebook"
-date:       2022-09-19 09:00:39
+date:       2022-09-26 13:35:14
 tags:
 ---
 
@@ -107,7 +107,7 @@ Gutter 的另一个好处是将那些访问失败的请求集中了起来，增�
 1. 随着 memcached 节点增多，网络拥塞也会越来越严重。
     > 另一个可能的点：n 个 client 与 m 个 server 之间可能的连接数是 n*m。
 
-作者的解法是将 memcached 加上业务 service 一起划成若干个 region 对应同一个 DB，好处：
+作者的解法是将 memcached 加上 webserver 一起划成若干个 region 对应同一个 DB，好处：
 1. 异常情况的影响范围小（俗称爆炸范围小）
 1. 可使用不同的网络配置
 
@@ -125,5 +125,81 @@ Gutter 的另一个好处是将那些访问失败的请求集中了起来，增�
 1. mcsqueal 的聚合效果更好
 1. mcsqueal 有机会重发 invalidation（直接通过 DB 的 WAL）。
 
+> 但如果数据本身是没有 MVCC 的，这种做法仍然有非常小的不一致风险：
+> 1. get data v0
+> 1. update data to v1
+> 1. invalidate data
+> 1. fill cache with v0
+
 ## Regional Pools
 
+如果将用户请求发给随机的一个前端集群，则最终每个集群都会 cache 几乎相同的数据。这样好处是我们可以单独下线一个集群而不会影响 cache 命中率。但另一方面，这会造成数据过度拷贝（over-replicating）。作者的解法是令多个前端集群共享同一组 memcached server，称为一个 regional pool。
+
+此时有个挑战时，如何决定哪些数据应该在每个 cluster 中都有副本，哪些应该一个 region 只有一份。前者的跨集群流量更少，延时更低，但后者更省机器和内存。
+
+作者给出的标准是：
+1. 用户越多，越倾向于 cluster
+1. 访问频率越高，越倾向于 cluster
+1. value 越大，越倾向于 cluster
+
+## Cold Cluster Warmup
+
+为了解决集群刚启动时 cache 有效数据极少，命中率极差的问题，冷集群可以从热集群中搬数据过来，而不用直接请求 DB。这样一个集群的预热可以在几小时内完成（相比之前要几天时间）。
+
+这里要注意的是避免数据不一致。一种常见的不一致场景是，来自从热集群获取数据与收到 invalidation 之间乱序，即先收到 invalidation，再收到 stale data。作者的解法比较 hack：令 invalidation 等待两秒再操作。这样仍然会冒一些数据不一致的风险，但实践中显示两秒是非常安全的。
+
+> 真的吗，我不信.jpg
+
+# Across Regions: Consistency
+
+Facebook 会 region 化部署 MySQL 集群，从而：
+1. 用户可以请求距离最近的 region，从而降低延时
+1. 控制爆炸半径
+1. 新集群往往可以享受到能源或经济上的好处
+
+MySQL 本身会有一个全局的 master 实例，其它 region 都是只读副本，region 之间使用 MySQL 的 replication 协议保持数据同步。但备实例落后于主实例却容易导致 memcached 与 DB 有数据不一致。
+
+这种不一致本质上也来自收到数据与收到 invalidation 之间乱序。备集群收到数据是延后的，如果 invalidation 提前到达，就没有指令可以令 stale data 失效了。
+
+一致性模型往往会带来性能上的额外开销，使其无法应用在大规模集群上。Facebook 的优势是 DB 与 memcached 可以协同设计来在一致性与性能之间取得比较好的平衡。
+
+**master region 发起的写入**
+
+考虑到一个位于 master region 的 webserver 刚写完 DB，它直接发送 invalidation 给各个 master region 的 memcached 是安全的，但发给其它 replica region 就不安全了：对应 region 可能还没有收到相应的修改。
+
+此时前面引入的 mcsqueal 就起了重要的作用：各个 region 都通过自身的 mcsqueal 来 invalidate 失效数据，保证了每个 region 的 DB 与 cache 状态是一致的。
+
+**非 master region 发起的写入**
+
+现在考虑非 master region 的写请求，如果仍然等 mcsqueal 来 invalidate，就会违反 read-your-write 语义；如果直接 invalidate，就可能导致数据不一致。
+
+作者引入了 remote marker 来最小化数据不一致的风险。remote marker 可以标记本地的某个 key 可能已失效，需要将请求转发给 master region。注意当有并发写入同一个 key 的情况时，过早删除 remote marker 仍然可能导致用户看到过期数据。
+
+# Single Server Improvements
+
+all-to-all 通信模式下，单点就可能成为瓶颈，提升单点性能也因此变得重要。
+
+## Performance Optimiztions
+
+优化的起点是一个使用固定大小 hashtable 的单线程 memcached。第一波优化：
+1. 自动扩容 hashtable。
+1. 引入多线程并用一个 global lock 保护共享结构。
+1. 每个线程单独的 UDP 端口以降低争抢。
+
+接下来的优化：
+1. 引入细粒度的锁：hit get 提升 2 倍；missed get 提升 1 倍。
+1. TCP 替换为 UDP：get 提升 13%，multiget 提升 8%。
+
+## Adaptive Slab Allocator
+
+> 为啥不直接用 jemalloc，自家的产品？一定是历史原因
+
+## The Transient Item Cache
+
+memcached 支持 ttl，会自动踢掉过期的 key。作者将其改成了 lazy eviction，直到下次访问时才判断过期。这带来了一个新问题：一波短生命期的 key 可能一直待在 LRU list 中直到被踢掉，期间一直在占用着内存。
+
+作者因此使用了一种混合方法：大多数情况下 lazy evict，对少数短生命期的 key 则 proactively eveit。这些 key 会被放到一个环形 buffer，称为 Transient Item Cache。memcached 每秒会扫描这个 buffer。
+
+## Software Upgrades
+
+为了避免集群升级导致 cache 变冷，memcached 会将数据保存在共享内存中，这样新进程启动之后仍然可以有足够的本地数据。
