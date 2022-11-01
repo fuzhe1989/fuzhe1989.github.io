@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Better bitmap performance with Roaring bitmaps  TL;DR 本文提出了一种 bitmap 压缩格式 Roaring，它使用自适应的两级索引结构，分别用 bitmap 保存 dense 数据、用数组保存 sparse 数据，由此在空间占用与常见操作性能之间取得了很好的平衡。 相比 trivial 的 bitset 实现，Roaring 在内存占">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Better bitmap performance with Roaring bitmaps">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/09/11/better-bitmap-performance-with-roaring-bitmaps/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Better bitmap performance with Roaring bitmaps  TL;DR 本文提出了一种 bitmap 压缩格式 Roaring，它使用自适应的两级索引结构，分别用 bitmap 保存 dense 数据、用数组保存 sparse 数据，由此在空间占用与常见操作性能之间取得了很好的平衡。 相比 trivial 的 bitset 实现，Roaring 在内存占">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/roaring-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/roaring-02.png">
+<meta property="article:published_time" content="2022-09-11T12:35:37.000Z">
+<meta property="article:modified_time" content="2022-10-17T04:12:25.553Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-09/roaring-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/09/11/better-bitmap-performance-with-roaring-bitmaps/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Better bitmap performance with Roaring bitmaps | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/11/better-bitmap-performance-with-roaring-bitmaps/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Better bitmap performance with Roaring bitmaps
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-11 20:35:37" itemprop="dateCreated datePublished" datetime="2022-09-11T20:35:37+08:00">2022-09-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://arxiv.org/pdf/1402.6407.pdf">Better bitmap performance with Roaring bitmaps</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文提出了一种 bitmap 压缩格式 Roaring，它使用自适应的两级索引结构，分别用 bitmap 保存 dense 数据、用数组保存 sparse 数据，由此在空间占用与常见操作性能之间取得了很好的平衡。</p>
+<p>相比 trivial 的 bitset 实现，Roaring 在内存占用，以及超稀疏场景下的操作性能上都有着明显的优势。相比基于 RLE 的 WAH 和 Concise 两种格式，它在空间占用与操作性能上都有着明显的优势。</p>
+<blockquote>
+<p>Roaring 属于是一看就觉得 make sense，早该如此的 idea。</p>
+</blockquote>
+<span id="more"></span>
+
+<h1 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h1><p>bitmap 属于是超经典数据结构了。我们对 bitmap 的要求有：</p>
+<ol>
+<li>空间占用，可以按 bit per element 来衡量。</li>
+<li>常见操作的性能：<ol>
+<li>union</li>
+<li>intersect</li>
+<li>n-th element</li>
+<li>count</li>
+</ol>
+</li>
+</ol>
+<p>最 trivial 的 bitmap 实现就是各种语言基本都带的 bitset。它的缺点是空间占用与元素密度成反比，当元素非常稀疏时空间占用太大。</p>
+<p>Roaring 之前最常用的高性能 bitmap 实现主要是基于 RLE（run-length encoding）的，如 <a target="_blank" rel="noopener" href="https://escholarship.org/content/qt5v921692/qt5v921692.pdf">WAH</a> 和 <a target="_blank" rel="noopener" href="https://arxiv.org/pdf/1004.0403">Concise</a>。</p>
+<p><a target="_blank" rel="noopener" href="https://escholarship.org/content/qt5v921692/qt5v921692.pdf">WAH</a> 将 n 位的 bitmap 按字长 w（如 32）位分成若干组。每组有两种类型：fill word 与 literal word：</p>
+<ol>
+<li>fill word 指连续若干个 w-1 位都是相同的 0 或者 1，这样的序列用一个 word 表示，其中最高位为 1，次高位为 0 或 1，其余 w-2 位编码序列长度。如序列长度为 2，表示后面 62 位都是 0 或 1。</li>
+<li>literal word 指 w-1 位中既有 0 又有 1，这样的 word 最高位为 0，接下来是 w-1 位数据。</li>
+</ol>
+<p>WAH 的问题是当编码稀疏集合时，如 {0, 2(w-1), 4(w-1), …}，平均每个元素要用 2w 位来编码。</p>
+<blockquote>
+<p>第一个 word 要用来编码 0-31 位，其中有一个元素，所以是 literal word；第二个 word 要用来编码 32-61 位，全是 0，所以是 fill word。依次类推，每个元素对应一个 literal word 和一个 fill word，所以是 2w 位。</p>
+</blockquote>
+<p>Concise 则针对这种场景做了一个优化，将空间占用降了一半。它将 fill word 中用于编码 run-length 的部分抽出了 log2(w) 位（w&#x3D;32 时抽出 5 位）用来编码 p（0&lt;&#x3D; p &lt; w)。语义是：</p>
+<ol>
+<li>接下来 w-1 位中，只有第 p-1 位是 0&#x2F;1，其它 w-2 位都是 1&#x2F;0。</li>
+<li>再后面跟着 r（r 为 run-length）个 fill word。</li>
+<li>如果 p&#x3D;0，则表示后面 r+1 个都是 fill word。</li>
+</ol>
+<p>这样上面的稀疏集合就可以表示为 n 个 fill word，平均每个元素使用 w 位。</p>
+<blockquote>
+<p>注意 Concise 只是对 w-1 位中有一个特异值的场景做了特殊优化。当有超过 1 个特异值时，这 w-1 位仍然会编码为 literal word。</p>
+</blockquote>
+<p>但这些基于 RLE 的编码都有个问题：随机访问慢。如 n-th element 需要 O(n) 时间。另外在做 union 或 intersection 操作时，如果遇到大段的 0 或 1，WAH 和 Concise 缺乏跳过另一个集合中对应范围的能力（需要跳到某个位置）。</p>
+<blockquote>
+<p>实际上 RLE 编码普遍可以通过额外维护一个 index 来将 n-th element 降到 O(1) 时间。作者也提到了 auxiliary index。这里轻描淡写有点不厚道。</p>
+</blockquote>
+<p>Roaring 的思路来自 RIDBit，两者都是将集合空间 [0, n) 分成若干个 chunk，每个 chunk 根据 dense 或 sparse 分别编码。两者区别在于 RIDBit 用链表来表达 sparse chunk，而 Roaring 则用紧凑的数组。众所周知链表对 cache 是非常不友好的，这点就造成了巨大的性能差异。</p>
+<p>另外 Roaring 也应用了很多新的优化，其中比较重要的是依赖 CPU 的 popcnt 指令来快速计算 cardinality。</p>
+<h1 id="Roaring-Bitmap"><a href="#Roaring-Bitmap" class="headerlink" title="Roaring Bitmap"></a>Roaring Bitmap</h1><p>Roaring 的设计其实非常直接：</p>
+<ol>
+<li>将 32 位整数的值域 [0, n) 分成长度为 2^16（64K）的 chunk。每个 chunk 中所有数字的高 16 位都相同。</li>
+<li>chunk 中的元素数量不多于 4096 时，使用一个 16 位整数数组来保存每个元素的低 16 位。数组保持有序。元素数量多于 4096 时，用一个 2^16 位的 bitmap 表示所有元素。这样，我们总是能够保证平均每个元素占的空间不多于 16 位。</li>
+<li>所有 chunk 的指针保存在一个动态数组中，按元素高 16 位排序。通常这个数组的 chunk 数量会很小，可以保持在 cache 中。</li>
+</ol>
+<p><img src="/images/2022-09/roaring-01.png"></p>
+<p>图中可以看到，每个 chunk 还会记录一些元数据：</p>
+<ol>
+<li>高 16 位</li>
+<li>cardinality</li>
+</ol>
+<p>cardinality 可以用来加速 count、n-th element 等操作，在 union 和 intersection 等操作上也有帮助。</p>
+<p>对于非常稠密的 chunk，如 cardinality &gt;&#x3D; 2^16-4096，Roaring 还可以将其转换为相反值对应的稀疏 chunk。</p>
+<p>无论是 bitmap 还是 array 类型的 chunk，都还可以进一步应用 bitmap 或 array 上的一些编码方式，进一步降低空间或提升性能。</p>
+<h1 id="Access-Operations"><a href="#Access-Operations" class="headerlink" title="Access Operations"></a>Access Operations</h1><p>向一个 array chunk 插入新元素可能令其 cardinality 超过 4096，此时 Roaring 会将其转换为 bitmap chunk。相反 bitmap chunk 也会因删除元素被转换为 array chunk。</p>
+<blockquote>
+<p>但直接用 4096 作为阈值可能产生颠簸，可能需要再选择一个阈值，比如 8192 作为 array chunk 到 bitmap chunk 的转换阈值。</p>
+<p>array chunk 的插入和删除成本可能会很高（但有界，毕竟 size 不超过 4096）。</p>
+</blockquote>
+<h1 id="Logical-Operations"><a href="#Logical-Operations" class="headerlink" title="Logical Operations"></a>Logical Operations</h1><p>这节主要讲 union 和 intersection 的实现。</p>
+<p>Roaring 中两个集合做 union 或 intersection 时，总是先按高 16 位对齐 chunk，再对相应的两个 chunk 做 union 或 intersection，生成新 chunk（后面也讨论了 in-place 修改）。</p>
+<p>接下来，我们根据两个 chunk 的类型分成三种情况讨论。</p>
+<p><strong>Bitmap vs Bitmap</strong></p>
+<p>每个 bitmap 大小为 2^16 位，因此两个 bitmap 之间的与或操作就等同于 1024 个 64 位整数之间的与或。</p>
+<p><strong>Algorithm 1</strong> Routine to compute the union of two bitmap containers</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">1: input: two bitmaps A and B indexed as arrays of 1024 64-bit integers</span><br><span class="line">2: output: a bitmap C representing the union of A and B, and its cardinality c</span><br><span class="line">3: c ← 0</span><br><span class="line">4: Let C be indexed as an array of 1024 64-bit integers</span><br><span class="line">5: for i ∈ &#123;1, 2, . . . , 1024&#125; do</span><br><span class="line">6:   Ci ← Ai OR Bi</span><br><span class="line">7:   c ← c + bitCount(Ci)</span><br><span class="line">8: return C and c</span><br></pre></td></tr></table></figure>
+
+<p>作者表示这里维护 cardinality 的代价并不大，原因：</p>
+<ol>
+<li><code>bitCount</code> 在现代 CPU 上直接映射为一条 <code>popcnt</code>，性能非常高，只需要一个周期。</li>
+<li>对于现代的超标量 CPU，同时间可以有多条没有数据依赖的指令同时执行。上图中的 L6 和 L7 相互没有数据依赖，因此大概率是同时执行的。</li>
+<li>这种简单运算的瓶颈通常是 cache miss，而不是运算能力。</li>
+</ol>
+<p>作者的数据是 Java 下单线程每秒可以运算 7 亿次 64 位整数的或操作。如果加上 L7，吞吐降到了 5 亿次，下降了 30%，但仍然远高于 WAH 和 Concise。</p>
+<p>上面是 union。对于 intersection，Roaring 将 cardinality 提前计算出来。如果新的 cardinality 不超过 4096，就会新生成一个 array，具体算法见 Algorithm 3，其中用 Algorithm 2 加速运算。</p>
+<p><strong>Algorithm 2</strong> Optimized algorithm to convert the set bits in a bitmap into a list of integers. We assume two-complement’s arithmetic. The function bitCount returns the Hamming weight of the integer.</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">1: input: an integer w</span><br><span class="line">2: output: an array S containing the indexes where a 1-bit can be found in w</span><br><span class="line">3: Let S be an initially empty list</span><br><span class="line">4: while w != 0 do</span><br><span class="line">5:   t ← w AND − w // clear all 1s but the least 1 in w</span><br><span class="line">6:   append bitCount(t − 1) to S</span><br><span class="line">7:   w ← w AND (w − 1) // clear the least 1</span><br><span class="line">8: return S</span><br></pre></td></tr></table></figure>
+
+<p><strong>Algorithm 3</strong> Routine to compute the intersection of two bitmap containers. The function bitCount returns the Hamming weight of the integer.</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"> 1: input: two bitmaps A and B indexed as arrays of 1024 64-bit integers</span><br><span class="line"> 2: output: a bitmap C representing the intersection of A and B, and its cardinality c if c &gt; 4096 or an equivalent array of integers  otherwise</span><br><span class="line"> 3: c ← 0</span><br><span class="line"> 4: for i ∈ &#123;1, 2, . . . , 1024&#125; do</span><br><span class="line"> 5:   c ← c + bitCount(Ai AND Bi)</span><br><span class="line"> 6: if c &gt; 4096 then</span><br><span class="line"> 7:   Let C be indexed as an array of 1024 64-bit integers</span><br><span class="line"> 8:   for i ∈ &#123;1, 2, . . . , 1024&#125; do</span><br><span class="line"> 9:     Ci ← Ai AND Bi</span><br><span class="line">10:   return C and c</span><br><span class="line">11: else</span><br><span class="line">12:   Let D be an array of integers, initially empty</span><br><span class="line">13:   for i ∈ &#123;1, 2, . . . , 1024&#125; do</span><br><span class="line">14:     append the set bits in Ai AND Bi to D using Algorithm 2</span><br><span class="line">15:   return D</span><br></pre></td></tr></table></figure>
+
+<p><strong>Bitmap vs Array</strong></p>
+<p>intersection：遍历 array 中的每个元素，查询 bitmap。</p>
+<p>union：复制一份 bitmap，再依次将 array 中每个元素插入到 bitmap 中。</p>
+<p><strong>Array vs Array</strong></p>
+<p>union：如果 cardinality 之和不超过 4096，直接 merge 两个数组；否则先将结果写入一个 bitmap，最终如果发现 cardinality 不超过 4096，再将 bitmap 转换回 array（使用 Algorithm 2）。</p>
+<p>intersection：如果两个 array size 差距不那么悬殊（64 倍以上），则直接 merge，否则使用 galloping intersection 算法。</p>
+<p>galloping intersection 是遍历小数组中每个元素，在大数组中二分查找。它要求输入两个数组大小差距非常悬殊。</p>
+<p>以上所有操作也可以 in-place 修改，好处是避免了内存分配和初始化。</p>
+<p>另外，当聚合非常多个 chunk 时，比如 union，我们可以先从中找到一个 bitmap，复制一份出来，再将其它 chunk 都原地 union 到这个复制的 bitmap 上。</p>
+<p><strong>Algorithm 4</strong> Optimized algorithm to compute the union of many roaring bitmaps</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"> 1: input: a set R of Roaring bitmaps as collections of containers; each container has a cardinality and a 16-bit key</span><br><span class="line"> 2: output: a new Roaring bitmap T representing the union</span><br><span class="line"> 3: Let T be an initially empty Roaring bitmap.</span><br><span class="line"> 4: Let P be the min-heap of containers in the bitmaps of R, configured to order the containers by their 16-bit keys.</span><br><span class="line"> 5: while P is not empty do</span><br><span class="line"> 6:   Let x be the root element of P. Remove from the min-heap P all elements having the same key as x, and call the result Q.</span><br><span class="line"> 7:   Sort Q by descending cardinality; Q1 has maximal cardinality.</span><br><span class="line"> 8:   Clone Q1 and call the result A. The container A might be an array or bitmap container.</span><br><span class="line"> 9:   for i ∈ &#123;2, . . . , |Q|&#125; do</span><br><span class="line">10:     if A is a bitmap container then</span><br><span class="line">11:       Compute the in-place union of A with Qi: A ← A OR Qi. Do not re-compute the cardinality of A: just compute the bitwise-OR operations.</span><br><span class="line">12:     else</span><br><span class="line">13:       Compute the union of the array container A with the array container Qi: A ← A OR Qi. If A exceeds a cardinality of 4096, then it beco  mes a bitmap container.</span><br><span class="line">14:   If A is a bitmap container, update A by computing its actual cardinality.</span><br><span class="line">15:   Add A to the output of Roaring bitmap T.</span><br><span class="line">16: return T</span><br></pre></td></tr></table></figure>
+
+<h1 id="Experiments"><a href="#Experiments" class="headerlink" title="Experiments"></a>Experiments</h1><p>一图胜千言</p>
+<p><img src="/images/2022-09/roaring-02.png"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/09/09/order-perserving-key-compression-for-in-memory-search-trees/" rel="prev" title="[笔记] Order-Preserving Key Compression for In-Memory Search Trees">
+      <i class="fa fa-chevron-left"></i> [笔记] Order-Preserving Key Compression for In-Memory Search Trees
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/09/14/processing-a-trillion-cells-per-mouse-click/" rel="next" title="[笔记] Processing a Trillion Cells per Mouse Click">
+      [笔记] Processing a Trillion Cells per Mouse Click <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Background"><span class="nav-number">1.</span> <span class="nav-text">Background</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Roaring-Bitmap"><span class="nav-number">2.</span> <span class="nav-text">Roaring Bitmap</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Access-Operations"><span class="nav-number">3.</span> <span class="nav-text">Access Operations</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Logical-Operations"><span class="nav-number">4.</span> <span class="nav-text">Logical Operations</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Experiments"><span class="nav-number">5.</span> <span class="nav-text">Experiments</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

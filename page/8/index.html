@@ -195,7 +195,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/15/the-google-file-system/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -209,7 +209,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/09/15/the-google-file-system/" class="post-title-link" itemprop="url">[笔记] The Google File System</a>
+            <a href="/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/" class="post-title-link" itemprop="url">[笔记] FlumeJava: Easy, Efficient Data-Parallel Pipelines</a>
         </h1>
 
         <div class="post-meta">
@@ -219,7 +219,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-09-15 21:20:10" itemprop="dateCreated datePublished" datetime="2020-09-15T21:20:10+08:00">2020-09-15</time>
+              <time title="创建时间：2020-10-16 20:00:43" itemprop="dateCreated datePublished" datetime="2020-10-16T20:00:43+08:00">2020-10-16</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -241,17 +241,20 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub51.pdf">The Google File System</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub35650.pdf">FlumeJava: Easy, Efficient Data-Parallel Pipelines</a></p>
 </blockquote>
-<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>GFS在设计上与传统的文件系统的几个区别：</p>
+<p><strong>TL;DR</strong></p>
+<p>FlumeJava是基于MapReduce的计算框架。它的特点：</p>
 <ul>
-<li>分布式系统中错误是常态，因此持续监控、错误检测、容错机制、自动恢复都是必要的。</li>
-<li>文件普遍非常大，达到GB级别以上，要重新审视对I&#x2F;O操作和块大小的预期。</li>
-<li>文件的追加写远多于覆盖写。</li>
+<li>提供了表达能力很强的Java库。</li>
+<li>惰性求值。</li>
+<li>结合了本地运算与远端MapReduce作业。</li>
+<li>可以生成优化的MapReduce程序。</li>
 </ul>
+<p>（FlumeJava这套框架目前仍在被大量使用，但底下应该已经不是MapReduce了。）</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/09/15/the-google-file-system/#more" rel="contents">
+              <a class="btn" href="/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -275,7 +278,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -289,7 +292,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/" class="post-title-link" itemprop="url">[笔记] OLTP Through the Looking Glass, and What We Found There</a>
+            <a href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/" class="post-title-link" itemprop="url">[笔记] The End of an Architectural Era (It's Time for a Complete Rewrite)</a>
         </h1>
 
         <div class="post-meta">
@@ -299,7 +302,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-09-01 12:23:11" itemprop="dateCreated datePublished" datetime="2020-09-01T12:23:11+08:00">2020-09-01</time>
+              <time title="创建时间：2020-10-14 16:56:10" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -321,89 +324,23 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="http://pages.cs.wisc.edu/~yxy/cs839-s20/papers/hstore_lookingglass_2008.pdf">OLTP Through the Looking Glass, and What We Found There</a> </p>
-</blockquote>
-<p>本文观点：随着硬件的发展和需求的变化，OLTP需要有新的设计；测量传统OLTP架构中各部分对性能的影响。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/09/01/oltp-through-the-looking-glass-and-what-we-found-there/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/" class="post-title-link" itemprop="url">[笔记] Column-Stores vs. Row-Stores: How Different Are They Really?</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-08-31 12:29:30" itemprop="dateCreated datePublished" datetime="2020-08-31T12:29:30+08:00">2020-08-31</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="http://www.cse.iitb.ac.in/infolab/Data/Courses/CS632/2017/2010/Papers/sigmod08-columstore-abadi.pdf">Column-Stores vs. Row-Stores: How Different Are They Really?</a> </p>
+<p>原文：<a target="_blank" rel="noopener" href="https://hstore.cs.brown.edu/papers/hstore-endofera.pdf">The End of an Architectural Era (It’s Time for a Complete Rewrite)</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>本文主要观点：单纯把一个RowStore的存储格式换成ColumnStore，而不做其它优化，是达不到一个原生的ColumnStore的性能的。</p>
-<p>本文针对的场景：星型的data warehouse，OLAP。</p>
+<p>本文针对新硬件带来的新的趋势，提出了一种全新的OLTP DBMS，H-Store，可以大幅度提高传统的DBMS的性能。</p>
+<p>传统的DBMS主要还是沿用System R的架构：</p>
+<ul>
+<li>面向磁盘的存储和索引结构。</li>
+<li>多线程。</li>
+<li>基于锁的并发控制。</li>
+<li>基于log的恢复机制。</li>
+</ul>
+<p>本文观点是在这套架构上小修小补已经不够了，我们需要全新的设计。</p>
+<p>尤其是传统RDBMS想用一套系统满足全部需求的想法已经过时了。</p>
+<p>H-Store针对OLTP场景，打破了上面这种架构，主要是充分利用大内存和多节点，结合对OLTP场景的若干假设，省掉log和lock相关的很多机制，从而大幅度提升了性能。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/08/31/column-stores-vs-row-stores-how-different-are-they-really/#more" rel="contents">
+              <a class="btn" href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -427,7 +364,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -441,7 +378,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/" class="post-title-link" itemprop="url">[笔记] The Chubby lock service for loosely-coupled distributed systems</a>
+            <a href="/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/" class="post-title-link" itemprop="url">[笔记] SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets</a>
         </h1>
 
         <div class="post-meta">
@@ -451,7 +388,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-08-28 11:59:16" itemprop="dateCreated datePublished" datetime="2020-08-28T11:59:16+08:00">2020-08-28</time>
+              <time title="创建时间：2020-10-11 18:18:37" itemprop="dateCreated datePublished" datetime="2020-10-11T18:18:37+08:00">2020-10-11</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -473,22 +410,20 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/event/osdi06/tech/full_papers/burrows/burrows_html/">The Chubby lock service for loosely-coupled distributed systems</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.vldb.org/pvldb/vol1/1454166.pdf">SCOPE: Easy and Efficient Parallel Processing of Massive Data Sets</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>本文idea：基于普通商用机构建出强一致的、高可用的分布式锁服务。</p>
-<p>论证过程：</p>
-<ol>
-<li>如何实现强一致：Paxos。</li>
-<li>实现为库还是外部服务：库是侵入式的，应用接入困难；外部服务能把应用与Chubby解耦开。</li>
-<li>提供什么样的接口：类UNIX文件系统，建议式锁，尽可能降低应用接入和开发者的使用难度。</li>
-<li>针对读远多于写的使用场景，如何降低server负载：尽可能地cache，为了降低开发者的理解难度，使用一致性cache而不是基于TTL的cache。</li>
-<li>如何提高可用性：粗粒度锁，client在session过期后有一个grace period。</li>
-<li>未来可以做哪些改进：使用proxy和partitioning进一步提升服务规模。</li>
-</ol>
+<p>SCOPE是一种分布式批处理语言，将类SQL的脚本编译为可以运行在Cosmos平台上的分布式作业。</p>
+<p>它的特点：</p>
+<ul>
+<li>同时支持类SQL语法和分步的声明式语法。</li>
+<li>支持使用C#编写扩展类和脚本内直接调用C#表达式。</li>
+<li>支持导入已有的脚本，且可传递参数。</li>
+<li>编译期支持基于开销进行优化，重写执行计划；运行期也支持优化，比如按rack做预聚合。</li>
+</ul>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems/#more" rel="contents">
+              <a class="btn" href="/2020/10/11/scope-easy-and-efficient-parallel-processing-of-massive-data-sets/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -512,7 +447,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/explore-the-world-0002/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -526,7 +461,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/08/13/explore-the-world-0002/" class="post-title-link" itemprop="url">随便看看 0002</a>
+            <a href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/" class="post-title-link" itemprop="url">[笔记] Dryad: Distributed Data-Parallel Programs from Sequential Building Blocks</a>
         </h1>
 
         <div class="post-meta">
@@ -536,134 +471,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-08-13 15:37:57" itemprop="dateCreated datePublished" datetime="2020-08-13T15:37:57+08:00">2020-08-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/406623513/answer/1338119623">如何理解悖论「每个自然数都能被三十字以内的句子刻画（唯一描述）」？ - 灵剑的回答 - 知乎</a></p>
-<blockquote>
-<p>从停机问题角度看待这个悖论，很有意思。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/410908068/answer/1379726440">李白一辈子没怎么工作过，整日游山玩水，他的钱从哪儿来？ - 瞻云的回答 - 知乎</a></p>
-<blockquote>
-<p>李白的生平。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/58835500/answer/1374006629">《人民的名义》里的李达康是个好官吗？ - 佐伊23的回答 - 知乎</a></p>
-<blockquote>
-<p>而李达康就是这样下指标、压任务、威胁下属、胡乱问责的人；基层公务员的视角；配合阅读<a target="_blank" rel="noopener" href="https://www.sohu.com/a/305206459_574698">今天通知明天要，只能是假报告</a>。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/411958013/answer/1388346437">31 省养老金已全部上调，你父母的退休工资比自己的在职工资高吗？ - 王海的回答 - 知乎</a></p>
-<blockquote>
-<p>现阶段养老基金投资实践中，负债端最大的问题就是资金短期化，委托规模低，资产负债不匹配这三点。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/166552504">揭阳食物中毒案中，为什么一碗河粉就能要人命？ - 厨房人类的文章 - 知乎</a></p>
-<blockquote>
-<p>河粉、米粉不能久放，木耳不能泡太长时间，在外面吃少点这些东西。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/409372180/answer/1384298523">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 塔列朗的回答 - 知乎</a></p>
-<blockquote>
-<p>凡尔赛条约最大的失误，就是在侮辱德国的同时，没有伤害德国基本盘；讽刺的是，从事后看，凡尔赛合约在保留德国基本盘的同时，彻底摧毁了中欧及东南欧的强权，德国的战略态势相比于1914年反而还好了，中欧和东南欧没有了任何制衡力量。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/409372180/answer/1365283381">一战后，德国人为什么觉得凡尔赛合约很屈辱？ - 路易-拿破仑的回答 - 知乎</a></p>
-<blockquote>
-<p>凡尔赛条约的一个典型特点是它在政治上非常宽松，另一个特点是在经济惩罚上非常严厉。在赔款以外，凡尔赛体系在民族自决这一原则上的“真双标”也是“屈辱”说的一个助推剂。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/357966552/answer/1021968782">如何评价电影《1917》？ - 电影榨汁的回答 - 知乎</a></p>
-<blockquote>
-<p>《1917》中的行军路线、所属部队和战役历史。</p>
-</blockquote>
-<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/163236128">浅谈OLAP系统核心技术点 - neoReMinD的文章 - 知乎</a></p>
-<blockquote>
-<p>不错的科普，参考文献很棒。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/312019918/answer/608965942">作为 IT 行业的过来人，你有什么话想对后辈说的？ - 二律背反的回答 - 知乎</a></p>
-<blockquote>
-<p>世界上没有技术驱动型公司；IT领域最重要的是经验而不是你有多聪明；能大规模商用的技术，都不需要智商；要有分享精神；现代管理学的精髓，就是让每个人都变得可替代；程序员工作创造的价值，至少一半是通过文档体现出来才对。</p>
-<p>评论里对什么是技术驱动吵了起来。我的理解：做决定时，技术 or 市场，这条线该划在哪，无论什么公司，总会有一些决定偏向市场，程序员要接受这些决定，但这不妨碍我们尝试把线往技术那边推一推。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/411917655/answer/1385638325">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 崔晨的回答 - 知乎</a></p>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/411917655/answer/1388596024">为什么shell脚本会有赋值语句的等号两边不能有空格这种奇葩语法? - 大宽宽的回答 - 知乎</a></p>
-<blockquote>
-<p>shell的历史包袱；奇怪的设计一定是有原因的。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/20405888/answer/15040566">如何理解「面向对象编程的精髓在于将操作绑定在数据上」？ - 冯东的回答 - 知乎</a></p>
-<blockquote>
-<p>data structure over procedure。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/166345772">关于程序员的59条搞笑但却真实无比的编程语录 - 动力节点的文章 - 知乎</a></p>
-<blockquote>
-<p>很多条很有道理。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.theverge.com/2018/7/16/17577654/amazon-prime-day-website-down-deals-service-disruption">Amazon’s website crashed as soon as Prime Day began</a></p>
-<blockquote>
-<p>Amazon在2018年的一次崩溃。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/67858225/answer/1091344044">如何看待sqlite作者放弃sqlite4的开发，说使用LSM Tree是一种失败？ - auxten的回答 - 知乎</a></p>
-<blockquote>
-<p>重点关注其中Dr. D. Richard Hipp关于测试的看法。</p>
-<p>100％MC &#x2F; DC只是一个阈值，一个很高的阈值，一个易于测量且难以作弊的门槛。100％MC &#x2F; DC 的主要好处之一并不是每个分支都经过测试，而是你必须编写如此多的测试，然后你就可以发现问题，并修复了许多你从未想过的问题。</p>
-</blockquote>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/c-store-a-column-oriented-dbms/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/08/13/c-store-a-column-oriented-dbms/" class="post-title-link" itemprop="url">[笔记] C-store: a column-oriented DBMS</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-08-13 12:12:32" itemprop="dateCreated datePublished" datetime="2020-08-13T12:12:32+08:00">2020-08-13</time>
+              <time title="创建时间：2020-10-11 15:25:21" itemprop="dateCreated datePublished" datetime="2020-10-11T15:25:21+08:00">2020-10-11</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -685,46 +493,20 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3226595.3226638">C-store: a column-oriented DBMS</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://cse.buffalo.edu/~stevko/courses/cse704/fall10/papers/eurosys07.pdf">Dryad: Distributed Data-Parallel Programs from Sequential Building Blocks</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>本文idea：面向ad-hoc读优化的分布式DBMS。</p>
-<p>论证过程：</p>
-<ol>
-<li>面向ad-hoc读优化需要：<ol>
-<li>列存，以提高压缩和扫描效率；</li>
-<li>数据直接存成多种排序形式，从而应对ad-hoc查询；</li>
-<li>只读事务避免加锁，需要读写分离以及snapshot isolation。</li>
-</ol>
-</li>
-<li>列存需要仔细地编码数据，因此需要区分不同情况编码。</li>
-<li>数据存成projection需要考虑：<ol>
-<li>不同replica可以用不同的projection，这样既满足了安全性，又有机会提高性能；</li>
-<li>anchor table物理上不存在，就需要通过storage key和join index组合多个projection来还原一行数据；</li>
-</ol>
-</li>
-<li>读写分离要考虑：<ol>
-<li>分成WS和RS，这样两者可以用不同的存储结构，分别在写和读上达到最优；</li>
-<li>任意时间的MVCC开销太大，可以把时间分成epoch，一段一段推进；</li>
-<li>需要有一个将WS合并进RS的操作。</li>
-</ol>
-</li>
-<li>考虑到C-Store的主要场景是写特别少读特别多，可以：<ol>
-<li>不压缩WS中的数据；</li>
-<li>使用简化的2PC而不需要考虑吞吐问题。</li>
-</ol>
-</li>
-</ol>
-<p>感想：</p>
-<ol>
-<li>学术界的paper画风和工业界的确实不太一样，到处都是idea，但细推敲又觉得缺点什么。</li>
-<li>列存的核心问题就是编码。</li>
-<li>不同replica用不同projection确实是非常棒的idea，但这样要求DB和FS必须耦合在一起，很多情况下不现实。</li>
-<li>关于读写分离的几个idea很棒，MVCC是可以不用那么细粒度的。</li>
-</ol>
+<p>Dryad是一个分布式批处理框架，相比MapReduce，它的特点是：</p>
+<ul>
+<li>支持多种operator组成的DAG，且支持组合多个DAG。</li>
+<li>DAG中多个顶点可以分配给一个进程。</li>
+<li>不同顶点间的消息传递不限于文件，还可以通过TCP和in-memory FIFO。</li>
+<li>支持按网络拓扑插入中间节点做部分聚合。</li>
+</ul>
+<p>Dryad属于是底层框架，用户真正用到的还是上面的框架，类似于MapReduce和Sawzall的关系。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/08/13/c-store-a-column-oriented-dbms/#more" rel="contents">
+              <a class="btn" href="/2020/10/11/dryad-distributed-data-parallel-programs-from-sequential-building-blocks/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -748,7 +530,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -762,7 +544,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/" class="post-title-link" itemprop="url">[笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone</a>
+            <a href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/" class="post-title-link" itemprop="url">[笔记] Improving MapReduce Performance in Heterogeneous Environments</a>
         </h1>
 
         <div class="post-meta">
@@ -772,7 +554,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-08-06 16:14:43" itemprop="dateCreated datePublished" datetime="2020-08-06T16:14:43+08:00">2020-08-06</time>
+              <time title="创建时间：2020-10-09 23:13:07" itemprop="dateCreated datePublished" datetime="2020-10-09T23:13:07+08:00">2020-10-09</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -794,26 +576,15 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.68.9136&rep=rep1&type=pdf">Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://static.usenix.org/event/osdi08/tech/full_papers/zaharia/zaharia.pdf">Improving MapReduce Performance in Heterogeneous Environments</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。</p>
-<p>论证过程：</p>
-<ol>
-<li>过去若干年中DBMS厂家追求“One size fits all”，原因有若干。</li>
-<li>传统DBMS主要针对OLTP，处理模型为outbound，针对性优化短事务，重点在于ACID，这些特点并不适用于OLAP。</li>
-<li>随着streaming processing兴起，它需要完全不同的优化方向。</li>
-<li>未来使用DBMS的应用类型会越来越多，会有更多针对特定领域的DB engine出现。</li>
-</ol>
-<p>感想：</p>
-<ol>
-<li>任何优化都是有代价的，选择针对一个方向优化，就会在另一个方向平庸。甚至提供不同优化的开关也是有代价的，只要允许选择，代价就会存在。</li>
-<li>不同应用需要不同程度的一致性，但一套系统在架构设计时就要锚定某种一致性，它运行在其它一致性级别时只是稍有优化，而不会达到很理想的水平。</li>
-<li>如何控制DB与应用逻辑的耦合度，过高的耦合度会带来安全性、维护性上的问题，而过低的耦合度又会带来性能开销。存储过程，以及各种各样的UDF就是其中的粘合剂。</li>
-</ol>
+<p>这篇文章讲的是如何优化Hadoop在异构环境下的任务调度性能。</p>
+<p>任务调度的关键在于如何让长尾任务尽快完成。MapReduce会在最后阶段冗余运行长尾任务，Google的数据显示这么做能提升44%的任务响应速度。</p>
+<p>Hadoop的调度策略是冗余运行最慢的任务，而这篇文章提出的LATE（Longest Approximate Time to End)策略则是找最可能最慢结束的任务。在异构环境下LATE可以让任务响应速度达到Hadoop原有策略的2倍。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/#more" rel="contents">
+              <a class="btn" href="/2020/10/09/improving-mapreduce-performance-in-heterogeneous-environments/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -837,7 +608,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/07/30/apache-pulsar-versus-apache-kafka/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/09/understanding-compression/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -851,7 +622,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/07/30/apache-pulsar-versus-apache-kafka/" class="post-title-link" itemprop="url">[笔记] Apache Pulsar Versus Apache Kafka</a>
+            <a href="/2020/10/09/understanding-compression/" class="post-title-link" itemprop="url">[笔记] 数据压缩入门（Understanding Compression）</a>
         </h1>
 
         <div class="post-meta">
@@ -861,7 +632,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-07-30 23:06:42" itemprop="dateCreated datePublished" datetime="2020-07-30T23:06:42+08:00">2020-07-30</time>
+              <time title="创建时间：2020-10-09 11:21:22" itemprop="dateCreated datePublished" datetime="2020-10-09T11:21:22+08:00">2020-10-09</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -882,10 +653,12 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p>只有33页的新书，可以从<a target="_blank" rel="noopener" href="https://www.memsql.com/resources/ebook-oreilly-pulsar-vs-kafka">MemSQL</a>上下载到。</p>
+          <blockquote>
+<p><a target="_blank" rel="noopener" href="https://book.douban.com/subject/35034359/">数据压缩入门</a></p>
+</blockquote>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/07/30/apache-pulsar-versus-apache-kafka/#more" rel="contents">
+              <a class="btn" href="/2020/10/09/understanding-compression/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -909,7 +682,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/07/30/explore-the-world-0001/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -923,7 +696,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/07/30/explore-the-world-0001/" class="post-title-link" itemprop="url">随便看看 0001</a>
+            <a href="/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/" class="post-title-link" itemprop="url">[笔记] Hive: a warehousing solution over a map-reduce framework</a>
         </h1>
 
         <div class="post-meta">
@@ -933,7 +706,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-07-30 15:44:57" itemprop="dateCreated datePublished" datetime="2020-07-30T15:44:57+08:00">2020-07-30</time>
+              <time title="创建时间：2020-09-29 21:30:09" itemprop="dateCreated datePublished" datetime="2020-09-29T21:30:09+08:00">2020-09-29</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -954,70 +727,24 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h2 id="随便看看"><a href="#随便看看" class="headerlink" title="随便看看"></a>随便看看</h2><p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/25648987/answer/31410048">哥德尔定理是否支持不可知论？ - 罗心澄的回答 - 知乎</a></p>
-<blockquote>
-<p>数学意义上的「真」和「可证」是两个不重叠的概念。</p>
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.303.2572&rep=rep1&type=pdf">Hive: a warehousing solution over a map-reduce framework</a></p>
 </blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/23289984/answer/24131288">是否存在「可证明」的对于世界的解释？ - oldgoat的回答 - 知乎</a></p>
-<blockquote>
-<p>一般来说，仅根据经验事实就可以确认某个判断为真，这就叫做“证实”（verify），具有这种特征的判断就叫做可证实（verifiability）的。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/27528796/answer/1346097249">如何简单清晰地解释哥德尔不完备定理？ - 叶青杰的回答 - 知乎</a></p>
-<blockquote>
-<p>哥德尔数与不动点。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/27528796/answer/246963736">如何简单清晰地解释哥德尔不完备定理？ - LLLBK的回答 - 知乎</a></p>
-<blockquote>
-<p>他认为自己的不完全性定理表明，存在一些确实为真的东西是人为构造的逻辑系统无法达到的，这些确实为真的东西就是数学的理念世界，它们跟人无关，它们有自己确定的真值，不论人有没有去研究它。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.nature.com/news/paradox-at-the-heart-of-mathematics-makes-physics-problem-unanswerable-1.18983">Paradox at the heart of mathematics makes physics problem unanswerable</a></p>
-<blockquote>
-<p>凝聚态计算spectral gap，当模型为无限大小的2D平面时，无法预测计算是否能结束，即spectral gap是否存在。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/410353226/answer/1370123832">如何看待南京一中高考成绩令部分家长不满，家长要求「校长下课」？ - 不想上吊王承恩的回答 - 知乎</a></p>
-<blockquote>
-<p>任何东西都是拥有了才有资格不在乎。像我这种工贼太多了，所以全世界的鸡蛋联合不起来，石头也不允许鸡蛋联合起来。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/408092992/answer/1353007308">如何看待杭州某物业私自将业主别墅出租给《我和我的儿女们》剧组拍摄，业主看剧才发现是自己家这件事？ - stan的回答 - 知乎</a></p>
-<blockquote>
-<p>法律常识学习：侵权还是违约？无权代理还是无权处分？合同效力？剧组是否应当承担责任？</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/409332169/answer/1370797027">为什么金属乐迷大多热衷于将金属从摇滚中独立出来？ - 远古邪恶小人物的回答 - 知乎</a></p>
-<blockquote>
-<p>摇滚乐是一场人类文化运动；类型文化总是具有原教旨倾向。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/410072393/answer/1365721848">如何看待美国防长 7 月 21 日谈中美关系时，称「我们不是要寻找冲突」？ - 王子君的回答 - 知乎</a></p>
-<blockquote>
-<p>华盛顿的态度是：我们又不是到摊牌的地步，你们为什么反应这么激烈嘛；北京的态度是：你们不能老是把你们国情的代价转移给我们。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/60779831/answer/1367943371">就目前（2017年）的国际局势来看，美国的联俄制中政策会取得成功吗? - 王子君的回答 - 知乎</a></p>
-<blockquote>
-<p>之所以折腾到今天，美俄还是冷眼互看，主要是内外都有阻力：外部反对；内部阻力。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/408451534/answer/1368146776">如何评价睡前消息第147期？ - 离离图总裂夫的回答 - 知乎</a></p>
-<blockquote>
-<p>一个没有核心价值的威权主义组织，有两个问题：第一，领袖稍微不行就一堆破事，组织开始涣散。从商周到罗马以色列，再到俄罗斯台湾全都是这样；第二，没有产生合格领袖的机制。</p>
-<p>纲不举的结果，就是目不张。</p>
-<p>新加坡其实适合走西方议会制路线的。因为英、美的制度设计，本质就是一种精英寡头政治。西方议会政治建立在社会中产以上有着强共识，而且统治集团人数很少，和中产没有根本利益冲突的前提下。这种制度下，一旦社会出现分裂，立马就混不下去。</p>
-<p>要说西方真对我们有什么贡献的话，就是让中国人明白，有时候还是得放下过去。（避免路线依赖）</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/406597161/answer/1344659749">如何看待「香港或被踢出 SWIFT 银行结算系统」的消息？如果属实，将会造成什么样的影响？ - Mason Wu的回答 - 知乎</a></p>
-<blockquote>
-<p>什么是SWIFT？为什么会有这个谣言？</p>
-</blockquote>
-<h2 id="计算机相关"><a href="#计算机相关" class="headerlink" title="计算机相关"></a>计算机相关</h2><p><a target="_blank" rel="noopener" href="https://www.memsql.com/resources/ebook-oreilly-pulsar-vs-kafka">O’Reilly eBook: Apache Pulsar Versus Apache Kafka - MemSQL</a></p>
-<blockquote>
-<p>只有33页的新书，各方面对比了一下Pulsar和Kafka，不是特别有新意。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://www.zhihu.com/question/392213415/answer/1362966848">为什么有线网络可以全双工，而无线网络只能半双工呢? - 甜草莓的回答 - 知乎</a></p>
-<blockquote>
-<p>同时同频（In-band）的无线全双工存在自干扰问题；解决方案收益不大且成本高（增加天线或增加隔离度）。</p>
-</blockquote>
-<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/165144850">deno fmt 从 prettier 切换到 dprint，性能提升 10+ 倍 - justjavac的文章 - 知乎</a></p>
-<blockquote>
-<p>Rust降维打击；wasm性能损耗不低。</p>
-</blockquote>
-
+<p><strong>TL;DR</strong></p>
+<p>Hive在MapReduce模型上实现了支持类SQL查询的数据仓库，它的改进点主要为：</p>
+<ul>
+<li>自己维护了元数据，从而允许了其它的所有优化。</li>
+<li>数据在物理上切分为partition和bucket，避免了扫描全量数据。</li>
+<li>实现了各种operator，从而支持了大多数关系型操作。</li>
+</ul>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/29/hive-a-warehousing-solution-over-a-map-reduce-framework/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1036,7 +763,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/06/28/2020-h1-summary/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -1050,7 +777,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/06/28/2020-h1-summary/" class="post-title-link" itemprop="url">2020年上半年总结</a>
+            <a href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/" class="post-title-link" itemprop="url">[笔记] Map-reduce-merge: simplified relational data processing on large clusters</a>
         </h1>
 
         <div class="post-meta">
@@ -1060,7 +787,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-06-28 18:14:16" itemprop="dateCreated datePublished" datetime="2020-06-28T18:14:16+08:00">2020-06-28</time>
+              <time title="创建时间：2020-09-27 22:46:41" itemprop="dateCreated datePublished" datetime="2020-09-27T22:46:41+08:00">2020-09-27</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -1081,51 +808,176 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h2 id="读书"><a href="#读书" class="headerlink" title="读书"></a>读书</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/1770782/">追风筝的人</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/2308234/">CSS权威指南（第三版）</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/4166546/">数据库系统实现</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/5348018/">国富论</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/10455982/">什么是数学</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/10549733/">JavaScript权威指南(第6版)</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/10794070/">心外传奇</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/20499301/">政治的历史与边界</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/24155919/">简明逻辑学</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/24708288/">算法设计与分析基础 : 第3版</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/25752357/">Head First HTML与CSS（第2版）</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/25829287/">数学</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/25832801/">旧制度与大革命</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/26769754/">Elixir程序设计</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/26772632/">Java 8实战</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/26801314/">人性的弱点</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/26874287/">历史意识的维度</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/26954760/">月亮与六便士</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/27042910/">Mesos 实战</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/30389639/">三十年战争史 : 1618-1648</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/30468519/">局外人</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/34767458/">Google工作法</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/34782541/">从一到无穷大</a></li>
-<li><a target="_blank" rel="noopener" href="https://book.douban.com/subject/35041576/">Spring Cloud Alibaba 微服务原理与实战 : Cloud</a></li>
-</ul>
-<h2 id="技能"><a href="#技能" class="headerlink" title="技能"></a>技能</h2><ul>
-<li>Dart</li>
-<li>Java<ul>
-<li>Guice</li>
-</ul>
-</li>
-<li>SQL</li>
-</ul>
-<h2 id="见识"><a href="#见识" class="headerlink" title="见识"></a>见识</h2><ul>
-<li>入关学</li>
-<li>新公司的协作方式</li>
-</ul>
-<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><ul>
-<li>如何预测与测量项目的收益</li>
-<li>团队内的沟通</li>
-<li>两个公司的管理模式的差异</li>
-<li>我的职业发展的目标是什么</li>
-</ul>
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.cs.duke.edu/courses/cps399.28/current/papers/sigmod07-YangDasdanEtAl-map_reduce_merge.pdf">Map-reduce-merge: simplified relational data processing on large clusters</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章为MapReduce模型增加了一步Merge，增强了Join的能力。原理如图。</p>
+<p><img src="/images/2010-09/map-reduce-merge-01.jpg"></p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
 
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/23/cassandra-a-decentralized-structured-storage-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/23/cassandra-a-decentralized-structured-storage-system/" class="post-title-link" itemprop="url">[笔记] Cassandra: a decentralized structured storage system</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-23 16:54:37" itemprop="dateCreated datePublished" datetime="2020-09-23T16:54:37+08:00">2020-09-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.cl.cam.ac.uk/~ey204/teaching/ACS/R212_2014_2015/papers/lakshman_ladis_2009.pdf">Cassandra: a decentralized structured storage system</a></p>
+<p>可以参考<a target="_blank" rel="noopener" href="https://static.last.fm/johan/nosql-20090611/cassandra_nosql.pdf">Cassandra: structured storage system on a P2P network</a>加深理解。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/23/cassandra-a-decentralized-structured-storage-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/" class="post-title-link" itemprop="url">[笔记] Dremel: interactive analysis of web-scale datasets</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-22 18:46:25" itemprop="dateCreated datePublished" datetime="2020-09-22T18:46:25+08:00">2020-09-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub36632.pdf">Dremel: interactive analysis of web-scale datasets</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章讲了两方面：</p>
+<ul>
+<li>支持嵌套结构（Protocol Buffers）的列式存储（Google内部叫ColumnIO，可以参考开源的<a target="_blank" rel="noopener" href="https://parquet.apache.org/">Parquet</a>）。</li>
+<li>并行执行架构。</li>
+</ul>
+<p>能列式存储复杂的嵌套结构，极大地扩展了列存的应用范围。相比而言Dremel的并行执行架构不是很新颖。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1144,7 +996,7 @@
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/7/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><span class="page-number current">8</span><a class="page-number" href="/page/9/">9</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/9/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/7/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><span class="page-number current">8</span><a class="page-number" href="/page/9/">9</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/9/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1213,7 +1065,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">122</span>
+          <span class="site-state-item-count">134</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

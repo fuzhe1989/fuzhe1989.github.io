@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Scaling Memcache at Facebook  TL;DR 在 cache coherence 方面经常被人引用的 paper。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Scaling Memcache at Facebook">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/09/26/scaling-memcache-at-facebook/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Scaling Memcache at Facebook  TL;DR 在 cache coherence 方面经常被人引用的 paper。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/memcached-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/memcached-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/memcached-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/memcached-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/memcached-05.png">
+<meta property="article:published_time" content="2022-09-26T05:35:14.000Z">
+<meta property="article:modified_time" content="2022-10-17T04:12:25.554Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-09/memcached-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/09/26/scaling-memcache-at-facebook/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Scaling Memcache at Facebook | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/26/scaling-memcache-at-facebook/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Scaling Memcache at Facebook
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-26 13:35:14" itemprop="dateCreated datePublished" datetime="2022-09-26T13:35:14+08:00">2022-09-26</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/system/files/conference/nsdi13/nsdi13-final170_update.pdf">Scaling Memcache at Facebook</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>在 cache coherence 方面经常被人引用的 paper。</p>
+<span id="more"></span>
+
+<h1 id="Overview"><a href="#Overview" class="headerlink" title="Overview"></a>Overview</h1><p>为什么要用单独的 cache service：</p>
+<ol>
+<li>读请求数量远多于写（高一个数量级）</li>
+<li>多种数据源（MySQL，HDFS，以及其它后端服务）</li>
+</ol>
+<p><img src="/images/2022-09/memcached-01.png"></p>
+<p>Facebook 用 cache service 的方式：</p>
+<ol>
+<li>作为 query cache 减轻 DB 的负担，见图 1。具体用法是按需填充（demand-filled）的 look-aside cache，即读请求先请求 cache，未命中再请求 DB，然后填充 cache；写请求直接写 DB，成功后再发请求给 cache 令对应的 key 失效（删除而未更新是为了保证幂等）。<blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.quora.com/Is-Memcached-look-aside-cache">Is Memcached look-aside cache?</a></p>
+<p>The distinction between look-aside and look-through caches is not whether data is fetched from the cache and memory in serial or in parallel. The distinction is whether the fetch to memory on a cache miss originates from the caller or the cache. If the fetch to memory originates from the caller on cache miss, then you’re using a look-aside cache. If the fetch to memory originates from the cache on cache miss, then you’re using a look-through cache.</p>
+<p>应用自己处理 cache miss 之后的 fill 就是 look-aside，cache 自己处理 fill 就是 look-through，学废了没有？</p>
+</blockquote>
+</li>
+<li>作为更通用的 key-value 存储（字面理解是不再绑定到具体的后端上了？）</li>
+</ol>
+<p>memcached 本身只是单机的，Facebook 将其修改为可以支持 cluster。这样，他们就多了两个需要处理的问题（在原有问题的基础上，笑）：</p>
+<ol>
+<li>如何协调多个 memcached 节点。</li>
+<li>如何维护 cache 与 DB 的一致性。</li>
+</ol>
+<p>这也是本文的两个重点：</p>
+<ol>
+<li>优化</li>
+<li>一致性</li>
+</ol>
+<p><img src="/images/2022-09/memcached-02.png"></p>
+<h1 id="In-a-Cluster-Latency-and-Load"><a href="#In-a-Cluster-Latency-and-Load" class="headerlink" title="In a Cluster: Latency and Load"></a>In a Cluster: Latency and Load</h1><h2 id="Reducing-Latency"><a href="#Reducing-Latency" class="headerlink" title="Reducing Latency"></a>Reducing Latency</h2><p>通常一个业务请求会对应很多次 cache 访问，比如作者的一份数据是平均 521 次 get（P95 是 1740 次）。在使用 memcached 集群后，这些 get 会根据某些 sharding 规则（实际是一致性 hashing）分散到不同的 memcached 节点。当集群规模增大后，这种 all-to-all 的通信模式会造成严重的拥塞。replication 可以缓解单点热点，但会降低内存的使用率。</p>
+<p>Facebook 的优化思路是从 client 入手：</p>
+<ol>
+<li><p>将数据间的依赖关系梳理为 DAG，从而能并发 batch fetch 相互不依赖的数据（平均一个请求可以 fetch 24 个 item）。</p>
+</li>
+<li><p>完全由 client 端维护 router，从而避免 server 间的通信。</p>
+</li>
+<li><p>client 通过 UDP 发送 get 请求，从而降低延时。数据显示在高峰期 0.25% 丢包率。set 和 remove 仍然走 TCP。</p>
+<p> <img src="/images/2022-09/memcached-03.png"></p>
+</li>
+<li><p>client 端使用滑动窗口来控制发出的请求数量，避免 response 把机架或交换机的网络打满。滑动窗口的拥塞策略类似于 TCP，即快下降+慢上升。与 TCP 不同的是，滑动窗口针对进程的所有请求生效，而 TCP 则是针对某个 stream 生效。如下图可见，窗口太小，请求并发上不去；窗口太大，容易触发网络拥塞。</p>
+<p> <img src="/images/2022-09/memcached-04.png"></p>
+</li>
+</ol>
+<h2 id="Reducing-Load"><a href="#Reducing-Load" class="headerlink" title="Reducing Load"></a>Reducing Load</h2><h3 id="Leases"><a href="#Leases" class="headerlink" title="Leases"></a>Leases</h3><p>作者引入 lease 是为了解决两类问题：失效的 set；惊群。前者发生在多个 client 并发乱序 update 一个 key 时。后者发生在一个很热的 key 不停被写，因此不停被 invalidate，读请求不得不反复请求 DB。</p>
+<p>每个 memcached 实例可以为某个 key 生成一个 token 返回给 client，client 后续就可以带着这个 token 去更新对应的 key，从而避免并发更新。memcached 会在收到 invalidation 请求后令对应 key 的 token 失效。</p>
+<p>为了顺便解决惊群问题，作者对 lease 机制加了个小小的限制：每个 key 最多每 10s 生成一个 token。如果时间没到就有 client 在 cache miss 下请求 token，memcached 会返回一个特定的错误，让 client 等一会重试。通常这个时间内 lease owner 就有机会重新填充 cache，其它 client 下次请求时就会命中 cache 了。</p>
+<p>另一个优化是 memcached 在收到 invalidation 请求后，不立即删除对应的数据，而是暂存起来一小会。这期间一些对一致性要求不那么高的 client 可以使用 stale get 获取数据，而不至于直接把寒气传递给 DB（笑）。</p>
+<h3 id="Memcache-Pools"><a href="#Memcache-Pools" class="headerlink" title="Memcache Pools"></a>Memcache Pools</h3><p>单独的 cache service 就要能承载不同的业务请求，但很多时间业务之间相互会打架，导致某些业务的 cache 命中率受影响。作者因此将整个 memcached 集群分成了若干个 pool，除了一个 default pool，其它的 pool 分别用于不同的 workload。比如可以有一个很小的 pool 用于那些访问频繁但 cache miss 代价不高的 key，另一个大的 pool 用于 cache miss 代价很高的 key。</p>
+<p>作者给的一个例子是更新频繁（high-churn）的 key 可能会挤走更新不频繁（low-churn）的 key，但后者可能仍然很有价值。分开到两个 pool 之后就能避免这种负面的相互影响。</p>
+<h3 id="Replication-Within-Pools"><a href="#Replication-Within-Pools" class="headerlink" title="Replication Within Pools"></a>Replication Within Pools</h3><p>replication 会被用于满足以下条件的 memcached pool：</p>
+<ol>
+<li>业务会定期同时获取大量 key。</li>
+<li>整个数据集可以放进一两台机器。</li>
+<li>但压力远高于一台机器的承载能力。</li>
+</ol>
+<p>这种情况下 replication 要比继续做 sharding 更好。</p>
+<blockquote>
+<p>空间换负载均衡</p>
+</blockquote>
+<h2 id="Handling-Failures"><a href="#Handling-Failures" class="headerlink" title="Handling Failures"></a>Handling Failures</h2><p>memcached 一旦无法服务，DB 就很容易被压垮，导致严重的后果。</p>
+<p>如果整个 memcached 集群不可服务，所有请求都会被导到其它集群。</p>
+<p>范围很小的不可服务会被自动处理掉，但处理前出错可能已经持续长达几分钟了，足以导致严重的后果。因此集群中会预留一小部分（1%）机器，称为 Gutter，用于临时接管这种小范围的机器不可服务。</p>
+<p>client 如果收不到 response，就会假设目标 memcached 挂了，接着请求一台 Gutter 机器。如果再请求失败，就会查询 DB，再将 key-value 写到 Gutter 机器上。</p>
+<p>Gutter 机器会快速令 cache 失效，这样它就不用处理 invalidation 请求，能降低负载。代价是一定的数据不一致。</p>
+<p>这种方法不同于传统的 rehash data 的地方在于，rehash data 有扩大失败范围的风险。比如有 key 非常热的时候，它去哪，哪出问题。而使用 Gutter 就可以很好地将风险控制在指定的机器范围内。</p>
+<p>Gutter 的另一个好处是将那些访问失败的请求集中了起来，增加了它们后续命中的机会，也因此降低了 DB 的负载。</p>
+<h1 id="In-a-Region-Replication"><a href="#In-a-Region-Replication" class="headerlink" title="In a Region: Replication"></a>In a Region: Replication</h1><p>随着业务压力增长而无脑扩容反倒可能让问题恶化：</p>
+<ol>
+<li>业务请求越多，热点 key 越热。</li>
+<li>随着 memcached 节点增多，网络拥塞也会越来越严重。<blockquote>
+<p>另一个可能的点：n 个 client 与 m 个 server 之间可能的连接数是 n*m。</p>
+</blockquote>
+</li>
+</ol>
+<p>作者的解法是将 memcached 加上 webserver 一起划成若干个 region 对应同一个 DB，好处：</p>
+<ol>
+<li>异常情况的影响范围小（俗称爆炸范围小）</li>
+<li>可使用不同的网络配置</li>
+</ol>
+<p>不同 region 对应同样的 DB，因此会有数据重复（即 replication），但分散了热点，允许不同的配置，这样用空间换取了其它好处。</p>
+<h2 id="Regional-Invalidations"><a href="#Regional-Invalidations" class="headerlink" title="Regional Invalidations"></a>Regional Invalidations</h2><p>在 region 化之后，数据可能同时存在于多个 region 上，当有 client 更新了对应的 key 之后，我们要能保证所有 region 的 cache 都能被正确 invalidate 掉。</p>
+<p><img src="/images/2022-09/memcached-05.png"></p>
+<p>作者的做法是在每台 DB 上部署一个名为 mcsqueal 的 daemon，它会在事务提交之后，将其中被影响到的 cache keys 取出来，广播给所有业务集群。为了降低 invalidation 的发包速度，daemon 会聚合一组 invalidation 发给部署有 mcrouter 的业务机器，再由这些机器将请求转发给具体的 memcached。</p>
+<p>这种做法，相比于 web server 直接发送 invalidation 给 memcached，好处：</p>
+<ol>
+<li>mcsqueal 的聚合效果更好</li>
+<li>mcsqueal 有机会重发 invalidation（直接通过 DB 的 WAL）。</li>
+</ol>
+<blockquote>
+<p>但如果数据本身是没有 MVCC 的，这种做法仍然有非常小的不一致风险：</p>
+<ol>
+<li>get data v0</li>
+<li>update data to v1</li>
+<li>invalidate data</li>
+<li>fill cache with v0</li>
+</ol>
+</blockquote>
+<h2 id="Regional-Pools"><a href="#Regional-Pools" class="headerlink" title="Regional Pools"></a>Regional Pools</h2><p>如果将用户请求发给随机的一个前端集群，则最终每个集群都会 cache 几乎相同的数据。这样好处是我们可以单独下线一个集群而不会影响 cache 命中率。但另一方面，这会造成数据过度拷贝（over-replicating）。作者的解法是令多个前端集群共享同一组 memcached server，称为一个 regional pool。</p>
+<p>此时有个挑战时，如何决定哪些数据应该在每个 cluster 中都有副本，哪些应该一个 region 只有一份。前者的跨集群流量更少，延时更低，但后者更省机器和内存。</p>
+<p>作者给出的标准是：</p>
+<ol>
+<li>用户越多，越倾向于 cluster</li>
+<li>访问频率越高，越倾向于 cluster</li>
+<li>value 越大，越倾向于 cluster</li>
+</ol>
+<h2 id="Cold-Cluster-Warmup"><a href="#Cold-Cluster-Warmup" class="headerlink" title="Cold Cluster Warmup"></a>Cold Cluster Warmup</h2><p>为了解决集群刚启动时 cache 有效数据极少，命中率极差的问题，冷集群可以从热集群中搬数据过来，而不用直接请求 DB。这样一个集群的预热可以在几小时内完成（相比之前要几天时间）。</p>
+<p>这里要注意的是避免数据不一致。一种常见的不一致场景是，来自从热集群获取数据与收到 invalidation 之间乱序，即先收到 invalidation，再收到 stale data。作者的解法比较 hack：令 invalidation 等待两秒再操作。这样仍然会冒一些数据不一致的风险，但实践中显示两秒是非常安全的。</p>
+<blockquote>
+<p>真的吗，我不信.jpg</p>
+</blockquote>
+<h1 id="Across-Regions-Consistency"><a href="#Across-Regions-Consistency" class="headerlink" title="Across Regions: Consistency"></a>Across Regions: Consistency</h1><p>Facebook 会 region 化部署 MySQL 集群，从而：</p>
+<ol>
+<li>用户可以请求距离最近的 region，从而降低延时</li>
+<li>控制爆炸半径</li>
+<li>新集群往往可以享受到能源或经济上的好处</li>
+</ol>
+<p>MySQL 本身会有一个全局的 master 实例，其它 region 都是只读副本，region 之间使用 MySQL 的 replication 协议保持数据同步。但备实例落后于主实例却容易导致 memcached 与 DB 有数据不一致。</p>
+<p>这种不一致本质上也来自收到数据与收到 invalidation 之间乱序。备集群收到数据是延后的，如果 invalidation 提前到达，就没有指令可以令 stale data 失效了。</p>
+<p>一致性模型往往会带来性能上的额外开销，使其无法应用在大规模集群上。Facebook 的优势是 DB 与 memcached 可以协同设计来在一致性与性能之间取得比较好的平衡。</p>
+<p><strong>master region 发起的写入</strong></p>
+<p>考虑到一个位于 master region 的 webserver 刚写完 DB，它直接发送 invalidation 给各个 master region 的 memcached 是安全的，但发给其它 replica region 就不安全了：对应 region 可能还没有收到相应的修改。</p>
+<p>此时前面引入的 mcsqueal 就起了重要的作用：各个 region 都通过自身的 mcsqueal 来 invalidate 失效数据，保证了每个 region 的 DB 与 cache 状态是一致的。</p>
+<p><strong>非 master region 发起的写入</strong></p>
+<p>现在考虑非 master region 的写请求，如果仍然等 mcsqueal 来 invalidate，就会违反 read-your-write 语义；如果直接 invalidate，就可能导致数据不一致。</p>
+<p>作者引入了 remote marker 来最小化数据不一致的风险。remote marker 可以标记本地的某个 key 可能已失效，需要将请求转发给 master region。注意当有并发写入同一个 key 的情况时，过早删除 remote marker 仍然可能导致用户看到过期数据。</p>
+<h1 id="Single-Server-Improvements"><a href="#Single-Server-Improvements" class="headerlink" title="Single Server Improvements"></a>Single Server Improvements</h1><p>all-to-all 通信模式下，单点就可能成为瓶颈，提升单点性能也因此变得重要。</p>
+<h2 id="Performance-Optimiztions"><a href="#Performance-Optimiztions" class="headerlink" title="Performance Optimiztions"></a>Performance Optimiztions</h2><p>优化的起点是一个使用固定大小 hashtable 的单线程 memcached。第一波优化：</p>
+<ol>
+<li>自动扩容 hashtable。</li>
+<li>引入多线程并用一个 global lock 保护共享结构。</li>
+<li>每个线程单独的 UDP 端口以降低争抢。</li>
+</ol>
+<p>接下来的优化：</p>
+<ol>
+<li>引入细粒度的锁：hit get 提升 2 倍；missed get 提升 1 倍。</li>
+<li>TCP 替换为 UDP：get 提升 13%，multiget 提升 8%。</li>
+</ol>
+<h2 id="Adaptive-Slab-Allocator"><a href="#Adaptive-Slab-Allocator" class="headerlink" title="Adaptive Slab Allocator"></a>Adaptive Slab Allocator</h2><blockquote>
+<p>为啥不直接用 jemalloc，自家的产品？一定是历史原因</p>
+</blockquote>
+<h2 id="The-Transient-Item-Cache"><a href="#The-Transient-Item-Cache" class="headerlink" title="The Transient Item Cache"></a>The Transient Item Cache</h2><p>memcached 支持 ttl，会自动踢掉过期的 key。作者将其改成了 lazy eviction，直到下次访问时才判断过期。这带来了一个新问题：一波短生命期的 key 可能一直待在 LRU list 中直到被踢掉，期间一直在占用着内存。</p>
+<p>作者因此使用了一种混合方法：大多数情况下 lazy evict，对少数短生命期的 key 则 proactively eveit。这些 key 会被放到一个环形 buffer，称为 Transient Item Cache。memcached 每秒会扫描这个 buffer。</p>
+<h2 id="Software-Upgrades"><a href="#Software-Upgrades" class="headerlink" title="Software Upgrades"></a>Software Upgrades</h2><p>为了避免集群升级导致 cache 变冷，memcached 会将数据保存在共享内存中，这样新进程启动之后仍然可以有足够的本地数据。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/09/19/cache-craftiness-for-multicore-key-value-storage/" rel="prev" title="[笔记] Cache Craftiness for Fast Multicore Key-Value Storage">
+      <i class="fa fa-chevron-left"></i> [笔记] Cache Craftiness for Fast Multicore Key-Value Storage
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/11/01/how-to-pretend-to-understand-snapshot-isolation/" rel="next" title="如何装作懂 Snapshot Isolation">
+      如何装作懂 Snapshot Isolation <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Overview"><span class="nav-number">1.</span> <span class="nav-text">Overview</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#In-a-Cluster-Latency-and-Load"><span class="nav-number">2.</span> <span class="nav-text">In a Cluster: Latency and Load</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Reducing-Latency"><span class="nav-number">2.1.</span> <span class="nav-text">Reducing Latency</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Reducing-Load"><span class="nav-number">2.2.</span> <span class="nav-text">Reducing Load</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Leases"><span class="nav-number">2.2.1.</span> <span class="nav-text">Leases</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Memcache-Pools"><span class="nav-number">2.2.2.</span> <span class="nav-text">Memcache Pools</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Replication-Within-Pools"><span class="nav-number">2.2.3.</span> <span class="nav-text">Replication Within Pools</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Handling-Failures"><span class="nav-number">2.3.</span> <span class="nav-text">Handling Failures</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#In-a-Region-Replication"><span class="nav-number">3.</span> <span class="nav-text">In a Region: Replication</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Regional-Invalidations"><span class="nav-number">3.1.</span> <span class="nav-text">Regional Invalidations</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Regional-Pools"><span class="nav-number">3.2.</span> <span class="nav-text">Regional Pools</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Cold-Cluster-Warmup"><span class="nav-number">3.3.</span> <span class="nav-text">Cold Cluster Warmup</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Across-Regions-Consistency"><span class="nav-number">4.</span> <span class="nav-text">Across Regions: Consistency</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Single-Server-Improvements"><span class="nav-number">5.</span> <span class="nav-text">Single Server Improvements</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Performance-Optimiztions"><span class="nav-number">5.1.</span> <span class="nav-text">Performance Optimiztions</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Adaptive-Slab-Allocator"><span class="nav-number">5.2.</span> <span class="nav-text">Adaptive Slab Allocator</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Transient-Item-Cache"><span class="nav-number">5.3.</span> <span class="nav-text">The Transient Item Cache</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Software-Upgrades"><span class="nav-number">5.4.</span> <span class="nav-text">Software Upgrades</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Order-Preserving Key Compression for In-Memory Search Trees  TL;DR 本文提出了一种针对字符串的分段编码框架 HOPE（High-speed Order-Preserving Encoder），在构建初始字典之后，可以流式编码任意字符串。且，重点来了，编码之间仍然保持原有字符串的顺序。这样 HOPE 的适用范围就不仅仅是静态的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Order-Preserving Key Compression for In-Memory Search Trees">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/09/09/order-perserving-key-compression-for-in-memory-search-trees/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Order-Preserving Key Compression for In-Memory Search Trees  TL;DR 本文提出了一种针对字符串的分段编码框架 HOPE（High-speed Order-Preserving Encoder），在构建初始字典之后，可以流式编码任意字符串。且，重点来了，编码之间仍然保持原有字符串的顺序。这样 HOPE 的适用范围就不仅仅是静态的">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/hope-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/hope-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/hope-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/hope-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/hope-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/hope-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/hope-07.png">
+<meta property="article:published_time" content="2022-09-09T14:53:32.000Z">
+<meta property="article:modified_time" content="2022-10-17T04:12:25.554Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-09/hope-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/09/09/order-perserving-key-compression-for-in-memory-search-trees/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Order-Preserving Key Compression for In-Memory Search Trees | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/09/order-perserving-key-compression-for-in-memory-search-trees/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Order-Preserving Key Compression for In-Memory Search Trees
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-09 22:53:32" itemprop="dateCreated datePublished" datetime="2022-09-09T22:53:32+08:00">2022-09-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/pdf/10.1145/3318464.3380583">Order-Preserving Key Compression for In-Memory Search Trees</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文提出了一种针对字符串的分段编码框架 HOPE（High-speed Order-Preserving Encoder），在构建初始字典之后，可以流式编码任意字符串。且，重点来了，编码之间仍然保持原有字符串的顺序。这样 HOPE 的适用范围就不仅仅是静态的压缩已有数据了，它还能直接与各种树结构结合，直接用编码后的值作为 key。这样的好处有：</p>
+<ol>
+<li>对于 B-tree 等，更短的 key 意味着更大的 fanout。</li>
+<li>对于 Trie 等，更短的 key 意味着更低的高度。</li>
+<li>节省空间有助于在内存中维护更多数据（如 cache 等）。</li>
+<li>节省空间有助于提升 cache 性能。</li>
+</ol>
+<blockquote>
+<p>令我大开眼界。直觉这篇 paper 比较实用。</p>
+</blockquote>
+<span id="more"></span>
+
+<h1 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h1><p>现代的内存查找树大致可以分为三类：</p>
+<ol>
+<li>B-tree&#x2F;B+tree 家族，如 Bw-tree。</li>
+<li>Trie 和各种 radix，如 ART。</li>
+<li>混合型，如 Masstree。</li>
+</ol>
+<p>用在这些树结构上时，通用压缩算法，如 LZ77、Snappy、LZ4 等的问题是需要解压之后才能使用，单次开销大。</p>
+<p>传统的整值字典编码有三个问题：</p>
+<ol>
+<li>可以保持编码值顺序不变的字典编码算法，在处理新增字典值时开销大。</li>
+<li>字典值的查询本身通常也会用到一些树型结构，相比直接用原始值查询并没有优势。</li>
+<li>如果值的 NDV 比较大，字典会越来越大，最终抵消掉空间上的收益。</li>
+</ol>
+<blockquote>
+<p>文章还讨论了基于频率的保序编码，如 DB2 BLU 以及 padding encoding，但我没太看懂。看描述意思前者也还是字典，只不过不同值的编码长度不同。后者在前者基础上做了补 0。这类方法主要用于列存编码中，不太适合内存查找树这种不停有新数据进来的场景，问题应该也是在字典的维护成本上。</p>
+<p>之前没了解过这两种编码，不知道我理解得对不对。</p>
+</blockquote>
+<p>像 Huffman 这样的墒编码会产生变长编码，之前在列存中的问题是解码太慢，但在内存查找树中这就不是问题了：查询和过滤都只针对编码值，不需要解码为原始值。</p>
+<h1 id="Compression-Model"><a href="#Compression-Model" class="headerlink" title="Compression Model"></a>Compression Model</h1><h2 id="The-String-Axis-Model"><a href="#The-String-Axis-Model" class="headerlink" title="The String Axis Model"></a>The String Axis Model</h2><p><img src="/images/2022-09/hope-01.png"></p>
+<p>为了能实现用固定的字典编码任意字符串，HOPE 提出了如下模型：</p>
+<ol>
+<li>将所有字符串按字典序排列在一个数轴上。</li>
+<li>将数轴划分为若干个区间，每个区间的所有字符串会有一个最长共同前缀 S<sub>i</sub>。</li>
+<li>使用某种编码算法为每个区间赋予一个编码值，这也同时是 S<sub>i</sub> 的编码值。</li>
+<li>编码字符串时，根据它落在的区间，将前缀 S<sub>i</sub> 替换为对应的编码值。</li>
+<li>重复步骤 4，直到字符串变成空串。</li>
+</ol>
+<p>通过编码区间，HOPE 因此可以用固定大小的字典匹配任意字符串。但为了能保证编码过程收敛，需要保证每个 S<sub>i</sub> 不能为空，因此每个区间都要保证有一个非空的共同前缀。</p>
+<p><img src="/images/2022-09/hope-02.png"></p>
+<p>以上就是 HOPE 定义的区间的<strong>完备性</strong>。</p>
+<p>注意，不同区间可以有相同的前缀，但它们的编码值不同。</p>
+<p>接下来，问题就是如何让编码保持顺序了。这就需要我们在步骤 3 使用一种保序的编码方式。</p>
+<h2 id="Exploiting-Entropy"><a href="#Exploiting-Entropy" class="headerlink" title="Exploiting Entropy"></a>Exploiting Entropy</h2><blockquote>
+<p>跳过其中出现的所有公式……反正都看不太懂</p>
+</blockquote>
+<p>作者提出了四种类型的编码：</p>
+<ol>
+<li>FIFC，定长区间+定长编码，如 ASCII，作者表示不讨论。</li>
+<li>FIVC，定长区间+变长编码，典型如 Hu-Tucker 编码。Huffman 或算术编码也算，但它们不保序。</li>
+<li>VIFC，变长区间+定长编码，典型如 ALM。优点是解码快。要注意的是因为区间是变长的，Code(ab) !&#x3D; Code(a)+Code(b)，但 HOPE 的场景不需要这种性质。</li>
+<li>VIVC，变长区间+变长编码，这是理论上压缩率最优的类型，但之前少有人研究。但这种方式下编码和解码速度都会受变长的影响。</li>
+</ol>
+<p><img src="/images/2022-09/hope-03.png"></p>
+<h2 id="Compression-Schemes"><a href="#Compression-Schemes" class="headerlink" title="Compression Schemes"></a>Compression Schemes</h2><p>文章选择了 6 种编码方式：</p>
+<ol>
+<li>Single-Char，FIVC，元素长度为 1，使用 Hu-Tucker 编码。</li>
+<li>Double-Char，FIVC，元素长度为 2，使用 Hu-Tucker 编码。注意考虑到长度只有 1 的字符串，元素里需要有 b∅ 这样的占位符。</li>
+<li>ALM，VIFC，它的特点是会根据 len(s) × freq(s) 判断 s 是否放进字典中。当所有满足条件的 s<blockquote>
+<p>大概知道个意思，具体细节还得看对应 paper。</p>
+</blockquote>
+</li>
+<li>3-Grams，VIVC，所有区间都用长度为 3 的字符串隔开，仍然用 Hu-Tucker 编码（看起来 VC 都是用 Hu-Tucker 编码）。</li>
+<li>4-Grams，VIVC，区间边界长度为 4。</li>
+<li>ALM-Improved，VIVC。相比 ALM 改进两点：<ol>
+<li>使用 Hu-Tucker 生成变长编码。</li>
+<li>ALM 会统计所有长度、所有位置的子串的频率，构建速度慢，内存占用高。ALM-Improved 则只统计每个采样字符串的所有前缀子串。</li>
+</ol>
+</li>
+</ol>
+<p><img src="/images/2022-09/hope-04.png"></p>
+<h1 id="HOPE"><a href="#HOPE" class="headerlink" title="HOPE"></a>HOPE</h1><h2 id="Overview"><a href="#Overview" class="headerlink" title="Overview"></a>Overview</h2><p><img src="/images/2022-09/hope-05.png"></p>
+<p>HOPE 分为以下组件：</p>
+<ol>
+<li>Symbol Selector（负责划分区间和取前缀）</li>
+<li>Code Assigner（负责赋予编码）</li>
+<li>Dictionary（构建字典）</li>
+<li>Encoder（使用字典编码字符串）</li>
+</ol>
+<p>其中字典大小对于 VI 模式是可配的。</p>
+<h2 id="Implementation"><a href="#Implementation" class="headerlink" title="Implementation"></a>Implementation</h2><p><strong>Symbol Selector</strong></p>
+<p>ALM 和 ALM-Improved 的 Symbol Selector 需要额外一步来保证每个采样的值不能是另一个值的前缀，否则这两个值会落入相同区间，如 sig 和 sigmod。方法是总是将前缀串对应的频率加到它最长的延长串上。</p>
+<p>对于 VI 编码，Symbol Selector 还会用对应的 symbol（共同前缀）长度为其对应的频率加权。</p>
+<p><strong>Code Assigner</strong></p>
+<p>Hu-Tucker 编码和 Huffman 非常像，也是统计出每个元素的频率，然后每次取出两个频率最低的拼在一起放回，依次直到所有元素组成一棵树，再沿着树的路径用 01 为每个叶子节点赋值。</p>
+<p>与 Huffman 的区别在于，Hu-Tucker 每次必须取两个相邻的、频率之和最低的元素，放回时也保证顺序。</p>
+<p><strong>Dictionary</strong></p>
+<p>字典中只需要保存每个区间的左边界。</p>
+<p>HOPE 中实现了三种不同的字典结构。</p>
+<p><img src="/images/2022-09/hope-06.png"></p>
+<p>Single-Char 和 Double-Char 直接使用了数组。</p>
+<p>3-Grams 和 4-Grams 使用了一种 bitmap-tree，有点类似于 Trie，用一个 bitmap 来保存具体的子节点是否存在。因此 bitmap 长度为 256。每个节点保存 (n, bitmap)，n 是它之前所有节点中的 1 的个数。所有节点保存在一个大数组中。这样一个节点的字符 l 对应的节点在数组中的下标就是 n + popcount(bitmap, l)。现代 CPU 都直接有 popcount 的指令，因此这种寻址方式非常快。</p>
+<p><img src="/images/2022-09/hope-07.png"></p>
+<p>最后，ALM 和 ALM-Improved 使用 ART 来保存字典。</p>
+<blockquote>
+<p>没看过 ART paper，这段略过。</p>
+</blockquote>
+<p><strong>Encoder</strong></p>
+<p>编码过程就是不停地判断字符串落在哪个区间，然后将前缀替换为编码，反复直到字符串变空。</p>
+<p>为了加速编码的拼接，HOPE 用若干个 uint64 来保存结果，每当有新编码接入时：</p>
+<ol>
+<li>左移当前结果以留出空间。这步可能需要分裂原编码结果。</li>
+<li>用按位或写入新编码。</li>
+</ol>
+<p>当批量编码时，HOPE 将值分成若干个固定数量的组，对每个组每次取共同前缀，只编码一次。当组内元素数量为 2 时，称为 pair-encoding。</p>
+<blockquote>
+<p>后面的 evaluation 部分略。看完感觉 3-Grams 和 4-Grams 真是好编码。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/09/07/infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystems/" rel="prev" title="[笔记] InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems">
+      <i class="fa fa-chevron-left"></i> [笔记] InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/09/11/better-bitmap-performance-with-roaring-bitmaps/" rel="next" title="[笔记] Better bitmap performance with Roaring bitmaps">
+      [笔记] Better bitmap performance with Roaring bitmaps <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Background"><span class="nav-number">1.</span> <span class="nav-text">Background</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Compression-Model"><span class="nav-number">2.</span> <span class="nav-text">Compression Model</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#The-String-Axis-Model"><span class="nav-number">2.1.</span> <span class="nav-text">The String Axis Model</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Exploiting-Entropy"><span class="nav-number">2.2.</span> <span class="nav-text">Exploiting Entropy</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Compression-Schemes"><span class="nav-number">2.3.</span> <span class="nav-text">Compression Schemes</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#HOPE"><span class="nav-number">3.</span> <span class="nav-text">HOPE</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Overview"><span class="nav-number">3.1.</span> <span class="nav-text">Overview</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Implementation"><span class="nav-number">3.2.</span> <span class="nav-text">Implementation</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

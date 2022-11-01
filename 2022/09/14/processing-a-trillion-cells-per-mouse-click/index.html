@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Processing a Trillion Cells per Mouse Click  TL;DR 一篇相对早期（2012 年）的 paper，介绍了服务特定领域（WebUI）的 OLAP 系统 PowerDrill。PowerDrill 貌似在狗家命运不太好，这篇 paper 发表前后已经被 Dremel 给取代了。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Processing a Trillion Cells per Mouse Click">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/09/14/processing-a-trillion-cells-per-mouse-click/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Processing a Trillion Cells per Mouse Click  TL;DR 一篇相对早期（2012 年）的 paper，介绍了服务特定领域（WebUI）的 OLAP 系统 PowerDrill。PowerDrill 貌似在狗家命运不太好，这篇 paper 发表前后已经被 Dremel 给取代了。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/powerdrill-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/powerdrill-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/powerdrill-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/powerdrill-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/powerdrill-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/powerdrill-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/powerdrill-07.png">
+<meta property="article:published_time" content="2022-09-14T14:42:31.000Z">
+<meta property="article:modified_time" content="2022-10-17T04:12:25.554Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-09/powerdrill-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/09/14/processing-a-trillion-cells-per-mouse-click/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Processing a Trillion Cells per Mouse Click | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/14/processing-a-trillion-cells-per-mouse-click/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Processing a Trillion Cells per Mouse Click
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-14 22:42:31" itemprop="dateCreated datePublished" datetime="2022-09-14T22:42:31+08:00">2022-09-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.vldb.org/pvldb/vol5/p1436_alexanderhall_vldb2012.pdf">Processing a Trillion Cells per Mouse Click</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>一篇相对早期（2012 年）的 paper，介绍了服务特定领域（WebUI）的 OLAP 系统 PowerDrill。PowerDrill 貌似在狗家命运不太好，这篇 paper 发表前后已经被 Dremel 给取代了。</p>
+<span id="more"></span>
+
+<h1 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h1><p>PowerDrill 是一个 in-memory 的列存分析引擎。它主要为 Google 的一个交互式的 WebUI 提供分析服务，需要高可用和低延时。因此 PowerDrill 选择了 in-memory 架构，这是它和 Dremel 最大的区别。优点是性能好，单个查询能扫描的行数比 Dremel 多，缺点是能支持的总数据量远小于 Dremel。</p>
+<p>PowerDrill 的一些数据（看看就好）：</p>
+<ol>
+<li>2008 年底上线，2009 年面向 Google 内部开放使用。</li>
+<li>每个月有超过 800 名用户（其实不少了）执行约四百万个 SQL query。</li>
+<li>最多的用户每天花在 WebUI 上的时间超过 6 小时，触发多达一万两千次查询，扫描多达 525 万亿（trillion）个 cell。</li>
+</ol>
+<h1 id="Basic-Approach"><a href="#Basic-Approach" class="headerlink" title="Basic Approach"></a>Basic Approach</h1><h2 id="The-Power-of-Full-Scans-vs-Skipping-Data"><a href="#The-Power-of-Full-Scans-vs-Skipping-Data" class="headerlink" title="The Power of Full Scans vs. Skipping Data"></a>The Power of Full Scans vs. Skipping Data</h2><p>列存相对于行存的主要优势是：</p>
+<ol>
+<li>典型查询只需要加载少部分列。（这里提到的是不多于 10 列 vs 上千列，看来是宽表场景）</li>
+<li>列存压缩效率高，更节省 I&#x2F;O 与内存占用。</li>
+</ol>
+<p>另外列存系统通常会着重优化扫描性能。对于像 PowerDrill 这样的大量 ad-hoc query 的系统，传统的二级索引已经无法满足需求了（维护过多列上的索引的代价是非常巨大的）。</p>
+<p>有一个经验法则，相对于通过索引，全表扫描的优点是：</p>
+<ol>
+<li>随机 I&#x2F;O 更少。（索引扫描本身是顺序的，但回表是随机 I&#x2F;O）</li>
+<li>内循环更简单，更容易被优化</li>
+<li>cache 局部性好。这一点对于内存中的数据尤为关键，访问 L2 性能要比内存高一个数量级。</li>
+</ol>
+<p>在全表扫描基础上，我们可以再引入 skip index。这就需要在数据导入时将数据切成若干个小 chunk，每个 chunk 维护简单的数据结构用于在查询时过滤掉整个 chunk。这就需要 skip index 本身不能有 false-negative。</p>
+<p>PowerDrill 中 partition + skip index 的效果远好于传统的索引，因为前者可以适用于所有查询，且不需要存储冗余数据（比如相比于 <a href="/2020/08/13/c-store-a-column-oriented-dbms/">C-Store</a>）。</p>
+<h2 id="Partitioning-the-Data"><a href="#Partitioning-the-Data" class="headerlink" title="Partitioning the Data"></a>Partitioning the Data</h2><p>PowerDrill 的 partition 策略是：</p>
+<ol>
+<li>用户选择一组用于 partition 的列（有序）。</li>
+<li>从一个大 chunk 开始，每次用 partition columns 二分（range partition）将其分成两个小 chunk。</li>
+<li>重复第 2 步直到每个 chunk 行数不超过 5 万行。</li>
+</ol>
+<blockquote>
+<p>缺点是需要用户干预</p>
+</blockquote>
+<p>注意查询时 partition columns 并不会被特殊对待。</p>
+<blockquote>
+<p>但它们本身的 range 会反映到 skip index 上</p>
+</blockquote>
+<h2 id="Basic-Data-Structures"><a href="#Basic-Data-Structures" class="headerlink" title="Basic Data-Structures"></a>Basic Data-Structures</h2><p>PowerDrill 主要面向的是字符串。它使用了 global + local directionary 来编码：</p>
+<ol>
+<li>全局 dict 有序。</li>
+<li>每个 chunk 维护这个 chunk 的 local dict 与 global dict 的映射关系。</li>
+<li>实际数据用 local dict 编码。</li>
+</ol>
+<p>这样的优点是：</p>
+<ol>
+<li>local -&gt; global mapping 本身可以当作 skip index 使用。</li>
+<li>local dict 元素数量少于 global dict，编码长度更短。</li>
+</ol>
+<p><img src="/images/2022-09/powerdrill-01.png"></p>
+<h2 id="How-to-Evaluate-a-Query"><a href="#How-to-Evaluate-a-Query" class="headerlink" title="How to Evaluate a Query"></a>How to Evaluate a Query</h2><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> search_string, <span class="built_in">COUNT</span>(<span class="operator">*</span>) <span class="keyword">as</span> c <span class="keyword">FROM</span> data</span><br><span class="line"><span class="keyword">WHERE</span> search_string <span class="keyword">IN</span> (&quot;la redoute&quot;, &quot;voyages sncf&quot;)</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> search_string <span class="keyword">ORDER</span> <span class="keyword">BY</span> c <span class="keyword">DESC</span> LIMIT <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>主要在讲怎么用 skip index 加速 <code>IN</code></p>
+</blockquote>
+<h2 id="Basic-Experiments"><a href="#Basic-Experiments" class="headerlink" title="Basic Experiments"></a>Basic Experiments</h2><p>这节先测量基准性能，PowerDrill 完全没 partition 数据，只用本身的列存查询引擎。</p>
+<p>Query 1: top 10 countries</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> country, <span class="built_in">COUNT</span>(<span class="operator">*</span>) <span class="keyword">as</span> c <span class="keyword">FROM</span> data</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> country <span class="keyword">ORDER</span> <span class="keyword">BY</span> c <span class="keyword">DESC</span> LIMIT <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
+
+<p>Query 2: number of queries and overall latency per day</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="type">date</span>(<span class="type">timestamp</span>) <span class="keyword">as</span> <span class="type">date</span>, <span class="built_in">COUNT</span>(<span class="operator">*</span>),</span><br><span class="line"><span class="built_in">SUM</span>(latency) <span class="keyword">FROM</span> data</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> <span class="type">date</span> <span class="keyword">ORDER</span> <span class="keyword">BY</span> <span class="type">date</span> <span class="keyword">ASC</span> LIMIT <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
+
+<p>Query 3: top 10 table-names</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> table_name, <span class="built_in">COUNT</span>(<span class="operator">*</span>) <span class="keyword">as</span> c <span class="keyword">FROM</span> data</span><br><span class="line"><span class="keyword">GROUP</span> <span class="keyword">BY</span> table_name <span class="keyword">ORDER</span> <span class="keyword">BY</span> c <span class="keyword">DESC</span> LIMIT <span class="number">10</span>;</span><br></pre></td></tr></table></figure>
+
+<p>下面的 CSV 和 record-io 都是行存。</p>
+<p><img src="/images/2022-09/powerdrill-02.png"></p>
+<p>解读：</p>
+<ol>
+<li>I&#x2F;O 不是瓶颈。</li>
+<li>PowerDrill 的 dict encoding 在 query 1 的 group by 发挥了巨大的作用。<blockquote>
+<p>脚注里写 PowerDrill 会将参与 group by 的多列物化为一列，但这三个 query 似乎没有这种场景。</p>
+</blockquote>
+</li>
+<li>所有数据常驻内存对性能影响巨大。但即使去掉这个假设，PowerDrill 性能仍然达到了 Dremel 的 30 倍以上。</li>
+<li>PowerDrill 使用的未压缩的 dict encoding 占用也和 Dremel 压缩后的体积差不多。</li>
+<li>另外即使有如 <code>date</code> 这样的函数，PowerDrill 仍然可以应用 dict encoding，是因为它默认物化了所有表达式。（笑）</li>
+</ol>
+<h1 id="Key-Optimizations"><a href="#Key-Optimizations" class="headerlink" title="Key Optimizations"></a>Key Optimizations</h1><p>PowerDrill 的第一优化原则就是在内存中容纳尽可能多的数据。</p>
+<p><strong>Partitioning the Data into Chunks</strong></p>
+<p>partition 列为 country 和 table_name，最终产生了 150 个 chunk。</p>
+<p>内存占用：</p>
+<p><img src="/images/2022-09/powerdrill-03.png"></p>
+<p>partitioning 略微增加了一些内存占用，其中 query 2 增加得相对较多是因为 local dict 中 distinct 值更多。</p>
+<p><strong>Optimize Encoding of Elements in Columns</strong></p>
+<p>目前 dict code 还是用 int32 保存，但实际上我们可以根据 NDV 选择合适的 bits。当只有一个 distinct value 时，直接保存 rows n 就可以了。</p>
+<p>下面是自适应使用 1&#x2F;2&#x2F;4 字节的 dict code 的优化效果（左边是 chunk dict 占用，右边是总占用）：</p>
+<p><img src="/images/2022-09/powerdrill-04.png"></p>
+<p>Query 1 的效果显著得过分了。但 query 3 的总体占用仍然非常高（table_name 有非常多的 distinct value），且主要是 globa dict 占用的。</p>
+<p><strong>Optimize Global-Dictionaries</strong></p>
+<p>global dict 满足以下两个条件：有序；通常公共前缀很长。因此 PowerDrill 用建立在 array 上的 trie tree 来编码 string -&gt; code 的映射，这个方向的内存占用就明显降低了。为了同时也能支持 code -&gt; string 的查询，trie tree 的每个 inner node 取 4 bit 长度的数据，这样一个 node 最多 16 个 child。</p>
+<blockquote>
+<p>code -&gt; string 这段没看懂，实际上我们需要做的是在 trie tree 中维护 count，我猜可能是 node 的 fanout 小一些可以减少 children 占用的空间。</p>
+</blockquote>
+<p>trie encoding 的效果是 table_name 的 global dict 从 67.03MB 降到了 3.37MB，query 3 总占用从 81.31MB 降到了 17.66MB。</p>
+<p><strong>Generic Compression Algorithm</strong></p>
+<p>接下来再应用 Zippy（Snappy 的内部版）：</p>
+<p><img src="/images/2022-09/powerdrill-05.png"></p>
+<p>效果很好，但相对 Basic 的优势也减小了。</p>
+<p>为什么前面还要自己搞那些优化：前面的 encoding 不需要解压就可以随机访问。毕竟只有很少量的数据会被用到。</p>
+<p>为了平摊解压本身的开销，PowerDrill 使用了两级结构：数据首先以压缩状态加载到内存中，随后被访问时再转换为解压状态。</p>
+<p><strong>Reordering Rows</strong></p>
+<blockquote>
+<p>我个人非常喜欢的一个优化</p>
+</blockquote>
+<p>接下来，为了帮助 Zippy，PowerDrill 使用了一种优化，将不同行数据按字典序进行排序。这样相近的数据排列在一起，能明显提升压缩效率。这个优化尤其适合与 RLE 配合使用。</p>
+<p><img src="/images/2022-09/powerdrill-06.png"></p>
+<p>最优的排序方式本身是 NP-hard 的，一种比较好的启发式算法是先按 cardinality 增序决定列的相对顺序。</p>
+<p><img src="/images/2022-09/powerdrill-07.png"></p>
+<blockquote>
+<p><a href="/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/">Dremel</a> 中也提到了这个优化，看起来效果很好。但奇怪的是似乎不太能见到 Google 以外的系统用到这个优化。可能它太偏向离线了？在线系统在 compaction 时也有机会做这类优化。</p>
+</blockquote>
+<h1 id="Distributed-Execution"><a href="#Distributed-Execution" class="headerlink" title="Distributed Execution"></a>Distributed Execution</h1><blockquote>
+<p>比较没意思，略</p>
+</blockquote>
+<h1 id="Extensions"><a href="#Extensions" class="headerlink" title="Extensions"></a>Extensions</h1><p><strong>Complex Expressions</strong></p>
+<p>物化表达式</p>
+<p><strong>Count Distinct</strong></p>
+<p>近似算法而不是精确值</p>
+<p><strong>Other Compression Algorithms</strong></p>
+<p>ZLIB 和 LZO。ZLIB 的压缩率很好，但解压太慢。LZO 的一个变种最终被用于了生产环境。</p>
+<p><strong>Further Optimizing the Global-Dictionaries</strong></p>
+<p>为了避免加载无用的 dict，作者将整个 global dict 分成了若干个 sub-dict，lazy load。另外作者还用到了 Bloom-filter 来进一步避免加载无用的 sub-dict。</p>
+<p><strong>Improved Cache Heuristics</strong></p>
+<p>为了避免单个 query 对 LRU cache 的冲击，PowerDrill 使用了类似于 ARC 的 cache。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/09/11/better-bitmap-performance-with-roaring-bitmaps/" rel="prev" title="[笔记] Better bitmap performance with Roaring bitmaps">
+      <i class="fa fa-chevron-left"></i> [笔记] Better bitmap performance with Roaring bitmaps
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/09/19/cache-craftiness-for-multicore-key-value-storage/" rel="next" title="[笔记] Cache Craftiness for Fast Multicore Key-Value Storage">
+      [笔记] Cache Craftiness for Fast Multicore Key-Value Storage <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Basic-Approach"><span class="nav-number">2.</span> <span class="nav-text">Basic Approach</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Power-of-Full-Scans-vs-Skipping-Data"><span class="nav-number">2.1.</span> <span class="nav-text">The Power of Full Scans vs. Skipping Data</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Partitioning-the-Data"><span class="nav-number">2.2.</span> <span class="nav-text">Partitioning the Data</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Basic-Data-Structures"><span class="nav-number">2.3.</span> <span class="nav-text">Basic Data-Structures</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#How-to-Evaluate-a-Query"><span class="nav-number">2.4.</span> <span class="nav-text">How to Evaluate a Query</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Basic-Experiments"><span class="nav-number">2.5.</span> <span class="nav-text">Basic Experiments</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Key-Optimizations"><span class="nav-number">3.</span> <span class="nav-text">Key Optimizations</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Distributed-Execution"><span class="nav-number">4.</span> <span class="nav-text">Distributed Execution</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Extensions"><span class="nav-number">5.</span> <span class="nav-text">Extensions</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

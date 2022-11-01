@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：Cache Craftiness for Fast Multicore Key-Value Storage  TL;DR 大名鼎鼎的 Masstree。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] Cache Craftiness for Fast Multicore Key-Value Storage">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/09/19/cache-craftiness-for-multicore-key-value-storage/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：Cache Craftiness for Fast Multicore Key-Value Storage  TL;DR 大名鼎鼎的 Masstree。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-07.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-08.png">
+<meta property="article:published_time" content="2022-09-19T01:00:39.000Z">
+<meta property="article:modified_time" content="2022-10-17T04:12:25.553Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-09/masstree-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/09/19/cache-craftiness-for-multicore-key-value-storage/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] Cache Craftiness for Fast Multicore Key-Value Storage | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/19/cache-craftiness-for-multicore-key-value-storage/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] Cache Craftiness for Fast Multicore Key-Value Storage
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-19 09:00:39" itemprop="dateCreated datePublished" datetime="2022-09-19T09:00:39+08:00">2022-09-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/pdf/10.1145/2168836.2168855">Cache Craftiness for Fast Multicore Key-Value Storage</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>大名鼎鼎的 Masstree。</p>
+<span id="more"></span>
+
+<h1 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h1><p>开篇第一句话很酷：“Storage server performance matters”。无论什么系统，单机性能永远是非常关键的。毕竟最好的分布式系统就是不要分布（笑）。</p>
+<blockquote>
+<p>面向多核设计的一些关键因素：</p>
+<ol>
+<li>通常读远多于写，因此优化读的性能要比优化写更关键。</li>
+<li>锁不是万恶之源，争抢才是。纯粹的 lockfree 可能难以实现，实现了性能代价也可能很高。在需要原子更新&#x2F;读取多值时，细粒度锁往往优于 lockfree。</li>
+<li>从 memory-model 角度理解并发操作，避免使用过强的 coherence（如 serializable）。锁本身意味着 serializable，但如果 acquire&#x2F;release 就能满足要求，那锁就是过强的。</li>
+<li>“不要共享”和“immutable”都是提升性能的利器。这往往意味着 copy-on-write 要出场了。lockfree 也经常需要结合 copy-on-write 才能实现。但此时需要仔细设计如何处理写写冲突。</li>
+<li>memory stall 已经成为了现代系统的一大性能瓶颈，充分利用 cache 以及 prefetch 是关键。前者意味着良好的数据结构设计，避免跨 cacheline 的原子操作，避免 false-sharing，利用空间局部性；后者则是在主动利用时间局部性。</li>
+</ol>
+</blockquote>
+<p>Masstree 其实也是一个 LSM-like 系统，亮点是它的 in-memory 结构。</p>
+<p>TODO</p>
+<h1 id="System-interface"><a href="#System-interface" class="headerlink" title="System interface"></a>System interface</h1><p>Masstree 有一套典型的 key-value 接口：</p>
+<ul>
+<li>get(k)</li>
+<li>put(k, v)</li>
+<li>remove(k)</li>
+<li>getrange(k, n)</li>
+</ul>
+<p>其中前三个是原子的，getrange 不是。</p>
+<h1 id="Masstree"><a href="#Masstree" class="headerlink" title="Masstree"></a>Masstree</h1><p>Masstree 的特点：</p>
+<ol>
+<li>多核之间共享（区别于不同核访问不同的树）。</li>
+<li>并发结构。</li>
+<li>结合了 B+tree 和 Trie-tree。</li>
+</ol>
+<p>Masstree 直面的三个挑战：</p>
+<ol>
+<li>能高效支持多种 key 的分布，包括变长的二进制的 key，且之间可能有大量相同前缀。</li>
+<li>为了保证高性能和扩展性，Masstree 必须支持细粒度并发，且读操作不能读到被写脏的共享数据。</li>
+<li>Masstree 的布局必须能支持 prefetch 和按 cacheline 对齐。</li>
+</ol>
+<p>后两点被作者称为“cache craftiness”。</p>
+<h2 id="Overview"><a href="#Overview" class="headerlink" title="Overview"></a>Overview</h2><p>Masstree 的大结构是一棵 trie tree。</p>
+<p>ART 中提到 trie tree 相比其它 tree 结构的优点是：</p>
+<ol>
+<li>天然的前缀压缩，不需要在叶子节点保存每个完整的 key，节省空间。</li>
+<li>固定 fanout 的 trie tree 能节省 key 之间的比较开销。另外它按下标寻址的特点也天然适合实现 lockfree。</li>
+</ol>
+<p>Masstree 选择用 trie tree 的理由大体也是这样。但 trie tree 的一个问题是 fanout 很难确定：</p>
+<ol>
+<li>fanout 太小，树的深度太大，查询经历的节点太多，随机访问次数多，性能不高。</li>
+<li>fanout 太大，空间浪费严重。</li>
+</ol>
+<p>ART 的思路是设计多种 node 大小，加上前缀压缩和 lazy expansion 来降低空间浪费。</p>
+<p>Masstree 则使用了另一种思路：选择一个巨大的 fanout（2^64，8 字节），但使用 B+tree 来实现 trie node。这样混搭方案的优点：</p>
+<ol>
+<li>逻辑上仍然是 trie tree，前缀压缩的优点仍然在。</li>
+<li>fanout 足够大，避免树太高。</li>
+<li>物理上使用 B+tree，有效避免空间浪费。</li>
+<li>此时 B+tree 面对的只是单个 trie node 的短 key（不超过 8 字节），可以将 key compare 实现得非常高效。</li>
+</ol>
+<p><img src="/images/2022-09/masstree-01.png"></p>
+<p>可以看到 Masstree 逻辑上分成了若干层，每层都由多个 B+tree 组成。每个 B+tree 的叶子节点除了存储 key 和 value 外，还可能存储指向下一层 B+tree 的指针。</p>
+<p>另外 Masstree 中的 B+tree 内部不会 merge 节点，即 remove key 不会引起 key 的重排。这也是为了避免读路径加锁。</p>
+<p>Masstree 同样使用了 lazy expansion，即只在必要的时候创建新的 B+tree。比如一个 key “01234567AB”，长度已经超过了 8 字节，但只要没有其它 key 和它共享前缀 “01234567”，我们就没必须为了它单独创建一层 B+tree。</p>
+<p>Masstree 相比普通的 B+tree 的一个缺点是 range query 开销更大，一个是要重建 key，另一个是要遍历更多的 layer。</p>
+<h2 id="Layout"><a href="#Layout" class="headerlink" title="Layout"></a>Layout</h2><p><img src="/images/2022-09/masstree-02.png"></p>
+<p>Masstree 中 B+tree 每个节点的 fanout 是 15（精妙的设计），其中所的 border nodes（即 leaf nodes）组成链表以支持 remove 和 getrange。</p>
+<p><code>keyslice</code> 是将长度最多为 8 的 key 编码为一个 <code>uint64</code>（需要保证顺序不变，不足用 0 补齐），这样直接用整数比较代替字符串比较来提升性能。</p>
+<p>注意上图中 border node 有 <code>keylen</code> 字段，但 interrior node 就没有了。直接用 <code>keyslice</code> 比较的话必须带上长度，否则无法区分原本就有的 0 和后补上的 0。但 Masstree 保证所有相同 <code>keyslice</code> 的 key 都位于相同的 border node 上，这样 interrior node 上就不需要保存 <code>keylen</code>，直接比较 <code>keyslice</code> 即可，进一步提升了性能。</p>
+<blockquote>
+<p>相同 <code>keyslice</code> 最多有 10 个不同的 key（长度 0-8，外加一个长度可能超过 8 的 key），而 B+tree 的 fanout 是 15，因此总是可以保证这些 key 都在相同的 border node 上。</p>
+</blockquote>
+<p>每个 border node 上所有 key 超过 8 字节的部分都保存在 <code>keysuffixes</code> 中。根据情况它既可能是 inline 的，也可能指向另一块内存。合理设定 inline 大小能提升一些性能。（但不多，可能是因为超过 8 字节的 key 并没有那么多）</p>
+<p>所有 value 都保存在 <code>link_or_value</code> 中，其中是 value 还是指向下一级 B+tree 的指针是由 <code>keylen</code> 决定的。</p>
+<p>Masstree 在访问一个 node 之前会先 prefetch，这就允许 Masstree 使用更宽的 node 来降低树的高度。实践表明当 border node 能放进 4 个 cacheline 大小（256B）时性能最好，此时允许的 fanout 就是 15。</p>
+<h2 id="Nonconcurrent-modification"><a href="#Nonconcurrent-modification" class="headerlink" title="Nonconcurrent modification"></a>Nonconcurrent modification</h2><p>insert 可能造成自底向上的分裂，但 remove 不会合并节点，只有当某个节点因此变空的时候，整个节点一起删掉。这个过程也是自底向上的。</p>
+<p>所有 border node 之间维护一个双向链表，目的是加速 remove 和 getrange。后者只要求单向链表，但前者的实现依赖双向链表。</p>
+<p>Masstree 有个对尾插入的优化：如果一个 key 插入到当前 B+tree 的尾部（border node 没有 next），且当前 border node 已经满了，则它直接插入到新节点中，老节点的数据不移动。</p>
+<h2 id="Concurrency-overview"><a href="#Concurrency-overview" class="headerlink" title="Concurrency overview"></a>Concurrency overview</h2><p>Masstree 中的并发控制本质上是 MVCC + 读路径乐观锁 + 写路径悲观锁：</p>
+<ol>
+<li>每个节点有一个 <code>version</code> 字段，读请求需要在读节点数据的前后分别获取一次 <code>version</code>，确保 <code>version</code> 不变，从而避免脏读。</li>
+<li><code>version</code> 本身包含 lock 以及细粒度的状态信息，写路径通过悲观锁来解决冲突。</li>
+</ol>
+<p>其中比较困难的是保证 split 和 remove 时读请求仍然能正确地读到数据。</p>
+<h2 id="Writer-writer-coordination"><a href="#Writer-writer-coordination" class="headerlink" title="Writer-writer coordination"></a>Writer-writer coordination</h2><p><img src="/images/2022-09/masstree-03.png"></p>
+<p>所有对 node 的修改都需要先对 node 加锁，例外：</p>
+<ul>
+<li><code>parent</code> 是由 parent node 的锁保护。</li>
+<li><code>prev</code> 是由 prev sibling node 的锁保护。</li>
+</ul>
+<p>这样可以简化 split 时的状态管理：parent node 可以直接修改 children 的 <code>parent</code>；原有的 node 可以直接修改新 split 出来的 node 的 <code>prev</code>。</p>
+<p>split 操作需要同时锁住三个 node：当前 node、parent、next。为了避免死锁，加锁顺序永远是从左向右，从下向上。</p>
+<blockquote>
+<p>这个例子中是先锁 node，再锁 next，再锁 parent。</p>
+</blockquote>
+<p>作者表示曾经对比过不同的并发控制方式，最终决定使用这种细粒度 spinlock 方案。相比之下纯粹使用 CAS 并不会降低 cache 层面的一致性开销。</p>
+<blockquote>
+<p>但使用 Masstree 的应用要自己控制好线程数量，尽量减少 context switch，毕竟使用了 spinlock。</p>
+</blockquote>
+<h2 id="Writer-reader-coordination"><a href="#Writer-reader-coordination" class="headerlink" title="Writer-reader coordination"></a>Writer-reader coordination</h2><p>基本原则：</p>
+<ol>
+<li>一次写操作开始前会修改 <code>version</code>，结束后再修改一次 <code>version</code>。</li>
+<li>读操作开始前会读一次 <code>version</code>，结束后再读一次 <code>version</code>，如果两者不等，说明发生了脏读，需要重试。</li>
+</ol>
+<p>接下来的优化方向是：针对部分写操作避免修改 <code>version</code>；针对部分读操作避免重试。</p>
+<p><img src="/images/2022-09/masstree-04.png"></p>
+<h3 id="Updates"><a href="#Updates" class="headerlink" title="Updates"></a>Updates</h3><p>update 操作会修改已有的 value，需要保证这次修改是原子的。这样不会影响到读操作的正确性，因此也就不需要修改 <code>version</code>。但注意的是写请求不能直接删除一个值，需要用 epoch reclamation 等方法 lazy 回收。</p>
+<h3 id="Border-inserts"><a href="#Border-inserts" class="headerlink" title="Border inserts"></a>Border inserts</h3><p>当插入一个值到 border node 上时，为了避免重排已有的 key-value，同时确保这次插入本身对读请求原子可见，Masstree 使用了一种非常巧妙的方法。</p>
+<p>每个节点的 key 和 value 数组都是 append-only 的，真正的顺序通过 <code>permutation</code> 字段体现。每个 node 的 fanout 是 15，每个元素用 4 位，这样一共是 60 位，再加上 4 位来表示当前有多少个元素，正好可以放进一个 uint64 中。</p>
+<p>完整的插入流程：</p>
+<ol>
+<li>锁住 node</li>
+<li>load <code>permutation</code></li>
+<li>计算得到新的 <code>permutation</code></li>
+<li>append 新的 key-value</li>
+<li>原子写回新的 <code>permutation</code>。直到此时这次插入才对读请求可见。</li>
+<li>释放锁</li>
+</ol>
+<p>这个过程不会出现脏读，因此也不需要修改 <code>version</code>。</p>
+<blockquote>
+<p><code>version</code> 中的 <code>vinsert</code> 不处理 border inserts</p>
+</blockquote>
+<h3 id="New-layers"><a href="#New-layers" class="headerlink" title="New layers"></a>New layers</h3><p>Masstree 会将 layer 的创建推迟到 border node 上两个 key 冲突（回顾前面的 lazy expansion，如果两个 key 映射到相同的 keyslice 上，就意味着需要创建新的 layer 了）。</p>
+<p>因此，创建新 layer 必然意味着某个 border node 的 key 已经存在。针对一个 key 的操作都可以不修改 <code>version</code>。但这里有个特殊情况要处理：我们现在要将它对应的 value 替换为一个新的 B+tree。这就意味着我们要完成两项修改（<code>link_or_value</code> 和 <code>keylen</code>），不可能由一个原子操作完成。</p>
+<p>为了不修改 <code>version</code>（会导致对其它 key 的读操作重试），Masstree 这里引入了一个中间状态：首先将 <code>keylen</code> 修改为 <code>UNSTABLE</code>，接下来修改 <code>link_or_value</code>，之后再将 <code>kenlen</code> 修改为正确的值。读请求如果遇到了 <code>UNSTABLE</code> 需要自行重试。</p>
+<blockquote>
+<p>又是一个要尽量避免 context switch 的地方。</p>
+</blockquote>
+<h3 id="Splits"><a href="#Splits" class="headerlink" title="Splits"></a>Splits</h3><p>重头戏来了。</p>
+<p>split 是对整个 node 的操作，因此需要修改 <code>version</code>（中的 <code>vsplit</code>），这样读操作就能意识到 split，避免脏读。这里的难点在于，修改是发生在写线程中，但检查是发生在读线程，需要正确处理，否则可能会有些修改生效了但没被读请求察觉。</p>
+<p><img src="/images/2022-09/masstree-05.png"></p>
+<p><img src="/images/2022-09/masstree-06.png"></p>
+<p>split 过程中会手递手（hand-over-hand）标记和加锁：节点会自底向上标记为 “splitting” 和加锁。同时读请求会自顶向下检查 <code>version</code>。</p>
+<p>考虑下面的中间节点 B 分裂出 B’ 的场景：</p>
+<p><img src="/images/2022-09/masstree-07.png"></p>
+<ol>
+<li>B 和 B’ 标记为 splitting</li>
+<li>包括 X 在内的一半子节点从 B 迁移到 B’</li>
+<li>A 被锁住，并标记为 inserting</li>
+<li>将 B’ 插入 A</li>
+<li>增加 A 的 <code>vinsert</code>、B 和 B’ 的 <code>vsplit</code>，并依次 unlock B，B’，A（按加锁顺序解锁）</li>
+</ol>
+<blockquote>
+<p>为什么不能按加锁的逆序解锁？似乎也没什么问题</p>
+</blockquote>
+<p>接下来作者探讨了 <code>findborder</code> 是如何与 <code>split</code> 配合保证正确性的。其核心思想就是与 hand-over-hand locking 相对应，<code>findborder</code> 中也要 hand-over-hand validate。对中间节点 A，要先获取 B&#x2F;B’（取决于 <code>findborder</code> 的调用时机）的 <code>version</code>，再 double check A 并未处于 locked 状态，且这期间 A 并未发生分裂。因为是先获取 B&#x2F;B’ 的 <code>version</code>，且通过 <code>stableversion</code> 我们知道这个时候 B&#x2F;B’ 一定未处于 inserting 或 splitting 状态，因此此时要么 B&#x2F;B’ 在一次 split 开始前，那我们就可以继续往下走；要么在我们获取之后 B&#x2F;B’ 开始了一次 split，那接下来下一轮迭代时我们检查 B&#x2F;B’ 的 <code>version</code> 就会 fail。</p>
+<p>注意 Masstree 中 insert 总是原地重试，而 split 则会从 root 开始重试。一个因素是并发 split 比并发 insert 更为罕见（fanout 为 15，因此 insert 频率是 split 的 15 倍），因此可以用开销大一些的实现方式。</p>
+<blockquote>
+<p>另一方面，insert 本身也要比 split 轻量很多，后者需要自底向上改变树的结构。</p>
+</blockquote>
+<p><img src="/images/2022-09/masstree-08.png"></p>
+<p>Border node 的 split 主要靠 border nodes 之间的链表来处理，有以下不变量：</p>
+<ol>
+<li>每个 B+tree 初始只有一个 border node，这个 border node 永远不会被删除，且永远是最左边的 border node（链表头）。</li>
+<li>每个 border node 负责的范围是 [lowkey, highkey)，其中 lowkey 永远不变，highkey 会在 split 和 delete 时修改。</li>
+</ol>
+<blockquote>
+<p>注意一旦查找到达了某个 border node，就不再需要返回 root 进行重试了：顺着链表一路往下找就行了。</p>
+</blockquote>
+<h3 id="Removes"><a href="#Removes" class="headerlink" title="Removes"></a>Removes</h3><p>Remove 需要注意的几点：</p>
+<ol>
+<li>不会物理删除 key-value，只会修改 <code>permutation</code>。这一步不需要修改 <code>version</code>。</li>
+<li>但下次 insert 重用已标记删除的位置时，需要修改 <code>vinsert</code> 以避免脏读。</li>
+<li>border node 变为空时会被整个删除，因此我们需要维护一个双向链表来实现 O(1) 的删除节点操作。</li>
+<li>中间节点的删除操作也需要 hand-over-hand locking。</li>
+<li>一个 B+tree 为空时可以删除整个树，但需要确保同时锁上自身和上层指向它的 border node。</li>
+<li>所有删除操作都需要在 epoch reclamation 的保护下进行。</li>
+</ol>
+<h2 id="Values"><a href="#Values" class="headerlink" title="Values"></a>Values</h2><p>Masstree 中需要保证 value 具有原子修改能力。因此大多数情况下 Masstree 中的 value 都会指向一块单独分配的内存，修改时通过 copy-on-write，再替换这个指针。</p>
+<blockquote>
+<p>当然对于直接支持 atomic 的 value 就可以原地修改了。</p>
+</blockquote>
+<h2 id="Discussion"><a href="#Discussion" class="headerlink" title="Discussion"></a>Discussion</h2><p>Masstree 中 lookup 的 30% 的开销来自 node 内部的 key lookup。Masstree 现在是用线性查找，相比二分查找，它的时间复杂度会略高一些，但局部性更好。Masstree 的测试显示在 Intel 处理器上线性查找会快 5% 左右。</p>
+<p>另一个潜在优化是类似于 PLAM 的并行查找，通过重叠内存的 prefetch 来掩盖访问内存的延时，测试显示在 Intel 处理器上会提升多达 34% 的吞吐（但在 AMD 机器上没有什么效果）。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/09/14/processing-a-trillion-cells-per-mouse-click/" rel="prev" title="[笔记] Processing a Trillion Cells per Mouse Click">
+      <i class="fa fa-chevron-left"></i> [笔记] Processing a Trillion Cells per Mouse Click
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/09/26/scaling-memcache-at-facebook/" rel="next" title="[笔记] Scaling Memcache at Facebook">
+      [笔记] Scaling Memcache at Facebook <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#System-interface"><span class="nav-number">2.</span> <span class="nav-text">System interface</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Masstree"><span class="nav-number">3.</span> <span class="nav-text">Masstree</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Overview"><span class="nav-number">3.1.</span> <span class="nav-text">Overview</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Layout"><span class="nav-number">3.2.</span> <span class="nav-text">Layout</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Nonconcurrent-modification"><span class="nav-number">3.3.</span> <span class="nav-text">Nonconcurrent modification</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Concurrency-overview"><span class="nav-number">3.4.</span> <span class="nav-text">Concurrency overview</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Writer-writer-coordination"><span class="nav-number">3.5.</span> <span class="nav-text">Writer-writer coordination</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Writer-reader-coordination"><span class="nav-number">3.6.</span> <span class="nav-text">Writer-reader coordination</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Updates"><span class="nav-number">3.6.1.</span> <span class="nav-text">Updates</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Border-inserts"><span class="nav-number">3.6.2.</span> <span class="nav-text">Border inserts</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#New-layers"><span class="nav-number">3.6.3.</span> <span class="nav-text">New layers</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Splits"><span class="nav-number">3.6.4.</span> <span class="nav-text">Splits</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Removes"><span class="nav-number">3.6.5.</span> <span class="nav-text">Removes</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Values"><span class="nav-number">3.7.</span> <span class="nav-text">Values</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Discussion"><span class="nav-number">3.8.</span> <span class="nav-text">Discussion</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

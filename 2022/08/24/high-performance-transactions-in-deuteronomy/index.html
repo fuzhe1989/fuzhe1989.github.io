@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：High Performance Transactions in Deuteronomy  TL;DR Deuteronomy 终于进化到了 MVCC 加持。新的 Deuteronomy 仍然是 TC + DC 的分离架构，但做了大量的优化，如 Bw-Tree、caching、lock-free 算法&#x2F;数据结构、epoch reclamation 等。  大多数系统其实不是架构不">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] High Performance Transactions in Deuteronomy">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/08/24/high-performance-transactions-in-deuteronomy/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：High Performance Transactions in Deuteronomy  TL;DR Deuteronomy 终于进化到了 MVCC 加持。新的 Deuteronomy 仍然是 TC + DC 的分离架构，但做了大量的优化，如 Bw-Tree、caching、lock-free 算法&#x2F;数据结构、epoch reclamation 等。  大多数系统其实不是架构不">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-08/deuteronomy-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-08/deuteronomy-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-08/deuteronomy-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-08/deuteronomy-04.png">
+<meta property="article:published_time" content="2022-08-24T04:42:00.000Z">
+<meta property="article:modified_time" content="2022-09-02T12:07:26.879Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-08/deuteronomy-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/08/24/high-performance-transactions-in-deuteronomy/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] High Performance Transactions in Deuteronomy | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/24/high-performance-transactions-in-deuteronomy/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] High Performance Transactions in Deuteronomy
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-08-24 12:42:00" itemprop="dateCreated datePublished" datetime="2022-08-24T12:42:00+08:00">2022-08-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-09-02 20:07:26" itemprop="dateModified" datetime="2022-09-02T20:07:26+08:00">2022-09-02</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/DeuteronomyTC-CIDR2015-full.pdf">High Performance Transactions in Deuteronomy</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Deuteronomy 终于进化到了 MVCC 加持。新的 Deuteronomy 仍然是 TC + DC 的分离架构，但做了大量的优化，如 Bw-Tree、caching、lock-free 算法&#x2F;数据结构、epoch reclamation 等。</p>
+<blockquote>
+<p>大多数系统其实不是架构不行，而是单纯优化不到位。</p>
+</blockquote>
+<p>总得来说我们能从 Deuteronomy 上看到很多后来的 cloud database 的影子。</p>
+<span id="more"></span>
+
+<h2 id="Overview"><a href="#Overview" class="headerlink" title="Overview"></a>Overview</h2><p><img src="/images/2022-08/deuteronomy-01.png"></p>
+<p><img src="/images/2022-08/deuteronomy-02.png"></p>
+<p><img src="/images/2022-08/deuteronomy-03.png"></p>
+<p><img src="/images/2022-08/deuteronomy-04.png"></p>
+<p>Deuteronomy 有三种组件：</p>
+<ul>
+<li>Transaction Component（TC）：请求入口，维护 transaction、mvcc table、log buffer、read cache。</li>
+<li>Data Component（DC）：存储状态机。</li>
+<li>TC Proxy：将 TC 的 committed transaction 发给 DC。</li>
+</ul>
+<p>Deuteronomy 的核心思想是 TC 与 DC 分离，这样就可以为多种不支持事务的 DC 增加事务能力。但它的<a href="/2021/04/22/deuteronomy-transaction-support-for-cloud-data/">旧实现</a>严重制约了它的性能，尤其是当 DC 经过几次演进之后，使用了 <a target="_blank" rel="noopener" href="https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/bw-tree-icde2013-final.pdf">Bw-tree</a>、<a href="/2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/">LLAMA</a> 等高性能结构之后，原有的 TC 的性能就成为了瓶颈。</p>
+<p>这篇 paper 就是在讲如何重新设计实现 TC（包括新加入的 TC Proxy），使其能充分发挥 DC 的高性能。</p>
+<blockquote>
+<p>全文看完，感想：</p>
+<ul>
+<li>TC 和 DC 分离的思路是非常适合分布式环境的。比如 FoundationDB 就用了类似的思路实现了非常好的扩展性和性能。</li>
+<li>TC 本身看上去是个单点，如何确保它的高可用是个复杂的问题。</li>
+<li>MVCC 的粒度是 record，当数据量非常大的时候是个问题。不同领域可以考虑用不同的粒度，比如传统的 RDBMS 可以用 page，OLAP 可以用 chunk 或者 partition 等。这里不同粒度需要 TC 和 DC 共同确定。</li>
+<li>大量读时，TC 本身可能成为瓶颈，在保证语义的前提下 bypass TC，直接访问 DC，可能是另一大优化。</li>
+</ul>
+<p>这篇 paper 架构层面没有做大的改变，对我而言主要价值来自：</p>
+<ul>
+<li>并发控制方面，为何选择用 TO 而不是 OCC。</li>
+<li>如何在实践中贯彻 latch-free，真正发挥硬件的能力。</li>
+<li>如何通过区分 fast path 和 slow path 兼顾性能与正确性。</li>
+<li>手把手教你怎么实现 epoch reclamation。</li>
+</ul>
+</blockquote>
+<h2 id="TC"><a href="#TC" class="headerlink" title="TC"></a>TC</h2><p>旧的 TC 的事务采用了 2PL，lock 开销很大。新 TC 引入了类似于 [Hakaton] 的 MVCC，其特点是每个 record 对应一个 valid version range。另外每个事务是可以读到其它未提交事务的修改的，因此需要在 commit 时确保所有依赖的事务都 commit 了，否则就要级联式 rollback。</p>
+<p>TC 中与 MVCC 有关的有（见图 2）：</p>
+<ul>
+<li>MVCC table，一个无锁的 hash-table，其中每个 item 不保存具体数据，而是指向其它结构。</li>
+<li>Version manager：<ul>
+<li>Log buffer：所有 redo log records，其中包含已经持久化的 records，但仍然保留在内存中用作 cache。</li>
+<li>Read cache：从 DC 读到的 records，与 log buffer 可能有重叠。</li>
+</ul>
+</li>
+</ul>
+<p>注意 TC 只使用了 redo log，而没有 undo log，是因为只有 committed transaction 才会被发往 TC Proxy，最终持久化到 DC 上。在 TC recovery 过程中，没有对应 committed record 的 transaction 会被直接丢弃。因为不需要 undo，redo log 中不需要保存旧值（因此也不需要读取旧值），进一步降低了开销。</p>
+<p><a href="/2021/04/22/deuteronomy-transaction-support-for-cloud-data/">旧设计</a> 中先写 DC 再写 log，因此 DC 还要处理 rollback。DC 还要确保不能将 TC 还未标记 stable 的 log 写下去，由此还引入了 EOSL（End Of Stable Log）机制，由 TC 来精细控制 DC 何时刷盘。新设计明显简化了 DC 的职责，也减少了 RPC 次数。</p>
+<p>另外新设计中 DC 写不再位于关键路径，用户请求只在 log 成功持久化到 TC 之后就返回。</p>
+<p>作者表示新的 TC 性能提升了两个数量级，主要归功于：</p>
+<ol>
+<li>MVCC</li>
+<li>readonly transaction 的 fast path</li>
+<li>延迟向 DC 发送 log</li>
+<li>将 log buffer 用作 cache</li>
+<li>batch 发送 log</li>
+<li>redo log 不需要读取旧值</li>
+<li>新的 latch-free 结构（buffer 管理与内存回收）</li>
+</ol>
+<h2 id="Concurrency-Control"><a href="#Concurrency-Control" class="headerlink" title="Concurrency Control"></a>Concurrency Control</h2><p>新设计的 MVCC 相比 <a href="/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/">Hekaton</a> 的 snapshot isolation 更进一步：serializability。作者选用了 Timestamp Order（TO），理由：</p>
+<ol>
+<li>Hyper 的经验表明 TO 对短事务效果非常好。</li>
+<li>只要过程中严格保证 ts 顺序，TO 在事务 commit 时不需要做任何额外检查（不会有冲突）。（但如前所述，可能存在级联 rollback）</li>
+</ol>
+<p>TC 上所有事务的状态保存在了 transaction table 中。TC 定期会计算得到当前最老的活跃事务 OAT（oldest active transaction），用于垃圾回收。</p>
+<p>MVCC table 是用无锁的 hash-table 实现的，分成了若干个 bucket，其中每个 item 对应一个 record，定长且对应一个 cacheline，包含：</p>
+<ul>
+<li>定长的 hash</li>
+<li>定长的 key 指针（key 本身是变长的）</li>
+<li>访问过当前 record 的最高的 ts</li>
+<li>record 对应的一个或多个 version，其中每个 version 也是定长的，包含：<ul>
+<li>对应的 transaction id</li>
+<li>version offset，对应到 log buffer 或 read cache</li>
+<li>aborted 位</li>
+</ul>
+</li>
+</ul>
+<p>整个 MVCC table 是无锁的，新增 record 就是 append 到对应 bucket 的末尾，而移除则只是设置一个 remove bit，后续再遍历 list，结合 epoch reclamation 真正物理移除。</p>
+<p><a href="/2021/04/22/deuteronomy-transaction-support-for-cloud-data/">旧设计</a> 中只读事务也要在 log buffer 中占一个位置，走完整的 commit 流程才能返回，这显然无法支撑大量读。新设计中作者使用了如下优化：</p>
+<p>只读事务过程中记录访问过的事务对应的最高的 LSN，到它自己 commit 时，如果这个 LSN 已经持久化好了，只读事务就不用再真正将 commit record 加到 log buffer 中了；反之，则仍然要走完整的 commit 流程。这是一种优化 fast path 的思路。</p>
+<p>接下来，MVCC table 需要定期 gc：</p>
+<ul>
+<li>比 OAT 依赖的事务还老的 record 可以回收。</li>
+<li>已经持久化到 DC 的 record 可以回收。</li>
+</ul>
+<h2 id="Managing-Versions"><a href="#Managing-Versions" class="headerlink" title="Managing Versions"></a>Managing Versions</h2><p>TC 处理事务的写操作时，首先通过 MVCC check 是否满足 TO 要求，接下来直接在 log buffer 中分配一个 item，然后再将这个 item 的 offset 和 version 一起写入 MVCC table。这样就能避免数据被反复移动。</p>
+<p>log buffer 本身可以用作 cache，除此之外，read cache 存放 DC 返回的数据。两者共同实现 TC 的 caching 机制。</p>
+<p>read cache 的结构见图 3，它由两个 latch-free 的结构组成：一个 hash table，一个 ring buffer。hash table 可以与 log buffer 共用相同的 id 机制，间接指向 ring buffer 中的某个位置。read cache 的 ring buffer 会随着写入逐渐覆盖老 version（间接达到 LRU 的效果）。所以 hash table 只能当作 hint。</p>
+<p>一种潜在优化是比较热的 version 不应该被直接覆盖，而是应该重新加到 tail，给它第二次机会，但作者表示没有动力做。</p>
+<h2 id="TC-Proxy"><a href="#TC-Proxy" class="headerlink" title="TC Proxy"></a>TC Proxy</h2><p>TC Proxy 永远与 DC 部署在一起。TC 会定期将持久化好的 log 发给 TC Proxy（如果 TC 与 DC 在相同机器上，只会发送引用，避免拷贝）。</p>
+<p>注意 TC 向 TC Proxy 发送的 log 是包含未 committed 的事务的，因此 TC Proxy 需要维护 transaction table。TC Proxy 会定期扫描自身的 log buffer，将所有确定 committed log records 写入 DC，剩余结果未知的 log records 则转移到一个 side buffer（预期很少），这样整个 log buffer 可以重用，效率更高。</p>
+<p>如前所述，Deuteronomy 只有 redo log，不需要读取旧值，因此 TC Proxy 只通过 upsert 向 DC 写入数据。这还允许 DC 中的 Bw-tree 直接向仍在磁盘上的 page 应用 delta（而不需要预先加载到 cache 中）。</p>
+<p>在配合 TC 回收 MVCC records 上，TC Proxy 会维护两个 LSN：</p>
+<ul>
+<li>T-LSN：TC Proxy 已收到的最高 LSN。</li>
+<li>O-LSN：DC 已连续持久化的最高 LSN。</li>
+</ul>
+<p>通过维护两个 LSN，我们可以确保长事务不会阻塞 gc：所有 LSN &lt;&#x3D; O_LSN 且 commit LSN &lt;&#x3D; T_LSN 的 MVCC records 都可以被 gc。</p>
+<blockquote>
+<p>commit LSN &lt;&#x3D; T_LSN 说明 TC Proxy 已知事务已 committed，可能是指此时可以放心去读 DC？</p>
+</blockquote>
+<h2 id="Supporting-Mechanisms"><a href="#Supporting-Mechanisms" class="headerlink" title="Supporting Mechanisms"></a>Supporting Mechanisms</h2><p>作者提到，他们一开始实现 latch-free 时，主要依赖 CAS（compare-and-swap） 操作，但后来换成了 FAA（fetch-and-add）。这也是这一领域的共识：尽量用总是成功的 FAA 替代可能冲突严重的 CAS，从而提升多核下的并发性能。</p>
+<p>具体到 buffer 的 offset 上，作者用低 32 位维护 offset，高 32 位维护当前活跃的 user count：每次 FAA 2^32 + SIZE 来修改 active user count。</p>
+<p>FAA 的结果如果超出 buffer capacity，说明这个 buffer 已经被 seal 了，不能再使用。那个恰好令它超过 capacity 的线程负责 flush buffer。其它发现 buffer 被 seal 的线程则尝试分配新 buffer（一次 CAS，只有一个能成功）。</p>
+<p>接下来是 epoch reclamation。<a href="/2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/">LLAMA</a> 和 <a target="_blank" rel="noopener" href="https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/bw-tree-icde2013-final.pdf">Bw-tree</a> 中已经介绍了 epoch reclamation 的实现。作者在这里又应用了 thread-local 来优化性能，减少争抢。</p>
+<p>具体实现：</p>
+<ul>
+<li>全局有一个 global epoch，一个固定长度的 buffer。</li>
+<li>每当 buffer size 超过阈值（比如 capacity&#x2F;4）就会提升 global epoch。</li>
+<li>所有需要删除的对象和它所属的 epoch 一起打包扔进一个固定长度的 buffer。</li>
+<li>每个线程维护 thread-local 的 epoch，每个操作前复制 global epoch 到 tls，操作后将其设置为 NULL。</li>
+<li>维护一个 min tls epoch，每当 global epoch 提升或阻碍了 buffer 回收时就重新计算。</li>
+</ul>
+<p>这样昂贵的操作（计算 min tls epoch）和全局争抢（提升 global epoch）都被分摊了，主要路径只有很少的原子操作。</p>
+<p>线程管理方面 Deuternomy 主要考虑了 NUMA 和 cache 亲和性，尽量避免跨 NUMA 通信。另外 Deuternomy 使用了协程，且优化了内存分配，确保协程栈分配在栈上，而不是堆上。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/08/14/cpp-libcxx-function-copy-first-when-move-with-sso/" rel="prev" title="记：不能依赖 std::function 的 move 函数清空 source">
+      <i class="fa fa-chevron-left"></i> 记：不能依赖 std::function 的 move 函数清空 source
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/08/25/anti-caching-a-new-approach-to-database-management-system-architecture/" rel="next" title="[笔记] Anti-Caching: A New Approach to Database Management System Architecture">
+      [笔记] Anti-Caching: A New Approach to Database Management System Architecture <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Overview"><span class="nav-number">1.</span> <span class="nav-text">Overview</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TC"><span class="nav-number">2.</span> <span class="nav-text">TC</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Concurrency-Control"><span class="nav-number">3.</span> <span class="nav-text">Concurrency Control</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Managing-Versions"><span class="nav-number">4.</span> <span class="nav-text">Managing Versions</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#TC-Proxy"><span class="nav-number">5.</span> <span class="nav-text">TC Proxy</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Supporting-Mechanisms"><span class="nav-number">6.</span> <span class="nav-text">Supporting Mechanisms</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

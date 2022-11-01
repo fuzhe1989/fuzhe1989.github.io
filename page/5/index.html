@@ -195,7 +195,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/16/consensus-on-transaction-commit/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -209,7 +209,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/" class="post-title-link" itemprop="url">[笔记] Impala: A Modern, Open-Source SQL Engine for Hadoop</a>
+            <a href="/2021/03/16/consensus-on-transaction-commit/" class="post-title-link" itemprop="url">[笔记] Consensus on Transaction Commit</a>
         </h1>
 
         <div class="post-meta">
@@ -219,7 +219,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-12-23 11:52:41" itemprop="dateCreated datePublished" datetime="2020-12-23T11:52:41+08:00">2020-12-23</time>
+              <time title="创建时间：2021-03-16 19:51:30" itemprop="dateCreated datePublished" datetime="2021-03-16T19:51:30+08:00">2021-03-16</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -241,18 +241,15 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://2013.berlinbuzzwords.de/sites/2013.berlinbuzzwords.de/files/slides/Impala%20tech%20talk.pdf">Impala: A Modern, Open-Source SQL Engine for Hadoop</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1132863.1132867">Consensus on Transaction Commit</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>Impala是建立在Hadoop生态之上的MPP query engine，它有以下特点：</p>
-<ul>
-<li>MPP，所有节点都可以参与query执行。</li>
-<li>代码生成。</li>
-<li>基于pub-sub的元数据同步。</li>
-</ul>
+<p>这篇文章是Jim Gray和Leslie Lamport两位图灵奖大佬的合作产物，是数据库与系统两个领域在consensus方面的结合。</p>
+<p>Paxos Commit算法使用Paxos弥补了2PC在容错性上的软肋，而进一步的Fast Paxos Commit算法则减少了一轮commit的延时跳数，代价是增加了总的通信次数。</p>
+<p>文章另外还论证了经典的2PC就是Paxos Commit的一种特例。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/#more" rel="contents">
+              <a class="btn" href="/2021/03/16/consensus-on-transaction-commit/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -276,7 +273,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/22/f1-a-distributed-sql-database-that-scales/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -290,7 +287,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/12/22/f1-a-distributed-sql-database-that-scales/" class="post-title-link" itemprop="url">[笔记] F1: A distributed SQL database that scales</a>
+            <a href="/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/" class="post-title-link" itemprop="url">[笔记] Pig Latin: A Not-So-Foreign Language for Data Processing</a>
         </h1>
 
         <div class="post-meta">
@@ -300,7 +297,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-12-22 15:59:20" itemprop="dateCreated datePublished" datetime="2020-12-22T15:59:20+08:00">2020-12-22</time>
+              <time title="创建时间：2021-03-16 12:29:41" itemprop="dateCreated datePublished" datetime="2021-03-16T12:29:41+08:00">2021-03-16</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -322,425 +319,16 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub41344/">F1: A distributed SQL database that scales</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1376616.1376726">Pig Latin: A Not-So-Foreign Language for Data Processing</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>F1是Google用于替换分库分表的MySQL的RDBMS系统。它在<a href="/2020/12/14/spanner-googles-globally-distributed-database/">Spanner</a>之上建立了一套关系模型，拥有Spanner的跨datacenter的同步replication能力。F1还开发了新的ORM模型，从而将同步geo-replication导致的延时隐藏了起来，保证了E2E延时在替换后没有上升。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/12/22/f1-a-distributed-sql-database-that-scales/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/14/spanner-googles-globally-distributed-database/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/12/14/spanner-googles-globally-distributed-database/" class="post-title-link" itemprop="url">[笔记] Spanner: Google's Globally-Distributed Database</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-12-14 12:22:39" itemprop="dateCreated datePublished" datetime="2020-12-14T12:22:39+08:00">2020-12-14</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2491245">Spanner: Google’s Globally-Distributed Database</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>Spanner 是划时代的 OLTP 系统，它的创新点是：</p>
-<ol>
-<li>用 TrueTime 实现了广域的物理 timestamp，这样不引入全局唯一的 TSO 就提供了基于 2PC 的分布式事务与 Snapshot Isolation。</li>
-<li>将数据分为了若干个 PaxosGroup，使用 MultiPaxos（但后来 <a target="_blank" rel="noopener" href="http://wcl.cs.rpi.edu/pilots/library/papers/consensus/RAFTOngaroPhD.pdf">透露他们的实现更接近于当时还未提出的 Raft</a>）实现了高可用。</li>
-</ol>
-<p>Spanner 启发了很多后来者，但它的 TrueTime 是很难模仿的，后来者也通常使用 TSO 或 HLC 来代替，但这样就很难做到像 Spanner 一样跨越大洲部署仍然能提供合理的延时。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/12/14/spanner-googles-globally-distributed-database/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/" class="post-title-link" itemprop="url">[笔记] Large-scale incremental processing using distributed transactions and notifications (Percolator)</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-12-11 22:21:40" itemprop="dateCreated datePublished" datetime="2020-12-11T22:21:40+08:00">2020-12-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/event/osdi10/tech/full_papers/Peng.pdf">Large-scale incremental processing using distributed transactions and notifications</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>Percolator是Google用于构建增量web索引的数据系统。它的价值在于提出了一种基于NoSQL（BigTable）的两阶段提交（2PC）实现。</p>
-<p>Percolator的2PC实现有以下特点：</p>
-<ol>
-<li>部分去中心化：依赖中心化的Timestamp Oracle（TSO），但不依赖集中式的锁管理节点。</li>
-<li>乐观锁：不能阻塞，检测到冲突需要abort。</li>
-<li>Snapshot Isolation：读比较旧的ts时不会被写block；但为了避免违反SI，读比较新的ts时可能会被写block。</li>
-<li>惰性清理：client失败导致的状态不一致不会立即被清理（没有中心节点）。client之间有种协作关系，如果发起事务的client挂了，根据事务进度，其它client既可能帮它abort，也可能帮它commit。</li>
-</ol>
-<p>以上很多特点都是源于Percolator没有中心节点，也导致了它的2PC延时偏高（尤其是失败时），但优点是能适应巨大的规模。这也是Google系产品的一个特点，可以不那么快，但一定要支持巨大的规模。</p>
-<p>Google系产品的第二个特点是很积极地使用已有产品来构建新系统，这里Percolator选择了基于BigTable来做，就体现了这一点。</p>
-<p>这篇文章实际讲了Percolator的两块内容，一个是2PC，另一个是observer，一种可级联的触发器，但后者似乎没有太多关注。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/" class="post-title-link" itemprop="url">[笔记] Dremel: a decade of interactive SQL analysis at web scale</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-12-08 15:06:12" itemprop="dateCreated datePublished" datetime="2020-12-08T15:06:12+08:00">2020-12-08</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3415478.3415568">Dremel: a decade of interactive SQL analysis at web scale</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>这篇文章主要讲Dremel的核心思想和架构原则（参考<a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets">2010年的paper</a>），包括这些年Dremel的演进（作为BigQuery的后端），以及这些思想在同领域的其它系统中的异同。</p>
-<p>在<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3385658.3385668">The Seattle Report on Database Research</a>中提到了当前AP系统的若干发展趋势，其中本文重点提到的有：</p>
-<ul>
-<li>SQL：大家都开始用SQL作为查询接口了。</li>
-<li>计算存储分离。</li>
-<li>原地分析：数据湖（Data Lake）越来越流行了，同一份数据可以由不同的计算引擎使用，结果再存回数据湖中，而不需要为了不同引擎反复转换数据。</li>
-<li>Serverless计算：提供on-demand方式，用时分配资源，按使用量计费，而不是传统的预留资源。</li>
-<li>列存：Dremel对嵌套结构的列存处理方式启发了许多后来者。</li>
-</ul>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/" class="post-title-link" itemprop="url">[笔记] Procella: Unifying serving and analytical data at YouTube</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-12-06 16:01:20" itemprop="dateCreated datePublished" datetime="2020-12-06T16:01:20+08:00">2020-12-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/citation.cfm?id=3352063.3360438">Procella: Unifying serving and analytical data at YouTube</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>Procella是一种可以适应不同查询需求的分析引擎，它的特点：</p>
-<ul>
-<li>松耦合的schema要求，只要数据schema与table schema兼容，不需要完全一致，且文件本身的索引结构也可以惰性生成。</li>
-<li>使用了新的列存格式Artus，内带索引结构，同时支持高性能的点查和扫描，且使用高性能的、不解压就可以操作的压缩算法。</li>
-<li>使用Lambda架构，实时节点与compaction节点分离，前者支持高性能读写，后者可以在后台做复杂的优化。</li>
-<li>多种优化，包括自适应的基于运行期抽样的query优化。</li>
-<li>广泛使用多种cache。</li>
-<li>完整的SQL支持。</li>
-</ul>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/05/separate-write-read-compaction-by-file-meta-service/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/12/05/separate-write-read-compaction-by-file-meta-service/" class="post-title-link" itemprop="url">解耦NoSQL系统的写、读、Compaction</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-12-05 13:50:58" itemprop="dateCreated datePublished" datetime="2020-12-05T13:50:58+08:00">2020-12-05</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>TL;DR</strong></p>
-<p>NoSQL系统中的一个常见问题就是写、读、compaction三类操作的资源争抢导致服务质量受到影响。这里脑洞一个方案，通过单独的FileMeta Service来管理文件的元数据与生命期，从而解耦前面三类操作，实现资源的隔离，提升服务质量。</p>
-<p>进一步地，分离三类操作后，我们甚至可以针对不同操作使用不同的分区策略，从而进一步解耦三类操作，释放出更高的能力。</p>
+<p>Pig Latin又是一个瞄准了MapReduce表达能力弱点的类SQL语言，它声称“集合了体现SQL精神的高阶查询与类MapReduce的过程式程序”。</p>
 <blockquote>
-<p>idea来源于我在阿里云Tablestore时的一次讨论，参考了Google的Procella和F1-lightning的实现方式。</p>
+<p>关于Pig Latin的逸事：<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/1OwY353VTfVrPfY2bxhGhA">大数据那些事(7)：腾飞的拉丁猪</a></p>
 </blockquote>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/12/05/separate-write-read-compaction-by-file-meta-service/#more" rel="contents">
+              <a class="btn" href="/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -764,7 +352,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/30/f1-lightning-htap-as-a-service/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/13/one-size-fits-all-part2-benchmarking-results/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -778,7 +366,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/11/30/f1-lightning-htap-as-a-service/" class="post-title-link" itemprop="url">[笔记] F1 Lightning: HTAP as a Service</a>
+            <a href="/2021/03/13/one-size-fits-all-part2-benchmarking-results/" class="post-title-link" itemprop="url">[笔记] One Size Fits All? - Part 2: Benchmarking Results</a>
         </h1>
 
         <div class="post-meta">
@@ -788,7 +376,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-11-30 12:38:12" itemprop="dateCreated datePublished" datetime="2020-11-30T12:38:12+08:00">2020-11-30</time>
+              <time title="创建时间：2021-03-13 22:36:40" itemprop="dateCreated datePublished" datetime="2021-03-13T22:36:40+08:00">2021-03-13</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -810,15 +398,16 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3415478.3415553">F1 Lightning: HTAP as a Service</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="http://static.cs.brown.edu/people/jduggan/research/osfa.pdf">One Size Fits All? - Part 2: Benchmarking Results</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>F1 Lightning是一种提供HTAP服务的系统，本身并不是一个完整的HTAP系统。它的切入点是为已有的OLTP（F1、Spanner）用户提供列式存储，供其它的OLAP系统（<a href="/2020/11/21/f1-query-declarative-querying-at-scale">F1 Query</a>）使用。这样用户不需要迁移转换已有的数据就能享受到更快捷的分析能力。</p>
-<p>F1 Lightning依赖于OLTP系统的ChangeDataCapture（CDC）接口，从而将OLTP的修改应用到Lightning列存上；另一端，它依赖于OLAP系统下推部分算子，从而充分利用列式存储的扫描优势。</p>
-<p>HTAP现在已经不那么新颖了，但F1 Lightning的切入点很独特，也是因为Google内部系统间合作比较容易，且已有数据量非常大，这种不需要迁移，与已有系统充分结合的方案才有用武之地。</p>
+<blockquote>
+<p>2005年的前文：<a href="/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone">‘One Size Fits All’: An Idea Whose Time Has Come and Gone</a></p>
+</blockquote>
+<p>和前文一样，这篇文章仍然在呼吁针对不同的新兴领域使用不同类型的数据库系统，而不是传统的一套系统打所有（one size fits all）。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/11/30/f1-lightning-htap-as-a-service/#more" rel="contents">
+              <a class="btn" href="/2021/03/13/one-size-fits-all-part2-benchmarking-results/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -842,7 +431,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/25/alibaba-hologres-a-cloud-native-service-for-hybrid-serving-analytical-processing/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/12/an-integrated-approach-to-recovery-and-high-availability-in-an-updatable-distributed-data-warehouse/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -856,7 +445,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/11/25/alibaba-hologres-a-cloud-native-service-for-hybrid-serving-analytical-processing/" class="post-title-link" itemprop="url">[笔记] Alibaba Hologres: A Cloud-Native Service for Hybrid Serving/Analytical Processing</a>
+            <a href="/2021/03/12/an-integrated-approach-to-recovery-and-high-availability-in-an-updatable-distributed-data-warehouse/" class="post-title-link" itemprop="url">[笔记] An Integrated Approach to Recovery and High Availability in an Updatable, Distributed Data Warehouse</a>
         </h1>
 
         <div class="post-meta">
@@ -866,7 +455,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-11-25 22:46:42" itemprop="dateCreated datePublished" datetime="2020-11-25T22:46:42+08:00">2020-11-25</time>
+              <time title="创建时间：2021-03-12 21:33:00" itemprop="dateCreated datePublished" datetime="2021-03-12T21:33:00+08:00">2021-03-12</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -888,23 +477,178 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3415478.3415550">Alibaba Hologres: A Cloud-Native Service for Hybrid Serving&#x2F;Analytical Processing</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.481.3000&rep=rep1&type=pdf">An Integrated Approach to Recovery and High Availability in an Updatable, Distributed Data Warehouse</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>Hologres是一种融合了NoSQL的写和OLAP的读的系统，它自称为HSAP，即Hybrid Srerving and Analytical Processing，目标是针对那些同时有着大量在线写入和实时分析需求的场景。</p>
-<p>Hologres的主要特点：</p>
+<p>这篇文章介绍了HARBOR，一种针对高可用数仓的新的恢复与高可用机制。相比传统的基于ARIES的系统，HARBOR不依赖log，而是利用冗余replica，在恢复时query其它replica来恢复数据。</p>
+<p>总的来说不太适合作为生产系统，错误处理与恢复流程需要考虑非常多的corner case。K-safety机制似乎是database社区对distributed system社区的一种反抗（我偏不用Paxos）。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/03/12/an-integrated-approach-to-recovery-and-high-availability-in-an-updatable-distributed-data-warehouse/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/07/dbmss-on-a-modern-processor-where-does-time-go/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/03/07/dbmss-on-a-modern-processor-where-does-time-go/" class="post-title-link" itemprop="url">[笔记] DBMSs On A Modern Processor: Where Does Time Go?</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-07 23:00:00" itemprop="dateCreated datePublished" datetime="2021-03-07T23:00:00+08:00">2021-03-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://infoscience.epfl.ch/record/133194/files/vldb99_dbms_eval.pdf">DBMSs On A Modern Processor: Where Does Time Go?</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>我们都知道数据库开销的大头是I&#x2F;O，但在现代机器架构下，CPU与内存的交互成本也不容忽视。这篇文章比较了四种商用数据库在三种典型场景下的性能分解，得出结论：</p>
+<ol>
+<li>一半的执行时间实际是在停顿（stall）。</li>
+<li>90%的停顿是因为L1指令cache miss与L2数据cache miss导致的，而L2指令cache miss与L1数据cache miss则不重要。</li>
+<li>20%的停顿是因为实现细节（如分支预测失败等）。</li>
+<li>内存访问延时对性能的影响大于内存带宽的影响。</li>
+<li>更快的CPU与缓存、内存的延时差距越来越大，以上因素会更加明显。</li>
+</ol>
+<blockquote>
+<p>这篇文章是1999年的，机器是PⅡ，在当前（2021年）的系统中本文的结论仍然有效，且可能有更大的影响。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/03/07/dbmss-on-a-modern-processor-where-does-time-go/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/18/amazon-aurora/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/01/18/amazon-aurora/" class="post-title-link" itemprop="url">[笔记] Amazon Aurora SIGMOD'17 '18</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-01-18 12:13:09" itemprop="dateCreated datePublished" datetime="2021-01-18T12:13:09+08:00">2021-01-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>Amazon Aurora目前有两篇文章：</p>
 <ul>
-<li>计算存储分离。</li>
-<li>兼容PostgreSQL。</li>
-<li>同时支持行列两种存储形式，从而支持高性能的写入、点查、扫描。</li>
-<li>高效的高并发实现。</li>
-<li>TableGroup，支持表之间colocate。</li>
-<li>还支持其它存储引擎，实现federation query。</li>
+<li>2017年的<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.45/3035918.3056101">Amazon aurora: Design considerations for high throughput cloud-native relational databases</a>。</li>
+<li>2018年的<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3183713.3196937">Amazon aurora: On avoiding distributed consensus for i&#x2F;os, commits, and membership changes</a>。</li>
 </ul>
-<p>（没有讲schema change）</p>
+<p>其中第一篇内容比较多，重点讲架构与实现；第二篇重点讲的是细节，比如一致性、优化、恢复过程、成员变更。</p>
+<p><a target="_blank" rel="noopener" href="https://www.percona.com/live/e18/sites/default/files/slides/Deep%20Dive%20on%20Amazon%20Aurora%20-%20FileId%20-%20160328.pdf">Deep Dive on Amazon Aurora</a>这个slide还介绍了很多paper中没提到的特性，比如cache在DB进程之外、锁优化、索引构建优化等。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/11/25/alibaba-hologres-a-cloud-native-service-for-hybrid-serving-analytical-processing/#more" rel="contents">
+              <a class="btn" href="/2021/01/18/amazon-aurora/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -928,7 +672,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/14/words-that-changed-me-during-tablestore-period/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -942,7 +686,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/" class="post-title-link" itemprop="url">[笔记] AnalyticDB: Real-time OLAP Database System at Alibaba Cloud</a>
+            <a href="/2021/01/14/words-that-changed-me-during-tablestore-period/" class="post-title-link" itemprop="url">回顾我在阿里云Tablestore的几年</a>
         </h1>
 
         <div class="post-meta">
@@ -952,7 +696,79 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-11-24 16:12:02" itemprop="dateCreated datePublished" datetime="2020-11-24T16:12:02+08:00">2020-11-24</time>
+              <time title="创建时间：2021-01-14 22:50:20" itemprop="dateCreated datePublished" datetime="2021-01-14T22:50:20+08:00">2021-01-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我在阿里云Tablestore团队工作了接近6年，这期间几个老板说过一些对我影响特别大的话，记录一下（以及感谢各位老板）。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/01/14/words-that-changed-me-during-tablestore-period/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/10/performance-tradeoffs-in-read-optimized-databases/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/01/10/performance-tradeoffs-in-read-optimized-databases/" class="post-title-link" itemprop="url">[笔记] Performance Tradeoffs in Read-Optimized Databases</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-01-10 23:16:30" itemprop="dateCreated datePublished" datetime="2021-01-10T23:16:30+08:00">2021-01-10</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -974,29 +790,183 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3352063.3352124">AnalyticDB: Real-time OLAP Database System at Alibaba Cloud</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="http://nms.csail.mit.edu/~stavros/pubs/vldb2006.pdf">Performance Tradeoffs in Read-Optimized Databases</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>AnalyticDB（以下简称ADB）是一种支持复杂ad-hoc查询的实时分析系统。</p>
-<p>ADB的主要特点：</p>
+<blockquote>
+<p>有点旧，有些结论可能不适合现在的列存数据库了。</p>
+</blockquote>
+<p>这篇文章讲的是，在面向读优化的数据库中，行存和列存的性能差异在什么地方，分别适合什么场景。</p>
+<p>大概结论就是projection的列比例越低、selectivity越低、CPU相比于I&#x2F;O的速度优势越大，列存的性能越有优势。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/01/10/performance-tradeoffs-in-read-optimized-databases/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/" class="post-title-link" itemprop="url">[笔记] Integrating Compression and Execution in Column-Oriented Database Systems</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-01-08 08:41:03" itemprop="dateCreated datePublished" datetime="2021-01-08T08:41:03+08:00">2021-01-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1142473.1142548">Integrating Compression and Execution in Column-Oriented Database Systems</a></p>
+<p>可以与The design and implementation of modern column-oriented database systems对照阅读。</p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>一篇略老（2006年）的paper，但很重要。</p>
+<p>数据库中压缩算法的使用是非常影响性能的。这方面列存要比行存更有优势：每列排列在一起天然就适合压缩，而行存中相同列的值是被其它列隔开的。</p>
+<p>这篇文章探讨的是，如何在列存数据库中使用压缩，以及不同压缩算法在不同场景中的比较。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/03/tidb-a-raft-based-htap-database/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/01/03/tidb-a-raft-based-htap-database/" class="post-title-link" itemprop="url">[笔记] TiDB: a Raft-based HTAP database</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-01-03 20:38:05" itemprop="dateCreated datePublished" datetime="2021-01-03T20:38:05+08:00">2021-01-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3415478.3415535">TiDB: a Raft-based HTAP database</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>TiDB是一个HTAP系统，目标是同时服务TP和AP服务，且能保证隔离性和数据新鲜度。它的架构受到了Spanner和F1的影响：计算层类似于F1，无状态；存储层类似于Spanner，支持分布式事务。</p>
+<p>它的存储层分为了行存的TiKV和列存的TiFlash，其中TiKV各个replica之间通过Raft保持一致，TiFlash则作为Raft的learner保证看到最新的数据。相比<a href="/2020/12/24/kudu-storage-for-fast-analytics-on-fast-data">Kudu</a>，TiDB物理上分离了TP和AP，隔离性更好；相比<a href="/2020/11/30/f1-lightning-htap-as-a-service">F1-Lightning</a>的基于CDC的replay，TiDB的新鲜度更好。</p>
+<p>一些看法：</p>
 <ul>
-<li>读写节点分离，之间通过pangu异步交换数据，或通过RPC同步交换数据。优点是可以避免相互影响，缺点是高数据可见性就会有一定的性能损失。</li>
-<li>索引功能强大：<ul>
-<li>全量数据中所有列都有索引，增量数据也有简单的索引。</li>
-<li>运行期可以基于选择率跳过部分索引，不会因过度使用索引而导致性能下降。</li>
-<li>索引类型丰富，string、int、JSON、向量等类型的列都可以建索引，还可以创建全文搜索索引。</li>
+<li>TiKV底下使用了RocksDB，但LSM的compaction会导致性能不稳定，在高并发的TP场景可能会有问题，如何解决？</li>
+<li>TiFlash是绑在TiKV上的：<ul>
+<li>数据一定要先进TiKV再进TiFlash，对于没有强事务需求的场景而言有些浪费，是否能提供更低开销的ingestion？</li>
+<li>列存和行存的key order是一样的，是否能有列存格式的索引？</li>
 </ul>
 </li>
-<li>仔细设计过的列存格式。</li>
-<li>使用MapReduce做全量数据的compaction。</li>
+<li>与Kudu等系统类似，TiKV的Raft与多副本是绑定的，对支持erasure coding有阻碍，对上云也有阻碍（使用云存储）。</li>
 </ul>
-<p>这篇文章中有些细节看得不是很明白，以下内容部分来自脑补。</p>
-<p>总体感觉ADB的性能确实好。缺点是可能成本会比较高，索引的构建过程的计算开销与所有列的索引对应的存储开销都挺高的。存储开销可以通过更好的编码和压缩来控制，但会导致计算开销更高，这样base compaction时间会更长，常规路径的数据可见性会受到一些影响。</p>
-<p>如果将compaction分成更多级别，一步步提高优化等级，优点是数据可见性比较好，缺点是第一次compaction时如果还是要为每列都建索引，则优化不够的话存储开销大，或者读开销也会大。而通常query都会更倾向于读近期的数据，相当于大多数query都只享受到了低优化等级。</p>
-<p>本质上数据可见性与优化就是矛盾的，没有万能药，只能靠工程上的tradeoff。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/11/24/analyticdb-real-time-olap-database-system-at-alibaba-cloud/#more" rel="contents">
+              <a class="btn" href="/2021/01/03/tidb-a-raft-based-htap-database/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -1020,7 +990,7 @@
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/4/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/6/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/4/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><span class="page-number current">5</span><a class="page-number" href="/page/6/">6</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/6/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1089,7 +1059,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">122</span>
+          <span class="site-state-item-count">134</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

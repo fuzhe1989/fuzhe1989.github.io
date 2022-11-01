@@ -195,7 +195,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -209,7 +209,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics/" class="post-title-link" itemprop="url">[笔记] Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</a>
+            <a href="/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/" class="post-title-link" itemprop="url">[C++] 一定要 public 继承 std::enable_shared_from_this</a>
         </h1>
 
         <div class="post-meta">
@@ -219,7 +219,154 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2021-04-21 12:31:17" itemprop="dateCreated datePublished" datetime="2021-04-21T12:31:17+08:00">2021-04-21</time>
+              <time title="创建时间：2021-07-25 00:23:17" itemprop="dateCreated datePublished" datetime="2021-07-25T00:23:17+08:00">2021-07-25</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><strong>TL;DR</strong></p>
+<p><code>std::enable_shared_from_this</code>必须要<code>public</code>继承，否则调用<code>shared_from_this()</code>不会编译失败，但运行时会抛<code>std::bad_weak_ptr</code>的异常。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/07/24/cpp-move-ctor-with-ref-member/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/07/24/cpp-move-ctor-with-ref-member/" class="post-title-link" itemprop="url">[C++] 带有引用类型成员的类居然默认允许移动</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-07-24 23:58:12" itemprop="dateCreated datePublished" datetime="2021-07-24T23:58:12+08:00">2021-07-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><strong>TL;DR</strong></p>
+<p>对于一个成员 X 是另一个成员 Y 的引用的类，C++编译器会默认为它生成移动构造函数和移动赋值函数，但这两个函数是有问题的。建议手动禁掉这种类的移动函数。</p>
+<p>但这类问题（dangling）是 C++的根本缺陷，没有好的解法，不要想着有什么万全之策了，接受它。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/07/24/cpp-move-ctor-with-ref-member/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/" class="post-title-link" itemprop="url">[笔记] Hekaton: SQL Server's Memory-Optimized OLTP Engine</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-05-18 13:07:16" itemprop="dateCreated datePublished" datetime="2021-05-18T13:07:16+08:00">2021-05-18</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -241,26 +388,19 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3229863.3229868">Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</a></p>
-<p>Omid三部曲：</p>
-<ol>
-<li><a href="/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores">Omid: Lock-free transactional support for distributed data stores</a></li>
-<li><a href="/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing">Omid, Reloaded: Scalable and Highly-Available Transaction Processing</a></li>
-<li>Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</li>
-</ol>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2463676.2463710">Hekaton: SQL Server’s Memory-Optimized OLTP Engine</a></p>
+<p>年代：2013</p>
 </blockquote>
-<p>这是Omid的第三篇（2018年），主要改进是提出了两种降低延时的新协议，从而满足新的实时事务的需求（作为Phoenix的后端）。</p>
-<p>两种新协议分别是：</p>
+<p>Hekaton是SQL Server的一个内存数据库子系统，它有以下特点：</p>
 <ul>
-<li>Omid Low Latency（Omid LL），将Omid中写CT的工作由TM转交给client，从而分散了负载，降低了延时。</li>
-<li>Omid Fast Path（Omid FP），处理单key事务时绕开TM，从而达到原生HBase操作的延时（代价是隔离级别从snapshot isolation（SI）降低到了generalized snapshot isolation（GSI）[<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1541186/">1</a>]）。</li>
+<li>数据全在内存中，但具备持久化存储能力（不会丢数据）。</li>
+<li>使用无锁结构（latch-free&#x2F;lock-free）。</li>
+<li>MVCC结合乐观并发控制（optimistic concurrency control）。</li>
+<li>存储过程可以预编译为C代码，再进一步编译为机器指令。</li>
 </ul>
-<p>Omid再改进就要考虑分散冲突检测了。</p>
-<p>Omid LL中TM有两个角色，一个是TSO，通常不会是瓶颈；另一个是全局冲突检测。我们知道Omid中冲突检测是per bucket进行的，每个bucket独立判断。假如bucket足够小，小到只有一个key，就相当于每个key独立判断一下冲不冲突。此时TM的必要性就不存在了，client可以直接与data server通信判断。</p>
-<p>此时Omid就变成了Percolator的变种，即将commit meta放到了单独的commit table中，而不是与数据在一起。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics/#more" rel="contents">
+              <a class="btn" href="/2021/05/18/hekaton-sql-servers-memory-optimized-oltp-engine/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -284,7 +424,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/20/clickhouse-code-strong-type-def/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -298,7 +438,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2021/04/20/clickhouse-code-strong-type-def/" class="post-title-link" itemprop="url">ClickHouse基础库学习：StrongTypedef</a>
+            <a href="/2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/" class="post-title-link" itemprop="url">[笔记] LLAMA: A Cache/Storage Subsystem for Modern Hardware</a>
         </h1>
 
         <div class="post-meta">
@@ -308,7 +448,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2021-04-20 17:08:52" itemprop="dateCreated datePublished" datetime="2021-04-20T17:08:52+08:00">2021-04-20</time>
+              <time title="创建时间：2021-05-08 12:25:47" itemprop="dateCreated datePublished" datetime="2021-05-08T12:25:47+08:00">2021-05-08</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -329,661 +469,514 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p>位置：base&#x2F;common&#x2F;strong_typedef.h</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">T</span>, <span class="keyword">class</span> <span class="title class_">Tag</span>&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">StrongTypedef</span></span><br><span class="line">&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="keyword">using</span> Self = StrongTypedef;</span><br><span class="line">    T t;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">using</span> UnderlyingType = T;</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">Enable</span> = <span class="keyword">typename</span> std::is_copy_constructible&lt;T&gt;::type&gt;</span><br><span class="line">    <span class="keyword">explicit</span> <span class="built_in">StrongTypedef</span>(<span class="type">const</span> T &amp; t_) : <span class="built_in">t</span>(t_) &#123;&#125;</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> Enable = <span class="keyword">typename</span> std::is_move_constructible&lt;T&gt;::type&gt;</span><br><span class="line">    <span class="keyword">explicit</span> <span class="built_in">StrongTypedef</span>(T &amp;&amp; t_) : <span class="built_in">t</span>(std::<span class="built_in">move</span>(t_)) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> Enable = <span class="keyword">typename</span> std::is_default_constructible&lt;T&gt;::type&gt;</span><br><span class="line">    <span class="built_in">StrongTypedef</span>(): <span class="built_in">t</span>() &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">StrongTypedef</span>(<span class="type">const</span> Self &amp;) = <span class="keyword">default</span>;</span><br><span class="line">    <span class="built_in">StrongTypedef</span>(Self &amp;&amp;) = <span class="keyword">default</span>;</span><br><span class="line"></span><br><span class="line">    Self &amp; <span class="keyword">operator</span>=(<span class="type">const</span> Self &amp;) = <span class="keyword">default</span>;</span><br><span class="line">    Self &amp; <span class="keyword">operator</span>=(Self &amp;&amp;) = <span class="keyword">default</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">Enable</span> = <span class="keyword">typename</span> std::is_copy_assignable&lt;T&gt;::type&gt;</span><br><span class="line">    Self &amp; <span class="keyword">operator</span>=(<span class="type">const</span> T &amp; rhs) &#123; t = rhs; <span class="keyword">return</span> *<span class="keyword">this</span>;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">class</span> <span class="title class_">Enable</span> = <span class="keyword">typename</span> std::is_move_assignable&lt;T&gt;::type&gt;</span><br><span class="line">    Self &amp; <span class="keyword">operator</span>=(T &amp;&amp; rhs) &#123; t = std::<span class="built_in">move</span>(rhs); <span class="keyword">return</span> *<span class="keyword">this</span>;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">operator</span> <span class="type">const</span> T &amp; () <span class="type">const</span> &#123; <span class="keyword">return</span> t; &#125;</span><br><span class="line">    <span class="keyword">operator</span> T &amp; () &#123; <span class="keyword">return</span> t; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">bool</span> <span class="keyword">operator</span>==(<span class="type">const</span> Self &amp; rhs) <span class="type">const</span> &#123; <span class="keyword">return</span> t == rhs.t; &#125;</span><br><span class="line">    <span class="type">bool</span> <span class="keyword">operator</span>&lt;(<span class="type">const</span> Self &amp; rhs) <span class="type">const</span> &#123; <span class="keyword">return</span> t &lt; rhs.t; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">T &amp; <span class="title">toUnderType</span><span class="params">()</span> </span>&#123; <span class="keyword">return</span> t; &#125;</span><br><span class="line">    <span class="function"><span class="type">const</span> T &amp; <span class="title">toUnderType</span><span class="params">()</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> t; &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> STRONG_TYPEDEF(T, D) \</span></span><br><span class="line"><span class="meta">    struct D ## Tag &#123;&#125;; \</span></span><br><span class="line"><span class="meta">    using D = StrongTypedef<span class="string">&lt;T, D ## Tag&gt;</span>; \</span></span><br></pre></td></tr></table></figure>
-
-<p><code>StrongTypedef</code>提供了<code>T</code>的一种别名，它支持以下操作：</p>
+          <p>LLAMA是一种无锁的page管理系统，它包含内存cache与磁盘log structured store（LSS）两部分，并自动控制page在两者之间移动（flush、换入&#x2F;换出）。</p>
+<p>它有以下特点：</p>
 <ul>
-<li>默认构造、复制&#x2F;移动×构造&#x2F;赋值。</li>
-<li><code>T</code>到<code>StrongTypedef</code>：复制&#x2F;移动×构造&#x2F;赋值。</li>
-<li><code>StrongTypedef</code>到<code>T</code>以及<code>T</code>可以隐式转换的类型<code>U</code>：隐式转换，<code>toUnderType</code>。</li>
+<li><p>所有操作都是无锁的（latch-free），内存部分基于epoch机制回收数据。</p>
+<p>  优点：系统并行度高；epoch机制几乎是额外开销最小的回收机制，且容易实现。</p>
+</li>
+<li><p>所有page都是immutable的，对page的修改要通过附加一个delta来实现，并通过对mapping table进行CAS来让新的page可见。</p>
+<p>  优点：既满足了无锁的需求，又对cache非常友好。</p>
+</li>
+<li><p>磁盘部分是一种log structured store，可以写入完整的page，或delta。</p>
+<p>  优点：可以只写入delta能显著降低写放大；LSS这种append-only的结构将所有随机写转化为了顺序写，性能更高，且可以省掉Flash的FTL。</p>
+</li>
 </ul>
-<p>关键是<code>StrongTypedef</code>禁止了哪些操作：</p>
+<p>LLAMA可以作为Bw-tree的底层系统。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/05/08/llama-a-cache-storage-subsystem-for-modern-hardware/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/05/06/wound-wait-and-wait-die/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/05/06/wound-wait-and-wait-die/" class="post-title-link" itemprop="url">How DBMS handle dead locks: wound-wait and wait-die</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-05-06 21:22:58" itemprop="dateCreated datePublished" datetime="2021-05-06T21:22:58+08:00">2021-05-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><strong>TL;DR</strong></p>
+<p>Wound-wait 与 wait-die 是 DBMS 中处理死锁的两种常见策略，它们的优缺点为：</p>
 <ul>
-<li><p><code>T</code>相同但<code>Tag</code>不同的两个<code>StrongTypedef</code>，好处是可以避免语义混淆：</p>
-  <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> Days = StrongTypedef&lt;<span class="type">int32_t</span>, Tag0&gt;;</span><br><span class="line"><span class="keyword">using</span> Months = StrongTypedef&lt;<span class="type">int32_t</span>, Tag1&gt;;</span><br><span class="line"><span class="function">Days <span class="title">d</span><span class="params">(<span class="number">100</span>)</span></span>;</span><br><span class="line">Months d1 = d; <span class="comment">// error!</span></span><br></pre></td></tr></table></figure></li>
+<li>Wait-die 会导致更多 rollback，但 rollback 的代价更低：被 rollback 的事务做过的事情比较少。</li>
+<li>Wound-wait 导致的 rollback 较少，但 rollback 的代价更高：被 rollback 的事务做过的事情比较多。</li>
 </ul>
-<p>（说实话我觉得<code>StrongTypedef</code>不应该支持到<code>T</code>的隐式转换，避免当<code>T</code>是某种整数类型时无意的narrowing）</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing/" class="post-title-link" itemprop="url">[笔记] Omid, Reloaded: Scalable and Highly-Available Transaction Processing</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-04-20 13:56:59" itemprop="dateCreated datePublished" datetime="2021-04-20T13:56:59+08:00">2021-04-20</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/conference/fast17/technical-sessions/presentation/shacham">Omid, Reloaded: Scalable and Highly-Available Transaction Processing</a></p>
-<p>Omid三部曲：</p>
-<ol>
-<li><a href="/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores">Omid: Lock-free transactional support for distributed data stores</a></li>
-<li>Omid, Reloaded: Scalable and Highly-Available Transaction Processing</li>
-<li><a href="/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics">Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</a></li>
-</ol>
-</blockquote>
-<p>这是Omid的第二篇（2017年），相比2014年的初版，它在规模和可用性上做了增强。</p>
-<p>主要改动有两个：</p>
-<ul>
-<li>增加了meta table，将事务的commit信息下放到存储层，减轻了控制层的的负担。</li>
-<li>Status Oracle（SO）进一步变为Transaction Manager（TM），负责timestamp分配（TSO）、冲突检测（SO）与写meta table。</li>
-</ul>
-<p>相比其它分布式事务的实现，Omid控制层与数据层切分得非常干净，很适合云上部署。</p>
-<p>相比Omid 14中事务meta完全放到TM的内存中，Omid 17独立出来的meta table能支持更大规模，在failover时恢复更快（Omid 14需要从头恢复WAL）。</p>
-<p>Omid实现了snapshot isolation，相比Spanner的external consistency（strict serializable isolation）和CockroachDB的serializable snapshot isolation，Omid的优点是只读事务不会abort（但这只是设计的tradeoff吧？）。</p>
-<p>（Omid很容易扩展为支持write snapshot isolation，类似于CockroachDB的SSI，参见<a href="/2021/03/30/a-critique-of-snapshot-isolation">[笔记] A Critique of Snapshot Isolation</a>）</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores/" class="post-title-link" itemprop="url">[笔记] Omid: Lock-free transactional support for distributed data stores</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-04-17 23:14:39" itemprop="dateCreated datePublished" datetime="2021-04-17T23:14:39+08:00">2021-04-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/6816691/">Omid: Lock-free transactional support for distributed data stores</a></p>
-<p>Omid三部曲：</p>
-<ol>
-<li>Omid: Lock-free transactional support for distributed data stores</li>
-<li><a href="/2021/04/20/omid-reloaded-scalable-and-highly-available-transaction-processing">Omid, Reloaded: Scalable and Highly-Available Transaction Processing</a></li>
-<li><a href="/2021/04/21/taking-omid-to-the-clouds-fast-scalable-transactions-for-real-time-cloud-analytics">Taking Omid to the Clouds: Fast, Scalable Transactions for Real-Time Cloud Analytics</a></li>
-</ol>
-</blockquote>
-<p>Omid的目标是为支持MVCC的分布式KV增加乐观事务（2PC）功能，实现snapshot isolation。</p>
-<p>它的特点：</p>
-<ul>
-<li>乐观锁（它称为lock-free）。</li>
-<li>有中心化的Status Oracle。</li>
-<li>依赖于client进行SI需要的判断。</li>
-</ul>
-<p>这是Omid的第一篇paper（后面还有2篇），从后续paper来看，这篇paper的实现在规模上还是存在问题，但它确实解决了Percolator的延迟高（尤其是有事务失败时）的问题。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/04/17/omid-lock-free-transactional-support-for-distributed-data-stores/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/30/a-critique-of-snapshot-isolation/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/30/a-critique-of-snapshot-isolation/" class="post-title-link" itemprop="url">[笔记] A Critique of Snapshot Isolation</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-03-30 21:50:37" itemprop="dateCreated datePublished" datetime="2021-03-30T21:50:37+08:00">2021-03-30</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2168836.2168853">A Critique of Snapshot Isolation</a></p>
-</blockquote>
-<p>这篇文章提出了一种保证了serializability的write-snapshot isolation（WSI）。相比snapshot isolation（SI），WSI是serializable的，且有着不弱于SI的并发性能。相比serializable snapshot isolation（SSI），它的检测成本更低，性能更高。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/03/30/a-critique-of-snapshot-isolation/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/" class="post-title-link" itemprop="url">[笔记] Ceph: A Scalable, High-Performance Distributed File System</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-03-28 13:03:20" itemprop="dateCreated datePublished" datetime="2021-03-28T13:03:20+08:00">2021-03-28</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/events/osdi06/tech/full_papers/weil/weil_html">Ceph: A Scalable, High-Performance Distributed File System</a></p>
-</blockquote>
-<p>这篇文章介绍了Ceph，一种分布式文件系统。它的最大特点是数据层与元数据分离所带来的高弹性。不像其它分布式文件系统（如GFS）master通过本地表记录数据分布，在Ceph中数据是由一种伪随机函数CRUSH来确定分布在哪个对象存储设备（OSD）上的。OSD本身是高度自治的单元，负责replication、错误检测、恢复。这种设计具备了非常高的弹性与灵活性。</p>
-<p>（通篇看下来感觉Ceph是挺适合云上部署的，另外明显感觉到分布式系统、存储、数据库三个领域需要融合，至少在2006年）</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/25/weaving-relations-for-cache-performance/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/25/weaving-relations-for-cache-performance/" class="post-title-link" itemprop="url">[笔记] Weaving Relations for Cache Performance</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-03-25 22:19:01" itemprop="dateCreated datePublished" datetime="2021-03-25T22:19:01+08:00">2021-03-25</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="http://www.vldb.org/conf/2001/P169.pdf">Weaving Relations for Cache Performance</a></p>
-</blockquote>
-<p>这篇文章提出了一种行列混合的布局方式PAX，可以在不改变operator的前提下提升cache利用率。现在这种布局几乎成为了各种OLAP系统的标配。虽然这篇文章是针对OLTP的，但OLTP中使用PAX的似乎不是很多。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/03/25/weaving-relations-for-cache-performance/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/25/paxos-made-live/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/25/paxos-made-live/" class="post-title-link" itemprop="url">[笔记] Paxos Made Live - An Engineering Perspective</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-03-25 15:38:11" itemprop="dateCreated datePublished" datetime="2021-03-25T15:38:11+08:00">2021-03-25</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1281100.1281103">Paxos Made Live - An Engineering Perspective</a></p>
-</blockquote>
-<p><a href="/2020/08/28/the-chubby-lock-service-for-loosely-coupled-distributed-systems">Chubby</a>的第一个版本基于一个第三方可容错的商业数据库（下文称为3DB），它的replication有很多bug，并没有基于任何已有证明的算法，也无法证明其正确性。最终Chubby将3DB替换为了基于Paxos的实现。</p>
-<p>作者在实现Paxos的过程中，发现这个工作并不trivial：</p>
-<ul>
-<li>描述Paxos的伪代码只要一页就够了，但作者的C++实现多达几千行。膨胀的原因是实际的生产系统需要的很多特性和优化是原paper中没有的。</li>
-<li>社区习惯于证明篇幅短的算法（一页伪代码）的正确性，但其证明方法难以扩展到几千行代码的规模，导致作者必须使用不同的广域来证明其实现的正确。</li>
-<li>容错算法只能处理一个精心选择的固定集合中的错误，而真实世界有着多得多的错误类型，包括了算法本身的错误、实现的错误、操作错误。</li>
-<li>真实系统很少能有精确的spec，甚至在实现过程中还会修改spec，就需要实现本身具有可塑性，也许就会有实现“误解”了spec导致的错误。</li>
-</ul>
-<p>这篇文章就在讲作者将Paxos从理论搬到实际的过程中的一些挑战。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/03/25/paxos-made-live/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/16/consensus-on-transaction-commit/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/16/consensus-on-transaction-commit/" class="post-title-link" itemprop="url">[笔记] Consensus on Transaction Commit</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-03-16 19:51:30" itemprop="dateCreated datePublished" datetime="2021-03-16T19:51:30+08:00">2021-03-16</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1132863.1132867">Consensus on Transaction Commit</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>这篇文章是Jim Gray和Leslie Lamport两位图灵奖大佬的合作产物，是数据库与系统两个领域在consensus方面的结合。</p>
-<p>Paxos Commit算法使用Paxos弥补了2PC在容错性上的软肋，而进一步的Fast Paxos Commit算法则减少了一轮commit的延时跳数，代价是增加了总的通信次数。</p>
-<p>文章另外还论证了经典的2PC就是Paxos Commit的一种特例。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/03/16/consensus-on-transaction-commit/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/" class="post-title-link" itemprop="url">[笔记] Pig Latin: A Not-So-Foreign Language for Data Processing</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-03-16 12:29:41" itemprop="dateCreated datePublished" datetime="2021-03-16T12:29:41+08:00">2021-03-16</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1376616.1376726">Pig Latin: A Not-So-Foreign Language for Data Processing</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>Pig Latin又是一个瞄准了MapReduce表达能力弱点的类SQL语言，它声称“集合了体现SQL精神的高阶查询与类MapReduce的过程式程序”。</p>
+<p>另外 [<a target="_blank" rel="noopener" href="https://www.zhihu.com/question/344517681/answer/815329816">1</a>] 中提到：</p>
 <blockquote>
-<p>关于Pig Latin的逸事：<a target="_blank" rel="noopener" href="https://mp.weixin.qq.com/s/1OwY353VTfVrPfY2bxhGhA">大数据那些事(7)：腾飞的拉丁猪</a></p>
+<p>还有一种方法，no wait，就是请求不到锁就回滚，不去做判断。现在的一般看法是，不等比等好，尤其是应用于分布式事务时。</p>
 </blockquote>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2021/03/16/pig-latin-a-not-so-foreign-language-for-data-processing/#more" rel="contents">
+              <a class="btn" href="/2021/05/06/wound-wait-and-wait-die/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/" class="post-title-link" itemprop="url">[笔记] Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-05-02 23:18:12" itemprop="dateCreated datePublished" datetime="2021-05-02T23:18:12+08:00">2021-05-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2043556.2043571">Windows Azure Storage: A Highly Available Cloud Storage Service With Strong Consistency</a></p>
+<p>年代：2011</p>
+</blockquote>
+<p>Windows Azure Storage（WAS）是Azure的存储层，它的特色在于基于同一套架构提供了对象存储（Blob）、结构化存储（Table）和队列服务（Queue）。</p>
+<p>这三种服务共享了一个提供了强一致、global namespace、多地容灾、支持多租户的存储层。</p>
+<blockquote>
+<p>个人猜测这种设计（同时推出三种服务）更多出于组织架构的考虑，而不是技术层面上有非这么做的理由。</p>
+<p>以及这篇文章作者中有多名后来加入阿里云存储的大佬，所以可以从这里面看到一些后来阿里云存储产品发展的影子。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/05/02/windows-azure-storage-a-highly-available-cloud-storage-service-with-strong-consistency/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/28/hyper-a-hybrid-oltp-olap-main-memory-database-system-based-on-virtual-memory-snapshots/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/04/28/hyper-a-hybrid-oltp-olap-main-memory-database-system-based-on-virtual-memory-snapshots/" class="post-title-link" itemprop="url">[笔记] Hyper: A Hybrid OLTP&OLAP Main Memory Database System Based on Virtual Memory Snapshots</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-28 22:48:13" itemprop="dateCreated datePublished" datetime="2021-04-28T22:48:13+08:00">2021-04-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/5767867/">Hyper: A Hybrid OLTP&amp;OLAP Main Memory Database System Based on Virtual Memory Snapshots</a></p>
+<p>年代：2011</p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>HyPer是一种内存数据库，它有以下特点：</p>
+<ol>
+<li>基于H-Store的设计，串行（因而无锁）执行事务（存储过程）。</li>
+<li>通过fork子进程方式服务OLAP请求。</li>
+</ol>
+<p>通过fork来隔离OLTP与OLAP还挺有创意的，OS的实现显然比自己控制请求间的数据隔离更高效。</p>
+<p>目测这仍然是研究大于实用的项目（至少在文章发表时）。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/04/28/hyper-a-hybrid-oltp-olap-main-memory-database-system-based-on-virtual-memory-snapshots/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/26/crush-controlled-scalable-decentralized-placement-of-replicated-data/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/04/26/crush-controlled-scalable-decentralized-placement-of-replicated-data/" class="post-title-link" itemprop="url">[笔记] CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-26 18:07:45" itemprop="dateCreated datePublished" datetime="2021-04-26T18:07:45+08:00">2021-04-26</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/4090205/">CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data</a></p>
+<p>Ceph笔记：</p>
+<ul>
+<li><a href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system">Ceph</a></li>
+<li><a href="/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems">Dynamic Metadata Management</a></li>
+<li>CRUSH: Data Placement</li>
+</ul>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>CRUSH是一种确定性的hash算法，用来计算数据（对象）的存储位置。</p>
+<p>Ceph中CRUSH的价值在于MDS和client都通过CRUSH来计算对象位置，这样client可以直接与OSD（Object Storage Device）通信，MDS也不需要维护对象与OSD之间的映射了。</p>
+<p>另一方面，相比其它hash算法，CRUSH有以下优势：</p>
+<ol>
+<li>相比平坦的hash，CRUSH支持层级结构和权重，可以实现复杂的分布策略。</li>
+<li>在有节点变动时，CRUSH可以最小化数据的迁移（根据分布策略），而简单的hash则会导致大量数据迁移。</li>
+<li>对failed和overloaded的设备有特殊处理。</li>
+</ol>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/04/26/crush-controlled-scalable-decentralized-placement-of-replicated-data/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems/" class="post-title-link" itemprop="url">[笔记] Dynamic Metadata Management for Petabyte-scale File Systems</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-23 23:09:00" itemprop="dateCreated datePublished" datetime="2021-04-23T23:09:00+08:00">2021-04-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1392934/">Dynamic Metadata Management for Petabyte-scale File Systems</a></p>
+<p><a href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system">之前Ceph的笔记</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章介绍了Ceph的Metadata Server（MDS）如何管理metadata，尤其是如何做目录树的动态负载均衡。</p>
+<p>（不是很有趣……）</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/04/23/dynamic-metadata-management-for-petabyte-scale-file-systems/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/04/23/chord-a-scalable-peer-to-peer-lookup-protocol-for-internet-applications/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/04/23/chord-a-scalable-peer-to-peer-lookup-protocol-for-internet-applications/" class="post-title-link" itemprop="url">[笔记] Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-23 13:49:48" itemprop="dateCreated datePublished" datetime="2021-04-23T13:49:48+08:00">2021-04-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://ieeexplore.ieee.org/abstract/document/1180543/">Chord: A Scalable Peer-to-Peer Lookup Protocol for Internet Applications</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Chord解决的是P2P系统（去中心化）中如何高效确定数据位置的问题。</p>
+<p>P2P系统中最常见的方案是将数据按一致性hash分散到不同节点上，这样显著减少了节点增减时产生的数据迁移。这套方案中最重要的是每个节点需要维护一个路由表，在接收到请求时，如果数据不在自己上面，需要根据路由表将请求转发给对应的节点。传统的一致性hash里路由表需要包含全部节点信息，产生了<code>O(N)</code>的维护代价，规模大了就会有问题。</p>
+<p>Chord在一致性hash基础上，只需要每个节点维护<code>O(logN)</code>大小的路由表，同样能实现<code>O(logN)</code>的查找，即使路由信息过时了也能回退到<code>O(n)</code>查找。减少了路由表的大小，显著地降低了Chord的维护代价，能在节点不停变化时仍然保持不错的性能。</p>
+<p><a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store">Dynamo</a>似乎使用了类似Chord的方案。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/04/23/chord-a-scalable-peer-to-peer-lookup-protocol-for-internet-applications/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -1007,7 +1000,7 @@
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/2/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><a class="page-number" href="/page/2/">2</a><span class="page-number current">3</span><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/4/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1076,7 +1069,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">122</span>
+          <span class="site-state-item-count">134</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="原文：InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems  TL;DR InfiniFS 针对的是如何实现超大规模的单一分布式文件系统，目标上有些类似于 Facebook 的 Tectonic。但 InfiniFS 仍然是比较正统的、遵守 POSIX 语义的 fs，而 Tectonic 则">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[笔记] InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/09/07/infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystems/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="原文：InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems  TL;DR InfiniFS 针对的是如何实现超大规模的单一分布式文件系统，目标上有些类似于 Facebook 的 Tectonic。但 InfiniFS 仍然是比较正统的、遵守 POSIX 语义的 fs，而 Tectonic 则">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/infinifs-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/infinifs-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/infinifs-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/infinifs-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/infinifs-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/infinifs-06.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-09/infinifs-07.png">
+<meta property="article:published_time" content="2022-09-07T15:01:51.000Z">
+<meta property="article:modified_time" content="2022-10-17T04:12:25.554Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-09/infinifs-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/09/07/infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystems/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>[笔记] InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/07/infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystems/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [笔记] InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-07 23:01:51" itemprop="dateCreated datePublished" datetime="2022-09-07T23:01:51+08:00">2022-09-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/system/files/fast22-lv.pdf">InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>InfiniFS 针对的是如何实现超大规模的单一分布式文件系统，目标上有些类似于 Facebook 的 Tectonic。但 InfiniFS 仍然是比较正统的、遵守 POSIX 语义的 fs，而 Tectonic 则是 HDFS 的升级版，目的是解决 Facebook 自身业务遇到的实际问题。</p>
+<p>InfiniFS 看上去是 LocoFS 的后继，延续了 <a href="/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/">LocoFS</a> 将 metadata 分成两部分的设计（但针对所有 inode 而不只是 f-inode）。另外 InfiniFS 还从 <a href="https://fuzhe1989.github.io/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/">HopsFS</a> 借鉴了并发 load inode。除此之外 InfiniFS 还有如下独特设计：</p>
+<ol>
+<li>client 端可以通过 hash 预测 inode id。结合并发 load inode，可以有效降低 network trip。</li>
+<li>client 与 metadata server 共同维护的一致性 cache。</li>
+<li>单独的 rename coordinator。</li>
+</ol>
+<blockquote>
+<p>整体看下来感觉 InfiniFS 的完成度还是比较高的，很实用，可能和有阿里云的前同事参与有比较大的关系。</p>
+</blockquote>
+<span id="more"></span>
+
+<h1 id="Background"><a href="#Background" class="headerlink" title="Background"></a>Background</h1><p>超大文件系统的挑战：</p>
+<ol>
+<li>data partitioning 难以兼顾良好的局部性和负载均衡性。<ol>
+<li>相近的文件&#x2F;目录经常被集中访问，造成热点。</li>
+<li>如果 hash partition，则分散了热点，但降低了局部性，同样的操作（如 path resolution&#x2F;list dir）涉及更多节点。</li>
+<li>如果以子树为单位 partition，则与之相反。</li>
+</ol>
+</li>
+<li>路径深度变大，path resolution 延时增加。<ol>
+<li>Trivial 的按 dir id partition（Tectonic 再次出镜） 会导致长度为 N 的路径查找需要经历 N-1 个 trip。</li>
+</ol>
+</li>
+<li>client 端 cache 的一致性维护负担加大。<ol>
+<li>lease 机制（如 <a href="/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/">LocoFS</a>）会导致越接近 root 的节点被 renew 的频率越高，无形中制造了热点。<blockquote>
+<p>在 metadata server 本身分布式之后，lease 维护代价也会变高。</p>
+</blockquote>
+</li>
+</ol>
+</li>
+</ol>
+<p>但超大文件系统的好处：</p>
+<ol>
+<li>全局 namespace 允许全局数据共享。</li>
+<li>资源利用率高（Tectonic 也有讲）（集中力量办大事）。</li>
+<li>避免了跨系统操作，降低了复杂度。</li>
+</ol>
+<p>下图是生产环境采集到的操作数量统计（很有用）：</p>
+<p><img src="/images/2022-09/infinifs-01.png"></p>
+<ol>
+<li>File 操作占了 95.8%。</li>
+<li>readdir 占了 93.3% 的目录操作。</li>
+<li>dir rename 和 set_permission 非常罕见。</li>
+</ol>
+<h1 id="Design-and-Implementation"><a href="#Design-and-Implementation" class="headerlink" title="Design and Implementation"></a>Design and Implementation</h1><h2 id="Overview"><a href="#Overview" class="headerlink" title="Overview"></a>Overview</h2><p><img src="/images/2022-09/infinifs-02.png"></p>
+<p>InfiniFS 有多个 metadata server，分别服务不同的 metadata partition。另外有一个全局唯一的 rename coordinator，处理 dir rename 与 set_permission。</p>
+<h2 id="Access-Content-Decoupled-Partitioning"><a href="#Access-Content-Decoupled-Partitioning" class="headerlink" title="Access-Content Decoupled Partitioning"></a>Access-Content Decoupled Partitioning</h2><p>类似于 <a href="/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/">LocoFS</a>，但区别在于：前者将 f-inode 分成了 access 和 content 两部分，而 InfiniFS 则是将所有 inode 分成了 access 和 content 两部分。</p>
+<p><img src="/images/2022-09/infinifs-04.png"></p>
+<p>其中 access 按 parent id partition，而 content 则按自身 id partition。这样每个 inode 的 access 就会与其 parent 的 content 分在相同的 server 上。</p>
+<p><img src="/images/2022-09/infinifs-03.png"></p>
+<p>这样 create&#x2F;delete&#x2F;readdir 等操作就只需要访问一个节点（它们的特点是需要 parent 的 content 和 child 的 access）。由此 InfiniFS 既分散了热点，又保证了一定的局部性。</p>
+<blockquote>
+<p>注意 path resolution 仍然需要经历 N-1 个节点。</p>
+</blockquote>
+<h2 id="Speculative-Path-Resolution"><a href="#Speculative-Path-Resolution" class="headerlink" title="Speculative Path Resolution"></a>Speculative Path Resolution</h2><h3 id="Predictable-Directory-ID"><a href="#Predictable-Directory-ID" class="headerlink" title="Predictable Directory ID"></a>Predictable Directory ID</h3><p><img src="/images/2022-09/infinifs-05.png"></p>
+<p>InfiniFS 使用了一种 hash 算 inode id 的方法：<code>id = hash(parent_id, name, name_version)</code>，其中 name_version 是一个由 parent 维护的 counter，用来保证 id 的唯一性。</p>
+<p>规则：</p>
+<ol>
+<li>每个 dir 维护一个 rename list（RL），其中每个元素都是 <code>(name, version)</code>，且 version 各不相同。初始 dir 的 name_version 为 0。此时 RL 为空。</li>
+<li>每个 dir 在被 rename 之后，会在自身 inode 中记录一个 back pointer（BP），指向它<strong>被创建时</strong>的 parent，和自己<strong>被第一次 rename</strong> 的时候的 name_version。</li>
+<li>每当有 rename 发生，所在的 dir 的 name_version 就增加。</li>
+<li>每当有 id 冲突，name version 也增加。</li>
+<li>存在 BP 的 dir 在被删除后，通过它的 BP 将 RL 中对应项删掉，它创建时的 dir 的 name_version 也可能因此减小。</li>
+<li>某个 dir 被删除时，它对应的 RL 会直到变空才删除。</li>
+</ol>
+<p>这些规则保证了：</p>
+<ol>
+<li>id 唯一性：通过 name_version 处理 hash 冲突。</li>
+<li>client 大概率可以直接根据 path 计算出每个 inode id。</li>
+<li>被 rename 的 dir 不需要更换 id（后续在它的 birth dir 创建的相同 name 的 child 不会有相同的 name_version）。</li>
+</ol>
+<p>同时我们知道 dir rename 的概率是非常低的，因此 name version 的维护开销也预期非常低。</p>
+<blockquote>
+<p>但 name version 如果保持单调增的话，也有好处，就是一个 id 几乎永远不会被重用。当然考虑到不是 100% 保证，意义不那么大。</p>
+</blockquote>
+<h3 id="Parallel-Path-Resolution"><a href="#Parallel-Path-Resolution" class="headerlink" title="Parallel Path Resolution"></a>Parallel Path Resolution</h3><p><img src="/images/2022-09/infinifs-06.png"></p>
+<blockquote>
+<p>直接参考 <a href="https://fuzhe1989.github.io/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/">HopsFS</a></p>
+</blockquote>
+<h2 id="Optimistic-Access-Metadata-Cache"><a href="#Optimistic-Access-Metadata-Cache" class="headerlink" title="Optimistic Access Metadata Cache"></a>Optimistic Access Metadata Cache</h2><p><img src="/images/2022-09/infinifs-07.png"></p>
+<p>这块要先讲 InfiniFS 中 dir rename 的实现。</p>
+<p>InfiniFS 中会有全局唯一的 rename coordinator 负责所有的 dir rename，过程如下：</p>
+<ol>
+<li>检查 rename 之间不会冲突（经典的 rename 造成孤儿 entry）。之后为每个 rename op 赋一个单调增的 version number。</li>
+<li>锁住对应的 dir，确保 rename 期间不会有请求访问对应的<strong>子树</strong>。</li>
+<li>广播 rename，invalidate 所有相关的 cache。</li>
+<li>真正执行 rename。</li>
+</ol>
+<p>这里的广播是指向所有 metaserver 广播。每个 metaserver 会本地记录所有 rename op，但注意 metaserver 本身是没有 cache 的。</p>
+<p>client 会在 cache 中记录每个 inode 对应的 version number，之后与 metaserver 通信时也会带上这个 version。metaserver 如果发现对应的 inode 发生过 rename，则会将 client 发来的 version 之后所有的相关 rename 都返回给 client。</p>
+<p>这样通过 version number，我们就可以保证 client 总是会看到一致的 cache，但同时又不需要同步 invalidate。</p>
+<p>当然上面过程也要求 rename coordinator 与 metaserver 都要记录 WAL 等信息到本地磁盘上。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/" rel="prev" title="[笔记] HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases">
+      <i class="fa fa-chevron-left"></i> [笔记] HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/09/09/order-perserving-key-compression-for-in-memory-search-trees/" rel="next" title="[笔记] Order-Preserving Key Compression for In-Memory Search Trees">
+      [笔记] Order-Preserving Key Compression for In-Memory Search Trees <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Background"><span class="nav-number">1.</span> <span class="nav-text">Background</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Design-and-Implementation"><span class="nav-number">2.</span> <span class="nav-text">Design and Implementation</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Overview"><span class="nav-number">2.1.</span> <span class="nav-text">Overview</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Access-Content-Decoupled-Partitioning"><span class="nav-number">2.2.</span> <span class="nav-text">Access-Content Decoupled Partitioning</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Speculative-Path-Resolution"><span class="nav-number">2.3.</span> <span class="nav-text">Speculative Path Resolution</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Predictable-Directory-ID"><span class="nav-number">2.3.1.</span> <span class="nav-text">Predictable Directory ID</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Parallel-Path-Resolution"><span class="nav-number">2.3.2.</span> <span class="nav-text">Parallel Path Resolution</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Optimistic-Access-Metadata-Cache"><span class="nav-number">2.4.</span> <span class="nav-text">Optimistic Access Metadata Cache</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

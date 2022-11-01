@@ -195,7 +195,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/21/druid-a-real-time-analytical-data-store/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/28/the-snowflake-elastic-data-warehouse/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -209,7 +209,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/11/21/druid-a-real-time-analytical-data-store/" class="post-title-link" itemprop="url">[笔记] Druid: A real-time analytical data store</a>
+            <a href="/2020/12/28/the-snowflake-elastic-data-warehouse/" class="post-title-link" itemprop="url">[笔记] The snowflake elastic data warehouse</a>
         </h1>
 
         <div class="post-meta">
@@ -219,7 +219,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-11-21 23:21:11" itemprop="dateCreated datePublished" datetime="2020-11-21T23:21:11+08:00">2020-11-21</time>
+              <time title="创建时间：2020-12-28 22:44:12" itemprop="dateCreated datePublished" datetime="2020-12-28T22:44:12+08:00">2020-12-28</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -241,14 +241,31 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2588555.2595631">Druid: A real-time analytical data store</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2882903.2903741">The snowflake elastic data warehouse</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>Druid是一种实时分析系统，它主要面向时序数据的复杂分析。Druid使用了lambda架构，使用实时节点来服务新数据，历史节点来服务历史数据，从而同时保证了查询效率、空间效率、数据可见性。Druid是存储计算分离架构，支持多种存储引擎，如HDFS、AWS S3等。</p>
-<p>Druid比较有价值的点是它的lambda架构、列存、倒排索引、良好的可伸缩性和高可用性。</p>
+<p>Snowflake是一个<strong>云原生</strong>的数据仓库。它的价值在于：</p>
+<ol>
+<li>展示了云平台与分布式系统的差别，如何利用好云上的基础设施。</li>
+<li>如何真正以用户体验为导向去设计一个系统。</li>
+<li>做系统的startup如何赚钱。</li>
+</ol>
+<p>前2条参见最后一小节“Lessons Learnd and Outlook”。</p>
+<p>第3条很有价值。（以下一堆马后炮）</p>
+<p>之前做系统的startup的商业模式是做开源系统，然后卖license、技术支持。但云时代了，这条路不太好走，前途一眼可见。问题在哪：</p>
+<ol>
+<li>你的开源系统要有竞争力，这就过滤掉了很多小用户了，他们用开源系统已经可以满足需求了，为什么要花钱？</li>
+<li>大客户不需要买你的服务，首先小公司的技术能力不一定能解决大公司特有的问题，其次大公司也有足够的人和资源，可以自己解决。</li>
+<li>最后剩下一些中等客户，他们往往要的是解决方案，而不是某个产品。但“基于开源”这个原则限制住了对应的闭源系统：要么小打小闹，只能解决局部问题而没办法提供好的方案；要么需要大改，甚至还要把周边系统一起改掉，没办法兼容开源生态。</li>
+</ol>
+<p>国内做系统的startup很多也有这方面的问题，而且更严重，大客户要资质，小客户不花钱。估值上就能看出来，想达到独角兽要比做业务的公司难得多。</p>
+<p>Snowflake选择了基于现成的云平台做第三方云服务商，做附加值。这个思路初看上去不太可行，云平台为什么不抄你的方案？但实际上云平台不是整体，它是由一个个独立的团队组成，互相有着说不清道不明的既合作又竞争的关系。而第三方相当于是每个团队的客户，是可以合作的。而且大公司人虽然多，但不养闲人，分摊到每个方向的人其实很少，尤其是这种要整合资源、探索新模式的工作，更是人嫌狗厌。这就是细分市场、垂直领域、小而精的团队的机会。</p>
+<p>可以看到这几年各种startup都开始搞第三方服务了，这是Snowflake的最大的价值：让工程师先富起来。</p>
+<p>这种模式国内的公司不太好学，因为国内的云平台通常没那么友善，有着足够多的焦虑的工程师，会抢走任何赚钱不赚钱的业务。那么要出海吗？问题在于出海的话你的优势在哪，国外的客户为什么要买一个中国公司的服务？甚至国内出海的客户也不见得更倾向中国公司提供的服务。</p>
+<p>然而2020告诉我们的就是，一切都会变的。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/11/21/druid-a-real-time-analytical-data-store/#more" rel="contents">
+              <a class="btn" href="/2020/12/28/the-snowflake-elastic-data-warehouse/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -272,7 +289,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/21/f1-query-declarative-querying-at-scale/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/24/kudu-storage-for-fast-analytics-on-fast-data/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -286,7 +303,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/11/21/f1-query-declarative-querying-at-scale/" class="post-title-link" itemprop="url">[笔记] F1 query: declarative querying at scale</a>
+            <a href="/2020/12/24/kudu-storage-for-fast-analytics-on-fast-data/" class="post-title-link" itemprop="url">[笔记] Kudu: Storage for fast analytics on fast data</a>
         </h1>
 
         <div class="post-meta">
@@ -296,7 +313,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-11-21 13:49:45" itemprop="dateCreated datePublished" datetime="2020-11-21T13:49:45+08:00">2020-11-21</time>
+              <time title="创建时间：2020-12-24 23:11:31" itemprop="dateCreated datePublished" datetime="2020-12-24T23:11:31+08:00">2020-12-24</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -318,262 +335,428 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3229863.3229871">F1 query: declarative querying at scale</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://kudu.apache.org/kudu.pdf">Kudu: Storage for fast analytics on fast data</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>F1 query是一种federated query processing平台，它的特点是：</p>
+<p>Kudu是一种同时支持高效的随机读写与扫描的存储系统，是用来弥补Hadoop生态中HDFS与HBase的gap的。它的特点是：</p>
+<ul>
+<li>自己用Raft实现了多副本（没有用HDFS）。</li>
+<li>精巧的列存设计。</li>
+<li>两种一致性级别，有可选的commit wait来实现外部一致的snapshot ioslation。</li>
+<li>codegen。</li>
+</ul>
+<p>Kudu应该也属于HTAP系统（或者更接近于HSAP），它的列存设计很棒。但这种使用Raft实现的多副本shard-nothing架构，计算和存储是耦合的，会给后面的扩展带来很多麻烦（比如怎么支持erasure coding）。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/12/24/kudu-storage-for-fast-analytics-on-fast-data/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/" class="post-title-link" itemprop="url">[笔记] Impala: A Modern, Open-Source SQL Engine for Hadoop</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-23 11:52:41" itemprop="dateCreated datePublished" datetime="2020-12-23T11:52:41+08:00">2020-12-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://2013.berlinbuzzwords.de/sites/2013.berlinbuzzwords.de/files/slides/Impala%20tech%20talk.pdf">Impala: A Modern, Open-Source SQL Engine for Hadoop</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Impala是建立在Hadoop生态之上的MPP query engine，它有以下特点：</p>
+<ul>
+<li>MPP，所有节点都可以参与query执行。</li>
+<li>代码生成。</li>
+<li>基于pub-sub的元数据同步。</li>
+</ul>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/12/23/impala-a-modern-open-source-sql-engine-for-hadoop/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/22/f1-a-distributed-sql-database-that-scales/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/12/22/f1-a-distributed-sql-database-that-scales/" class="post-title-link" itemprop="url">[笔记] F1: A distributed SQL database that scales</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-22 15:59:20" itemprop="dateCreated datePublished" datetime="2020-12-22T15:59:20+08:00">2020-12-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub41344/">F1: A distributed SQL database that scales</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>F1是Google用于替换分库分表的MySQL的RDBMS系统。它在<a href="/2020/12/14/spanner-googles-globally-distributed-database/">Spanner</a>之上建立了一套关系模型，拥有Spanner的跨datacenter的同步replication能力。F1还开发了新的ORM模型，从而将同步geo-replication导致的延时隐藏了起来，保证了E2E延时在替换后没有上升。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/12/22/f1-a-distributed-sql-database-that-scales/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/14/spanner-googles-globally-distributed-database/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/12/14/spanner-googles-globally-distributed-database/" class="post-title-link" itemprop="url">[笔记] Spanner: Google's Globally-Distributed Database</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-14 12:22:39" itemprop="dateCreated datePublished" datetime="2020-12-14T12:22:39+08:00">2020-12-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/2491245">Spanner: Google’s Globally-Distributed Database</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Spanner 是划时代的 OLTP 系统，它的创新点是：</p>
 <ol>
+<li>用 TrueTime 实现了广域的物理 timestamp，这样不引入全局唯一的 TSO 就提供了基于 2PC 的分布式事务与 Snapshot Isolation。</li>
+<li>将数据分为了若干个 PaxosGroup，使用 MultiPaxos（但后来 <a target="_blank" rel="noopener" href="http://wcl.cs.rpi.edu/pilots/library/papers/consensus/RAFTOngaroPhD.pdf">透露他们的实现更接近于当时还未提出的 Raft</a>）实现了高可用。</li>
+</ol>
+<p>Spanner 启发了很多后来者，但它的 TrueTime 是很难模仿的，后来者也通常使用 TSO 或 HLC 来代替，但这样就很难做到像 Spanner 一样跨越大洲部署仍然能提供合理的延时。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/12/14/spanner-googles-globally-distributed-database/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/" class="post-title-link" itemprop="url">[笔记] Large-scale incremental processing using distributed transactions and notifications (Percolator)</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-11 22:21:40" itemprop="dateCreated datePublished" datetime="2020-12-11T22:21:40+08:00">2020-12-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/event/osdi10/tech/full_papers/Peng.pdf">Large-scale incremental processing using distributed transactions and notifications</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>Percolator是Google用于构建增量web索引的数据系统。它的价值在于提出了一种基于NoSQL（BigTable）的两阶段提交（2PC）实现。</p>
+<p>Percolator的2PC实现有以下特点：</p>
+<ol>
+<li>部分去中心化：依赖中心化的Timestamp Oracle（TSO），但不依赖集中式的锁管理节点。</li>
+<li>乐观锁：不能阻塞，检测到冲突需要abort。</li>
+<li>Snapshot Isolation：读比较旧的ts时不会被写block；但为了避免违反SI，读比较新的ts时可能会被写block。</li>
+<li>惰性清理：client失败导致的状态不一致不会立即被清理（没有中心节点）。client之间有种协作关系，如果发起事务的client挂了，根据事务进度，其它client既可能帮它abort，也可能帮它commit。</li>
+</ol>
+<p>以上很多特点都是源于Percolator没有中心节点，也导致了它的2PC延时偏高（尤其是失败时），但优点是能适应巨大的规模。这也是Google系产品的一个特点，可以不那么快，但一定要支持巨大的规模。</p>
+<p>Google系产品的第二个特点是很积极地使用已有产品来构建新系统，这里Percolator选择了基于BigTable来做，就体现了这一点。</p>
+<p>这篇文章实际讲了Percolator的两块内容，一个是2PC，另一个是observer，一种可级联的触发器，但后者似乎没有太多关注。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/12/11/large-scale-incremental-processing-using-distributed-transactions-and-notifications/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/" class="post-title-link" itemprop="url">[笔记] Dremel: a decade of interactive SQL analysis at web scale</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-12-08 15:06:12" itemprop="dateCreated datePublished" datetime="2020-12-08T15:06:12+08:00">2020-12-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3415478.3415568">Dremel: a decade of interactive SQL analysis at web scale</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章主要讲Dremel的核心思想和架构原则（参考<a href="/2020/09/22/dremel-interactive-analysis-of-web-scale-datasets">2010年的paper</a>），包括这些年Dremel的演进（作为BigQuery的后端），以及这些思想在同领域的其它系统中的异同。</p>
+<p>在<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3385658.3385668">The Seattle Report on Database Research</a>中提到了当前AP系统的若干发展趋势，其中本文重点提到的有：</p>
+<ul>
+<li>SQL：大家都开始用SQL作为查询接口了。</li>
 <li>计算存储分离。</li>
-<li>支持不同的存储引擎，如BigTable、Spanner、Mesa等，因此称为federated query processing。</li>
-<li>使用三种不同的模式处理不同规模的query：单节点模式处理短的实时query；分布式模式处理中等query；远程模式使用MapReduce处理大型query。</li>
-<li>使用启发式的query optimizer。</li>
-</ol>
-<p>这里面最有价值的部分就是它如何融合不同的数据源与处理模式。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/11/21/f1-query-declarative-querying-at-scale/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/" class="post-title-link" itemprop="url">[笔记] Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-11-17 22:06:38" itemprop="dateCreated datePublished" datetime="2020-11-17T22:06:38+08:00">2020-11-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub42851/">Mesa: Geo-Replicated, Near Real-Time, Scalable Data Warehousing</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>Mesa是一种面向Google Ads的特定模式数据的准实时数仓，而不是面向非常通用场景的离线数仓。Mesa的设计上偏向于高伸缩性和准实时响应，目标是保证简单query场景的高性能；相对地，Mesa不支持完整的ad-hoc查询（似乎也不支持SQL），可以支撑支持SQL的更上层系统（如MySQL、F1、Dremel）。</p>
-<p>Mesa依赖Google的Colossus、BigTable、MapReduce，数据被水平分片并复制到多个datacenter。Mesa会批量导入数据，每行数据都有version，使用MVCC，周期性提升可见的数据版本。为了保证跨datacenter的更新一致性，Mesa还使用了基于Paxos的同步协议。</p>
-<p>Mesa比较有特色的是它的聚合函数、数据版本管理、以及多datacenter同步。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/11/17/mesa-geo-replicated-near-real-time-scalable-data-warehousing/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/" class="post-title-link" itemprop="url">[笔记] Pebblesdb: Building key-value stores using fragmented log-structured merge trees</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-11-13 23:35:48" itemprop="dateCreated datePublished" datetime="2020-11-13T23:35:48+08:00">2020-11-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3132747.3132765">Pebblesdb: Building key-value stores using fragmented log-structured merge trees</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>PebblesDB在LevelDB（实际是HyperLevelDB）的基础上，借鉴了SkipList中的guard概念，提出了一种Fragmented Log-Structured Merge Trees（FLSM），将整个fileset分成了多层的，层内多个不重叠的区间，每个区间内可以有多个文件。这样compaction可以只在level i做，而不涉及level i+1，从而显著降低了写放大。代价是读的时候从level 1开始每层都可能引入多个文件（对比LevelDB每层一个），开销会变大。PebblesDB因此也引入了一些优化以降低读路径的延时。</p>
-<p>生产中有大量写多的workload，这些场景下PebblesDB的意义很大，且它的实践难度并不高，值得集成到现有系统中。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/11/13/pebblesdb-building-key-value-stores-using-fragmented-log-structured-merge-trees/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/dynamo-amazons-highly-available-key-value-store/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/11/11/dynamo-amazons-highly-available-key-value-store/" class="post-title-link" itemprop="url">[笔记] Dynamo: amazon's highly available key-value store</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-11-11 17:49:12" itemprop="dateCreated datePublished" datetime="2020-11-11T17:49:12+08:00">2020-11-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1323293.1294281">Dynamo: amazon’s highly available key-value store</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>Dynamo是一种去中心化的KV分布式存储系统。它的主要设计目标是：</p>
-<ul>
-<li>高可用性（always writable）。</li>
-<li>高可伸缩性。</li>
-<li>高性能（低延时）。</li>
-<li>面向异构机器。</li>
+<li>原地分析：数据湖（Data Lake）越来越流行了，同一份数据可以由不同的计算引擎使用，结果再存回数据湖中，而不需要为了不同引擎反复转换数据。</li>
+<li>Serverless计算：提供on-demand方式，用时分配资源，按使用量计费，而不是传统的预留资源。</li>
+<li>列存：Dremel对嵌套结构的列存处理方式启发了许多后来者。</li>
 </ul>
-<p>为此Dynamo在CAP中选择了AP，牺牲了一部分的一致性（最终一致）。针对潜在的数据修改的冲突，Dynamo将选择权交给了用户，读取会返回一个“vector clock”，由用户自己解决冲突。</p>
-<p>另外为了避免单点问题影响可用性，Dynamo选择了去中心化架构，所有节点都是相同地位的，通过一致性哈希决定数据分片，通过gossip协议在不同节点间同步节点列表和所管理的数据范围。</p>
-<p>Dynamo使用了quorum协议（即R+W&gt;N）来读写不同replica的数据。为了进一步提升集群发生错误时的可用性，Dynamo使用了“sloppy quorum”以允许少数派节点也可以临时写入数据，因此造成的数据冲突由上面提到的vector clock来解决。</p>
-<p>Dynamo与BigTable是同一个时期非常不同的两种技术选择，前者看重可用性，后者看重一致性，且有着更复杂的数据模型。目前来看，用户似乎通常不太喜欢自己来解决数据冲突，默认的“last write win”策略已经够好了。对于只在一个datacenter内的后继系统来说，Dynamo有点过于复杂了，中心节点可以极大简化系统设计。但对于跨datacenter的系统，quorum的价值一下子提高了很多。</p>
-<p><img src="/images/2020-11/dynamo-02.jpg" alt="Summary of techniques used in Dynamo"></p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/11/11/dynamo-amazons-highly-available-key-value-store/#more" rel="contents">
+              <a class="btn" href="/2020/12/08/dremel-a-decade-of-interactive-sql-analysis-at-web-scale/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -597,7 +780,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/building-a-database-on-s3/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -611,7 +794,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/11/11/building-a-database-on-s3/" class="post-title-link" itemprop="url">[笔记] Building a Database on S3</a>
+            <a href="/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/" class="post-title-link" itemprop="url">[笔记] Procella: Unifying serving and analytical data at YouTube</a>
         </h1>
 
         <div class="post-meta">
@@ -621,7 +804,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-11-11 14:35:58" itemprop="dateCreated datePublished" datetime="2020-11-11T14:35:58+08:00">2020-11-11</time>
+              <time title="创建时间：2020-12-06 16:01:20" itemprop="dateCreated datePublished" datetime="2020-12-06T16:01:20+08:00">2020-12-06</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -643,23 +826,21 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1376616.1376645">Building a Database on S3</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/citation.cfm?id=3352063.3360438">Procella: Unifying serving and analytical data at YouTube</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>这篇文章讲的是如何实现自己的“云原生”数据库，以及探索S3是否适合作为DB的共享存储。</p>
-<p>S3的优点是安全、无需运维、按使用付费，缺点是访问延时高、使用廉价硬件可能会牺牲一致性（这里作者引用了Dynamo，不太确定Dynamo和S3的关系）、更新不保证顺序。</p>
-<p>本文的贡献：</p>
+<p>Procella是一种可以适应不同查询需求的分析引擎，它的特点：</p>
 <ul>
-<li>演示了如何在S3上实现需要被并发修改的小对象。</li>
-<li>演示了S3上如何实现B树。</li>
-<li>提出了可以演示如何用S3实现不同一致性级别的协议。</li>
-<li>使用TPC-W基准测试了不同一致性级别下使用S3的成本。</li>
+<li>松耦合的schema要求，只要数据schema与table schema兼容，不需要完全一致，且文件本身的索引结构也可以惰性生成。</li>
+<li>使用了新的列存格式Artus，内带索引结构，同时支持高性能的点查和扫描，且使用高性能的、不解压就可以操作的压缩算法。</li>
+<li>使用Lambda架构，实时节点与compaction节点分离，前者支持高性能读写，后者可以在后台做复杂的优化。</li>
+<li>多种优化，包括自适应的基于运行期抽样的query优化。</li>
+<li>广泛使用多种cache。</li>
+<li>完整的SQL支持。</li>
 </ul>
-<p>本文的目的是在保证可用性和资源利用率的前提下，探索如何将DB的性质尽可能多地搬到云上。</p>
-<p>结论：显然只是一次实验，验证了使用S3作为共享存储的可行性，但实用性不高。如果换成EBS的话可能更好一些。它的PU queue有点像Bw-tree。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/11/11/building-a-database-on-s3/#more" rel="contents">
+              <a class="btn" href="/2020/12/06/procella-unifying-serving-and-analytical-data-at-youtube/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -683,7 +864,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/08/map-reduce-a-major-step-backwards/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/12/05/separate-write-read-compaction-by-file-meta-service/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -697,7 +878,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/11/08/map-reduce-a-major-step-backwards/" class="post-title-link" itemprop="url">[笔记] MapReduce: A Major step backwards</a>
+            <a href="/2020/12/05/separate-write-read-compaction-by-file-meta-service/" class="post-title-link" itemprop="url">解耦NoSQL系统的写、读、Compaction</a>
         </h1>
 
         <div class="post-meta">
@@ -707,7 +888,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-11-08 21:22:24" itemprop="dateCreated datePublished" datetime="2020-11-08T21:22:24+08:00">2020-11-08</time>
+              <time title="创建时间：2020-12-05 13:50:58" itemprop="dateCreated datePublished" datetime="2020-12-05T13:50:58+08:00">2020-12-05</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -728,23 +909,15 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://pdfs.semanticscholar.org/08d1/2e771d811bcd0d4bc81fa3993563efbaeadb.pdf">MapReduce: A Major step backwards</a></p>
+          <p><strong>TL;DR</strong></p>
+<p>NoSQL系统中的一个常见问题就是写、读、compaction三类操作的资源争抢导致服务质量受到影响。这里脑洞一个方案，通过单独的FileMeta Service来管理文件的元数据与生命期，从而解耦前面三类操作，实现资源的隔离，提升服务质量。</p>
+<p>进一步地，分离三类操作后，我们甚至可以针对不同操作使用不同的分区策略，从而进一步解耦三类操作，释放出更高的能力。</p>
+<blockquote>
+<p>idea来源于我在阿里云Tablestore时的一次讨论，参考了Google的Procella和F1-lightning的实现方式。</p>
 </blockquote>
-<p><strong>TL;DR</strong></p>
-<p>这篇文章是两位大佬（DeWitt和Stonebraker）对“MapReduce可以革掉传统的并行RDBMS的命”的论点的回击。</p>
-<p>MapReduce对于DB社区而言：</p>
-<ol>
-<li>在大规模数据密集型应用的编程范式角度是一种倒退。</li>
-<li>并非最优化的实现，因其使用暴力搜索而不是索引。</li>
-<li>一点也不新奇 —— 它就是25年前广为人知的技术的又一次实现。</li>
-<li>缺少当今DBMS必备的多种功能。</li>
-<li>与DBMS用户依赖的工具不兼容。</li>
-</ol>
-<p>（因此之后若干年大家用高度的热情将这两者又统一起来了）</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/11/08/map-reduce-a-major-step-backwards/#more" rel="contents">
+              <a class="btn" href="/2020/12/05/separate-write-read-compaction-by-file-meta-service/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -768,7 +941,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/22/mega-store-providing-scalable-highly-available-storage-for-interactive-services/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/30/f1-lightning-htap-as-a-service/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -782,7 +955,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2020/10/22/mega-store-providing-scalable-highly-available-storage-for-interactive-services/" class="post-title-link" itemprop="url">[笔记] Megastore: Providing scalable, highly available storage for interactive services</a>
+            <a href="/2020/11/30/f1-lightning-htap-as-a-service/" class="post-title-link" itemprop="url">[笔记] F1 Lightning: HTAP as a Service</a>
         </h1>
 
         <div class="post-meta">
@@ -792,7 +965,7 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2020-10-22 17:38:03" itemprop="dateCreated datePublished" datetime="2020-10-22T17:38:03+08:00">2020-10-22</time>
+              <time title="创建时间：2020-11-30 12:38:12" itemprop="dateCreated datePublished" datetime="2020-11-30T12:38:12+08:00">2020-11-30</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
@@ -814,184 +987,15 @@
 
       
           <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub36971.pdf">Megastore: Providing scalable, highly available storage for interactive services</a></p>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.14778/3415478.3415553">F1 Lightning: HTAP as a Service</a></p>
 </blockquote>
 <p><strong>TL;DR</strong></p>
-<p>Megastore结合了NoSQL的扩展性和RDBMS的便利性，支持局部的ACID、多datacenter间的无缝failover。</p>
-<p>Megastore在每个datacenter有一个instance，数据存储在对应的Bigtable中，instance之间使用Paxos协调。</p>
-<p>从性能指标来看读写延时有点高，平均在100ms以上。</p>
+<p>F1 Lightning是一种提供HTAP服务的系统，本身并不是一个完整的HTAP系统。它的切入点是为已有的OLTP（F1、Spanner）用户提供列式存储，供其它的OLAP系统（<a href="/2020/11/21/f1-query-declarative-querying-at-scale">F1 Query</a>）使用。这样用户不需要迁移转换已有的数据就能享受到更快捷的分析能力。</p>
+<p>F1 Lightning依赖于OLTP系统的ChangeDataCapture（CDC）接口，从而将OLTP的修改应用到Lightning列存上；另一端，它依赖于OLAP系统下推部分算子，从而充分利用列式存储的扫描优势。</p>
+<p>HTAP现在已经不那么新颖了，但F1 Lightning的切入点很独特，也是因为Google内部系统间合作比较容易，且已有数据量非常大，这种不需要迁移，与已有系统充分结合的方案才有用武之地。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2020/10/22/mega-store-providing-scalable-highly-available-storage-for-interactive-services/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/" class="post-title-link" itemprop="url">[笔记] FlumeJava: Easy, Efficient Data-Parallel Pipelines</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-16 20:00:43" itemprop="dateCreated datePublished" datetime="2020-10-16T20:00:43+08:00">2020-10-16</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://research.google/pubs/pub35650.pdf">FlumeJava: Easy, Efficient Data-Parallel Pipelines</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>FlumeJava是基于MapReduce的计算框架。它的特点：</p>
-<ul>
-<li>提供了表达能力很强的Java库。</li>
-<li>惰性求值。</li>
-<li>结合了本地运算与远端MapReduce作业。</li>
-<li>可以生成优化的MapReduce程序。</li>
-</ul>
-<p>（FlumeJava这套框架目前仍在被大量使用，但底下应该已经不是MapReduce了。）</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/16/flume-java-easy-efficient-data-parallel-pipelines/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/" class="post-title-link" itemprop="url">[笔记] The End of an Architectural Era (It's Time for a Complete Rewrite)</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-10-14 16:56:10" itemprop="dateCreated datePublished" datetime="2020-10-14T16:56:10+08:00">2020-10-14</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://hstore.cs.brown.edu/papers/hstore-endofera.pdf">The End of an Architectural Era (It’s Time for a Complete Rewrite)</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>本文针对新硬件带来的新的趋势，提出了一种全新的OLTP DBMS，H-Store，可以大幅度提高传统的DBMS的性能。</p>
-<p>传统的DBMS主要还是沿用System R的架构：</p>
-<ul>
-<li>面向磁盘的存储和索引结构。</li>
-<li>多线程。</li>
-<li>基于锁的并发控制。</li>
-<li>基于log的恢复机制。</li>
-</ul>
-<p>本文观点是在这套架构上小修小补已经不够了，我们需要全新的设计。</p>
-<p>尤其是传统RDBMS想用一套系统满足全部需求的想法已经过时了。</p>
-<p>H-Store针对OLTP场景，打破了上面这种架构，主要是充分利用大内存和多节点，结合对OLTP场景的若干假设，省掉log和lock相关的很多机制，从而大幅度提升了性能。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/10/14/the-end-of-an-architectural-era-its-time-for-a-complete-rewrite/#more" rel="contents">
+              <a class="btn" href="/2020/11/30/f1-lightning-htap-as-a-service/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -1015,7 +1019,7 @@
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/5/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/7/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/5/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/7/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1084,7 +1088,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">122</span>
+          <span class="site-state-item-count">134</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

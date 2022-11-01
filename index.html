@@ -195,7 +195,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/14/cpp-libcxx-function-copy-first-when-move-with-sso/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/11/01/how-to-pretend-to-understand-snapshot-isolation/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -209,7 +209,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2022/08/14/cpp-libcxx-function-copy-first-when-move-with-sso/" class="post-title-link" itemprop="url">记：不能依赖 std::function 的 move 函数清空 source</a>
+            <a href="/2022/11/01/how-to-pretend-to-understand-snapshot-isolation/" class="post-title-link" itemprop="url">如何装作懂 Snapshot Isolation</a>
         </h1>
 
         <div class="post-meta">
@@ -220,7 +220,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2022-08-14 11:23:45 / 修改时间：11:24:00" itemprop="dateCreated datePublished" datetime="2022-08-14T11:23:45+08:00">2022-08-14</time>
+              <time title="创建时间：2022-11-01 22:32:15 / 修改时间：22:32:40" itemprop="dateCreated datePublished" datetime="2022-11-01T22:32:15+08:00">2022-11-01</time>
             </span>
 
           
@@ -234,156 +234,16 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p><strong>TL;DR</strong></p>
-<p>分享某位不愿透露姓名的耿老板发现的 libc++ 的某个奇怪行为：<code>std::function</code> 当内部成员体积足够小，且其 copy 函数标记为 <code>noexcept</code> 时，move ctor 或 assign 函数会优先调用内部成员的 copy 函数，而不是 move 函数。</p>
-<p>这不是 bug，但很反直觉。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/08/14/cpp-libcxx-function-copy-first-when-move-with-sso/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/09/cpp-coroutine-misalign-frame-address/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/08/09/cpp-coroutine-misalign-frame-address/" class="post-title-link" itemprop="url">记：C++20 coroutine 的诡异 bug 调查过程</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-08-09 20:48:56" itemprop="dateCreated datePublished" datetime="2022-08-09T20:48:56+08:00">2022-08-09</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-08-12 21:09:19" itemprop="dateModified" datetime="2022-08-12T21:09:19+08:00">2022-08-12</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>TL;DR</strong></p>
-<p>C++20 coroutine 有一个严重的 <a target="_blank" rel="noopener" href="https://github.com/llvm/llvm-project/issues/56671">bug</a>，且这个 bug 本质上来源于 C++ 标准不完善：在分配 coroutine frame 时，没有严格按 alignment 要求。目前看起来 gcc 与 clang 都中招了，只有 msvc 似乎没问题。</p>
-<p>本文记录了我是如何被这个 bug 消耗掉了<del>两</del>三天光明。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/08/09/cpp-coroutine-misalign-frame-address/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/" class="post-title-link" itemprop="url">一种通过 skip cache 加速重复查询的方法</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2022-08-03 21:33:18 / 修改时间：21:33:41" itemprop="dateCreated datePublished" datetime="2022-08-03T21:33:18+08:00">2022-08-03</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>TL;DR</strong></p>
-<p>AP 系统中缓存算子结果是一种很有效的针对重复查询的优化手段。但这种方法严重依赖于结果的不变性，因此并不适用于频繁更新的场景（如 TiFlash）。本文提出一种通过维护运行期的 skip cache，尽可能跳过无效 page 的优化方法，<strong>应该</strong>对这种场景有效。</p>
+          <blockquote>
+<p>以下大量内容参考自 <a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/54979396">Snapshot Isolation综述</a>，不一一列举了。</p>
+</blockquote>
+<p>某天，某群，某位老师冒出来一个问题：</p>
 <blockquote>
-<p>有 paper 已经讲过这种优化的话求告知。</p>
+<p>话说我在想，snapshot isolation 这种的读不会被写阻塞是不是一个伪命题</p>
 </blockquote>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2022/08/03/maintain-runtime-skip-cache-for-dynamic-filtering/#more" rel="contents">
+              <a class="btn" href="/2022/11/01/how-to-pretend-to-understand-snapshot-isolation/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -407,7 +267,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/01/cpp-variadic-macro-tips/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/26/scaling-memcache-at-facebook/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -421,7 +281,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2022/08/01/cpp-variadic-macro-tips/" class="post-title-link" itemprop="url">C++ 变参宏的两个技巧</a>
+            <a href="/2022/09/26/scaling-memcache-at-facebook/" class="post-title-link" itemprop="url">[笔记] Scaling Memcache at Facebook</a>
         </h1>
 
         <div class="post-meta">
@@ -431,14 +291,14 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2022-08-01 21:22:09" itemprop="dateCreated datePublished" datetime="2022-08-01T21:22:09+08:00">2022-08-01</time>
+              <time title="创建时间：2022-09-26 13:35:14" itemprop="dateCreated datePublished" datetime="2022-09-26T13:35:14+08:00">2022-09-26</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-08-03 19:39:58" itemprop="dateModified" datetime="2022-08-03T19:39:58+08:00">2022-08-03</time>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
               </span>
 
           
@@ -452,17 +312,498 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p><strong>TL;DR</strong></p>
-<blockquote>
-<p>小朋友不要乱学</p>
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/system/files/conference/nsdi13/nsdi13-final170_update.pdf">Scaling Memcache at Facebook</a></p>
 </blockquote>
+<p><strong>TL;DR</strong></p>
+<p>在 cache coherence 方面经常被人引用的 paper。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/09/26/scaling-memcache-at-facebook/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/19/cache-craftiness-for-multicore-key-value-storage/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/09/19/cache-craftiness-for-multicore-key-value-storage/" class="post-title-link" itemprop="url">[笔记] Cache Craftiness for Fast Multicore Key-Value Storage</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-19 09:00:39" itemprop="dateCreated datePublished" datetime="2022-09-19T09:00:39+08:00">2022-09-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/pdf/10.1145/2168836.2168855">Cache Craftiness for Fast Multicore Key-Value Storage</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>大名鼎鼎的 Masstree。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/09/19/cache-craftiness-for-multicore-key-value-storage/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/14/processing-a-trillion-cells-per-mouse-click/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/09/14/processing-a-trillion-cells-per-mouse-click/" class="post-title-link" itemprop="url">[笔记] Processing a Trillion Cells per Mouse Click</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-14 22:42:31" itemprop="dateCreated datePublished" datetime="2022-09-14T22:42:31+08:00">2022-09-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.vldb.org/pvldb/vol5/p1436_alexanderhall_vldb2012.pdf">Processing a Trillion Cells per Mouse Click</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>一篇相对早期（2012 年）的 paper，介绍了服务特定领域（WebUI）的 OLAP 系统 PowerDrill。PowerDrill 貌似在狗家命运不太好，这篇 paper 发表前后已经被 Dremel 给取代了。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/09/14/processing-a-trillion-cells-per-mouse-click/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/11/better-bitmap-performance-with-roaring-bitmaps/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/09/11/better-bitmap-performance-with-roaring-bitmaps/" class="post-title-link" itemprop="url">[笔记] Better bitmap performance with Roaring bitmaps</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-11 20:35:37" itemprop="dateCreated datePublished" datetime="2022-09-11T20:35:37+08:00">2022-09-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://arxiv.org/pdf/1402.6407.pdf">Better bitmap performance with Roaring bitmaps</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文提出了一种 bitmap 压缩格式 Roaring，它使用自适应的两级索引结构，分别用 bitmap 保存 dense 数据、用数组保存 sparse 数据，由此在空间占用与常见操作性能之间取得了很好的平衡。</p>
+<p>相比 trivial 的 bitset 实现，Roaring 在内存占用，以及超稀疏场景下的操作性能上都有着明显的优势。相比基于 RLE 的 WAH 和 Concise 两种格式，它在空间占用与操作性能上都有着明显的优势。</p>
+<blockquote>
+<p>Roaring 属于是一看就觉得 make sense，早该如此的 idea。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/09/11/better-bitmap-performance-with-roaring-bitmaps/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/09/order-perserving-key-compression-for-in-memory-search-trees/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/09/09/order-perserving-key-compression-for-in-memory-search-trees/" class="post-title-link" itemprop="url">[笔记] Order-Preserving Key Compression for In-Memory Search Trees</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-09 22:53:32" itemprop="dateCreated datePublished" datetime="2022-09-09T22:53:32+08:00">2022-09-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/pdf/10.1145/3318464.3380583">Order-Preserving Key Compression for In-Memory Search Trees</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文提出了一种针对字符串的分段编码框架 HOPE（High-speed Order-Preserving Encoder），在构建初始字典之后，可以流式编码任意字符串。且，重点来了，编码之间仍然保持原有字符串的顺序。这样 HOPE 的适用范围就不仅仅是静态的压缩已有数据了，它还能直接与各种树结构结合，直接用编码后的值作为 key。这样的好处有：</p>
 <ol>
-<li>基于参数数量重载宏函数。</li>
-<li>当 <code>__VA_ARGS__</code> 为空时，忽略多余的逗号。</li>
+<li>对于 B-tree 等，更短的 key 意味着更大的 fanout。</li>
+<li>对于 Trie 等，更短的 key 意味着更低的高度。</li>
+<li>节省空间有助于在内存中维护更多数据（如 cache 等）。</li>
+<li>节省空间有助于提升 cache 性能。</li>
+</ol>
+<blockquote>
+<p>令我大开眼界。直觉这篇 paper 比较实用。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/09/09/order-perserving-key-compression-for-in-memory-search-trees/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/07/infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystems/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/09/07/infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystems/" class="post-title-link" itemprop="url">[笔记] InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-07 23:01:51" itemprop="dateCreated datePublished" datetime="2022-09-07T23:01:51+08:00">2022-09-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/system/files/fast22-lv.pdf">InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>InfiniFS 针对的是如何实现超大规模的单一分布式文件系统，目标上有些类似于 Facebook 的 Tectonic。但 InfiniFS 仍然是比较正统的、遵守 POSIX 语义的 fs，而 Tectonic 则是 HDFS 的升级版，目的是解决 Facebook 自身业务遇到的实际问题。</p>
+<p>InfiniFS 看上去是 LocoFS 的后继，延续了 <a href="/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/">LocoFS</a> 将 metadata 分成两部分的设计（但针对所有 inode 而不只是 f-inode）。另外 InfiniFS 还从 <a href="https://fuzhe1989.github.io/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/">HopsFS</a> 借鉴了并发 load inode。除此之外 InfiniFS 还有如下独特设计：</p>
+<ol>
+<li>client 端可以通过 hash 预测 inode id。结合并发 load inode，可以有效降低 network trip。</li>
+<li>client 与 metadata server 共同维护的一致性 cache。</li>
+<li>单独的 rename coordinator。</li>
+</ol>
+<blockquote>
+<p>整体看下来感觉 InfiniFS 的完成度还是比较高的，很实用，可能和有阿里云的前同事参与有比较大的关系。</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/09/07/infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystems/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/" class="post-title-link" itemprop="url">[笔记] HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-07 13:01:10" itemprop="dateCreated datePublished" datetime="2022-09-07T13:01:10+08:00">2022-09-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/system/files/conference/fast17/fast17-niazi.pdf">HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>HopsFS 目标是成为下一代 HDFS，其核心改进是使用一个分布式的 NewSQL 系统（NDB）替代了 HDFS 原本的单节点 in-memory metadata management。</p>
+<p>亮点：</p>
+<ol>
+<li>展示了如何使用分离的存储系统来管理 metadata。</li>
+<li>仔细设计 schema 以缓解分布式事务对性能的影响。</li>
+<li>并行 load inode。</li>
 </ol>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2022/08/01/cpp-variadic-macro-tips/#more" rel="contents">
+              <a class="btn" href="/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -486,7 +827,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/07/01/probability-of-data-loss-when-nodes-increase/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -500,7 +841,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2022/07/01/probability-of-data-loss-when-nodes-increase/" class="post-title-link" itemprop="url">数据丢失概率与节点数量的关系</a>
+            <a href="/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/" class="post-title-link" itemprop="url">[笔记] LocoFS: A Loosely-Coupled Metadata Service for Distributed File Systems</a>
         </h1>
 
         <div class="post-meta">
@@ -510,14 +851,14 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2022-07-01 12:23:54" itemprop="dateCreated datePublished" datetime="2022-07-01T12:23:54+08:00">2022-07-01</time>
+              <time title="创建时间：2022-09-07 11:22:53" itemprop="dateCreated datePublished" datetime="2022-09-07T11:22:53+08:00">2022-09-07</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
               </span>
 
           
@@ -531,20 +872,24 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p><strong>TL;DR</strong></p>
-<p>分布式系统中我们经常会使用多副本策略来保证数据的可靠性。常见的多副本策略可以按容错能力分为两类。假设系统需要能容忍最多 f 个节点失败：</p>
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/pdf/10.1145/3126908.3126928">LocoFS: A Loosely-Coupled Metadata Service for Distributed File Systems</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>LocoFS 的出发点：</p>
 <ol>
-<li>需要 2f+1 个副本的 Quorum 策略，如 Paxos&#x2F;Raft </li>
-<li>需要 f+1 个副本，如 chain replication（下文称 CR）。</li>
+<li>降低 metadata 操作的网络延时。</li>
+<li>充分发挥 kv-store 的性能。</li>
 </ol>
-<p>本文通过简单的模拟计算，得到以下结论：</p>
+<p>LocoFS 做了以下两种优化：</p>
 <ol>
-<li>固定节点失败概率与每个节点上的 shard 数量，数据丢失概率是节点数量的凸函数，即随着节点数量增加，数据丢失概率逐渐增大，到达峰值后再逐渐减小。</li>
-<li>同等存储成本下，CR 的数据丢失概率远低于 Quorum。</li>
+<li>将 dir entry 与 child 的 inode 放到一起管理，更有利于将整个 namespace 的树型结构平坦化为 key-value 结构。</li>
+<li>将 file metadata 分为 access 与 content 两类，降低单次操作的粒度。</li>
 </ol>
+<p>LocoFS 整体上来看对系统限制还是比较强（限制只有一个 DMS），但思路还不错。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2022/07/01/probability-of-data-loss-when-nodes-increase/#more" rel="contents">
+              <a class="btn" href="/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -568,7 +913,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/26/cpp-initializer-list-type-infer/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.jpg">
@@ -582,7 +927,7 @@
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
           
-            <a href="/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/" class="post-title-link" itemprop="url">基于 fs 抽象实现 cloud native kv engine</a>
+            <a href="/2022/08/26/cpp-initializer-list-type-infer/" class="post-title-link" itemprop="url">C++: std::initializer_list 的类型推导</a>
         </h1>
 
         <div class="post-meta">
@@ -592,14 +937,14 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2022-05-29 12:28:12" itemprop="dateCreated datePublished" datetime="2022-05-29T12:28:12+08:00">2022-05-29</time>
+              <time title="创建时间：2022-08-26 17:21:29" itemprop="dateCreated datePublished" datetime="2022-08-26T17:21:29+08:00">2022-08-26</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
                   <i class="fa fa-calendar-check-o"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+                <time title="修改时间：2022-09-02 20:07:26" itemprop="dateModified" datetime="2022-09-02T20:07:26+08:00">2022-09-02</time>
               </span>
 
           
@@ -613,310 +958,11 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <p><strong>TL;DR</strong></p>
-<p>本文探讨如何基于 AWS 的多种存储介质（本地 SSD、EBS 与 S3）实现一个 cloud native 版的 kv engine（比如 TiKV [狗头]），以及其中为什么要引入文件系统这一层抽象。</p>
+          <p><a target="_blank" rel="noopener" href="https://godbolt.org/z/nh57noeM3">Compiler Explorer</a> 一个例子胜千言。</p>
+<p>更准确地说明看<a target="_blank" rel="noopener" href="https://en.cppreference.com/w/cpp/utility/initializer_list">这里</a>。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/04/17/tiflash-executor-thread-model/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/04/17/tiflash-executor-thread-model/" class="post-title-link" itemprop="url">TiFlash 执行器线程模型</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-04-17 23:45:38" itemprop="dateCreated datePublished" datetime="2022-04-17T23:45:38+08:00">2022-04-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>TL;DR</strong></p>
-<p><a target="_blank" rel="noopener" href="https://github.com/pingcap/tiflash">TiFlash</a> 是 MPP + 列存的 HTAP 引擎，这篇主要介绍它的执行器的线程模型。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/04/17/tiflash-executor-thread-model/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/03/05/one-creed-intention-semantic/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/03/05/one-creed-intention-semantic/" class="post-title-link" itemprop="url">纲领、意图、语义：从接口设计到公司治理</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-03-05 21:00:27" itemprop="dateCreated datePublished" datetime="2022-03-05T21:00:27+08:00">2022-03-05</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>TL;DR</strong></p>
-<ol>
-<li>为什么接口设计要表达清晰明确的语义？</li>
-<li>为什么一次代码修改（cl&#x2F;pr&#x2F;commit）要有唯一明确的意图？</li>
-<li>工作中为什么要树立自己的人设？</li>
-<li>如何让 OKR 发挥作用？</li>
-<li>如何三句话让客户为你的产品花钱？</li>
-</ol>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/03/05/one-creed-intention-semantic/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/" class="post-title-link" itemprop="url">[C++] 一定要 public 继承 std::enable_shared_from_this</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-07-25 00:23:17" itemprop="dateCreated datePublished" datetime="2021-07-25T00:23:17+08:00">2021-07-25</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>TL;DR</strong></p>
-<p><code>std::enable_shared_from_this</code>必须要<code>public</code>继承，否则调用<code>shared_from_this()</code>不会编译失败，但运行时会抛<code>std::bad_weak_ptr</code>的异常。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/07/25/cpp-enable-shared-from-this-must-be-public-inherited/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/07/24/cpp-move-ctor-with-ref-member/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/07/24/cpp-move-ctor-with-ref-member/" class="post-title-link" itemprop="url">[C++] 带有引用类型成员的类居然默认允许移动</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-07-24 23:58:12" itemprop="dateCreated datePublished" datetime="2021-07-24T23:58:12+08:00">2021-07-24</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>TL;DR</strong></p>
-<p>对于一个成员 X 是另一个成员 Y 的引用的类，C++编译器会默认为它生成移动构造函数和移动赋值函数，但这两个函数是有问题的。建议手动禁掉这种类的移动函数。</p>
-<p>但这类问题（dangling）是 C++的根本缺陷，没有好的解法，不要想着有什么万全之策了，接受它。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/07/24/cpp-move-ctor-with-ref-member/#more" rel="contents">
+              <a class="btn" href="/2022/08/26/cpp-initializer-list-type-infer/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -940,7 +986,7 @@
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/13/">13</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/14/">14</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1009,7 +1055,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">122</span>
+          <span class="site-state-item-count">134</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
