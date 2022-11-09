@@ -195,6 +195,77 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/11/09/cpp-a-minimal-static-reflection-demo/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/11/09/cpp-a-minimal-static-reflection-demo/" class="post-title-link" itemprop="url">C++：一个极简的静态反射 demo</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-11-09 21:52:21 / 修改时间：21:53:11" itemprop="dateCreated datePublished" datetime="2022-11-09T21:52:21+08:00">2022-11-09</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>下面这个类可以静态枚举字段：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">A</span> : Base &#123;</span><br><span class="line">    <span class="built_in">ADD_FIELD</span>(<span class="type">int</span>, a, <span class="number">110</span>);</span><br><span class="line">    <span class="built_in">ADD_FIELD</span>(<span class="type">double</span>, b, <span class="number">1.2</span>);</span><br><span class="line">    <span class="built_in">ADD_FIELD</span>(std::string, c, <span class="string">&quot;OK&quot;</span>);</span><br><span class="line">    <span class="built_in">ADD_FIELD</span>(<span class="type">uint32_t</span>, d, <span class="number">27</span>);</span><br><span class="line">    std::string others;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    A a;</span><br><span class="line">    Helper::<span class="built_in">visit</span>([](std::string_view name, <span class="keyword">auto</span> &amp;&amp;value) &#123;</span><br><span class="line">        std::<span class="built_in">print</span>(<span class="string">&quot;name: &#123;&#125; value: &#123;&#125;\n&quot;</span>, name, value);</span><br><span class="line">    &#125;, a);</span><br><span class="line"></span><br><span class="line">    Helper::<span class="built_in">apply</span>([](<span class="type">int</span> a, <span class="type">double</span> b, std::string_view c, <span class="type">uint32_t</span> d) &#123;</span><br><span class="line">        std::<span class="built_in">print</span>(<span class="string">&quot;a: &#123;&#125; b: &#123;&#125; c: &#123;&#125; d: &#123;&#125;\n&quot;</span>, a, b, c, d);</span><br><span class="line">    &#125;, a);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>感谢某同事手把手教会我写这个 demo</p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/11/09/cpp-a-minimal-static-reflection-demo/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/11/01/how-to-pretend-to-understand-snapshot-isolation/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -909,79 +980,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/08/26/cpp-initializer-list-type-infer/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/08/26/cpp-initializer-list-type-infer/" class="post-title-link" itemprop="url">C++: std::initializer_list 的类型推导</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-08-26 17:21:29" itemprop="dateCreated datePublished" datetime="2022-08-26T17:21:29+08:00">2022-08-26</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-09-02 20:07:26" itemprop="dateModified" datetime="2022-09-02T20:07:26+08:00">2022-09-02</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><a target="_blank" rel="noopener" href="https://godbolt.org/z/nh57noeM3">Compiler Explorer</a> 一个例子胜千言。</p>
-<p>更准确地说明看<a target="_blank" rel="noopener" href="https://en.cppreference.com/w/cpp/utility/initializer_list">这里</a>。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/08/26/cpp-initializer-list-type-infer/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1055,7 +1053,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-count">135</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
