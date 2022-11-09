@@ -266,3 +266,5 @@ auto apply(F &&f, T &t) {
 以上基本照搬 [apply](https://en.cppreference.com/w/cpp/utility/apply) 的实现。
 
 由此，我们终于完成了这个极简的静态反射的 demo。
+
+[Compiler Explorer](https://godbolt.org/z/qsqe3aW6b)
