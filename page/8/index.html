@@ -195,6 +195,91 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/08/map-reduce-a-major-step-backwards/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/08/map-reduce-a-major-step-backwards/" class="post-title-link" itemprop="url">[笔记] MapReduce: A Major step backwards</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-08 21:22:24" itemprop="dateCreated datePublished" datetime="2020-11-08T21:22:24+08:00">2020-11-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://pdfs.semanticscholar.org/08d1/2e771d811bcd0d4bc81fa3993563efbaeadb.pdf">MapReduce: A Major step backwards</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章是两位大佬（DeWitt和Stonebraker）对“MapReduce可以革掉传统的并行RDBMS的命”的论点的回击。</p>
+<p>MapReduce对于DB社区而言：</p>
+<ol>
+<li>在大规模数据密集型应用的编程范式角度是一种倒退。</li>
+<li>并非最优化的实现，因其使用暴力搜索而不是索引。</li>
+<li>一点也不新奇 —— 它就是25年前广为人知的技术的又一次实现。</li>
+<li>缺少当今DBMS必备的多种功能。</li>
+<li>与DBMS用户依赖的工具不兼容。</li>
+</ol>
+<p>（因此之后若干年大家用高度的热情将这两者又统一起来了）</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/08/map-reduce-a-major-step-backwards/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/10/22/mega-store-providing-scalable-highly-available-storage-for-interactive-services/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -914,81 +999,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/23/cassandra-a-decentralized-structured-storage-system/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/23/cassandra-a-decentralized-structured-storage-system/" class="post-title-link" itemprop="url">[笔记] Cassandra: a decentralized structured storage system</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-09-23 16:54:37" itemprop="dateCreated datePublished" datetime="2020-09-23T16:54:37+08:00">2020-09-23</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="http://www.cl.cam.ac.uk/~ey204/teaching/ACS/R212_2014_2015/papers/lakshman_ladis_2009.pdf">Cassandra: a decentralized structured storage system</a></p>
-<p>可以参考<a target="_blank" rel="noopener" href="https://static.last.fm/johan/nosql-20090611/cassandra_nosql.pdf">Cassandra: structured storage system on a P2P network</a>加深理解。</p>
-</blockquote>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/09/23/cassandra-a-decentralized-structured-storage-system/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1062,7 +1072,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">135</span>
+          <span class="site-state-item-count">136</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

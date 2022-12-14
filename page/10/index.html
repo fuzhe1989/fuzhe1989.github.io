@@ -195,6 +195,95 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/" class="post-title-link" itemprop="url">[笔记] ‘One Size Fits All’: An Idea Whose Time Has Come and Gone</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-06 16:14:43" itemprop="dateCreated datePublished" datetime="2020-08-06T16:14:43+08:00">2020-08-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.68.9136&rep=rep1&type=pdf">Michael Stonebraker and Uğur Çetintemel: “‘One Size Fits All’: An Idea Whose Time Has Come and Gone,” at April 2005.</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文idea：DBMS的未来趋势是多个相互独立的DB engine针对不同的细分领域。</p>
+<p>论证过程：</p>
+<ol>
+<li>过去若干年中DBMS厂家追求“One size fits all”，原因有若干。</li>
+<li>传统DBMS主要针对OLTP，处理模型为outbound，针对性优化短事务，重点在于ACID，这些特点并不适用于OLAP。</li>
+<li>随着streaming processing兴起，它需要完全不同的优化方向。</li>
+<li>未来使用DBMS的应用类型会越来越多，会有更多针对特定领域的DB engine出现。</li>
+</ol>
+<p>感想：</p>
+<ol>
+<li>任何优化都是有代价的，选择针对一个方向优化，就会在另一个方向平庸。甚至提供不同优化的开关也是有代价的，只要允许选择，代价就会存在。</li>
+<li>不同应用需要不同程度的一致性，但一套系统在架构设计时就要锚定某种一致性，它运行在其它一致性级别时只是稍有优化，而不会达到很理想的水平。</li>
+<li>如何控制DB与应用逻辑的耦合度，过高的耦合度会带来安全性、维护性上的问题，而过低的耦合度又会带来性能开销。存储过程，以及各种各样的UDF就是其中的粘合剂。</li>
+</ol>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/07/30/apache-pulsar-versus-apache-kafka/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1027,85 +1116,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/04/28/real-world-concurrency/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/04/28/real-world-concurrency/" class="post-title-link" itemprop="url">[翻译] 并发的实践经验</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-04-28 00:25:08" itemprop="dateCreated datePublished" datetime="2018-04-28T00:25:08+08:00">2018-04-28</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>原文：<a target="_blank" rel="noopener" href="https://queue.acm.org/detail.cfm?id=1454462">Real-world Concurrency</a></p>
-<blockquote>
-<p><strong>你可能不需要真的去写多线程的代码。但如果你需要的话，一些关键原则能帮助你掌握这项“魔法”。</strong></p>
-</blockquote>
-<p>软件从业者们可能因为近期微处理器的发展而对软件行业的未来产生恐惧，这种恐惧情有可原。尽管摩尔定律继续存在（晶体管密度依然每18个月翻倍），但因为难以解决的物理限制和实际的工程考虑，新增的晶体管密度不再花在提高时钟频率上了，而是用于在一块CPU晶元上放置多个CPU核心。从软件角度看，这不是一个革命性的变化，而是一个渐进的变化：多核心CPU不是一种新范式，而是将旧范式（多进程）推向更广泛的发展。但根据近期有关这一话题的诸多文章和论文，有人可能会得出这一判断：并发编程的绽放是即将到来的灾难，所谓“免费午餐结束了”。</p>
-<p>作为长期处于并发系统第一线的从业者，我们希望为这场总会陷入歇斯底里的争论注入一些现实的冷静（如果不是来之不易的智慧的话）。尤其是，我们希望能回答一个本质的问题：并发性的扩散对你开发的软件意味着什么？也许有点遗憾，这个问题的答案既不简单又不普适——你的软件与并发之间的关系取决于它物理上在哪执行，它在抽象栈中的位置，以及围绕它的经济模型。</p>
-<p>考虑到许多软件项目现在都有位于不同抽象层次、跨越不同架构的组件，你可能会发现即使对于你自己写的软件，上面问题的答案也不只一个，而是多个：你可能可以留一些代码永远串行执行，而另一些需要高度并行化且显式多线程执行。再令答案复杂一些，我们会认为你的很多代码不会整整齐齐地属于这两类之一：它可能在本质上是串行的但在某些层次上需要注意并发性。</p>
-<p>尽管我们断言需要并行的代码要比某些人恐惧的更少，但必须要承认写并行代码仍然是一种魔法。因此我们也给出了开发高并行度的系统需要的具体实现技术。因此，本文有些二分：我们既认为大多数代码可以（且应该）实现并发，且不需要显式的并行化，同时还要为那些必须写显式并行代码的人解释实现技术。本文半是禁欲的训诫，半是爱经的指导。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/04/28/real-world-concurrency/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1179,7 +1189,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">135</span>
+          <span class="site-state-item-count">136</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

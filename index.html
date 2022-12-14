@@ -195,6 +195,74 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/12/14/facebooks-tectonic-filesystem/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/12/14/facebooks-tectonic-filesystem/" class="post-title-link" itemprop="url">[笔记] Facebook’s Tectonic Filesystem: Efficiency from Exascale</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-12-14 21:33:30 / 修改时间：21:33:51" itemprop="dateCreated datePublished" datetime="2022-12-14T21:33:30+08:00">2022-12-14</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/system/files/fast21-pan.pdf">Facebook’s Tectonic Filesystem: Efficiency from Exascale</a></p>
+</blockquote>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/12/14/facebooks-tectonic-filesystem/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/11/09/cpp-a-minimal-static-reflection-demo/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -894,92 +962,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/" class="post-title-link" itemprop="url">[笔记] LocoFS: A Loosely-Coupled Metadata Service for Distributed File Systems</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-09-07 11:22:53" itemprop="dateCreated datePublished" datetime="2022-09-07T11:22:53+08:00">2022-09-07</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/pdf/10.1145/3126908.3126928">LocoFS: A Loosely-Coupled Metadata Service for Distributed File Systems</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>LocoFS 的出发点：</p>
-<ol>
-<li>降低 metadata 操作的网络延时。</li>
-<li>充分发挥 kv-store 的性能。</li>
-</ol>
-<p>LocoFS 做了以下两种优化：</p>
-<ol>
-<li>将 dir entry 与 child 的 inode 放到一起管理，更有利于将整个 namespace 的树型结构平坦化为 key-value 结构。</li>
-<li>将 file metadata 分为 access 与 content 两类，降低单次操作的粒度。</li>
-</ol>
-<p>LocoFS 整体上来看对系统限制还是比较强（限制只有一个 DMS），但思路还不错。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1053,7 +1035,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">135</span>
+          <span class="site-state-item-count">136</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

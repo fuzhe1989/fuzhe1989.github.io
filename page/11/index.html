@@ -195,6 +195,85 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/04/28/real-world-concurrency/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/04/28/real-world-concurrency/" class="post-title-link" itemprop="url">[翻译] 并发的实践经验</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-04-28 00:25:08" itemprop="dateCreated datePublished" datetime="2018-04-28T00:25:08+08:00">2018-04-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>原文：<a target="_blank" rel="noopener" href="https://queue.acm.org/detail.cfm?id=1454462">Real-world Concurrency</a></p>
+<blockquote>
+<p><strong>你可能不需要真的去写多线程的代码。但如果你需要的话，一些关键原则能帮助你掌握这项“魔法”。</strong></p>
+</blockquote>
+<p>软件从业者们可能因为近期微处理器的发展而对软件行业的未来产生恐惧，这种恐惧情有可原。尽管摩尔定律继续存在（晶体管密度依然每18个月翻倍），但因为难以解决的物理限制和实际的工程考虑，新增的晶体管密度不再花在提高时钟频率上了，而是用于在一块CPU晶元上放置多个CPU核心。从软件角度看，这不是一个革命性的变化，而是一个渐进的变化：多核心CPU不是一种新范式，而是将旧范式（多进程）推向更广泛的发展。但根据近期有关这一话题的诸多文章和论文，有人可能会得出这一判断：并发编程的绽放是即将到来的灾难，所谓“免费午餐结束了”。</p>
+<p>作为长期处于并发系统第一线的从业者，我们希望为这场总会陷入歇斯底里的争论注入一些现实的冷静（如果不是来之不易的智慧的话）。尤其是，我们希望能回答一个本质的问题：并发性的扩散对你开发的软件意味着什么？也许有点遗憾，这个问题的答案既不简单又不普适——你的软件与并发之间的关系取决于它物理上在哪执行，它在抽象栈中的位置，以及围绕它的经济模型。</p>
+<p>考虑到许多软件项目现在都有位于不同抽象层次、跨越不同架构的组件，你可能会发现即使对于你自己写的软件，上面问题的答案也不只一个，而是多个：你可能可以留一些代码永远串行执行，而另一些需要高度并行化且显式多线程执行。再令答案复杂一些，我们会认为你的很多代码不会整整齐齐地属于这两类之一：它可能在本质上是串行的但在某些层次上需要注意并发性。</p>
+<p>尽管我们断言需要并行的代码要比某些人恐惧的更少，但必须要承认写并行代码仍然是一种魔法。因此我们也给出了开发高并行度的系统需要的具体实现技术。因此，本文有些二分：我们既认为大多数代码可以（且应该）实现并发，且不需要显式的并行化，同时还要为那些必须写显式并行代码的人解释实现技术。本文半是禁欲的训诫，半是爱经的指导。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/04/28/real-world-concurrency/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/04/21/mixin/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2101,80 +2180,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/05/high-concurrency-work/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/05/high-concurrency-work/" class="post-title-link" itemprop="url">高并发工作</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-03-05 13:56:37" itemprop="dateCreated datePublished" datetime="2018-03-05T13:56:37+08:00">2018-03-05</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>大体来讲，我们每个人头上都不会只有一项工作，很可能在某阶段，头上会有N项工作。我们当然希望这些工作能按部就班的、一项一项的顺序完成。但现实是残酷的，总有些工作会depend其它人，而不得不暂停下来；也总有些工作每天都有人催，需要尽快完成。所以，结论就是每个人都需要高并发工作，也需要知道怎么实现高并发工作。</p>
-<p>有种观点是，编程中的所有概念都是人类活动的延续，反映了人类自己的思维方式与组织架构。这句话反过来说也不无道理，即人类的思维方式与组织架构，往往可以从编程中找到对应的概念。</p>
-<p>某种程度上，实现高并发工作的方法与实现高并发编程是类似的。本文就参照高并发编程的一些要素，来分析一下如何达到高并发工作。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/03/05/high-concurrency-work/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2248,7 +2253,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">135</span>
+          <span class="site-state-item-count">136</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

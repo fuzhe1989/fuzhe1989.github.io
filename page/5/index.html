@@ -195,6 +195,81 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/25/weaving-relations-for-cache-performance/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/03/25/weaving-relations-for-cache-performance/" class="post-title-link" itemprop="url">[笔记] Weaving Relations for Cache Performance</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-25 22:19:01" itemprop="dateCreated datePublished" datetime="2021-03-25T22:19:01+08:00">2021-03-25</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.vldb.org/conf/2001/P169.pdf">Weaving Relations for Cache Performance</a></p>
+</blockquote>
+<p>这篇文章提出了一种行列混合的布局方式PAX，可以在不改变operator的前提下提升cache利用率。现在这种布局几乎成为了各种OLAP系统的标配。虽然这篇文章是针对OLTP的，但OLTP中使用PAX的似乎不是很多。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/03/25/weaving-relations-for-cache-performance/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/25/paxos-made-live/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -903,85 +978,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/" class="post-title-link" itemprop="url">[笔记] Integrating Compression and Execution in Column-Oriented Database Systems</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-01-08 08:41:03" itemprop="dateCreated datePublished" datetime="2021-01-08T08:41:03+08:00">2021-01-08</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1142473.1142548">Integrating Compression and Execution in Column-Oriented Database Systems</a></p>
-<p>可以与The design and implementation of modern column-oriented database systems对照阅读。</p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>一篇略老（2006年）的paper，但很重要。</p>
-<p>数据库中压缩算法的使用是非常影响性能的。这方面列存要比行存更有优势：每列排列在一起天然就适合压缩，而行存中相同列的值是被其它列隔开的。</p>
-<p>这篇文章探讨的是，如何在列存数据库中使用压缩，以及不同压缩算法在不同场景中的比较。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/08/integrating-compression-and-execution-in-column-oriented-database-systems/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1055,7 +1051,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">135</span>
+          <span class="site-state-item-count">136</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
