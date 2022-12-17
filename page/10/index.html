@@ -195,6 +195,115 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/c-store-a-column-oriented-dbms/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/08/13/c-store-a-column-oriented-dbms/" class="post-title-link" itemprop="url">[笔记] C-store: a column-oriented DBMS</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-08-13 12:12:32" itemprop="dateCreated datePublished" datetime="2020-08-13T12:12:32+08:00">2020-08-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3226595.3226638">C-store: a column-oriented DBMS</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>本文idea：面向ad-hoc读优化的分布式DBMS。</p>
+<p>论证过程：</p>
+<ol>
+<li>面向ad-hoc读优化需要：<ol>
+<li>列存，以提高压缩和扫描效率；</li>
+<li>数据直接存成多种排序形式，从而应对ad-hoc查询；</li>
+<li>只读事务避免加锁，需要读写分离以及snapshot isolation。</li>
+</ol>
+</li>
+<li>列存需要仔细地编码数据，因此需要区分不同情况编码。</li>
+<li>数据存成projection需要考虑：<ol>
+<li>不同replica可以用不同的projection，这样既满足了安全性，又有机会提高性能；</li>
+<li>anchor table物理上不存在，就需要通过storage key和join index组合多个projection来还原一行数据；</li>
+</ol>
+</li>
+<li>读写分离要考虑：<ol>
+<li>分成WS和RS，这样两者可以用不同的存储结构，分别在写和读上达到最优；</li>
+<li>任意时间的MVCC开销太大，可以把时间分成epoch，一段一段推进；</li>
+<li>需要有一个将WS合并进RS的操作。</li>
+</ol>
+</li>
+<li>考虑到C-Store的主要场景是写特别少读特别多，可以：<ol>
+<li>不压缩WS中的数据；</li>
+<li>使用简化的2PC而不需要考虑吞吐问题。</li>
+</ol>
+</li>
+</ol>
+<p>感想：</p>
+<ol>
+<li>学术界的paper画风和工业界的确实不太一样，到处都是idea，但细推敲又觉得缺点什么。</li>
+<li>列存的核心问题就是编码。</li>
+<li>不同replica用不同projection确实是非常棒的idea，但这样要求DB和FS必须耦合在一起，很多情况下不现实。</li>
+<li>关于读写分离的几个idea很棒，MVCC是可以不用那么细粒度的。</li>
+</ol>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/08/13/c-store-a-column-oriented-dbms/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/06/one-size-fits-all-an-idea-whose-time-has-come-and-gone/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1039,83 +1148,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/05/17/message-passing-and-the-actor-model/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/05/17/message-passing-and-the-actor-model/" class="post-title-link" itemprop="url">[翻译]消息传递与actor模型</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-05-17 23:35:06" itemprop="dateCreated datePublished" datetime="2018-05-17T23:35:06+08:00">2018-05-17</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>原文：<a target="_blank" rel="noopener" href="http://dist-prog-book.com/chapter/3/message-passing.html">Message Passing and the Actor Model</a></p>
-<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>自有分布式计算以来，人们就已经讨论过消息传递编程模型了，因此消息传递可以用于表示许多事情。Wikipedia上消息传递的宽泛定义包括了远程过程调用（RPC）和消息传递接口（MPI）等。另外，实践中的消息传递系统也受到了像是pi-calculus和CSP这些流行的进程演算（process-calculus）的启发。例如，Go的channel就是基于pi-calculus中消息通道作为一等公民的思想，而Clojure中的core.async库则是基于CSP。但今天人们谈起消息传递时，通常是指actor模型。作为一种通用的消息传递编程模型，它开端于20世纪70年代，并在今天用于构建大规模可伸缩系统。</p>
-<p>在消息传递编程模型领域，重要的不仅是考虑目前的研究现状，还包括历史上最初的关于消息传递和actor模型的论文，它们是更近期的论文描述的编程模型的源头。看看这些模型卡在了哪里，以及近期的论文都引用和指出了旧论文中的哪些不足，这些是很有启发性的。历史上有许多编程语言是围绕着消息传递设计的，特别是那些专注于actor模型和组织计算单元的语言。</p>
-<p>本章我会描述actor模型的四个主要变体：经典actor模型、基于进程的actor模型、通信事件循环模型、以及活动对象模型。我会试着强调体现了这些模型的历史上和现代的语言，以及程序员需要注意的编程哲学和取舍，从而理解并最好的利用这些模型。</p>
-<p>尽管actor模型早在20世纪70年代就开始了，正如许多近期发表的论文和系统显示，它仍在发展，并被纳入到今天的编程语言中。有些健壮的工业级actor系统正被用于赋能大规模可伸缩分布式系统，例如Akka被用于服务PayPal的十亿级的事务，Erlang被用于为WhatsApp的上亿用户发送消息，而Orleans被用于服务Halo4的数百万玩家。围绕着监控、错误处理、actor生命周期管理，有许多不同方式去构建一个工业级的actor框架，后面会详述。</p>
-<p>对于我们介绍的actor模型，一个重点就在这个问题中：“为什么要传递消息，特别是为什么要用actor模型？”考虑到有那么多分布式编程模型，有人可能会问，为什么这个模型在最初提出时这么重要？为什么它促进了当今广泛使用的高级语言、系统和库？我们将在这一章看到，actor模型的一些最明显的优点包括了actor状态的隔离、可伸缩性、以及简化程序员对系统的推理难度。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/05/17/message-passing-and-the-actor-model/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1189,7 +1221,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">136</span>
+          <span class="site-state-item-count">137</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

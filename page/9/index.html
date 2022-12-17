@@ -195,6 +195,83 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/" class="post-title-link" itemprop="url">[笔记] Map-reduce-merge: simplified relational data processing on large clusters</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-09-27 22:46:41" itemprop="dateCreated datePublished" datetime="2020-09-27T22:46:41+08:00">2020-09-27</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="http://www.cs.duke.edu/courses/cps399.28/current/papers/sigmod07-YangDasdanEtAl-map_reduce_merge.pdf">Map-reduce-merge: simplified relational data processing on large clusters</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章为MapReduce模型增加了一步Merge，增强了Join的能力。原理如图。</p>
+<p><img src="/images/2010-09/map-reduce-merge-01.jpg"></p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/23/cassandra-a-decentralized-structured-storage-system/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -963,115 +1040,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/08/13/c-store-a-column-oriented-dbms/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/08/13/c-store-a-column-oriented-dbms/" class="post-title-link" itemprop="url">[笔记] C-store: a column-oriented DBMS</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-08-13 12:12:32" itemprop="dateCreated datePublished" datetime="2020-08-13T12:12:32+08:00">2020-08-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/3226595.3226638">C-store: a column-oriented DBMS</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>本文idea：面向ad-hoc读优化的分布式DBMS。</p>
-<p>论证过程：</p>
-<ol>
-<li>面向ad-hoc读优化需要：<ol>
-<li>列存，以提高压缩和扫描效率；</li>
-<li>数据直接存成多种排序形式，从而应对ad-hoc查询；</li>
-<li>只读事务避免加锁，需要读写分离以及snapshot isolation。</li>
-</ol>
-</li>
-<li>列存需要仔细地编码数据，因此需要区分不同情况编码。</li>
-<li>数据存成projection需要考虑：<ol>
-<li>不同replica可以用不同的projection，这样既满足了安全性，又有机会提高性能；</li>
-<li>anchor table物理上不存在，就需要通过storage key和join index组合多个projection来还原一行数据；</li>
-</ol>
-</li>
-<li>读写分离要考虑：<ol>
-<li>分成WS和RS，这样两者可以用不同的存储结构，分别在写和读上达到最优；</li>
-<li>任意时间的MVCC开销太大，可以把时间分成epoch，一段一段推进；</li>
-<li>需要有一个将WS合并进RS的操作。</li>
-</ol>
-</li>
-<li>考虑到C-Store的主要场景是写特别少读特别多，可以：<ol>
-<li>不压缩WS中的数据；</li>
-<li>使用简化的2PC而不需要考虑吞吐问题。</li>
-</ol>
-</li>
-</ol>
-<p>感想：</p>
-<ol>
-<li>学术界的paper画风和工业界的确实不太一样，到处都是idea，但细推敲又觉得缺点什么。</li>
-<li>列存的核心问题就是编码。</li>
-<li>不同replica用不同projection确实是非常棒的idea，但这样要求DB和FS必须耦合在一起，很多情况下不现实。</li>
-<li>关于读写分离的几个idea很棒，MVCC是可以不用那么细粒度的。</li>
-</ol>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/08/13/c-store-a-column-oriented-dbms/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1145,7 +1113,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">136</span>
+          <span class="site-state-item-count">137</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

@@ -195,6 +195,92 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/11/building-a-database-on-s3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/11/11/building-a-database-on-s3/" class="post-title-link" itemprop="url">[笔记] Building a Database on S3</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-11-11 14:35:58" itemprop="dateCreated datePublished" datetime="2020-11-11T14:35:58+08:00">2020-11-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/abs/10.1145/1376616.1376645">Building a Database on S3</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>这篇文章讲的是如何实现自己的“云原生”数据库，以及探索S3是否适合作为DB的共享存储。</p>
+<p>S3的优点是安全、无需运维、按使用付费，缺点是访问延时高、使用廉价硬件可能会牺牲一致性（这里作者引用了Dynamo，不太确定Dynamo和S3的关系）、更新不保证顺序。</p>
+<p>本文的贡献：</p>
+<ul>
+<li>演示了如何在S3上实现需要被并发修改的小对象。</li>
+<li>演示了S3上如何实现B树。</li>
+<li>提出了可以演示如何用S3实现不同一致性级别的协议。</li>
+<li>使用TPC-W基准测试了不同一致性级别下使用S3的成本。</li>
+</ul>
+<p>本文的目的是在保证可用性和资源利用率的前提下，探索如何将DB的性质尽可能多地搬到云上。</p>
+<p>结论：显然只是一次实验，验证了使用S3作为共享存储的可行性，但实用性不高。如果换成EBS的话可能更好一些。它的PU queue有点像Bw-tree。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/11/11/building-a-database-on-s3/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/11/08/map-reduce-a-major-step-backwards/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -922,83 +1008,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/" class="post-title-link" itemprop="url">[笔记] Map-reduce-merge: simplified relational data processing on large clusters</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2020-09-27 22:46:41" itemprop="dateCreated datePublished" datetime="2020-09-27T22:46:41+08:00">2020-09-27</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="http://www.cs.duke.edu/courses/cps399.28/current/papers/sigmod07-YangDasdanEtAl-map_reduce_merge.pdf">Map-reduce-merge: simplified relational data processing on large clusters</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<p>这篇文章为MapReduce模型增加了一步Merge，增强了Join的能力。原理如图。</p>
-<p><img src="/images/2010-09/map-reduce-merge-01.jpg"></p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2020/09/27/map-reduce-merge-simplified-relational-data-processing-on-large-clusters/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1072,7 +1081,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">136</span>
+          <span class="site-state-item-count">137</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

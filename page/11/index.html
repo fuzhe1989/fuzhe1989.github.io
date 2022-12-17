@@ -195,6 +195,83 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/05/17/message-passing-and-the-actor-model/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/05/17/message-passing-and-the-actor-model/" class="post-title-link" itemprop="url">[翻译]消息传递与actor模型</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2018-05-17 23:35:06" itemprop="dateCreated datePublished" datetime="2018-05-17T23:35:06+08:00">2018-05-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>原文：<a target="_blank" rel="noopener" href="http://dist-prog-book.com/chapter/3/message-passing.html">Message Passing and the Actor Model</a></p>
+<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>自有分布式计算以来，人们就已经讨论过消息传递编程模型了，因此消息传递可以用于表示许多事情。Wikipedia上消息传递的宽泛定义包括了远程过程调用（RPC）和消息传递接口（MPI）等。另外，实践中的消息传递系统也受到了像是pi-calculus和CSP这些流行的进程演算（process-calculus）的启发。例如，Go的channel就是基于pi-calculus中消息通道作为一等公民的思想，而Clojure中的core.async库则是基于CSP。但今天人们谈起消息传递时，通常是指actor模型。作为一种通用的消息传递编程模型，它开端于20世纪70年代，并在今天用于构建大规模可伸缩系统。</p>
+<p>在消息传递编程模型领域，重要的不仅是考虑目前的研究现状，还包括历史上最初的关于消息传递和actor模型的论文，它们是更近期的论文描述的编程模型的源头。看看这些模型卡在了哪里，以及近期的论文都引用和指出了旧论文中的哪些不足，这些是很有启发性的。历史上有许多编程语言是围绕着消息传递设计的，特别是那些专注于actor模型和组织计算单元的语言。</p>
+<p>本章我会描述actor模型的四个主要变体：经典actor模型、基于进程的actor模型、通信事件循环模型、以及活动对象模型。我会试着强调体现了这些模型的历史上和现代的语言，以及程序员需要注意的编程哲学和取舍，从而理解并最好的利用这些模型。</p>
+<p>尽管actor模型早在20世纪70年代就开始了，正如许多近期发表的论文和系统显示，它仍在发展，并被纳入到今天的编程语言中。有些健壮的工业级actor系统正被用于赋能大规模可伸缩分布式系统，例如Akka被用于服务PayPal的十亿级的事务，Erlang被用于为WhatsApp的上亿用户发送消息，而Orleans被用于服务Halo4的数百万玩家。围绕着监控、错误处理、actor生命周期管理，有许多不同方式去构建一个工业级的actor框架，后面会详述。</p>
+<p>对于我们介绍的actor模型，一个重点就在这个问题中：“为什么要传递消息，特别是为什么要用actor模型？”考虑到有那么多分布式编程模型，有人可能会问，为什么这个模型在最初提出时这么重要？为什么它促进了当今广泛使用的高级语言、系统和库？我们将在这一章看到，actor模型的一些最明显的优点包括了actor状态的隔离、可伸缩性、以及简化程序员对系统的推理难度。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/05/17/message-passing-and-the-actor-model/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/04/28/real-world-concurrency/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2048,138 +2125,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2018/03/07/cpp-object-model-alignment/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/07/cpp-object-model-alignment/" class="post-title-link" itemprop="url">C++对象模型（一）Alignment</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2018-03-07 20:31:30" itemprop="dateCreated datePublished" datetime="2018-03-07T20:31:30+08:00">2018-03-07</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="word"><a href="#word" class="headerlink" title="word"></a>word</h1><p>第一个概念，word（字）。</p>
-<p>word是cpu领域的一个重要概念，它被定义为cpu使用数据的一个自然单位（natural unit），cpu的很多数据长度都与其相关，比如：</p>
-<ul>
-<li>通常cpu的大多数寄存器长度为一个word。</li>
-<li>通常cpu最大寻址空间为一个word（即指针大小通常是一个word）。</li>
-<li>总线宽度通常为一个word，即cpu单次读写内存的量通常最大为一个word。</li>
-<li>很多cpu每条指令的长度也为一个word。</li>
-</ul>
-<p>32位&#x2F;64位cpu中的32位和64位就是指它的字长（word-length或word-size）为32位或64位。</p>
-<p>这里不详细介绍不同cpu的word的具体含义。我们说一下word对内存读写的影响：</p>
-<ul>
-<li>早期的cpu通常只能沿着一个word的边界读写数据，如果一次读&#x2F;写操作的目标地址不是字长的整数倍，cpu会报错。</li>
-<li>现代的X86 cpu可以在任意地址读写数据，但如果目标地址不是字长的整数倍，底层会将这次操作按word分界分成多个读写操作，对性能有明显影响。</li>
-<li>X86-64 cpu可以在任意地址读写数据，且不会有明显的性能影响。</li>
-</ul>
-<p><img src="http://7xipsa.com1.z0.glb.clouddn.com/alignment.png" alt="alignment"></p>
-<p>上图的第一个例子，我们按alignment存放了1个int（4字节数据），cpu只需要一次内存操作就可以完成存取。而第二个例子中，cpu需要两次内存操作来完成int的存取。</p>
-<p>现代的cpu通常有多个字长概念（word、1&#x2F;2word、1&#x2F;4word等），针对不同的数据长度，可以有不同的字长。X86和X86-64对长度为1&#x2F;2&#x2F;4&#x2F;8字节的数据，其字长也为1&#x2F;2&#x2F;4&#x2F;8字节。</p>
-<h1 id="alignment和padding"><a href="#alignment和padding" class="headerlink" title="alignment和padding"></a>alignment和padding</h1><p>第二个概念，alignment。</p>
-<p>考虑到数据不按word边界存放可能引起的问题，编译器在排列变量时，会尽量将其按对应的字长来排列。这种行为就被称为对齐（alignment），而因为alignment导致的数据间产生未使用的空洞，则被称为填充（padding）。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">func</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">char</span> c;</span><br><span class="line">    <span class="type">int16_t</span> i16;</span><br><span class="line">    <span class="type">int32_t</span> i32;</span><br><span class="line">    <span class="type">int64_t</span> i64;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;c:%ld i16:%ld i32:%ld i64:%ld\n&quot;</span>, &amp;c, &amp;i16, &amp;i32, &amp;i64);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在我的环境下（X86-64，gcc4.8.5），输出为：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">c:140730763468703 i16:140730763468700 i32:140730763468696 i64:140730763468688</span><br></pre></td></tr></table></figure>
-
-<p>可以看到<code>i16</code>与<code>c</code>之间有2字节的padding，<code>i32</code>与<code>i16</code>之间有2字节的padding，<code>i64</code>与<code>i32</code>之间有4字节的padding，实际上是这么排列的：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">char</span> c;</span><br><span class="line"><span class="type">char</span> padding0[<span class="number">2</span>];</span><br><span class="line"><span class="type">int16_t</span> i16;</span><br><span class="line"><span class="type">char</span> padding1[<span class="number">2</span>];</span><br><span class="line"><span class="type">int32_t</span> i32;</span><br><span class="line"><span class="type">char</span> padding2[<span class="number">4</span>];</span><br><span class="line"><span class="type">int64_t</span> i64;</span><br></pre></td></tr></table></figure>
-
-<h1 id="struct的alignment"><a href="#struct的alignment" class="headerlink" title="struct的alignment"></a>struct的alignment</h1><p>struct的alignment规则很简单：</p>
-<ul>
-<li>空struct的size与alignment均为1。</li>
-<li>非空的struct，其alignment为各成员的alignment的最大值。其最后一个成员后面若有需要，也要padding。</li>
-</ul>
-<p>注意第2条规则，会导致struct占用的空间比我们预期的更多，例子：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="type">char</span> c0;</span><br><span class="line">    <span class="type">int64_t</span> i64;</span><br><span class="line">    <span class="type">char</span> c1;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>它的自然大小为10B（1+8+1），但考虑到alignment的影响，真实大小却是24B（8+8+8）！</p>
-<p>因此<code>S</code>的真实布局为：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="type">char</span> c0;</span><br><span class="line">    <span class="type">char</span> padding0[<span class="number">7</span>]；</span><br><span class="line">    <span class="type">int64_t</span> i64;</span><br><span class="line">    <span class="type">char</span> c1;</span><br><span class="line">    <span class="type">char</span> padding1[<span class="number">7</span>];</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>而当<code>S</code>作为其它struct的成员时，它的size和alignment分别是24和8，会影响到上层struct的alignment。</p>
-<p>适当的重新排列<code>S</code>的成员，可以显著减小它的size：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="type">char</span> c0;</span><br><span class="line">    <span class="type">char</span> c1;</span><br><span class="line">    <span class="type">int64_t</span> i64;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>此时它的真实布局为：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="type">char</span> c0;</span><br><span class="line">    <span class="type">char</span> c1;</span><br><span class="line">    <span class="type">char</span> padding[<span class="number">6</span>];</span><br><span class="line">    <span class="type">int64_t</span> i64;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p><code>S</code>的size减小到了16B。</p>
-<h1 id="与alignment有关的编译器扩展"><a href="#与alignment有关的编译器扩展" class="headerlink" title="与alignment有关的编译器扩展"></a>与alignment有关的编译器扩展</h1><p>这里只介绍gcc的相关扩展。</p>
-<p>gcc允许我们用<code>__attribute__</code>来修饰变量，其中用于改变alignment的有以下几种。</p>
-<p>注意：修改alignment可能会影响ABI兼容性和可移植性，通常不推荐。</p>
-<h2 id="aligned"><a href="#aligned" class="headerlink" title="aligned"></a>aligned</h2><p>语法1：<code>__attribute__ ((aligned (size_in_byte)))</code>，显式指定alignment。注意：指定比默认更小的alignment是无效的，会被编译器忽略。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> x __attribute__ ((aligned (<span class="number">16</span>))) = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="type">int</span> x[<span class="number">2</span>] __attribute__ ((aligned (<span class="number">8</span>)));</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">R</span> &#123;</span></span><br><span class="line">    <span class="type">char</span> c;</span><br><span class="line">&#125; __attribute__ ((aligned (<span class="number">8</span>)));</span><br></pre></td></tr></table></figure>
-
-<p>语法2：<code>__attribute__ ((aligned))</code>，让编译器选择可能的最大alignment，对64位环境而言通常是8。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">R</span> &#123;</span></span><br><span class="line">    <span class="type">char</span> c;</span><br><span class="line">&#125; __attribute__ ((aligned));</span><br></pre></td></tr></table></figure>
-
-<h2 id="packed"><a href="#packed" class="headerlink" title="packed"></a>packed</h2><p>语法：<code>__attribute__ ((packed))</code>，表示该变量或struct选择可能的最小alignment，对64位环境而言通常是1。</p>
-<p>下面这个struct，加上<code>packed</code>后其大小变为10，与其自然大小相等：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">S</span> &#123;</span></span><br><span class="line">    <span class="type">char</span> c0;</span><br><span class="line">    <span class="type">int64_t</span> i64;</span><br><span class="line">    <span class="type">char</span> c1;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<h2 id="编译选项"><a href="#编译选项" class="headerlink" title="编译选项"></a>编译选项</h2><p>编译时如果加上<code>-fpack-struct</code>，则默认所有变量和struct都会按<code>packed</code>处理。</p>
-<p>如果加上<code>-Wpadded</code>，则编译器增加padding的地方会有warning。注意只包含struct场景。</p>
-<h1 id="相关链接"><a href="#相关链接" class="headerlink" title="相关链接"></a>相关链接</h1><ul>
-<li><a target="_blank" rel="noopener" href="https://wr.informatik.uni-hamburg.de/_media/teaching/wintersemester_2013_2014/epc-14-haase-svenhendrik-alignmentinc-paper.pdf">Alignment in C</a></li>
-<li><a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Word_(computer_architecture)">Wiki - Word</a></li>
-<li><a target="_blank" rel="noopener" href="https://gcc.gnu.org/onlinedocs/gcc-3.2/gcc/Variable-Attributes.html">Specifying Attributes of Variables</a></li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -2253,7 +2198,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">136</span>
+          <span class="site-state-item-count">137</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

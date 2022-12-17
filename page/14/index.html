@@ -195,6 +195,150 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/" class="post-title-link" itemprop="url">Effective Modern C++ 笔记 Chapter2 auto (Item 5-6)</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2017-05-22 22:05:59" itemprop="dateCreated datePublished" datetime="2017-05-22T22:05:59+08:00">2017-05-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><code>auto</code>能大大简化我们的代码，但用不好也会带来正确性和性能上的问题。本章覆盖了<code>auto</code>的方方面面，帮助我们避开陷阱，高高兴兴的把手动的类型声明替换成<code>auto</code>。</p>
+<h2 id="Item5-优先选用auto而不是显式类型声明"><a href="#Item5-优先选用auto而不是显式类型声明" class="headerlink" title="Item5: 优先选用auto而不是显式类型声明"></a>Item5: 优先选用<code>auto</code>而不是显式类型声明</h2><h3 id="优点1-避免忘记初始化"><a href="#优点1-避免忘记初始化" class="headerlink" title="优点1: 避免忘记初始化"></a>优点1: 避免忘记初始化</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> x1;      <span class="comment">// potentially uninitialized</span></span><br><span class="line"><span class="keyword">auto</span> x2;     <span class="comment">// error! initializer required</span></span><br><span class="line"><span class="keyword">auto</span> x3 = <span class="number">0</span>; <span class="comment">// fine, x3 is well-defined</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="优点2-方便声明冗长的，或只有编译器知道的类型"><a href="#优点2-方便声明冗长的，或只有编译器知道的类型" class="headerlink" title="优点2: 方便声明冗长的，或只有编译器知道的类型"></a>优点2: 方便声明冗长的，或只有编译器知道的类型</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> It&gt;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">dwim</span><span class="params">(It b, It e)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">for</span> (; b != e; ++b) &#123;</span><br><span class="line">        <span class="keyword">typename</span> std::iterator_traits&lt;It&gt;::value_type currValue = *b;</span><br><span class="line">        <span class="comment">// or</span></span><br><span class="line">        <span class="keyword">auto</span> currValue = *b;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>以及：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> derefUPLess = </span><br><span class="line">    [](<span class="type">const</span> std::unique_ptr&lt;Widget&gt;&amp; p1,</span><br><span class="line">       <span class="type">const</span> std::unique_ptr&lt;Widget&gt;&amp; p2)</span><br><span class="line">    &#123; <span class="keyword">return</span> *p1 &lt; *p2; &#125;</span><br></pre></td></tr></table></figure>
+
+<p>C++14中我们还可以写成：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> derefLess = [](<span class="type">const</span> <span class="keyword">auto</span>&amp; p1, <span class="type">const</span> <span class="keyword">auto</span>&amp; p2) &#123; <span class="keyword">return</span> *p1 &lt; *p2; &#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子中，我们根本没办法知道derefLess的类型了，但编译器知道，我们也就能通过<code>auto</code>拿到这个类型了。</p>
+<h3 id="优点3-对函数来说，auto比std-function体积更小，速度更快"><a href="#优点3-对函数来说，auto比std-function体积更小，速度更快" class="headerlink" title="优点3: 对函数来说，auto比std::function体积更小，速度更快"></a>优点3: 对函数来说，<code>auto</code>比<code>std::function</code>体积更小，速度更快</h3><p>上例中<code>derefUPLess</code>的类型应该<code>bool(const std::unique_ptr&lt;Widget&gt;&amp;, const std::unique_ptr&lt;Widget&gt;&amp;)</code>，但如果要手动声明的话，我们要用<code>std::function</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">std::function&lt;<span class="type">bool</span>(<span class="type">const</span> std::unique_ptr&lt;Widget&gt;&amp;, <span class="type">const</span> std::unique_ptr&lt;Widget&gt;&amp;)&gt; </span><br><span class="line">derefUPLess =</span><br><span class="line">    [](<span class="type">const</span> std::unique_ptr&lt;Widget&gt;&amp; p1,</span><br><span class="line">       <span class="type">const</span> std::unique_ptr&lt;Widget&gt;&amp; p2)</span><br><span class="line">    &#123; <span class="keyword">return</span> *p1 &lt; *p2; &#125;</span><br></pre></td></tr></table></figure>
+
+<p>一个重要的事实是<code>std::function</code>与<code>auto</code>是不同的。</p>
+<p><code>std::function</code>里面要hold我们传入的closure。相同函数签名的不同closure可能捕获了不同的元素，因此它们需要的体积也不同，但一个函数签名对应着一个确定的<code>std::function</code>特化类型，这个类型的体积是固定的，这说明<code>std::function</code>内部可能会根据不同的closure分配不同大小的堆上内存。这个机制还会影响函数的inline。</p>
+<p>结果就是<code>std::function</code>几乎一定比<code>auto</code>体积大，调用慢，还可能会抛<code>out-of-memory</code>的异常。</p>
+<p>而且<code>auto</code>还能比<code>std::function</code>少写很长一段代码。</p>
+<h3 id="优点4-声明类型更准确"><a href="#优点4-声明类型更准确" class="headerlink" title="优点4: 声明类型更准确"></a>优点4: 声明类型更准确</h3><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">std::vector&lt;<span class="type">int</span>&gt; v;</span><br><span class="line"><span class="type">unsigned</span> sz = v.<span class="built_in">size</span>();</span><br></pre></td></tr></table></figure>
+
+<p><code>v.size()</code>实际返回的是<code>std::vector&lt;int&gt;::size_type</code>，它是一个无符号整数类型，因此很多人习惯声明为<code>unsigned</code>，但这是不准确的。</p>
+<p>32位环境下<code>unsigned</code>和<code>std::vector&lt;int&gt;::size_type</code>都是<code>uint32_t</code>，没问题。但64位环境下，前者还是32位的，后者却是64位的。</p>
+<p>而用<code>auto sz = v.size()</code>就能避免这个问题。</p>
+<p>另一个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">std::unordered_map&lt;std::string, <span class="type">int</span>&gt; m;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">for</span> (<span class="type">const</span> std::pair&lt;std::string, <span class="type">int</span>&gt;&amp; p: m) &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面的代码有一个大问题：<code>std::unordered_map</code>的key是<code>const</code>的，因此<code>p</code>的类型应该声明为<code>const std::pair&lt;const std::string, int&gt;&amp;</code>。</p>
+<p>问题还没结束，编译器会努力的为<code>p</code>找到一个从<code>std::pair&lt;const std::string, int&gt;</code>到<code>std::pair&lt;std::string, int&gt;</code>的转换，而这样的转换是存在的：生成一个<code>std::pair&lt;std::string, int&gt;</code>的临时对象。</p>
+<p>结果就是每次循环都会生成一个临时对象。</p>
+<p>而用<code>auto</code>就没有这个问题了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; p: m) &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>用<code>auto</code>不光是效率上的问题，还有正确性的问题：如果我们取<code>p</code>的地址，我们能百分百确定它是在<code>m</code>中，而不用<code>auto</code>，我们可能取到一个临时对象的地址。</p>
+<p>上面两个例子说明，合理的使用<code>auto</code>有助于写出<strong>显然正确</strong>的代码，而不需要我们小心翼翼的确定要声明的类型。</p>
+<h3 id="如何取舍auto与代码的可读性"><a href="#如何取舍auto与代码的可读性" class="headerlink" title="如何取舍auto与代码的可读性"></a>如何取舍<code>auto</code>与代码的可读性</h3><p><code>auto</code>只是一种选项，不是强制要求，如果显式声明类型能让代码更干净，更好维护，就继续用显式类型声明。</p>
+<p>但根据其它语言中的经验，自动类型推断并没有阻碍我们对大型的工业级代码库的开发和维护。</p>
+<p>有人担心<code>auto</code>略去了类型，会影响我们对代码的理解，但很多时间一个好的名字能解决这个问题，比如知道这个变量是容器、计数器，还是一个智能指针。</p>
+<p>显式写出类型，往往只能引入微妙的问题，而没有提供很多信息。使用<code>auto</code>还能帮助我们做重构。比如一个变量的初始类型是<code>int</code>，有一天你想换成<code>long</code>，那么用了<code>auto</code>的地方自动就变掉了，但用了<code>int</code>去声明的地方则要你一个一个的找出来。</p>
+<h2 id="Item6-在auto推断非预期时显式声明类型"><a href="#Item6-在auto推断非预期时显式声明类型" class="headerlink" title="Item6: 在auto推断非预期时显式声明类型"></a>Item6: 在<code>auto</code>推断非预期时显式声明类型</h2><p>一些场景下表达式的类型与我们想要的类型并不一致，我们依赖于隐式类型转换才能得到想要的类型。这个时候我们需要显式声明类型，如果用<code>auto</code>就会得到非预期的类型。</p>
+<p>一种常见场景是表达式返回一个代理类型，比如<code>std::vector&lt;bool&gt;::operator[]</code>返回<code>std::vector&lt;bool&gt;::reference</code>，而不是我们预期的<code>bool</code>。类的设计者预期我们会把返回值的类型声明为<code>bool</code>，再通过<code>reference::operator bool()</code>来做隐式转换。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::vector&lt;<span class="type">bool</span>&gt; <span class="title">features</span><span class="params">()</span></span>;</span><br><span class="line">...</span><br><span class="line"><span class="type">bool</span> highPriority = <span class="built_in">features</span>()[<span class="number">5</span>];  <span class="comment">// reference -&gt; bool, not bool&amp;</span></span><br><span class="line">...</span><br><span class="line"><span class="built_in">processWidget</span>(w, highPriority);</span><br></pre></td></tr></table></figure>
+
+<p>而如果声明变量为<code>auto</code>，那么变量的类型就是<code>std::vector&lt;bool&gt;::reference</code>！</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::vector&lt;<span class="type">bool</span>&gt; <span class="title">features</span><span class="params">()</span></span>;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">auto</span> highPriority = <span class="built_in">features</span>()[<span class="number">5</span>];  <span class="comment">// std::vector&lt;bool&gt;::reference</span></span><br><span class="line">...</span><br><span class="line"><span class="built_in">processWidget</span>(w, highPriority);     <span class="comment">// undefined behavior</span></span><br></pre></td></tr></table></figure>
+
+<p>更严重的是，<code>features()</code>返回了一个临时的<code>std::vector&lt;bool&gt;</code>对象，而<code>highPriority</code>中包含一个指向这个临时对象的指针，在这行结束时，这个临时对象就会析构，<code>highPriority</code>中的指针就变成了空悬指针，<code>processWidget</code>的调用就会成为未定义行为。</p>
+<p>很多C++库都用到了一种叫做“表达式模板”的技术，也会导致上面的问题。</p>
+<p>一个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Matrix sum = m1 + m2 + m3 + m4;</span><br></pre></td></tr></table></figure>
+
+<p>通常来说这会产生3个临时的<code>Matrix</code>对象：每次<code>operator+</code>产生1个。如果我们定义一个代理类作为<code>Matrix::operator+</code>的返回值，这个类只会持有<code>Matrix</code>的引用，不做实际的运算，直到调用<code>=</code>时再去生成最终的<code>Matrix</code>，就能避免这几个临时对象的产生。</p>
+<p>这个例子中我们也没办法直接声明<code>auto sum = ...</code>。</p>
+<p>怎么避免出现<code>auto var = expression of &quot;invisible&quot; proxy class type;</code>这种情况呢？</p>
+<ol>
+<li>看文档，一般设计成这样的类会有特殊说明；</li>
+<li>看头文件，看具体调用的返回值类型是不是符合预期；</li>
+<li>用<code>static_cast</code>，保证返回值的类型符合预期。</li>
+</ol>
+<p><code>static_cast</code>的例子：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> highPriority = <span class="built_in">static_cast</span>&lt;<span class="type">bool</span>&gt;(<span class="built_in">features</span>()[<span class="number">5</span>]);</span><br><span class="line"><span class="keyword">auto</span> sum = <span class="built_in">static_cast</span>&lt;Matrix&gt;(m1 + m2 + m3 + m4);</span><br></pre></td></tr></table></figure>
+
+<p>一些依赖于基础类型的隐式转换的场景也可以用<code>static_cast</code>：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">double</span> <span class="title">calcEpsilon</span><span class="params">()</span></span>;</span><br><span class="line"><span class="type">float</span> ep = <span class="built_in">calcEpsilon</span>();   <span class="comment">// implicitly convert double -&gt; float</span></span><br><span class="line"><span class="keyword">auto</span> ep = <span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(<span class="built_in">calcEpsilon</span>());</span><br></pre></td></tr></table></figure>
+
+<p>（我觉得<code>static_cast</code>只适合用于“确定了用<code>auto</code>”的场景，否则还是显式声明类型好一些）</p>
+<h2 id="目录"><a href="#目录" class="headerlink" title="目录"></a>目录</h2><ul>
+<li><a href="/2017/05/14/effective-modern-cpp-chapter1-iterm1-4/">Chapter1 类型推断 (Item 1-4)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter2-iterm5-6/">Chapter2 auto (Item 5-6)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm7-10/">Chapter3 现代C++（Item 7-10)</a></li>
+<li><a href="/2017/05/22/effective-modern-cpp-chapter3-iterm11-14/">Chapter3 现代C++（Item 11-14)</a></li>
+<li><a href="/2017/07/09/effective-modern-cpp-chapter3-iterm15-17/">Chapter3 现代C++（Item 15-17)</a></li>
+<li><a href="/2017/07/27/effective-modern-cpp-chapter4-iterm18-22/">Chapter4 智能指针 (Item 18-22)</a></li>
+<li><a href="/2017/08/08/effective-modern-cpp-chapter5-iterm23-26/">Chapter5 右值引用、移动语义、完美转发（Item 23-26)</a></li>
+<li><a href="/2017/08/22/effective-modern-cpp-chapter5-iterm27-30/">Chapter5 右值引用、移动语义、完美转发（Item 27-30)</a></li>
+<li><a href="/2017/09/06/effective-modern-cpp-chapter6-iterm31-34/">Chapter6: Lamba表达式 (Item 31-34)</a></li>
+<li><a href="/2017/09/24/effective-modern-cpp-chapter7-iterm35-37/">Chapter7: 并发API (Item 35-37)</a></li>
+<li><a href="/2017/10/09/effective-modern-cpp-chapter7-iterm38-40/">Chapter7: 并发API (Item 38-40)</a></li>
+<li><a href="/2017/10/26/effective-modern-cpp-chapter8-iterm41-42/">Chapter8: 杂项 (Item 41-42)</a></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2017/05/19/cpp-different-role-of-deleter-in-unique-ptr-and-shared-ptr/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -985,7 +1129,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">136</span>
+          <span class="site-state-item-count">137</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

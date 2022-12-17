@@ -195,6 +195,88 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/" class="post-title-link" itemprop="url">[笔记] HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-09-07 13:01:10" itemprop="dateCreated datePublished" datetime="2022-09-07T13:01:10+08:00">2022-09-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-10-17 12:12:25" itemprop="dateModified" datetime="2022-10-17T12:12:25+08:00">2022-10-17</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/system/files/conference/fast17/fast17-niazi.pdf">HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases</a></p>
+</blockquote>
+<p><strong>TL;DR</strong></p>
+<p>HopsFS 目标是成为下一代 HDFS，其核心改进是使用一个分布式的 NewSQL 系统（NDB）替代了 HDFS 原本的单节点 in-memory metadata management。</p>
+<p>亮点：</p>
+<ol>
+<li>展示了如何使用分离的存储系统来管理 metadata。</li>
+<li>仔细设计 schema 以缓解分布式事务对性能的影响。</li>
+<li>并行 load inode。</li>
+</ol>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2022/09/07/hopsfs-scaling-hierarchical-file-system-metadata-using-mysql-databases/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/09/07/locofs-a-loosely-coupled-metadata-service-for-distributed-file-systems/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -879,79 +961,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/" class="post-title-link" itemprop="url">基于 fs 抽象实现 cloud native kv engine</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2022-05-29 12:28:12" itemprop="dateCreated datePublished" datetime="2022-05-29T12:28:12+08:00">2022-05-29</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><strong>TL;DR</strong></p>
-<p>本文探讨如何基于 AWS 的多种存储介质（本地 SSD、EBS 与 S3）实现一个 cloud native 版的 kv engine（比如 TiKV [狗头]），以及其中为什么要引入文件系统这一层抽象。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2022/05/29/build-cloud-native-kv-engine-based-on-a-dfs/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1025,7 +1034,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">136</span>
+          <span class="site-state-item-count">137</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

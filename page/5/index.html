@@ -195,6 +195,82 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/" class="post-title-link" itemprop="url">[笔记] Ceph: A Scalable, High-Performance Distributed File System</a>
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-03-28 13:03:20" itemprop="dateCreated datePublished" datetime="2021-03-28T13:03:20+08:00">2021-03-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-calendar-check-o"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://www.usenix.org/events/osdi06/tech/full_papers/weil/weil_html">Ceph: A Scalable, High-Performance Distributed File System</a></p>
+</blockquote>
+<p>这篇文章介绍了Ceph，一种分布式文件系统。它的最大特点是数据层与元数据分离所带来的高弹性。不像其它分布式文件系统（如GFS）master通过本地表记录数据分布，在Ceph中数据是由一种伪随机函数CRUSH来确定分布在哪个对象存储设备（OSD）上的。OSD本身是高度自治的单元，负责replication、错误检测、恢复。这种设计具备了非常高的弹性与灵活性。</p>
+<p>（通篇看下来感觉Ceph是挺适合云上部署的，另外明显感觉到分布式系统、存储、数据库三个领域需要融合，至少在2006年）</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/03/28/ceph-a-scalable-high-performance-distributed-file-system/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+        
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/03/25/weaving-relations-for-cache-performance/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -898,86 +974,6 @@
   
   
 
-        
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block home" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2021/01/10/performance-tradeoffs-in-read-optimized-databases/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.jpg">
-      <meta itemprop="name" content="Fu Zhe">
-      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Fu Zhe's Blog">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/10/performance-tradeoffs-in-read-optimized-databases/" class="post-title-link" itemprop="url">[笔记] Performance Tradeoffs in Read-Optimized Databases</a>
-        </h1>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-01-10 23:16:30" itemprop="dateCreated datePublished" datetime="2021-01-10T23:16:30+08:00">2021-01-10</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="fa fa-calendar-check-o"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-26 08:01:50" itemprop="dateModified" datetime="2022-07-26T08:01:50+08:00">2022-07-26</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>原文：<a target="_blank" rel="noopener" href="http://nms.csail.mit.edu/~stavros/pubs/vldb2006.pdf">Performance Tradeoffs in Read-Optimized Databases</a></p>
-</blockquote>
-<p><strong>TL;DR</strong></p>
-<blockquote>
-<p>有点旧，有些结论可能不适合现在的列存数据库了。</p>
-</blockquote>
-<p>这篇文章讲的是，在面向读优化的数据库中，行存和列存的性能差异在什么地方，分别适合什么场景。</p>
-<p>大概结论就是projection的列比例越低、selectivity越低、CPU相比于I&#x2F;O的速度优势越大，列存的性能越有优势。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/10/performance-tradeoffs-in-read-optimized-databases/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
   </div>
 
   
@@ -1051,7 +1047,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">136</span>
+          <span class="site-state-item-count">137</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

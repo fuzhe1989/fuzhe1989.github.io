@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16.png">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css">
+
+
+<script id="hexo-configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    hostname: new URL('http://fuzhe1989.github.io').hostname,
+    root: '/',
+    scheme: 'Mist',
+    version: '7.6.0',
+    exturl: false,
+    sidebar: {"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},
+    copycode: {"enable":false,"show_result":false,"style":null},
+    back2top: {"enable":true,"sidebar":false,"scrollpercent":false},
+    bookmark: {"enable":false,"color":"#222","save":"auto"},
+    fancybox: false,
+    mediumzoom: false,
+    lazyload: false,
+    pangu: false,
+    comments: {"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},
+    algolia: {
+      appID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    },
+    localsearch: {"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},
+    path: '',
+    motion: {"enable":false,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}
+  };
+</script>
+
+  <meta name="description" content="TL;DR  原文：Morsel-Driven Parallelism: A NUMA-Aware Query Evaluation Framework for the Many-Core Age">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Morsel-Driven Parallelism: A NUMA-Aware Query Evaluation Framework for the Many-Core Age">
+<meta property="og:url" content="http://fuzhe1989.github.io/2022/12/17/morsel-driven/index.html">
+<meta property="og:site_name" content="Fu Zhe&#39;s Blog">
+<meta property="og:description" content="TL;DR  原文：Morsel-Driven Parallelism: A NUMA-Aware Query Evaluation Framework for the Many-Core Age">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-12/morsel-driven-01.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-12/morsel-driven-02.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-12/morsel-driven-03.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-12/morsel-driven-04.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-12/morsel-driven-05.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-12/morsel-driven-08.png">
+<meta property="og:image" content="http://fuzhe1989.github.io/images/2022-12/morsel-driven-09.png">
+<meta property="article:published_time" content="2022-12-17T14:21:32.000Z">
+<meta property="article:modified_time" content="2022-12-17T14:21:34.387Z">
+<meta property="article:author" content="Fu Zhe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://fuzhe1989.github.io/images/2022-12/morsel-driven-01.png">
+
+<link rel="canonical" href="http://fuzhe1989.github.io/2022/12/17/morsel-driven/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome: false,
+    isPost: true
+  };
+</script>
+
+  <title>Morsel-Driven Parallelism: A NUMA-Aware Query Evaluation Framework for the Many-Core Age | Fu Zhe's Blog</title>
+  
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-4HC396822H"></script>
+    <script>
+      if (CONFIG.hostname === location.hostname) {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-4HC396822H');
+      }
+    </script>
+
+
+  <script>
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?df45b34764dad306c840c8f1da5faf14";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Fu Zhe's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-meta">
+
+    <div>
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">Fu Zhe's Blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+</div>
+
+
+<nav class="site-nav">
+  
+  <ul id="menu" class="menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-fw fa-home"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-fw fa-user"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-fw fa-tags"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-fw fa-archive"></i>归档</a>
+
+  </li>
+  </ul>
+
+</nav>
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content">
+            
+
+  <div class="posts-expand">
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block " lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://fuzhe1989.github.io/2022/12/17/morsel-driven/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpg">
+      <meta itemprop="name" content="Fu Zhe">
+      <meta itemprop="description" content="High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Fu Zhe's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Morsel-Driven Parallelism: A NUMA-Aware Query Evaluation Framework for the Many-Core Age
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-12-17 22:21:32 / 修改时间：22:21:34" itemprop="dateCreated datePublished" datetime="2022-12-17T22:21:32+08:00">2022-12-17</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>TL;DR</strong></p>
+<blockquote>
+<p>原文：<a target="_blank" rel="noopener" href="https://dl.acm.org/doi/pdf/10.1145/2588555.2610507">Morsel-Driven Parallelism: A NUMA-Aware Query Evaluation Framework for the Many-Core Age</a></p>
+</blockquote>
+<span id="more"></span>
+
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><p>作者希望能解决现代系统架构中 query 执行的两个问题：</p>
+<ol>
+<li>如何充分利用多核能力。</li>
+<li>如何在不同核之间均匀分发负载。注意即使统计信息本身无比精确，静态 dispatch 也会随着执行过程逐渐变得不均匀。</li>
+</ol>
+<p>作者因此选择的切入点是：</p>
+<ol>
+<li>将输入数据切分为大量小体积的 morsel，这样更容易做负载均衡。</li>
+<li>将 plan 组织为若干个线性的 pipeline，每个 morsel 在 pipeline 中顺序执行，直到 pipeline breaker，之间不做线程切换，这样减少了执行过程因线程切换造成的性能损失。</li>
+<li>task 调度考虑 NUMA，尽量避免数据在不同 NUMA 之间传输。</li>
+<li>相比于传统 query plan 在执行前确定好并行度，morsel-driven 中并行度是动态调节的，避免了静态并行度导致的执行资源不均衡的问题。</li>
+</ol>
+<p>作者的依据：</p>
+<ol>
+<li>硬件的发展（多核、大内存）使得 query 执行的瓶颈由 IO 变为了内存。</li>
+<li>NUMA 的引入令多核系统更像一个小集群，不同 NUMA node 之间的内存带宽成为了瓶颈。</li>
+</ol>
+<p>传统的 volcano 模型的并行可以被称为 plan-driven，即在 query 编译成 plan 的过程中就确定了要用多少线程，不同线程间再用 exchange 算子通信。但这种模型不能很好地适应现代系统。</p>
+<p>morsel-driven 相对应地：</p>
+<ol>
+<li>使用固定数量的线程，每个线程绑到特定的 cpu 核上，从而将线程与 NUMA node 之间的映射固定下来。</li>
+<li>尽量保持数据不在 NUMA 间迁移：每个线程处理的 input 来自 NUMA 本地，output 同样写到 NUMA 本地。</li>
+<li>运行期动态调节并行度，甚至动态调节优先级。</li>
+</ol>
+<p><img src="/images/2022-12/morsel-driven-01.png"></p>
+<p>morsel-driven 要求所有算子都要能以 morsel 为粒度并行执行，在传统的 volcano 模型基础上修修补补是不够的。这种新的执行框架的一个要素是 data locality，每个输入的 morsel，以及物化的输出，以及中间产生的各种数据结构（如 hash table）都会封装到一个共享的 state 中。state 本身具有高度的 NUMA locality：尽管允许被所有核&#x2F;线程访问，但大部分时间只有创建 state 的 pipeline 会访问，而 pipeline 执行过程是绑定到核&#x2F;线程上的，因此保证了高度的 NUMA locality。</p>
+<blockquote>
+<p>volcano 是在算子间交换数据，以算子为中心；morsel-driven 则是以数据为中心，在数据上迭代不同的算子，更符合分布式计算的理念。</p>
+</blockquote>
+<p>纯粹的 volcano 并行框架中，并行是被隐藏在算子内部的，算子间需要交换数据，因此需要在 plan 阶段插入 exchange 算子来做运行期的 data partitioning。partition 的好处是提高了 data locality，但这种好处不一定能抵消增加的开销。相反，morsel-driven 是将并行暴露在算子之外，通过 morsel 的 locality 来实现 data 的 locality，再辅以共享 hash table 等数据结构，因此不需要运行期 partitioning。</p>
+<p>作者认为 morsel-driven 可以很容易地与其它系统集成：只要将其中的 exchange 算子替换为 morsel 执行即可。另外 morsel-driven 中的 pipeline 很适合结合 JIT。实际上 morsel-driven 背后的 Hyper 就在使用 JIT。</p>
+<h2 id="Morsel-driven-execution"><a href="#Morsel-driven-execution" class="headerlink" title="Morsel-driven execution"></a>Morsel-driven execution</h2><p>morsel-driven 中 plan 是由若干个 pipeline 组成，每个 pipeline 包含若干个线性执行的算子：一个算子的输出是下个算子的输入。这样每个 pipeline 可以被编译为一个执行单元，输入一个 morsel，产生输出，中间的算子不会真的物化输出结果。一个 pipeline 在执行过程中可以产生多个实例，不同实例负责处理不同的 morsel。</p>
+<p>具体实现上，QEPobject 负责根据数据依赖关系驱动 pipeline 执行。它会为每个 pipeline 在每个线程上创建一块 storage 存放输出结果。一个 pipeline 执行结束后，storage 中的输出会再被切分为均匀大小的 morsel 给后续 pipeline 作为输入。</p>
+<p>每个 pipeline 结束后重新划分 morsel 有助于避免不同 morsel 产生的输出大小不均匀导致的数据倾斜。</p>
+<p><img src="/images/2022-12/morsel-driven-02.png"></p>
+<p><img src="/images/2022-12/morsel-driven-03.png"></p>
+<p>图 3 中输入被 filter 之后划分为若干个 morsel，每个 morsel 会被 dispatcher 分给一个线程执行，因此会被直接写入到这个线程对应的 storage socket 中（根据颜色对应）。每个线程在处理完当前 morsel 之后，要么切换到另一个 task，要么再从它本地的 storage 中取出下个 morsel 继续执行。过程中并行度随时可以根据数据量进行调节。</p>
+<p>在所有数据都被 filter 并分别写入不同线程的 socket 之后，才会开始 build hash table。此时数据大小已知，就可以提前 reserve 好 hash table。build 过程每个线程读取自己本地的 socket 中的 morsel，再将其插入到一个全局的无锁 hash table 中。</p>
+<blockquote>
+<p>插入全局 hash table 仍然会带来冲突。TiFlash 做了一个优化，尽量利用 data stream 本来就有的 hash 特性，避免使用全局 hash table（<a target="_blank" rel="noopener" href="https://github.com/pingcap/tiflash/issues/4631">点这里</a>）。</p>
+</blockquote>
+<p><img src="/images/2022-12/morsel-driven-04.png"></p>
+<p>如图 4，build 结束之后，probe pipeline 仍然是先 filter，然后将 morsel 写到不同线程的 socket，probe 算子读取 morsel，先后通过两个 hash table，再将输出写到每个线程专属的 socket 中。</p>
+<p>上述过程中可以体现出 morsel-driven 的『pipeline』与 volcano 中的算子的区别：不同 pipeline 是协作进行的，每个 pipeline 会感知共享的数据结构、上下游数据依赖，因此可以生成最优化的执行逻辑。另外 pipeline 的实例数量也是根据数据变化的，可以有非常灵活的并行度调节。</p>
+<h2 id="Dispatcher-Scheduling-Parallel-Pipeline-Tasks"><a href="#Dispatcher-Scheduling-Parallel-Pipeline-Tasks" class="headerlink" title="Dispatcher: Scheduling Parallel Pipeline Tasks"></a>Dispatcher: Scheduling Parallel Pipeline Tasks</h2><p>morsel-driven 中线程是预先创建好并绑核的，因此并行度的调节完全取决于 dispatcher，而不是线程数量。每个 pipeline 的一个运行实例称为一个 task，负责处理一个 morsel。</p>
+<p>dispatcher 的三个主要目标：</p>
+<ol>
+<li>将 morsel 分配给它位于的 cpu 核，以保持 NUMA locality。</li>
+<li>保证单个 query 的并行度有充分的弹性。</li>
+<li>单个 query 涉及的多个 cpu 核之间负载均衡，让所有 pipeline 同时结束工作，避免有 cpu 核陷入等待。</li>
+</ol>
+<h3 id="Elasticity"><a href="#Elasticity" class="headerlink" title="Elasticity"></a>Elasticity</h3><p>每个 task 只处理一个 morsel 是为了保持执行的弹性，这样可以在运行期灵活调节并行度，比如逐渐减少一个长 query 的并行度，将算力让给另一个优先级更高的 query。</p>
+<h3 id="Implementation-Overview"><a href="#Implementation-Overview" class="headerlink" title="Implementation Overview"></a>Implementation Overview</h3><p>morsel-driven 的实现中，每个 core&#x2F;socket 有一大块预先分配好的内存空间，且会按需分配出 morsel。一个 core 在向 dispatcher 请求一个新的 task 后，对应 pipeline 的 storage 输入才会被从相应的 socket storage 中切出来（而不是预先分配好 pipeline 所需的空间）。</p>
+<p><img src="/images/2022-12/morsel-driven-05.png"></p>
+<p>上图看起来像是 dispatcher 自己也占一个线程，但实际不是。dispatcher 是被动调度的，本身实际是一个无锁的数据结构，由请求 task 的线程驱动。</p>
+<p>每个 task 会不停从当前 socket 中取出下个 morsel 执行，这样避免了跨 NUMA 的访问。但为了避免执行长尾，当有 core 处理完本地 socket 的所有 morsel，请求下个 task 时，dispatcher 可能会从其它 socket『偷』一些 morsel 过来。</p>
+<p>morsel-driven 支持 bushy 形状的 pipeline，比如『filter 并构建 hash table T』和『filter 并构建 hash table S』是可以并行执行的。但 bushy 并行的缺点也很明显，一个 query 中相互独立的 pipeline 数量往往比较少，限制了它的优势（理论上并行度高）。另外 bushy pipeline 可能需要比较大的空间来保存中间结果，会降低 cache locality。因此 morsel-driven 中每个 query 限制同时只能执行一个 pipeline，当前 pipeline 结束后再调度下个 pipeline。</p>
+<p>morsel-driven 另一个相对于线程级并行的优势是更容易 cancel 一个 query，只需要在 dispatcher 标记，不需要 cancel 一个线程（通常不现实）。</p>
+<h3 id="Morsel-Size"><a href="#Morsel-Size" class="headerlink" title="Morsel Size"></a>Morsel Size</h3><p>太小的 morsel 会导致 task 切换过于频繁，向量化失效；太大的 morsel 会影响 cache 和负载均衡。作者的实验中 10k 个 tuple 大小的 morsel 达到了最好的平衡。</p>
+<h2 id="Parallel-Operator-Details"><a href="#Parallel-Operator-Details" class="headerlink" title="Parallel Operator Details"></a>Parallel Operator Details</h2><h3 id="Hash-Join"><a href="#Hash-Join" class="headerlink" title="Hash Join"></a>Hash Join</h3><p>如前所述，morsel-driven 中 hash join 最大的特点是：</p>
+<ol>
+<li>先收集数据，写到各个线程本地的 socket 中。这样可以得到一个比较理想的 hash table 的初始大小。</li>
+<li>每个线程再将 tuple 插入到一个全局的无锁 hash table 中。</li>
+</ol>
+<p>这样就避免了传统的边 insert 边 grow 的最大缺点：hash table grow 开销巨大。</p>
+<blockquote>
+<p>在有锁的并行 hash table 构建中，grow 的开销进一步恶化了：grow 是要在临界区内的，即使分桶，也会阻塞所有线程。</p>
+</blockquote>
+<p>与高度优化的 radix-join 的对比：</p>
+<ol>
+<li>可以流水线处理更大的输入数据，且 probe 可以原地进行，更节省空间。</li>
+<li>多个小的 hash table（维度表）可以组合起来 probe。</li>
+<li>当 join 两个输入表的 cardinality 差别非常大时（实践中非常常见）morsel-driven 这种执行非常高效。</li>
+<li>当 hash key 分布倾斜时表现更好。</li>
+<li>对 tuple size 不敏感。</li>
+<li>不需要硬件相关的参数。</li>
+</ol>
+<p>但作者也表示 radix-join 值得一试。</p>
+<h3 id="Lock-Free-Tagged-Hash-Table"><a href="#Lock-Free-Tagged-Hash-Table" class="headerlink" title="Lock-Free Tagged Hash Table"></a>Lock-Free Tagged Hash Table</h3><p>morsel-driven 中的 hash table 中每个 bucket 是一个链表。它的特别之处是在链表头的指针中嵌入了一个 16 位的 filter，称为 tag。链表中每个元素会被 hash 为 tag 中的 1 位。显然这是一种非确定性的 filter，类似于 bloom filter。但在这个场景中，它的开销比 bloom filter 更低，却能达到类似的提前过滤的效果。</p>
+<p>为了降低内存访问开销，hash table 使用 huge page（2MB），且通过 mmap 惰性分配。这样的好处是 page 会在随后线程构建 hash table 时分配，会落到各自的 NUMA node 上，这样多线程构建时各个 page 就大体上均匀分配在各个 NUMA node 上了。</p>
+<h3 id="NUMA-Aware-Table-Partitioning"><a href="#NUMA-Aware-Table-Partitioning" class="headerlink" title="NUMA-Aware Table Partitioning"></a>NUMA-Aware Table Partitioning</h3><p>NUMA-aware 的 table scan 需要将数据分发到各个 NUMA node。如果在 dispatch 时能根据某些属性 hash，就能提升 data locality。注意这只是个 hint，实际运行时数据仍然可能因为 work-stealing 或者 data-skew 跑到其它 NUMA node 上。</p>
+<p>另外这个优化不是决定性的，毕竟只要数据经过第一个 pipeline 之后就在 NUMA 本地了，因此这个优化最多对第一个 pipeline 有一定效果。</p>
+<h3 id="Grouping-x2F-Aggregation"><a href="#Grouping-x2F-Aggregation" class="headerlink" title="Grouping&#x2F;Aggregation"></a>Grouping&#x2F;Aggregation</h3><p><img src="/images/2022-12/morsel-driven-08.png"></p>
+<p>如图，agg 分两阶段：</p>
+<ol>
+<li>每个线程单独聚合，维护一个本地的固定大小的 hash table。当这个 hash table 满了之后，就会被写到 overflow partition 中。所有输入都被 partition 之后，线程间会交换不同 partition 的数据。</li>
+<li>这一阶段每个线程分别扫描一个 partition 的数据，将其聚合为 thread local 的 hash table。每当有 partition 聚合好，它的输出会被立刻发给下一个算子，这样保证了下个算子执行时数据仍然大概率在 cache 中。</li>
+</ol>
+<p>注意 agg 与 join 的区别在于，agg 一定会破坏 pipeline（它需要 sink），不如直接引入 partition。而 join 的 probe 阶段是可以完全 pipeline 的，引入 partition 会破坏 pipeline，不如使用单个 hash table。</p>
+<h2 id="Sorting"><a href="#Sorting" class="headerlink" title="Sorting"></a>Sorting</h2><p><img src="/images/2022-12/morsel-driven-09.png"></p>
+<p>内存中 hash-join 和 hash-agg 通常快于 merge-sort-join 和 agg，因此 morsel-driven 中 sort 只用于 order by 或 top-k。</p>
+<p>morsel-driven 中 sort 也是两阶段：</p>
+<ol>
+<li>每个线程本地 sort，之后选出 distribution key，所有线程将这些 distribution key 合并确定最终输出数组的各个区间的位置。</li>
+<li>之后每个线程负责一个区间，将各个线程的对应数据 merge 到最终输出中。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/12/14/facebooks-tectonic-filesystem/" rel="prev" title="[笔记] Facebook’s Tectonic Filesystem: Efficiency from Exascale">
+      <i class="fa fa-chevron-left"></i> [笔记] Facebook’s Tectonic Filesystem: Efficiency from Exascale
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+  </div>
+
+
+          </div>
+          
+    <div class="comments" id="comments">
+        
+<script src="https://utteranc.es/client.js"
+        repo="fuzhe1989/blogissues"
+        issue-term="pathname"
+        label="Comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+    </div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let activeClass = CONFIG.comments.activeClass;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Introduction"><span class="nav-number">1.</span> <span class="nav-text">Introduction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Morsel-driven-execution"><span class="nav-number">2.</span> <span class="nav-text">Morsel-driven execution</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Dispatcher-Scheduling-Parallel-Pipeline-Tasks"><span class="nav-number">3.</span> <span class="nav-text">Dispatcher: Scheduling Parallel Pipeline Tasks</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Elasticity"><span class="nav-number">3.1.</span> <span class="nav-text">Elasticity</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Implementation-Overview"><span class="nav-number">3.2.</span> <span class="nav-text">Implementation Overview</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Morsel-Size"><span class="nav-number">3.3.</span> <span class="nav-text">Morsel Size</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Parallel-Operator-Details"><span class="nav-number">4.</span> <span class="nav-text">Parallel Operator Details</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Hash-Join"><span class="nav-number">4.1.</span> <span class="nav-text">Hash Join</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Lock-Free-Tagged-Hash-Table"><span class="nav-number">4.2.</span> <span class="nav-text">Lock-Free Tagged Hash Table</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#NUMA-Aware-Table-Partitioning"><span class="nav-number">4.3.</span> <span class="nav-text">NUMA-Aware Table Partitioning</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Grouping-x2F-Aggregation"><span class="nav-number">4.4.</span> <span class="nav-text">Grouping&#x2F;Aggregation</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Sorting"><span class="nav-number">5.</span> <span class="nav-text">Sorting</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Fu Zhe"
+      src="/images/avatar.jpg">
+  <p class="site-author-name" itemprop="name">Fu Zhe</p>
+  <div class="site-description" itemprop="description">High-Flyer AI<br/>PingCAP<br/>Google<br/>Alibaba Cloud<br/>Harbin Institute of Technology</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">137</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">81</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="/atom.xml" title="RSS → &#x2F;atom.xml"><i class="fa fa-fw fa-rss"></i>RSS</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Fu Zhe</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> 强力驱动 v6.2.0
+  </div>
+  <span class="post-meta-divider">|</span>
+  <div class="theme-info">主题 – <a href="https://mist.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Mist</a> v7.6.0
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
