@@ -27,10 +27,10 @@ std::cout << "f1 is " << (f1? "non-empty" : "empty") << std::endl;
 直觉告诉我应该是 empty，但这是真的吗？
 
 从 [Compiler Explorer](https://godbolt.org/z/6E71GoK3x) 我们看到，在不同编译器下，有不同结果：
-- clang + libc++：empty
-- clang + libstdc++：non-empty
-- gcc：non-empty
-- msvc：non-empty
+- clang + libc++：non-empty
+- clang + libstdc++：empty
+- gcc：empty
+- msvc：empty
 
 说明问题出在 libc++ 的实现上。
 
